@@ -383,7 +383,9 @@ def get_cross_bank_query_capabilities(
         enforce_tenant_isolation(principal.tenant_id, eff_bank, roles=principal.roles)
 
     from app.application.services.consortium_service import ConsortiumGovernanceService
+    from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
     consortium_svc = ConsortiumGovernanceService()
+    intel_service = CrossBankIntelligenceService.get_instance()
     consortia_map = consortium_svc._consortia
     consortia_res: list[CrossBankConsortiumCapability] = []
 
@@ -419,15 +421,38 @@ def get_cross_bank_query_capabilities(
                     authorized_purposes.append(purp)
 
             gov_status: Literal["ACTIVE", "REVOKED", "MISSING_GRANT", "EVICTED"]
-            readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE"]
+            readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE", "UNVERIFIED", "UNKNOWN"]
             is_authorized: bool
             disclosure_modes: list[str]
 
             if authorized_purposes:
                 gov_status = "ACTIVE"
                 is_authorized = True
-                readiness = "OPERATIONAL"
                 disclosure_modes = ["ANONYMIZED_SUMMARY", "ATTRIBUTED_INSTITUTIONS"]
+
+                # Observable runtime availability vs unverified execution readiness
+                cb_state = intel_service.circuit_breaker_store.get_circuit_state(
+                    c.consortium_id, eff_bank, target_bank
+                )
+                if cb_state.get("state") == "OPEN":
+                    readiness = "UNAVAILABLE"
+                elif cb_state.get("state") == "HALF_OPEN":
+                    readiness = "DEGRADED"
+                else:
+                    try:
+                        from app.application.services.coordinator_service import coordinator_service
+                        active_clients = coordinator_service.get_active_clients()
+                        is_online = any(
+                            getattr(c_node, "bank_id", "").lower().strip() == target_bank.lower().strip()
+                            and getattr(c_node, "status", "") == "ONLINE"
+                            for c_node in active_clients
+                        )
+                        if is_online:
+                            readiness = "OPERATIONAL"
+                        else:
+                            readiness = "UNVERIFIED"
+                    except Exception:
+                        readiness = "UNVERIFIED"
             else:
                 p_grants = consortium_svc.list_pairwise_operational_grants(c.consortium_id, eff_bank)
                 target_g = [

@@ -587,7 +587,9 @@ class CrossBankCounterpartCapability(BaseModel):
     disclosure_modes: list[str] = Field(
         default_factory=list, description="Supported disclosure modes under active grant."
     )
-    execution_readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE"] = Field(
+    execution_readiness: Literal[
+        "OPERATIONAL", "DEGRADED", "UNAVAILABLE", "UNVERIFIED", "UNKNOWN"
+    ] = Field(
         ..., description="Observed or verified execution readiness."
     )
 

@@ -34,19 +34,12 @@ export interface CrossBankIntelligenceWorkspaceProps {
   isOpen?: boolean;
 }
 
-const FALLBACK_CONSORTIUMS = [
-  { id: 'consortium_alpha', name: 'Consortium Alpha (Tier-1 AML Federation)' },
-  { id: 'consortium_beta', name: 'Consortium Beta (Cross-Border Payments)' },
-];
-
-const DEFAULT_COUNTERPARTS = ['bank_b', 'bank_c', 'bank_d'];
-
-const PURPOSE_OPTIONS = [
-  { value: 'FRAUD_INVESTIGATION', label: 'Fraud & Financial Crime Investigation' },
-  { value: 'AML_HIGH_RISK_MATCHING', label: 'AML High-Risk Entity Correlation' },
-  { value: 'SANCTIONS_SCREENING', label: 'Cross-Border Sanctions Intelligence' },
-  { value: 'REGULATORY_SAR_EVIDENCE', label: 'FinCEN SAR Regulatory Evidence Corroboration' },
-];
+const formatPurposeLabel = (purp: string): string => {
+  return purp
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+};
 
 export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspaceProps> = ({
   caseId,
@@ -55,8 +48,8 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 }) => {
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
   const [selectedConsortium, setSelectedConsortium] = useState<string>('');
-  const [targetBanks, setTargetBanks] = useState<string[]>(['bank_b', 'bank_c']);
-  const [purpose, setPurpose] = useState<string>('FRAUD_INVESTIGATION');
+  const [selectedTargets, setSelectedTargets] = useState<string[] | null>(null);
+  const [purpose, setPurpose] = useState<string>('');
   const [analystNotes, setAnalystNotes] = useState<string>('');
   const [queryError, setQueryError] = useState<string | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -87,10 +80,11 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   const persistedEvidence = Array.isArray(rawPersistedEvidence) ? rawPersistedEvidence : [];
 
-  // Gate C: Query Capabilities from server-authoritative bilateral grants
+  // Gate C: Query Capabilities from server-authoritative bilateral grants (Fail-Closed)
   const {
     data: capabilitiesData,
     isLoading: isLoadingCapabilities,
+    error: capabilitiesError,
     refetch: refetchCapabilities,
   } = useCrossBankQueryCapabilities(bankId ?? undefined);
 
@@ -99,67 +93,118 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   const notesInputId = useId();
 
-  // Active consortia from query capabilities or fallback
+  // Active consortia from query capabilities (strictly server-authoritative, zero fallbacks)
   const activeConsortia = (capabilitiesData?.consortia || []).filter(
-    (c) => c.status.toLowerCase() === 'active',
+    (item) => item.status.toLowerCase() === 'active',
   );
 
   const effectiveConsortiumId =
-    selectedConsortium || (activeConsortia.length > 0 && activeConsortia[0] ? activeConsortia[0].consortium_id : 'consortium_alpha');
+    selectedConsortium && activeConsortia.some((item) => item.consortium_id === selectedConsortium)
+      ? selectedConsortium
+      : (activeConsortia[0]?.consortium_id ?? '');
 
   const currentConsortium = activeConsortia.find(
-    (c) => c.consortium_id === effectiveConsortiumId,
+    (item) => item.consortium_id === effectiveConsortiumId,
   );
 
   const availableCounterparts = currentConsortium?.counterparts || [];
+  const authorizedCounterparts = availableCounterparts.filter((cp) => cp.is_authorized);
+
+  // Permitted purposes strictly derived from active consortium capability
+  const permittedPurposes = currentConsortium?.permitted_purposes || [];
+  const effectivePurpose =
+    purpose && permittedPurposes.includes(purpose)
+      ? purpose
+      : (permittedPurposes[0] ?? '');
+
+  const authorizedCounterpartIds = authorizedCounterparts.map((cp) => cp.counterpart_bank_id);
+
+  // Valid targets strictly restricted to authorized counterparts (defaults to all authorized if not explicitly toggled)
+  const validSelectedTargets =
+    selectedTargets !== null
+      ? selectedTargets.filter((t) => authorizedCounterpartIds.includes(t))
+      : authorizedCounterpartIds;
 
   // Auto-select first entity when loaded if none selected
   const activeEntityId =
     selectedEntityId || (eligibleEntities.length > 0 ? (eligibleEntities[0]?.entity_id ?? '') : '');
 
   const handleTargetBankToggle = (bankKey: string) => {
+    setQueryResponse(null);
+    setQueryError(null);
+    setAttachResponse(null);
+    setAttachError(null);
     setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
-    setTargetBanks((prev) =>
-      prev.includes(bankKey) ? prev.filter((b) => b !== bankKey) : [...prev, bankKey],
-    );
+    setSelectedTargets((prev) => {
+      const current = prev !== null ? prev : authorizedCounterpartIds;
+      return current.includes(bankKey) ? current.filter((b) => b !== bankKey) : [...current, bankKey];
+    });
   };
 
   const handleEntityChange = (newEid: string) => {
     setSelectedEntityId(newEid);
+    setQueryResponse(null);
+    setQueryError(null);
+    setAttachResponse(null);
+    setAttachError(null);
     setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
   };
 
   const handleConsortiumChange = (newCid: string) => {
     setSelectedConsortium(newCid);
+    setSelectedTargets(null);
+    setPurpose('');
+    setQueryResponse(null);
+    setQueryError(null);
+    setAttachResponse(null);
+    setAttachError(null);
     setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
   };
 
   const handlePurposeChange = (newPurp: string) => {
     setPurpose(newPurp);
+    setQueryResponse(null);
+    setQueryError(null);
+    setAttachResponse(null);
+    setAttachError(null);
     setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
   };
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = (val: string, id: string) => {
+    navigator.clipboard.writeText(val);
     setCopiedHash(id);
     setTimeout(() => setCopiedHash(null), 2000);
   };
 
+  // Fail-Closed Dispatch Eligibility: requires valid bank, entity, consortium, authorized targets, and purpose
+  const canDispatch = Boolean(
+    bankId &&
+    bankId.trim() !== '' &&
+    activeEntityId &&
+    effectiveConsortiumId &&
+    validSelectedTargets.length > 0 &&
+    effectivePurpose &&
+    !isLoadingCapabilities &&
+    !capabilitiesError &&
+    !isLoadingEntities &&
+    !queryMultiMutation.isPending
+  );
+
   const handleDispatchQuery = async () => {
-    if (!activeEntityId || targetBanks.length === 0) return;
+    if (!canDispatch || !bankId) return;
     setQueryError(null);
     setAttachResponse(null);
 
-    const effBankId = (bankId || 'bank_a').toLowerCase().trim();
+    const cleanBankId = bankId.toLowerCase().trim();
 
     try {
       const resp = await queryMultiMutation.mutateAsync({
-        requesting_bank_id: effBankId,
+        requesting_bank_id: cleanBankId,
         query_entity_id: activeEntityId,
         consortium_id: effectiveConsortiumId,
-        target_bank_ids: targetBanks,
+        target_bank_ids: validSelectedTargets,
         case_id: caseId,
-        purpose,
+        purpose: effectivePurpose,
         execution_mode: 'VERIFIED_OPERATIONAL',
         use_established_psi: true,
         require_established_psi: true,
@@ -226,7 +271,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
         <div className="flex items-center gap-2 flex-wrap">
           <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
-            TENANT: {(bankId || 'bank_a').toUpperCase()}
+            TENANT: {bankId ? bankId.toUpperCase() : 'UNAUTHENTICATED'}
           </span>
           <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -238,6 +283,16 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
           </span>
         </div>
       </div>
+
+      {/* Tenant Context Warning if unauthenticated / missing bankId */}
+      {(!bankId || bankId.trim() === '') && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2.5" data-testid="unauthenticated-warning">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>
+            Tenant Context Required: An authenticated institution bank ID is required to query cross-bank intelligence and view authorized capabilities.
+          </span>
+        </div>
+      )}
 
       {/* Grid: Left Column (Query Builder) & Right Column (Execution / Persisted Trail) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -304,107 +359,111 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               </p>
             </div>
 
-            {/* Consortium Selector (Derived from server-authoritative capabilities) */}
+            {/* Consortium Selector (Derived strictly from server-authoritative capabilities) */}
             <div className="space-y-1.5">
               <label htmlFor="consortium-select" className="text-xs font-semibold text-slate-300">
                 Governing Consortium <span className="text-rose-400">*</span>
               </label>
-              <select
-                id="consortium-select"
-                value={effectiveConsortiumId}
-                onChange={(e) => handleConsortiumChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
-              >
-                {activeConsortia.length > 0
-                  ? activeConsortia.map((c) => (
-                      <option key={c.consortium_id} value={c.consortium_id}>
-                        {c.name} ({c.status.toUpperCase()})
-                      </option>
-                    ))
-                  : FALLBACK_CONSORTIUMS.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-              </select>
+              {isLoadingCapabilities ? (
+                <div className="p-2.5 rounded-lg bg-slate-900 text-xs font-mono text-slate-400 border border-slate-800 animate-pulse">
+                  Loading authorized consortium capabilities...
+                </div>
+              ) : capabilitiesError ? (
+                <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-mono">
+                  Failed to load capabilities: {formatApiError(capabilitiesError)}
+                </div>
+              ) : activeConsortia.length === 0 ? (
+                <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs leading-relaxed" data-testid="empty-consortia-callout">
+                  No verified consortium participation or authorized bilateral counterparts configured for this institution.
+                </div>
+              ) : (
+                <select
+                  id="consortium-select"
+                  value={effectiveConsortiumId}
+                  onChange={(e) => handleConsortiumChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                  data-testid="consortium-select"
+                >
+                  {activeConsortia.map((item) => (
+                    <option key={item.consortium_id} value={item.consortium_id}>
+                      {item.name} ({item.status.toUpperCase()})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {/* Target Counterparty Selection (Derived from real pairwise grants) */}
+            {/* Target Counterparty Selection (Derived strictly from real pairwise grants) */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300">
                 Target Counterparty Institutions <span className="text-rose-400">*</span>
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {availableCounterparts.length > 0
-                  ? availableCounterparts.map((cp) => {
-                      const bankKey = cp.counterpart_bank_id;
-                      const isChecked = targetBanks.includes(bankKey);
-                      const isAuth = cp.is_authorized;
-                      return (
-                        <button
-                          type="button"
-                          key={bankKey}
-                          onClick={() => isAuth && handleTargetBankToggle(bankKey)}
-                          disabled={!isAuth}
-                          className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex flex-col justify-between border text-left ${
-                            isChecked
-                              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                              : isAuth
-                              ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                              : 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span>{cp.display_name || bankKey.toUpperCase()}</span>
-                            {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
-                          </div>
-                          <span className={`text-[9px] mt-1 font-mono ${isAuth ? 'text-emerald-400' : 'text-slate-500'}`}>
-                            {isAuth ? cp.execution_readiness : cp.governance_status}
-                          </span>
-                        </button>
-                      );
-                    })
-                  : DEFAULT_COUNTERPARTS.map((bankKey) => {
-                      const isChecked = targetBanks.includes(bankKey);
-                      return (
-                        <button
-                          type="button"
-                          key={bankKey}
-                          onClick={() => handleTargetBankToggle(bankKey)}
-                          className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex items-center justify-between border ${
-                            isChecked
-                              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                              : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                          }`}
-                        >
-                          <span>{bankKey.toUpperCase()}</span>
+              {availableCounterparts.length === 0 ? (
+                <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 text-slate-400 text-xs font-mono" data-testid="empty-counterparts-callout">
+                  No counterpart institutions available in this consortium.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {availableCounterparts.map((cp) => {
+                    const bankKey = cp.counterpart_bank_id;
+                    const isChecked = validSelectedTargets.includes(bankKey);
+                    const isAuth = cp.is_authorized;
+                    return (
+                      <button
+                        type="button"
+                        key={bankKey}
+                        onClick={() => isAuth && handleTargetBankToggle(bankKey)}
+                        disabled={!isAuth}
+                        className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex flex-col justify-between border text-left ${
+                          isChecked
+                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                            : isAuth
+                            ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                            : 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                        }`}
+                        data-testid={`target-toggle-${bankKey}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>{cp.display_name || bankKey.toUpperCase()}</span>
                           {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
-                        </button>
-                      );
-                    })}
-              </div>
+                        </div>
+                        <span className={`text-[9px] mt-1 font-mono ${isAuth ? (cp.execution_readiness === 'OPERATIONAL' ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'}`}>
+                          {isAuth ? cp.execution_readiness : cp.governance_status}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <p className="text-[10px] text-slate-500">
                 Private set intersection is evaluated separately and privately per counterpart institution.
               </p>
             </div>
 
-            {/* Purpose Selector */}
+            {/* Purpose Selector (Derived strictly from consortium authorized purposes) */}
             <div className="space-y-1.5">
               <label htmlFor="purpose-select" className="text-xs font-semibold text-slate-300">
                 Regulatory & Investigative Purpose <span className="text-rose-400">*</span>
               </label>
-              <select
-                id="purpose-select"
-                value={purpose}
-                onChange={(e) => handlePurposeChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
-              >
-                {PURPOSE_OPTIONS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              {permittedPurposes.length === 0 ? (
+                <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 text-slate-400 text-xs font-mono" data-testid="empty-purposes-callout">
+                  No regulatory purposes authorized for this consortium.
+                </div>
+              ) : (
+                <select
+                  id="purpose-select"
+                  value={effectivePurpose}
+                  onChange={(e) => handlePurposeChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                  data-testid="purpose-select"
+                >
+                  {permittedPurposes.map((p) => (
+                    <option key={p} value={p}>
+                      {formatPurposeLabel(p)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Assurance Guarantees Indicator */}
@@ -430,7 +489,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             <button
               type="button"
               onClick={handleDispatchQuery}
-              disabled={!activeEntityId || targetBanks.length === 0 || queryMultiMutation.isPending}
+              disabled={!canDispatch}
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold tracking-wide uppercase bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               data-testid="dispatch-multi-query-btn"
             >
@@ -520,7 +579,13 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                 {/* Per-Counterparty Outcomes */}
                 <div className="space-y-2.5" data-testid="counterparty-outcomes-list">
-                  {targetBanks.map((bankKey) => {
+                  {Array.from(
+                    new Set([
+                      ...validSelectedTargets,
+                      ...Object.keys(queryResponse.results || {}),
+                      ...Object.keys(queryResponse.failures || {}),
+                    ]),
+                  ).map((bankKey, index) => {
                     const signal = queryResponse.results ? queryResponse.results[bankKey] : null;
                     const failure = queryResponse.failures ? queryResponse.failures[bankKey] : null;
 
@@ -546,7 +611,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                             ? 'bg-rose-950/20 border-rose-500/30'
                             : 'bg-slate-900/40 border-slate-800'
                         }`}
-                        data-testid={`outcome-card-${bankKey}`}
+                        data-testid={isAnonymized ? `outcome-card-anonymized-${index}` : `outcome-card-${bankKey}`} data-outcome-index={index}
                       >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2">
@@ -609,7 +674,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                         {/* Truthful Sanitized Failure Details */}
                         {failure && (
                           <div className="mt-2 pt-2 border-t border-rose-500/20 text-[11px] text-rose-300/90 leading-relaxed font-mono">
-                            {failure.error_message}
+                            {isAnonymized && failure.error_message ? failure.error_message.replace(/\bbank_[a-zA-Z0-9_\-]+\b/gi, '[redacted-counterparty]') : failure.error_message}
                           </div>
                         )}
                       </div>

@@ -3688,7 +3688,7 @@ export interface CrossBankCounterpartCapability {
   governance_status: string;
   permitted_purposes: string[];
   disclosure_modes: string[];
-  execution_readiness: string;
+  execution_readiness: 'OPERATIONAL' | 'DEGRADED' | 'UNAVAILABLE' | 'UNVERIFIED' | 'UNKNOWN' | string;
 }
 
 export interface CrossBankConsortiumCapability {

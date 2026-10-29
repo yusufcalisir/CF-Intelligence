@@ -20,6 +20,7 @@ Verifies acceptance gates:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
@@ -225,6 +226,7 @@ def test_get_case_intelligence_evidence_anonymous_masking_and_scrubbing(
     evidence_svc = EvidenceRegistryService()
     batch_store = DurableCrossBankBatchStore.get_instance()
     consortium_svc = ConsortiumGovernanceService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
 
     # Ensure active consortium exists with bank_a and bank_b using admin token
     consortium_id = f"c_{uuid.uuid4().hex[:8]}"
@@ -251,6 +253,21 @@ def test_get_case_intelligence_evidence_anonymous_masking_and_scrubbing(
 
     query_id = f"batch_{uuid.uuid4().hex[:12]}"
     signal_id = "sig_b_123"
+
+    # Populate admitted receipts store for authentic issuance verification
+    intel_svc._admitted_receipts_store.set(
+        "rcp_b_123",
+        {
+            "receipt_id": "rcp_b_123",
+            "signal_id": signal_id,
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "consortium_id": consortium_id,
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": hashlib.sha256(b"dummy_receipt_digest_b").hexdigest(),
+        },
+    )
 
     # Record active batch in batch store
     batch_store.record_batch(
@@ -365,6 +382,10 @@ def test_get_case_intelligence_evidence_attributed_disclosure(
             "signal_id": signal_id,
             "requesting_bank_id": "bank_a",
             "target_bank_id": "bank_b",
+            "consortium_id": "consortium_alpha",
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": hashlib.sha256(b"dummy_attr_digest").hexdigest(),
         },
     )
 
@@ -424,7 +445,7 @@ def test_get_case_intelligence_evidence_attributed_disclosure(
     # Batch was not recorded in batch store, so retention status reflects RETENTION_EXPIRED
     assert ev_item["retention_status"] == "RETENTION_EXPIRED"
     assert ev_item["batch_expires_at"] is None
-    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["verification_state"] == "VERIFIED"
     assert ev_item["operational_status"] == "HISTORICAL_RECORD"
 
 
@@ -612,6 +633,9 @@ def test_get_case_intelligence_evidence_revoked_grant_classified_consent_revoked
             "target_bank_id": "bank_b",
             "grant_id": grant_id,
             "consortium_id": consortium_id,
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": hashlib.sha256(b"dummy_sig_bytes").hexdigest(),
         },
     )
 
@@ -675,10 +699,11 @@ def test_get_case_intelligence_evidence_revoked_grant_classified_consent_revoked
     assert len(data) == 1
     ev_item = data[0]
 
-    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["verification_state"] == "VERIFIED"
     assert ev_item["operational_status"] == "CONSENT_REVOKED"
-    assert ev_item["is_authoritative"] is False
-    assert "Pairwise data sharing authorization has been revoked" in ev_item["explanation"]
+    assert ev_item["is_authoritative"] is True
+    assert "Historical operational evidence cryptographically verified" in ev_item["explanation"]
+    assert "revoked" in ev_item["explanation"]
 
 
 def test_get_case_intelligence_evidence_cross_tenant_rejected(
@@ -769,6 +794,7 @@ def test_get_query_capabilities_authenticated_bank_a(
     assert len(b_counterpart) == 1
     assert b_counterpart[0]["is_authorized"] is True
     assert b_counterpart[0]["governance_status"] == "ACTIVE"
+    assert b_counterpart[0]["execution_readiness"] == "UNVERIFIED"
     assert "FRAUD_INVESTIGATION" in b_counterpart[0]["permitted_purposes"]
     assert "AML_HIGH_RISK_MATCHING" in b_counterpart[0]["permitted_purposes"]
 
@@ -792,3 +818,545 @@ def test_get_query_capabilities_cross_tenant_rejected(
     )
     assert resp.status_code == 403
     assert "is not authorized to access resources belonging to" in resp.json()["detail"]
+
+
+def test_adversarial_intact_evidence_with_active_batch_no_admitted_receipt_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Intact evidence referencing a real active batch, but lacking admitted receipt is NOT VERIFIED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    batch_store = DurableCrossBankBatchStore.get_instance()
+
+    case = case_svc.create_case(
+        title="Active Batch Unadmitted Receipt Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    signal_id = "sig_active_batch_no_rcp_001"
+    receipt_id = f"rcp_{uuid.uuid4().hex[:12]}"
+
+    # Batch exists in SQLite with successful signal
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="consortium_alpha",
+        query_entity_id="ent_cust_alice",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": signal_id},
+        receipt_ids={"bank_b": receipt_id},
+        overall_outcome="COMPLETED",
+        case_id=case.id,
+        ttl_seconds=3600,
+    )
+    # NOTE: receipt_id is deliberately NOT set in _admitted_receipts_store
+
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": True, "risk_level": "HIGH"},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": receipt_id,
+        },
+        "batch_query_id": query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_no_admitted_rcp.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Active Batch Unadmitted Evidence",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id, "batch_query_id": query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["operational_status"] == "UNADMITTED"
+    assert ev_item["is_authoritative"] is False
+    assert "lacks authentic operational issuance receipt" in ev_item["explanation"]
+
+
+def test_adversarial_intact_evidence_with_unrelated_admitted_receipt_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Intact evidence referencing an admitted receipt issued for a DIFFERENT signal is NOT VERIFIED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+    batch_store = DurableCrossBankBatchStore.get_instance()
+
+    case = case_svc.create_case(
+        title="Unrelated Admitted Receipt Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    signal_id = "sig_forged_binding_001"
+    unrelated_signal_id = "sig_original_different_002"
+    receipt_id = f"rcp_{uuid.uuid4().hex[:12]}"
+
+    # Admitted receipt is legitimately registered, but for a DIFFERENT signal
+    intel_svc._admitted_receipts_store.set(
+        receipt_id,
+        {
+            "receipt_id": receipt_id,
+            "signal_id": unrelated_signal_id,
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "consortium_id": "consortium_alpha",
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": hashlib.sha256(b"dummy_diff_sig").hexdigest(),
+        },
+    )
+
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="consortium_alpha",
+        query_entity_id="ent_cust_alice",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": signal_id},
+        receipt_ids={"bank_b": receipt_id},
+        overall_outcome="COMPLETED",
+        case_id=case.id,
+        ttl_seconds=3600,
+    )
+
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": True, "risk_level": "HIGH"},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": receipt_id,
+        },
+        "batch_query_id": query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_unrelated_rcp.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Unrelated Receipt Evidence",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id, "batch_query_id": query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["operational_status"] == "PROVENANCE_MISMATCH"
+    assert ev_item["is_authoritative"] is False
+    assert "signal binding mismatch" in ev_item["explanation"]
+
+
+def test_adversarial_matching_receipt_id_with_mismatched_scope_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Matching receipt ID but mismatched requesting bank / entity scope is NOT VERIFIED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+
+    case = case_svc.create_case(
+        title="Mismatched Scope Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    signal_id = "sig_scope_mismatch_001"
+    receipt_id = f"rcp_{uuid.uuid4().hex[:12]}"
+
+    # Admitted receipt has mismatched requesting bank (bank_c instead of bank_a)
+    intel_svc._admitted_receipts_store.set(
+        receipt_id,
+        {
+            "receipt_id": receipt_id,
+            "signal_id": signal_id,
+            "requesting_bank_id": "bank_c",
+            "target_bank_id": "bank_b",
+            "consortium_id": "consortium_alpha",
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": hashlib.sha256(b"dummy_scope_sig").hexdigest(),
+        },
+    )
+
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": True, "risk_level": "HIGH"},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": receipt_id,
+        },
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_mismatched_scope.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Mismatched Scope Evidence",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["operational_status"] == "PROVENANCE_MISMATCH"
+    assert ev_item["is_authoritative"] is False
+    assert "scope mismatch" in ev_item["explanation"]
+
+
+def test_authentic_operational_admission_with_matching_receipt_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Authentic operational evidence with fully consistent admitted receipt and batch is VERIFIED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+    batch_store = DurableCrossBankBatchStore.get_instance()
+
+    case = case_svc.create_case(
+        title="Authentic Admission Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    signal_id = f"sig_authentic_{uuid.uuid4().hex[:8]}"
+    receipt_id = f"rcp_authentic_{uuid.uuid4().hex[:8]}"
+    sig_content_hash = hashlib.sha256(b"authentic_verified_signal_content").hexdigest()
+
+    intel_svc._admitted_receipts_store.set(
+        receipt_id,
+        {
+            "receipt_id": receipt_id,
+            "signal_id": signal_id,
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "consortium_id": "consortium_alpha",
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": sig_content_hash,
+        },
+    )
+
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="consortium_alpha",
+        query_entity_id="ent_cust_alice",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": signal_id},
+        receipt_ids={"bank_b": receipt_id},
+        overall_outcome="COMPLETED",
+        case_id=case.id,
+        ttl_seconds=3600,
+    )
+
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": True, "risk_level": "CRITICAL", "confidence": 0.98},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": receipt_id,
+        },
+        "batch_query_id": query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_authentic.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Authentic Evidence Record",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id, "batch_query_id": query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "VERIFIED"
+    assert ev_item["operational_status"] == "OPERATIONAL"
+    assert ev_item["is_authoritative"] is True
+    assert ev_item["retention_status"] == "ACTIVE"
+
+
+def test_expired_batch_with_retained_authentic_issuance_verified_historical(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Expired batch cache (>24h TTL) preserves VERIFIED historical state when issuance proof is retained."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+
+    case = case_svc.create_case(
+        title="Expired Batch Historical Retention Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    expired_query_id = f"batch_expired_{uuid.uuid4().hex[:8]}"
+    signal_id = f"sig_hist_{uuid.uuid4().hex[:8]}"
+    receipt_id = f"rcp_hist_{uuid.uuid4().hex[:8]}"
+    sig_content_hash = hashlib.sha256(b"historical_signal_content").hexdigest()
+
+    # Admitted receipt is retained in durable store
+    intel_svc._admitted_receipts_store.set(
+        receipt_id,
+        {
+            "receipt_id": receipt_id,
+            "signal_id": signal_id,
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "consortium_id": "consortium_alpha",
+            "query_entity_id": "ent_cust_alice",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "content_hash": sig_content_hash,
+        },
+    )
+    # Note: expired_query_id is NOT in batch_store (simulating expired/purged batch cache)
+
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": False, "risk_level": "LOW"},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": receipt_id,
+        },
+        "batch_query_id": expired_query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_historical.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Historical Evidence Record",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id, "batch_query_id": expired_query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "VERIFIED"
+    assert ev_item["retention_status"] == "RETENTION_EXPIRED"
+    assert ev_item["operational_status"] == "HISTORICAL_RECORD"
+    assert ev_item["is_authoritative"] is True
+
+
+def test_expired_batch_without_retained_issuance_proof_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Expired batch cache without retained authentic issuance proof cannot receive VERIFIED status."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+
+    case = case_svc.create_case(
+        title="Expired Batch No Proof Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    expired_query_id = f"batch_purged_{uuid.uuid4().hex[:8]}"
+    signal_id = f"sig_unverified_{uuid.uuid4().hex[:8]}"
+
+    # Neither batch record nor admitted receipt exists
+    payload = {
+        "signal_id": signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {"match_confirmed": True, "risk_level": "HIGH"},
+        "provenance": {
+            "signal_id": signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ANONYMIZED_SUMMARY",
+        },
+        "batch_query_id": expired_query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_no_proof.json"
+
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Unverified Evidence Record",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": signal_id, "batch_query_id": expired_query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["retention_status"] == "RETENTION_EXPIRED"
+    assert ev_item["is_authoritative"] is False
+
+
+def test_query_capabilities_circuit_breaker_open_readiness_unavailable(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """When circuit breaker is in OPEN state, counterpart execution_readiness is UNAVAILABLE."""
+    consortium_svc = ConsortiumGovernanceService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+
+    consortium_id = f"c_{uuid.uuid4().hex[:8]}"
+    consortium_svc.create_consortium(
+        consortium_id=consortium_id,
+        name="CB Readiness Test Consortium",
+        founder_bank_id="bank_a",
+        auth_token=auth_tokens["admin_a"],
+    )
+    consortium_svc.propose_membership_change(
+        consortium_id=consortium_id,
+        creator_bank_id="bank_a",
+        target_bank_id="bank_b",
+        action=ProposalAction.ADD_MEMBER,
+        auth_token=auth_tokens["admin_a"],
+    )
+
+    grant_id = f"grant_{uuid.uuid4().hex[:8]}"
+    consortium_svc.register_pairwise_operational_grant(
+        consortium_id=consortium_id,
+        grant_id=grant_id,
+        institution_a="bank_a",
+        institution_b="bank_b",
+        authority="BILATERAL_AML_TREATY",
+        allowed_purposes=["FRAUD_INVESTIGATION"],
+        allowed_jurisdictions=["EU", "US"],
+        institution_jurisdictions={"bank_a": "EU", "bank_b": "EU"},
+        allow_cross_border=False,
+        allow_institution_identity_sharing=True,
+        revision=1,
+        auth_token=auth_tokens["admin_a"],
+    )
+    consortium_svc.approve_pairwise_operational_grant(
+        consortium_id=consortium_id,
+        grant_id=grant_id,
+        approving_bank_id="bank_b",
+        auth_token=auth_tokens["admin_b"],
+    )
+
+    # Trip the circuit breaker for (consortium_id, bank_a, bank_b)
+    from app.domain.circuit_breaker_policy import CounterpartyCircuitBreakerPolicy
+    cb_policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=1,
+        cooldown_seconds=600.0,
+    )
+    intel_svc.circuit_breaker_store.record_failure(
+        consortium_id=consortium_id,
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        error_category="WORKER_UNAVAILABLE",
+        probe_id=None,
+        policy=cb_policy,
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get("/api/v1/intelligence/cross-bank/query-capabilities", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    c_match = [c for c in data["consortia"] if c["consortium_id"] == consortium_id][0]
+    b_cp = [cp for cp in c_match["counterparts"] if cp["counterpart_bank_id"] == "bank_b"][0]
+
+    assert b_cp["is_authorized"] is True
+    assert b_cp["governance_status"] == "ACTIVE"
+    assert b_cp["execution_readiness"] == "UNAVAILABLE"

@@ -1087,71 +1087,124 @@ async def get_case_intelligence_evidence(
         else:
             # Content is cryptographically intact on disk; now evaluate issuance provenance
             receipt_id = provenance.get("receipt_id")
+            target_bank_from_batch: str | None = None
             if not receipt_id and batch_record:
                 succ_signals = batch_record.get("successful_signal_ids") or {}
                 rcp_ids = batch_record.get("receipt_ids") or {}
                 for t_bank, s_id in succ_signals.items():
                     if s_id == signal_id:
                         receipt_id = rcp_ids.get(t_bank)
+                        target_bank_from_batch = t_bank
                         break
 
             admitted_rcp = intel_svc._admitted_receipts_store.get(receipt_id) if receipt_id else None
 
-            # Check if this evidence was registered arbitrarily without authentic admission proof
-            is_unadmitted_arbitrary = (not batch_record and not admitted_rcp)
+            # Evaluate full chain of evidence for authentic issuance verification
+            issuance_verified = False
+            issuance_mismatch_reason: str | None = None
+
+            if not admitted_rcp:
+                issuance_mismatch_reason = (
+                    "lacks authentic operational issuance receipt and lacks authentic operational issuance proof in cryptographic admission registry"
+                )
+            else:
+                # 1. Authoritative signal binding
+                adm_signal_id = admitted_rcp.get("signal_id")
+                adm_receipt_id = admitted_rcp.get("receipt_id")
+                adm_req_bank = (admitted_rcp.get("requesting_bank_id") or "").lower().strip()
+                adm_consortium = (admitted_rcp.get("consortium_id") or "").lower().strip()
+                adm_entity = (admitted_rcp.get("query_entity_id") or "").strip()
+                adm_target = (admitted_rcp.get("target_bank_id") or "").lower().strip()
+                trusted_digest = admitted_rcp.get("content_hash")
+                case_bank = (case.bank_id or "").lower().strip()
+                payload_entity = (payload.get("query_entity_id") or "").strip()
+                eff_consortium = (consortium_id or "").lower().strip()
+
+                if not adm_signal_id or adm_signal_id != signal_id:
+                    issuance_mismatch_reason = f"receipt '{receipt_id}' signal binding mismatch (bound to '{adm_signal_id}', got '{signal_id}')"
+                elif not adm_receipt_id or adm_receipt_id != receipt_id:
+                    issuance_mismatch_reason = f"receipt ID mismatch (expected '{receipt_id}', got '{adm_receipt_id}')"
+                elif not adm_req_bank or adm_req_bank != case_bank:
+                    issuance_mismatch_reason = f"receipt requesting bank scope mismatch ('{adm_req_bank}' != case bank '{case_bank}')"
+                elif eff_consortium and adm_consortium != eff_consortium:
+                    issuance_mismatch_reason = f"receipt consortium scope mismatch ('{adm_consortium}' != '{eff_consortium}')"
+                elif payload_entity and adm_entity != payload_entity:
+                    issuance_mismatch_reason = f"receipt query entity scope mismatch ('{adm_entity}' != '{payload_entity}')"
+                elif target_bank is not None and adm_target != str(target_bank).lower().strip():
+                    issuance_mismatch_reason = f"receipt counterpart scope mismatch ('{adm_target}' != '{target_bank}')"
+                elif not trusted_digest or not isinstance(trusted_digest, str) or len(trusted_digest) != 64:
+                    issuance_mismatch_reason = "admitted receipt lacks valid 64-char SHA-256 issuance digest"
+                elif admitted_rcp.get("execution_mode") != "VERIFIED_OPERATIONAL":
+                    issuance_mismatch_reason = f"admitted receipt execution mode '{admitted_rcp.get('execution_mode')}' is not VERIFIED_OPERATIONAL"
+                else:
+                    # Optional signal store digest check
+                    sig_rec = intel_svc._signal_store.get(signal_id) if hasattr(intel_svc, "_signal_store") else None
+                    if sig_rec and sig_rec.get("content_hash") and sig_rec.get("content_hash") != trusted_digest:
+                        issuance_mismatch_reason = "signal store content hash diverges from cryptographically admitted issuance digest"
+                    elif batch_record:
+                        # Batch membership checks
+                        b_signals = batch_record.get("successful_signal_ids") or {}
+                        b_rcps = batch_record.get("receipt_ids") or {}
+                        b_req = (batch_record.get("requesting_bank_id") or "").lower().strip()
+                        b_entity = (batch_record.get("query_entity_id") or "").strip()
+                        effective_target = target_bank_from_batch or adm_target
+
+                        if signal_id not in b_signals.values():
+                            issuance_mismatch_reason = f"signal '{signal_id}' not found in batch successful signals"
+                        elif b_rcps.get(effective_target) != receipt_id:
+                            issuance_mismatch_reason = f"batch receipt ID for counterpart '{effective_target}' diverges from admitted receipt"
+                        elif b_req and b_req != case_bank:
+                            issuance_mismatch_reason = f"batch requesting bank '{b_req}' does not match case bank '{case_bank}'"
+                        elif payload_entity and b_entity and b_entity != payload_entity:
+                            issuance_mismatch_reason = f"batch query entity '{b_entity}' does not match payload entity '{payload_entity}'"
+                        else:
+                            issuance_verified = True
+                    else:
+                        # Original batch expired or unavailable, but independent issuance receipt is intact and verified
+                        issuance_verified = True
 
             # Check current consortium status and pairwise grant revocation
-            consortium_active = False
             grant_revoked = False
-            if consortium_id:
-                c = consortium_svc.get_consortium(consortium_id.lower().strip())
-                if c and c.status.value.lower() == "active":
-                    consortium_active = True
-                if admitted_rcp:
-                    g_id = admitted_rcp.get("grant_id")
-                    if g_id:
-                        grant = consortium_svc.get_pairwise_operational_grant(consortium_id, g_id)
-                        if grant and grant.get("revoked_at"):
-                            grant_revoked = True
+            if consortium_id and admitted_rcp:
+                g_id = admitted_rcp.get("grant_id")
+                if g_id:
+                    grant = consortium_svc.get_pairwise_operational_grant(consortium_id, g_id)
+                    if grant and (grant.get("revoked_at") or grant.get("status") == "REVOKED" or not grant.get("is_active", True)):
+                        grant_revoked = True
 
-            if is_unadmitted_arbitrary:
+            if not issuance_verified:
                 verification_state = "INTEGRITY_VERIFIED_ONLY"
-                operational_status = "UNADMITTED"
+                operational_status = "UNADMITTED" if not admitted_rcp else "PROVENANCE_MISMATCH"
                 is_authoritative = False
                 explanation = (
                     f"Evidence payload integrity verified ({expected_content_hash[:16]}...), "
-                    "but lacks authentic operational issuance proof in cryptographic admission registry."
-                )
-            elif grant_revoked:
-                verification_state = "INTEGRITY_VERIFIED_ONLY"
-                operational_status = "CONSENT_REVOKED"
-                is_authoritative = False
-                explanation = (
-                    f"Historical operational evidence integrity verified ({expected_content_hash[:16]}...). "
-                    "Pairwise data sharing authorization has been revoked; current operational consent is inactive."
-                )
-            elif retention_status == "RETENTION_EXPIRED":
-                verification_state = "INTEGRITY_VERIFIED_ONLY"
-                operational_status = "HISTORICAL_RECORD"
-                is_authoritative = True
-                explanation = (
-                    f"Historical operational evidence integrity verified ({expected_content_hash[:16]}...). "
-                    "Intermediate query batch cache expired (>24h TTL); immutable dossier evidence retained."
-                )
-            elif batch_record and consortium_active:
-                verification_state = "VERIFIED"
-                operational_status = "OPERATIONAL"
-                is_authoritative = True
-                explanation = (
-                    f"Authentic cross-bank operational signal verified ({consortium_id.upper() if consortium_id else 'CONSORTIUM'}). "
-                    f"Cryptographic payload digest: {expected_content_hash[:16]}... "
-                    f"Independent admission and audit proofs verified."
+                    f"but {issuance_mismatch_reason}."
                 )
             else:
-                verification_state = "INTEGRITY_VERIFIED_ONLY"
-                operational_status = "OPERATIONAL"
+                # Authentic issuance is cryptographically verified
+                verification_state = "VERIFIED"
                 is_authoritative = True
-                explanation = f"Evidence payload digest verified ({expected_content_hash[:16]}...)."
+
+                # Current authorization state vs historical facts
+                if grant_revoked:
+                    operational_status = "CONSENT_REVOKED"
+                    explanation = (
+                        f"Historical operational evidence cryptographically verified ({expected_content_hash[:16]}...). "
+                        "Pairwise data sharing authorization has been revoked; current operational consent is inactive."
+                    )
+                elif retention_status == "RETENTION_EXPIRED":
+                    operational_status = "HISTORICAL_RECORD"
+                    explanation = (
+                        f"Historical operational evidence cryptographically verified ({expected_content_hash[:16]}...). "
+                        "Intermediate query batch cache expired (>24h TTL); immutable dossier evidence retained."
+                    )
+                else:
+                    operational_status = "OPERATIONAL"
+                    explanation = (
+                        f"Authentic cross-bank operational signal verified ({consortium_id.upper() if consortium_id else 'CONSORTIUM'}). "
+                        f"Cryptographic payload digest: {expected_content_hash[:16]}... "
+                        "Independent admission and audit proofs verified."
+                    )
 
         # Signal fields
         match_confirmed = signal_content.get("match_confirmed")
