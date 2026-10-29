@@ -468,8 +468,9 @@ def test_legitimate_partial_failure_assembly(multi_assembly_env: dict[str, Any])
 
     assert len(res.omitted_or_failed) == 1
     omitted = res.omitted_or_failed[0]
-    assert omitted.target_bank_id == "bank_c"
-    assert omitted.category in ("WORKER_TIMEOUT", "COUNTERPART_EXECUTION_FAILURE")
+    assert omitted.target_bank_id is None
+    assert omitted.signal_id is None
+    assert omitted.category in ("WORKER_TIMEOUT", "COUNTERPART_TIMEOUT")
     assert "timed out" in omitted.reason
 
     # Verify only Bank B evidence was created
@@ -703,6 +704,8 @@ def test_adversarial_batch_with_zero_eligible_signals(multi_assembly_env: dict[s
     assert res.failed_count == 2
     assert len(res.attached_evidence) == 0
     assert len(res.omitted_or_failed) == 2
+    # Defect C: batches with zero eligible signals must NOT bind the destination case
+    assert batch_store.get_batch(query_id)["bound_case_id"] is None
 
 
 def test_adversarial_caller_bank_not_case_owner_rejected(multi_assembly_env: dict[str, Any]):
@@ -757,6 +760,21 @@ def test_adversarial_terminal_case_rejected(multi_assembly_env: dict[str, Any]):
             principal=principal_a,
         )
     assert "terminal state" in str(exc.value)
+
+    # Defect C verification: Terminal case rejection must NOT bind or poison the batch
+    batch_rec = batch_store.get_batch(query_id)
+    assert batch_rec["bound_case_id"] is None
+
+    # Subsequent attachment of the unbound batch to a valid open case must succeed
+    open_case = case_svc.create_case(title="Valid Open Case", bank_id="bank_a")
+    res_open = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=open_case.id,
+        principal=principal_a,
+    )
+    assert res_open.assembly_status == "COMPLETED"
+    assert res_open.attached_count == 1
+    assert batch_store.get_batch(query_id)["bound_case_id"] == open_case.id
 
 
 def test_adversarial_idempotency_conflicts(multi_assembly_env: dict[str, Any]):
@@ -1304,3 +1322,282 @@ def test_batch_assembly_disclosure_safe_failed_outcomes_anonymity_preservation(m
     assert "bank_c" not in fail.reason
     assert "secret_worker_42" not in fail.reason
     assert "PSI" not in fail.reason
+    # Defect C: batches with zero eligible signals must NOT bind the destination case
+    assert batch_store.get_batch(qid)["bound_case_id"] is None
+
+
+def test_defect_a_anonymous_failed_counterpart_identities_rejected_in_notes(multi_assembly_env: dict[str, Any]):
+    """Defect A: Preflight validates anonymity across ALL targets including failed/unavailable counterparts."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    # Bank B succeeds with attributed sharing; Bank C fails without signal (anonymous)
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b", disclosure_mode="ATTRIBUTED_INSTITUTIONS")
+    query_id = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        execution_outcomes={
+            "bank_b": {"status": "SUCCESS"},
+            "bank_c": {
+                "status": "FAILED",
+                "failure": {"error_category": "WORKER_TIMEOUT", "error_message": "Timeout on socket."},
+            },
+        },
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
+        overall_outcome="PARTIAL_FAILURE",
+    )
+
+    case = case_svc.create_case(title="Defect A Case Notes", bank_id="bank_a")
+
+    # Attempt attachment with notes mentioning failed anonymous counterpart 'bank_c'
+    with pytest.raises(ConsortiumSecurityError) as exc:
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=query_id,
+            case_id=case.id,
+            principal=principal_a,
+            notes="Bank B observed activity, but bank_c timed out during private matching.",
+        )
+    assert "anonymity policy" in str(exc.value)
+
+    # Invariants: Zero evidence persisted, batch remains UN-BOUND
+    assert len(case_svc.evidence_service.get_case_evidence(case.id)) == 0
+    assert batch_store.get_batch(query_id)["bound_case_id"] is None
+
+    # Retry with clean notes: Bank B attaches cleanly, Bank C is safely omitted without leakage
+    clean_res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=case.id,
+        principal=principal_a,
+        notes="Standard multi-counterparty investigation notes.",
+    )
+    assert clean_res.assembly_status == "PARTIAL"
+    assert clean_res.attached_count == 1
+    assert clean_res.failed_count == 1
+    assert clean_res.omitted_or_failed[0].target_bank_id is None
+    assert batch_store.get_batch(query_id)["bound_case_id"] == case.id
+
+
+def test_defect_b_failure_projection_requires_active_grant_and_verified_context(multi_assembly_env: dict[str, Any]):
+    """Defect B: _is_counterparty_attributed_authorized requires BOTH active pairwise grant AND verified execution context."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    gov_svc: ConsortiumGovernanceService = multi_assembly_env["gov_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    # Register active pairwise grant allowing attributed sharing between bank_a and bank_c
+    gov_svc.register_operational_data_sharing_grant(
+        consortium_id="c_multi_test",
+        grant_id="grant_ac_attrib_test",
+        authority="FFIEC",
+        participating_banks=["bank_a", "bank_c"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        institution_jurisdictions={"bank_a": "EU", "bank_c": "EU"},
+        allow_institution_identity_sharing=True,
+        revision=1,
+        approving_bank_id="bank_a",
+        auth_token=multi_assembly_env["tokens"]["admin"],
+    )
+
+    # 1. Counterpart failed execution without signal -> target_bank_id MUST be None (no verified context)
+    qid1 = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=qid1,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_c"],
+        execution_outcomes={
+            "bank_c": {
+                "status": "FAILED",
+                "failure": {"error_category": "CIRCUIT_BREAKER_ACTIVE", "error_message": "Circuit open."},
+            },
+        },
+        successful_signal_ids={},
+        receipt_ids={},
+        overall_outcome="FAILED",
+    )
+    case1 = case_svc.create_case(title="Defect B Case 1", bank_id="bank_a")
+    res1 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid1,
+        case_id=case1.id,
+        principal=principal_a,
+    )
+    assert res1.omitted_or_failed[0].target_bank_id is None
+    assert res1.omitted_or_failed[0].signal_id is None
+
+    # 2. Counterpart produced signal, but pairwise grant is revoked -> target_bank_id MUST be None
+    sig_c, rcp_c = _seed_operational_signal(cbi_svc, target_bank_id="bank_c", disclosure_mode="ATTRIBUTED_INSTITUTIONS")
+    # Revoke grant
+    gov_svc.revoke_operational_data_sharing_grant(
+        consortium_id="c_multi_test",
+        grant_id="grant_ac_attrib_test",
+        revoking_bank_id="bank_c",
+        reason="Revoked during test",
+        auth_token=multi_assembly_env["tokens"]["admin"],
+    )
+
+    qid2 = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=qid2,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_c"],
+        execution_outcomes={"bank_c": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_c": sig_c},
+        receipt_ids={"bank_c": rcp_c},
+        overall_outcome="COMPLETED",
+    )
+    case2 = case_svc.create_case(title="Defect B Case 2", bank_id="bank_a")
+    res2 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid2,
+        case_id=case2.id,
+        principal=principal_a,
+    )
+    assert res2.assembly_status == "FAILED"
+    assert len(res2.omitted_or_failed) == 1
+    # Revoked grant fails closed: target_bank_id and signal_id are None
+    assert res2.omitted_or_failed[0].target_bank_id is None
+    assert res2.omitted_or_failed[0].signal_id is None
+    assert "revoked" in res2.omitted_or_failed[0].reason.lower()
+
+
+def test_defect_c_case_binding_lifecycle_ordering(multi_assembly_env: dict[str, Any]):
+    """Defect C: Lifecycle validates case open, governance, notes, and scope BEFORE binding batch."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b", disclosure_mode="ATTRIBUTED_INSTITUTIONS")
+    query_id = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
+        overall_outcome="COMPLETED",
+    )
+
+    # 1. Closed Case: rejected before binding
+    closed_case = case_svc.create_case(title="Closed Case", bank_id="bank_a")
+    from app.application.services.case_service import _case_to_dict
+    closed_case.status = CaseStatus.CLOSED_FALSE_POSITIVE
+    case_svc._cases.set(closed_case.id, _case_to_dict(closed_case))
+
+    with pytest.raises(TerminalCaseImmutableError):
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=query_id,
+            case_id=closed_case.id,
+            principal=principal_a,
+        )
+    # Batch must remain UN-BOUND
+    assert batch_store.get_batch(query_id)["bound_case_id"] is None
+
+    # 2. Attach to open case: succeeds and binds atomically
+    open_case_1 = case_svc.create_case(title="Open Case 1", bank_id="bank_a")
+    res1 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=open_case_1.id,
+        principal=principal_a,
+    )
+    assert res1.assembly_status == "COMPLETED"
+    assert batch_store.get_batch(query_id)["bound_case_id"] == open_case_1.id
+
+    # 3. Subsequent attachment of the now-bound batch to Case 2 raises 409 conflict
+    open_case_2 = case_svc.create_case(title="Open Case 2", bank_id="bank_a")
+    with pytest.raises(ConsortiumSecurityError) as exc:
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=query_id,
+            case_id=open_case_2.id,
+            principal=principal_a,
+        )
+    assert "already bound" in str(exc.value)
+
+
+def test_defect_d_mandatory_receipt_query_entity_binding_enforced(multi_assembly_env: dict[str, Any]):
+    """Defect D: Query-entity binding between receipt and batch must be nonempty and strictly match."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b", query_entity_id="entity_alpha")
+
+    # Case 1: Receipt has mismatched query_entity_id ("entity_corrupted")
+    admitted = cbi_svc._admitted_receipts_store.get(rcp_b)
+    assert admitted
+    corrupted_rcp = dict(admitted)
+    corrupted_rcp["query_entity_id"] = "entity_mismatched"
+    cbi_svc._admitted_receipts_store.set(rcp_b, corrupted_rcp)
+
+    query_id = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=query_id,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
+        overall_outcome="COMPLETED",
+    )
+    case = case_svc.create_case(title="Defect D Entity Mismatch", bank_id="bank_a")
+    res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=case.id,
+        principal=principal_a,
+    )
+    assert res.assembly_status == "FAILED"
+    assert len(res.omitted_or_failed) == 1
+    assert res.omitted_or_failed[0].category == "GOVERNANCE_OR_ADMISSION_REJECTED"
+
+    # Case 2: Receipt has empty query_entity_id ("")
+    corrupted_rcp["query_entity_id"] = ""
+    cbi_svc._admitted_receipts_store.set(rcp_b, corrupted_rcp)
+    qid_empty = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=qid_empty,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
+        overall_outcome="COMPLETED",
+    )
+    case_empty = case_svc.create_case(title="Defect D Entity Empty", bank_id="bank_a")
+    res_empty = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid_empty,
+        case_id=case_empty.id,
+        principal=principal_a,
+    )
+    assert res_empty.assembly_status == "FAILED"
+    assert res_empty.omitted_or_failed[0].category == "GOVERNANCE_OR_ADMISSION_REJECTED"

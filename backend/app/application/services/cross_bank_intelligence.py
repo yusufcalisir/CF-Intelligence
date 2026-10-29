@@ -43,6 +43,7 @@ from app.application.schemas.cross_bank_intelligence import (
 from app.application.services.case_service import (
     CaseManagementService,
     CaseNotFoundError,
+    CaseStatus,
     EvidenceRegistryService,
     InvalidCaseTransitionError,
     TerminalCaseImmutableError,
@@ -3897,37 +3898,56 @@ class CrossBankIntelligenceService:
     ) -> bool:
         """Evaluate whether counterpart identity disclosure is explicitly authorized under governance policy.
 
-        Fails closed (returns False) unless the governing operational grant or the admitted signal record
-        explicitly permits ATTRIBUTED_INSTITUTIONS disclosure mode.
+        Fails closed (returns False) unless BOTH:
+        1. Valid, current, active pairwise identity-sharing authority exists between requesting_bank and target_bank
+           in an active consortium (never broad grants or unauthenticated fallbacks).
+        2. Verified execution-specific disclosure context confirms ATTRIBUTED_INSTITUTIONS disclosure mode
+           (unverifiable, absent, failed, or anonymous executions return False).
         """
-        if signal_record:
-            raw_sig_data = signal_record.get("signal_data")
-            sig_data: dict[str, Any] = raw_sig_data if isinstance(raw_sig_data, dict) else {}
-            mode = sig_data.get("disclosure_mode") or signal_record.get("disclosure_mode")
-            if mode == "ATTRIBUTED_INSTITUTIONS":
-                return True
-            if mode in ("ANONYMOUS_SUMMARY", "ANONYMIZED_SUMMARY", "ANONYMOUS_STATISTICAL", "PSEUDONYMIZED"):
-                return False
+        # 1. Consortium and Membership Verification
+        if not consortium:
+            return False
+        c_status = getattr(consortium, "status", None)
+        if c_status != ConsortiumStatus.ACTIVE:
+            return False
 
-        if consortium:
-            if hasattr(consortium, "find_pairwise_operational_grant"):
-                g = consortium.find_pairwise_operational_grant(requesting_bank, target_bank)
-                if g and isinstance(g, dict):
-                    is_active = g.get("is_active", True) and not g.get("revoked_by_institutions")
-                    if is_active and bool(g.get("allow_institution_identity_sharing", False)):
-                        return True
+        req_clean = requesting_bank.lower().strip()
+        tgt_clean = target_bank.lower().strip()
+        if not req_clean or not tgt_clean or req_clean == tgt_clean:
+            return False
 
-            # Also check all operational data sharing grants as fallback
-            req_clean = requesting_bank.lower().strip()
-            tgt_clean = target_bank.lower().strip()
-            all_grants = getattr(consortium, "operational_data_sharing_grants", {}) or {}
-            for g in all_grants.values():
-                if isinstance(g, dict):
-                    parts = {str(b).lower().strip() for b in (g.get("participating_banks") or g.get("member_institutions") or [])}
-                    is_active = g.get("is_active", True) and not g.get("revoked_by_institutions")
-                    if is_active and req_clean in parts and tgt_clean in parts and bool(g.get("allow_institution_identity_sharing", False)):
-                        return True
-        return False
+        removed = getattr(consortium, "removed_members", None) or set()
+        members = getattr(consortium, "members", None) or set()
+        if req_clean in removed or tgt_clean in removed:
+            return False
+        if req_clean not in members or tgt_clean not in members:
+            return False
+
+        # 2. Authentic Active Pairwise Operational Grant Verification
+        if not hasattr(consortium, "find_pairwise_operational_grant"):
+            return False
+        pairwise_grant = consortium.find_pairwise_operational_grant(req_clean, tgt_clean)
+        if not pairwise_grant or not isinstance(pairwise_grant, dict):
+            return False
+        if not pairwise_grant.get("is_active", True) or pairwise_grant.get("revoked_by_institutions"):
+            return False
+        if not bool(pairwise_grant.get("allow_institution_identity_sharing", False)):
+            return False
+
+        # 3. Verified Execution-Specific Disclosure Context
+        # Fails closed if execution context is absent (failed/timed out counterpart), unverified, or non-attributed
+        if not signal_record or not isinstance(signal_record, dict):
+            return False
+
+        if signal_record.get("is_authoritative") is not True or signal_record.get("is_synthetic") is not False:
+            return False
+        if signal_record.get("execution_mode") != "VERIFIED_OPERATIONAL":
+            return False
+
+        raw_sig_data = signal_record.get("signal_data")
+        sig_data: dict[str, Any] = raw_sig_data if isinstance(raw_sig_data, dict) else {}
+        mode = sig_data.get("disclosure_mode") or signal_record.get("disclosure_mode")
+        return mode == "ATTRIBUTED_INSTITUTIONS"
 
     def _project_safe_attach_failure(
         self,
@@ -4059,7 +4079,16 @@ class CrossBankIntelligenceService:
                     "Authoritative case evidence writes require caller-bank ownership regardless of administrative roles."
                 )
 
-            # 3. Retrieve Server-Authoritative Batch Execution Record
+            # 3. Terminal Case Check (Correction C: Validate BEFORE Binding)
+            if not case.is_open or getattr(case, "status", None) in (
+                CaseStatus.CLOSED_CONFIRMED,
+                CaseStatus.CLOSED_FALSE_POSITIVE,
+            ):
+                raise TerminalCaseImmutableError(
+                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
+                )
+
+            # 4. Retrieve Server-Authoritative Batch Execution Record & Validate Scopes
             clean_qid = (query_id or "").strip()
             if not clean_qid:
                 raise ValueError(
@@ -4084,13 +4113,7 @@ class CrossBankIntelligenceService:
             if not batch_consortium_id:
                 raise ValueError(f"Corrupted batch record '{clean_qid}': missing consortium_id binding.")
 
-            # Atomically establish single destination case binding (Correction B)
-            try:
-                self.batch_store.bind_case(query_id=clean_qid, case_id=case_id)
-            except BatchCaseBindingConflictError as e:
-                raise ConsortiumSecurityError(str(e)) from e
-
-            # Revalidate Consortium Active Membership
+            # 5. Revalidate Consortium Active Membership (Correction C: Validate BEFORE Binding)
             consortium = self.consortium_service.get_consortium(batch_consortium_id)
             if not consortium:
                 raise ConsortiumSecurityError(f"Consortium '{batch_consortium_id}' no longer exists.")
@@ -4107,12 +4130,30 @@ class CrossBankIntelligenceService:
                     f"Institution '{eff_case_bank}' is not an active member of consortium '{batch_consortium_id}'."
                 )
 
-            if not case.is_open:
-                raise TerminalCaseImmutableError(
-                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
-                )
+            target_bank_ids = list(batch.get("target_bank_ids") or [])
+            successful_signal_ids: dict[str, str] = dict(batch.get("successful_signal_ids") or {})
+            raw_failures: dict[str, Any] = dict(batch.get("execution_outcomes") or {})
 
-            # 4. Batch-Level Idempotency and Conflict Check
+            # 6. Pre-validate Shared Analyst Notes Policy against ALL Targets (Correction A & C: Validate BEFORE Binding)
+            if notes:
+                for t in target_bank_ids:
+                    sig_id = successful_signal_ids.get(t)
+                    sig_rec = self._signal_store.get(sig_id) if sig_id else None
+                    is_attributed = self._is_counterparty_attributed_authorized(
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        target_bank=t,
+                        signal_record=sig_rec,
+                    )
+                    if not is_attributed:
+                        self._validate_anonymous_notes_policy(
+                            notes=notes,
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            target_bank=t,
+                        )
+
+            # 7. Batch-Level Idempotency and Conflict Preflight (Correction C: Validate BEFORE Binding)
             batch_fingerprint = hashlib.sha256(
                 f"{clean_qid}:{case_id}:{notes or ''}".encode()
             ).hexdigest()
@@ -4133,28 +4174,7 @@ class CrossBankIntelligenceService:
                                 f"with differing material batch payload or analyst notes."
                             )
 
-            target_bank_ids = list(batch.get("target_bank_ids") or [])
-            successful_signal_ids: dict[str, str] = dict(batch.get("successful_signal_ids") or {})
-            raw_failures: dict[str, Any] = dict(batch.get("execution_outcomes") or {})
-
-            # 5. Pre-validate Shared Analyst Notes Policy against Any Anonymous Target
-            if notes:
-                for t in target_bank_ids:
-                    sig_id = successful_signal_ids.get(t)
-                    if sig_id:
-                        sig_rec = self._signal_store.get(sig_id)
-                        if sig_rec:
-                            sig_data = sig_rec.get("signal_data") if isinstance(sig_rec.get("signal_data"), dict) else {}
-                            sig_mode = sig_data.get("disclosure_mode") or sig_rec.get("disclosure_mode") or "ANONYMIZED_SUMMARY"
-                            if sig_mode != "ATTRIBUTED_INSTITUTIONS":
-                                self._validate_anonymous_notes_policy(
-                                    notes=notes,
-                                    consortium=consortium,
-                                    requesting_bank=eff_case_bank,
-                                    target_bank=t,
-                                )
-
-            # 6. Handle Batch with Zero Admissible/Successful Signals (Correction C: Disclosure-Safe Projection)
+            # 8. Handle Batch with Zero Admissible/Successful Signals (Correction C: Do NOT Bind Case!)
             if not successful_signal_ids:
                 omitted_failures: list[MultiCounterpartyEvidenceAttachFailure] = []
                 for t in target_bank_ids:
@@ -4192,7 +4212,13 @@ class CrossBankIntelligenceService:
                     is_duplicate_submission=False,
                 )
 
-            # 7. Assemble Eligible Signals into Case Evidence
+            # 9. Atomically Establish Single Destination Case Binding (Correction C)
+            try:
+                self.batch_store.bind_case(query_id=clean_qid, case_id=case_id)
+            except BatchCaseBindingConflictError as e:
+                raise ConsortiumSecurityError(str(e)) from e
+
+            # 10. Assemble Eligible Signals into Case Evidence
             attached_items: list[MultiCounterpartyEvidenceItem] = []
             omitted_failures = []
             newly_attached_count = 0
@@ -4250,23 +4276,41 @@ class CrossBankIntelligenceService:
                     continue
 
                 # Verify consistent binding across query_id membership, signal, receipt, banks, and entity
+                rcp_sig_id = str(admitted_rcp.get("signal_id") or "").strip()
+                rcp_rcp_id = str(admitted_rcp.get("receipt_id") or "").strip()
+                rcp_req_bank = str(admitted_rcp.get("requesting_bank_id") or "").lower().strip()
+                rcp_consortium = str(admitted_rcp.get("consortium_id") or "").lower().strip()
+                rcp_target_bank = str(admitted_rcp.get("target_bank_id") or "").lower().strip()
+
                 if (
-                    admitted_rcp.get("signal_id") != sig_id
-                    or admitted_rcp.get("receipt_id") != expected_rcp_id
-                    or (admitted_rcp.get("requesting_bank_id") or "").lower().strip() != eff_case_bank.lower().strip()
-                    or (admitted_rcp.get("consortium_id") or "").lower().strip() != batch_consortium_id.lower().strip()
-                    or (admitted_rcp.get("target_bank_id") or "").lower().strip() != t.lower().strip()
-                    or (
-                        admitted_rcp.get("query_entity_id")
-                        and batch.get("query_entity_id")
-                        and str(admitted_rcp.get("query_entity_id")).strip() != str(batch.get("query_entity_id") or "").strip()
-                    )
+                    rcp_sig_id != sig_id
+                    or rcp_rcp_id != expected_rcp_id
+                    or rcp_req_bank != eff_case_bank
+                    or rcp_consortium != batch_consortium_id
+                    or rcp_target_bank != t.lower().strip()
                 ):
                     omitted_failures.append(
                         self._project_safe_attach_failure(
                             target_bank=t,
                             category="GOVERNANCE_OR_ADMISSION_REJECTED",
                             raw_reason=f"Receipt '{expected_rcp_id}' binding mismatch with batch execution identity.",
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            signal_id=sig_id,
+                            signal_record=sig_rec,
+                        )
+                    )
+                    continue
+
+                # Mandatory Non-Empty Query Entity Binding (Correction D)
+                rcp_entity = str(admitted_rcp.get("query_entity_id") or "").strip()
+                batch_entity = str(batch.get("query_entity_id") or "").strip()
+                if not rcp_entity or not batch_entity or rcp_entity != batch_entity:
+                    omitted_failures.append(
+                        self._project_safe_attach_failure(
+                            target_bank=t,
+                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                            raw_reason=f"Receipt '{expected_rcp_id}' query_entity_id ('{rcp_entity}') missing, empty, or mismatched with batch entity ('{batch_entity}').",
                             consortium=consortium,
                             requesting_bank=eff_case_bank,
                             signal_id=sig_id,
