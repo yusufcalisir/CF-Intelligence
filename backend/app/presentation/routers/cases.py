@@ -989,12 +989,14 @@ async def get_case_intelligence_evidence(
 
     _verify_investigator_authorization(principal, case, caller_tenant)
 
+    import hashlib
     import json
     import re
 
     from app.application.services.case_service import EvidencePersistenceError
     from app.application.services.consortium_service import ConsortiumGovernanceService
     from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
     from app.infrastructure.storage.durable_batch_store import DurableCrossBankBatchStore
 
     batch_store = DurableCrossBankBatchStore.get_instance()
@@ -1097,18 +1099,42 @@ async def get_case_intelligence_evidence(
                         target_bank_from_batch = t_bank
                         break
 
+            if not receipt_id:
+                receipt_id = ev_meta.get("receipt_id")
+
+            # Fallback to authoritative signal record for receipt_id if masked under ANONYMIZED_SUMMARY
+            sig_rec = (
+                intel_svc._signal_store.get(signal_id)
+                if isinstance(signal_id, str) and hasattr(intel_svc, "_signal_store")
+                else None
+            )
+            if not receipt_id and sig_rec:
+                receipt_id = sig_rec.get("receipt_id") or sig_rec.get("admission_record", {}).get("receipt_id")
+
             admitted_rcp = intel_svc._admitted_receipts_store.get(receipt_id) if receipt_id else None
 
             # Evaluate full chain of evidence for authentic issuance verification
             issuance_verified = False
             issuance_mismatch_reason: str | None = None
 
+            # 1. Independent Audit Chain & Authorized Attachment Pathway Verification
+            audit_chain = ImmutableAuditChain.get_instance()
+            ev_audit_events = audit_chain.query_events(target_id=f"evidence:{ev_id}")
+            has_exact_attachment_audit = any(
+                e.event_type == "CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED"
+                and e.details.get("case_id") == case.id
+                and e.details.get("signal_id") == signal_id
+                for e in ev_audit_events
+            )
+            case_in_signal_store = bool(sig_rec and case.id in sig_rec.get("attached_to_cases", []))
+
             if not admitted_rcp:
                 issuance_mismatch_reason = (
-                    "lacks authentic operational issuance receipt and lacks authentic operational issuance proof in cryptographic admission registry"
+                    "lacks authentic operational issuance receipt and lacks authentic operational issuance proof "
+                    "in cryptographic admission registry"
                 )
             else:
-                # 1. Authoritative signal binding
+                # 1. Authoritative signal and scope bindings
                 adm_signal_id = admitted_rcp.get("signal_id")
                 adm_receipt_id = admitted_rcp.get("receipt_id")
                 adm_req_bank = (admitted_rcp.get("requesting_bank_id") or "").lower().strip()
@@ -1136,17 +1162,72 @@ async def get_case_intelligence_evidence(
                     issuance_mismatch_reason = "admitted receipt lacks valid 64-char SHA-256 issuance digest"
                 elif admitted_rcp.get("execution_mode") != "VERIFIED_OPERATIONAL":
                     issuance_mismatch_reason = f"admitted receipt execution mode '{admitted_rcp.get('execution_mode')}' is not VERIFIED_OPERATIONAL"
-                else:
-                    # Optional signal store digest check
-                    sig_rec = (
-                        intel_svc._signal_store.get(signal_id)
-                        if isinstance(signal_id, str) and hasattr(intel_svc, "_signal_store")
-                        else None
+                elif admitted_rcp.get("assurance_level") not in (
+                    "REVIEWED_ESTABLISHED_PSI_VERIFIED",
+                    "ESTABLISHED_PSI_VERIFIED",
+                ) and not str(admitted_rcp.get("assurance_level", "")).startswith("REVIEWED_ESTABLISHED_PSI"):
+                    issuance_mismatch_reason = f"admitted receipt assurance level '{admitted_rcp.get('assurance_level')}' is unverified"
+                elif not has_exact_attachment_audit and not case_in_signal_store:
+                    # 2. Independent Audit Chain & Authorized Attachment Pathway Verification
+                    issuance_mismatch_reason = (
+                        "evidence artifact lacks independent audit chain or authoritative signal attachment proof "
+                        "for destination case (unauthorized generic registry bypass)"
                     )
-                    if sig_rec and sig_rec.get("content_hash") and sig_rec.get("content_hash") != trusted_digest:
-                        issuance_mismatch_reason = "signal store content hash diverges from cryptographically admitted issuance digest"
-                    elif batch_record:
-                        # Batch membership checks
+                else:
+                    # 3. Authoritative Signal Verification & Material Parity
+                    if sig_rec:
+                        if not sig_rec.get("is_authoritative") or sig_rec.get("is_synthetic"):
+                            issuance_mismatch_reason = "source signal in signal store is not authoritative operational signal"
+                        elif sig_rec.get("admission_status") == "REJECTED":
+                            issuance_mismatch_reason = f"source signal admission was rejected: {sig_rec.get('rejection_reason', 'rejected')}"
+                        elif sig_rec.get("publication_status") in ("COMMIT_FAILED", "PUBLICATION_REJECTED", "REJECTED"):
+                            issuance_mismatch_reason = f"source signal publication failed: {sig_rec.get('publication_status')}"
+                        elif sig_rec.get("operational_status") != "OPERATIONAL":
+                            issuance_mismatch_reason = f"source signal operational status '{sig_rec.get('operational_status')}' is not OPERATIONAL"
+                        elif sig_rec.get("content_hash") and sig_rec.get("content_hash") != trusted_digest:
+                            issuance_mismatch_reason = "signal store content hash diverges from cryptographically admitted issuance digest"
+                        else:
+                            sig_data = sig_rec.get("signal_data") if isinstance(sig_rec.get("signal_data"), dict) else sig_rec
+                            computed_sig_digest = hashlib.sha256(
+                                json.dumps(sig_data, sort_keys=True).encode("utf-8")
+                            ).hexdigest()
+                            if computed_sig_digest != trusted_digest:
+                                issuance_mismatch_reason = "authoritative signal canonical content digest does not match cryptographically admitted issuance digest"
+                            else:
+                                # Parity of material match results between persisted evidence payload and authoritative signal
+                                payload_mc = signal_content.get("match_confirmed")
+                                auth_mc = sig_data.get("match_confirmed")
+                                if payload_mc is not None and auth_mc is not None and bool(payload_mc) != bool(auth_mc):
+                                    issuance_mismatch_reason = f"evidence match_confirmed ({payload_mc}) diverges from authoritative signal ({auth_mc})"
+
+                                payload_cat = signal_content.get("match_category")
+                                auth_cat = sig_data.get("match_category")
+                                if not issuance_mismatch_reason and payload_cat and auth_cat and str(payload_cat) != str(auth_cat):
+                                    issuance_mismatch_reason = f"evidence match_category ('{payload_cat}') diverges from authoritative signal ('{auth_cat}')"
+
+                                payload_risk = signal_content.get("risk_level") or signal_content.get("sanitized_risk_level")
+                                auth_risk = sig_data.get("sanitized_risk_level") or sig_data.get("risk_level")
+                                if not issuance_mismatch_reason and payload_risk and auth_risk and str(payload_risk).upper() != str(auth_risk).upper():
+                                    issuance_mismatch_reason = f"evidence risk level ('{payload_risk}') diverges from authoritative signal ('{auth_risk}')"
+
+                                payload_conf = signal_content.get("confidence") or signal_content.get("match_confidence")
+                                auth_conf = sig_data.get("match_confidence") or sig_data.get("confidence")
+                                if not issuance_mismatch_reason and payload_conf is not None and auth_conf is not None:
+                                    try:
+                                        if abs(float(payload_conf) - float(auth_conf)) > 1e-4:
+                                            issuance_mismatch_reason = f"evidence match confidence ({payload_conf}) diverges from authoritative signal ({auth_conf})"
+                                    except (ValueError, TypeError):
+                                        pass
+
+                                payload_typs = set(signal_content.get("sanitized_typology_indicators") or signal_content.get("typology_indicators") or [])
+                                auth_typs = set(sig_data.get("sanitized_typology_indicators") or [])
+                                if not issuance_mismatch_reason and payload_typs and auth_typs and not payload_typs.issubset(auth_typs):
+                                    issuance_mismatch_reason = "evidence typologies contain unverified indicators not present in authoritative signal"
+                    elif not batch_record and not has_exact_attachment_audit:
+                        issuance_mismatch_reason = "historical issuance proof unavailable: source signal expired and durable audit proof is missing"
+
+                    # 4. Batch Membership Checks (if batch_record is present)
+                    if not issuance_mismatch_reason and batch_record:
                         b_signals = batch_record.get("successful_signal_ids") or {}
                         b_rcps = batch_record.get("receipt_ids") or {}
                         b_req = (batch_record.get("requesting_bank_id") or "").lower().strip()
@@ -1161,10 +1242,11 @@ async def get_case_intelligence_evidence(
                             issuance_mismatch_reason = f"batch requesting bank '{b_req}' does not match case bank '{case_bank}'"
                         elif payload_entity and b_entity and b_entity != payload_entity:
                             issuance_mismatch_reason = f"batch query entity '{b_entity}' does not match payload entity '{payload_entity}'"
+                        elif batch_record.get("case_id") and batch_record.get("case_id") != case.id:
+                            issuance_mismatch_reason = f"batch bound to different case '{batch_record.get('case_id')}' (destination case is '{case.id}')"
                         else:
                             issuance_verified = True
-                    else:
-                        # Original batch expired or unavailable, but independent issuance receipt is intact and verified
+                    elif not issuance_mismatch_reason:
                         issuance_verified = True
 
             # Check current consortium status and pairwise grant revocation
@@ -1177,8 +1259,16 @@ async def get_case_intelligence_evidence(
                         grant_revoked = True
 
             if not issuance_verified:
-                verification_state = "INTEGRITY_VERIFIED_ONLY"
-                operational_status = "UNADMITTED" if not admitted_rcp else "PROVENANCE_MISMATCH"
+                if (
+                    "diverges" in (issuance_mismatch_reason or "")
+                    or "does not match cryptographically admitted" in (issuance_mismatch_reason or "")
+                    or "unverified indicators" in (issuance_mismatch_reason or "")
+                ):
+                    verification_state = "FAILED_VERIFICATION"
+                    operational_status = "TAMPERED"
+                else:
+                    verification_state = "INTEGRITY_VERIFIED_ONLY"
+                    operational_status = "UNADMITTED" if not admitted_rcp else "PROVENANCE_MISMATCH"
                 is_authoritative = False
                 explanation = (
                     f"Evidence payload integrity verified ({expected_content_hash[:16]}...), "
