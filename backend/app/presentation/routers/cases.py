@@ -882,17 +882,60 @@ async def attach_cross_bank_intelligence_to_case_subresource(
         raise HTTPException(status_code=400, detail=str(err)) from err
 
 
+ALLOWED_INVESTIGATION_ROLES = {
+    "investigator",
+    "compliance_officer",
+    "compliance_auditor",
+    "analyst",
+    "risk_officer",
+    "supervisor",
+    "fraud_analyst",
+    "bank_admin",
+    "admin",
+    "super_admin",
+    "cross_bank_investigator",
+}
+
+
+def _verify_investigator_authorization(principal: PrincipalDep, case: Any, caller_tenant: str | None) -> str:
+    """Enforce mandatory institutional authentication, role clearance, and strict case ownership."""
+    if not principal.is_authenticated or principal.principal_id == "anonymous":
+        raise HTTPException(
+            status_code=401,
+            detail="Institutional authentication required. Bearer token or authorized workload identity must be provided.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    clean_roles = {r.lower().strip() for r in (principal.roles or [])}
+    if not any(r in ALLOWED_INVESTIGATION_ROLES for r in clean_roles):
+        raise HTTPException(
+            status_code=403,
+            detail="Investigator or compliance clearance required to access case intelligence workspace.",
+        )
+
+    case_bank = (getattr(case, "bank_id", None) or "").lower().strip()
+    eff_tenant = (principal.tenant_id or caller_tenant or "").lower().strip()
+    if case_bank and eff_tenant and eff_tenant != case_bank:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Broken Access Control Prevention: Tenant '{eff_tenant}' is not authorized to access resources belonging to '{case_bank}'.",
+        )
+    return case_bank or eff_tenant
+
+
 @router.get("/{case_id}/eligible-entities", response_model=list[CaseEligibleEntityResponse])
 @api_router.get("/{case_id}/eligible-entities", response_model=list[CaseEligibleEntityResponse])
 async def get_case_eligible_entities(
     case_id: str,
+    principal: PrincipalDep,
     caller_tenant: TenantDep = None,
 ) -> list[CaseEligibleEntityResponse]:
     """Retrieve legitimate institution-owned entities eligible for cross-bank investigation on this case."""
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
-    _enforce_case_tenant(case, caller_tenant)
+
+    case_bank = _verify_investigator_authorization(principal, case, caller_tenant)
 
     from app.application.services.entity_resolution import EntityResolutionService
     from app.presentation.routers.alerts import get_alert_service
@@ -900,11 +943,10 @@ async def get_case_eligible_entities(
     alert_svc = get_alert_service()
     entity_svc = EntityResolutionService()
 
-    case_bank = (getattr(case, "bank_id", None) or caller_tenant or "").lower().strip()
     results: list[CaseEligibleEntityResponse] = []
     seen_entity_ids: set[str] = set()
 
-    # 1. Gather entities directly associated with the case's linked alerts
+    # Authoritative entity derivation strictly from case-linked alerts
     if getattr(case, "alert_ids", None):
         for a_id in case.alert_ids:
             alert = alert_svc.get_alert(a_id)
@@ -930,24 +972,6 @@ async def get_case_eligible_entities(
                         )
                     )
 
-    # 2. If no entities were linked via alerts or additional entities are available for this bank,
-    # include authoritative bank-owned entities to allow query initialization
-    if case_bank:
-        bank_entities = entity_svc.get_entities(bank_id=case_bank)
-        for ent in bank_entities:
-            if ent.id not in seen_entity_ids:
-                seen_entity_ids.add(ent.id)
-                results.append(
-                    CaseEligibleEntityResponse(
-                        entity_id=ent.id,
-                        display_label=ent.display_label,
-                        entity_type=ent.entity_type.value,
-                        risk_level=ent.risk_level.value,
-                        bank_id=ent.bank_id,
-                        source_alert_id=None,
-                    )
-                )
-
     return results
 
 
@@ -955,19 +979,28 @@ async def get_case_eligible_entities(
 @api_router.get("/{case_id}/intelligence-evidence", response_model=list[CaseIntelligenceEvidenceResponse])
 async def get_case_intelligence_evidence(
     case_id: str,
+    principal: PrincipalDep,
     caller_tenant: TenantDep = None,
 ) -> list[CaseIntelligenceEvidenceResponse]:
     """Retrieve verified cross-bank intelligence evidence items for an investigation case."""
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
-    _enforce_case_tenant(case, caller_tenant)
+
+    _verify_investigator_authorization(principal, case, caller_tenant)
 
     import json
+    import re
 
+    from app.application.services.case_service import EvidencePersistenceError
+    from app.application.services.consortium_service import ConsortiumGovernanceService
+    from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
     from app.infrastructure.storage.durable_batch_store import DurableCrossBankBatchStore
 
     batch_store = DurableCrossBankBatchStore.get_instance()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+    consortium_svc = ConsortiumGovernanceService()
+
     all_evidence = _evidence_service.get_case_evidence(case_id)
     projected: list[CaseIntelligenceEvidenceResponse] = []
 
@@ -977,44 +1010,146 @@ async def get_case_intelligence_evidence(
 
         ev_id = ev["id"]
         ev_meta = ev.get("metadata") or {}
-        raw_content = ""
+        expected_content_hash = ev.get("content_hash") or ""
+        raw_content: str | None = None
         payload: dict[str, Any] = {}
+
+        content_integrity_valid = False
+        is_tampered = False
+        is_corrupt_json = False
 
         try:
             raw_content = _evidence_service.get_evidence_content(ev_id)
             payload = json.loads(raw_content)
-        except Exception as e:
-            logger.warning("Could not read durable content for evidence '%s': %s", ev_id, e)
-            payload = {}
+            content_integrity_valid = True
+        except EvidencePersistenceError as err:
+            err_msg = str(err).lower()
+            if "tampering detected" in err_msg or "does not match authoritative digest" in err_msg:
+                is_tampered = True
+        except json.JSONDecodeError:
+            is_corrupt_json = True
+        except Exception:
+            pass
 
         provenance = payload.get("provenance") or {}
         signal_content = payload.get("signal_content") or {}
 
-        # Disclosure mode & counterparty masking
-        disclosure_mode = (
+        # ── Gate B: Real Accepted Disclosure Modes (ATTRIBUTED_INSTITUTIONS vs ANONYMIZED_SUMMARY) ──
+        raw_disclosure = (
             provenance.get("disclosure_mode")
             or ev_meta.get("disclosure_mode")
-            or "ANONYMOUS_FLAG"
+            or "ANONYMIZED_SUMMARY"
         )
-        if disclosure_mode == "ATTRIBUTED_INSTITUTIONS":
-            target_bank = provenance.get("target_bank_id")
+        if raw_disclosure == "ATTRIBUTED_INSTITUTIONS":
+            disclosure_mode = "ATTRIBUTED_INSTITUTIONS"
+            target_bank = provenance.get("target_bank_id") or ev_meta.get("target_bank_id")
         else:
-            target_bank = None  # Strictly masked under ANONYMOUS_FLAG
+            disclosure_mode = "ANONYMIZED_SUMMARY"
+            target_bank = None  # Strictly masked under ANONYMIZED_SUMMARY
 
-        # Batch retention check
         batch_qid = ev_meta.get("batch_query_id") or payload.get("batch_query_id")
-        retention_status = "ACTIVE"
-        batch_expires_at = None
+        batch_record = batch_store.get_batch(batch_qid) if batch_qid else None
 
-        if batch_qid:
-            batch_record = batch_store.get_batch(batch_qid)
-            if batch_record:
-                retention_status = "ACTIVE"
-                batch_expires_at = batch_record.get("expires_at")
+        if batch_record:
+            retention_status = "ACTIVE"
+            batch_expires_at = batch_record.get("expires_at")
+        else:
+            retention_status = "RETENTION_EXPIRED"
+            batch_expires_at = None
+
+        signal_id = payload.get("signal_id") or ev_meta.get("signal_id")
+        consortium_id = payload.get("consortium_id") or ev_meta.get("consortium_id")
+
+        # ── Gate A: Authentic Evidence Verification State Evaluation ──
+        if not content_integrity_valid:
+            if is_tampered:
+                verification_state = "FAILED_VERIFICATION"
+                operational_status = "TAMPERED"
+                is_authoritative = False
+                explanation = (
+                    f"Cryptographic verification failed: Persisted evidence artifact digest does not match "
+                    f"authoritative registered hash '{expected_content_hash[:16]}...'."
+                )
+            elif is_corrupt_json:
+                verification_state = "FAILED_VERIFICATION"
+                operational_status = "CORRUPT"
+                is_authoritative = False
+                explanation = "Cryptographic verification failed: Evidence artifact content cannot be parsed as JSON."
             else:
-                retention_status = "RETENTION_EXPIRED"
-                batch_expires_at = None
+                verification_state = "INDETERMINATE"
+                operational_status = "UNAVAILABLE"
+                is_authoritative = False
+                explanation = "Authoritative evidence artifact is missing from durable storage or unreadable."
+        else:
+            # Content is cryptographically intact on disk; now evaluate issuance provenance
+            receipt_id = provenance.get("receipt_id")
+            if not receipt_id and batch_record:
+                succ_signals = batch_record.get("successful_signal_ids") or {}
+                rcp_ids = batch_record.get("receipt_ids") or {}
+                for t_bank, s_id in succ_signals.items():
+                    if s_id == signal_id:
+                        receipt_id = rcp_ids.get(t_bank)
+                        break
 
+            admitted_rcp = intel_svc._admitted_receipts_store.get(receipt_id) if receipt_id else None
+
+            # Check if this evidence was registered arbitrarily without authentic admission proof
+            is_unadmitted_arbitrary = (not batch_record and not admitted_rcp)
+
+            # Check current consortium status and pairwise grant revocation
+            consortium_active = False
+            grant_revoked = False
+            if consortium_id:
+                c = consortium_svc.get_consortium(consortium_id.lower().strip())
+                if c and c.status.value.lower() == "active":
+                    consortium_active = True
+                if admitted_rcp:
+                    g_id = admitted_rcp.get("grant_id")
+                    if g_id:
+                        grant = consortium_svc.get_pairwise_operational_grant(consortium_id, g_id)
+                        if grant and grant.get("revoked_at"):
+                            grant_revoked = True
+
+            if is_unadmitted_arbitrary:
+                verification_state = "INTEGRITY_VERIFIED_ONLY"
+                operational_status = "UNADMITTED"
+                is_authoritative = False
+                explanation = (
+                    f"Evidence payload integrity verified ({expected_content_hash[:16]}...), "
+                    "but lacks authentic operational issuance proof in cryptographic admission registry."
+                )
+            elif grant_revoked:
+                verification_state = "INTEGRITY_VERIFIED_ONLY"
+                operational_status = "CONSENT_REVOKED"
+                is_authoritative = False
+                explanation = (
+                    f"Historical operational evidence integrity verified ({expected_content_hash[:16]}...). "
+                    "Pairwise data sharing authorization has been revoked; current operational consent is inactive."
+                )
+            elif retention_status == "RETENTION_EXPIRED":
+                verification_state = "INTEGRITY_VERIFIED_ONLY"
+                operational_status = "HISTORICAL_RECORD"
+                is_authoritative = True
+                explanation = (
+                    f"Historical operational evidence integrity verified ({expected_content_hash[:16]}...). "
+                    "Intermediate query batch cache expired (>24h TTL); immutable dossier evidence retained."
+                )
+            elif batch_record and consortium_active:
+                verification_state = "VERIFIED"
+                operational_status = "OPERATIONAL"
+                is_authoritative = True
+                explanation = (
+                    f"Authentic cross-bank operational signal verified ({consortium_id.upper() if consortium_id else 'CONSORTIUM'}). "
+                    f"Cryptographic payload digest: {expected_content_hash[:16]}... "
+                    f"Independent admission and audit proofs verified."
+                )
+            else:
+                verification_state = "INTEGRITY_VERIFIED_ONLY"
+                operational_status = "OPERATIONAL"
+                is_authoritative = True
+                explanation = f"Evidence payload digest verified ({expected_content_hash[:16]}...)."
+
+        # Signal fields
         match_confirmed = signal_content.get("match_confirmed")
         if match_confirmed is None and "match_confirmed" in ev_meta:
             match_confirmed = ev_meta["match_confirmed"]
@@ -1028,24 +1163,25 @@ async def get_case_intelligence_evidence(
             or []
         )
         notes = payload.get("analyst_notes") or ev_meta.get("notes")
+        title = ev.get("title", "Consortium Intelligence Evidence")
 
-        explanation = (
-            f"Verified cross-bank intelligence evidence ({ev_meta.get('consortium_id', 'CONSORTIUM').upper()}). "
-            f"Cryptographic payload digest: {ev.get('content_hash', '')[:16]}... "
-            f"Durable evidence ledger retains immutable record."
-        )
+        # Under ANONYMIZED_SUMMARY, sanitize notes and titles to prevent counterpart bank leaks
+        if disclosure_mode == "ANONYMIZED_SUMMARY":
+            if notes:
+                notes = re.sub(r"\bbank_[a-zA-Z0-9_\-]+\b", "[REDACTED_INSTITUTION]", str(notes), flags=re.IGNORECASE)
+            title = re.sub(r"\bbank_[a-zA-Z0-9_\-]+\b", "Anonymous Peer", str(title), flags=re.IGNORECASE)
 
         projected.append(
             CaseIntelligenceEvidenceResponse(
                 evidence_id=ev_id,
                 case_id=case_id,
-                title=ev.get("title", "Consortium Intelligence Evidence"),
-                content_hash=ev.get("content_hash", ""),
+                title=title,
+                content_hash=expected_content_hash,
                 batch_query_id=batch_qid,
                 uploaded_at=ev.get("uploaded_at", datetime.now(UTC).isoformat()),
                 uploaded_by=ev.get("uploaded_by", "system"),
-                operational_status=ev_meta.get("operational_status", "OPERATIONAL"),
-                is_authoritative=bool(ev_meta.get("is_authoritative", True)),
+                operational_status=operational_status,
+                is_authoritative=is_authoritative,
                 disclosure_mode=disclosure_mode,
                 target_bank_id=target_bank,
                 match_confirmed=match_confirmed,
@@ -1054,7 +1190,7 @@ async def get_case_intelligence_evidence(
                 risk_level=risk_level,
                 typology_indicators=typology_indicators,
                 analyst_notes=notes,
-                verification_state="AUTHENTIC_VERIFIED",
+                verification_state=verification_state,
                 retention_status=retention_status,
                 batch_expires_at=batch_expires_at,
                 explanation=explanation,

@@ -568,3 +568,53 @@ class CrossBankMultiEvidenceAttachResponse(BaseModel):
         default=False,
         description="True if entire multi-attachment request was an idempotent duplicate.",
     )
+
+
+class CrossBankCounterpartCapability(BaseModel):
+    """Authoritative capability and governance status for a counterpart institution."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    counterpart_bank_id: str = Field(..., description="Counterpart institution ID.")
+    display_name: str = Field(..., description="Institutional display name.")
+    is_authorized: bool = Field(..., description="Whether bilateral pairwise governance is active.")
+    governance_status: Literal["ACTIVE", "REVOKED", "MISSING_GRANT", "EVICTED"] = Field(
+        ..., description="Bilateral pairwise governance authorization state."
+    )
+    permitted_purposes: list[str] = Field(
+        default_factory=list, description="Permitted operational query purposes."
+    )
+    disclosure_modes: list[str] = Field(
+        default_factory=list, description="Supported disclosure modes under active grant."
+    )
+    execution_readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE"] = Field(
+        ..., description="Observed or verified execution readiness."
+    )
+
+
+class CrossBankConsortiumCapability(BaseModel):
+    """Authoritative consortium capability profile for an authenticated institution."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    consortium_id: str = Field(..., description="Consortium identifier.")
+    name: str = Field(..., description="Consortium legal or operational name.")
+    status: str = Field(..., description="Consortium operational status (e.g. ACTIVE).")
+    counterparts: list[CrossBankCounterpartCapability] = Field(
+        default_factory=list, description="Available counterpart institutions in this consortium."
+    )
+    permitted_purposes: list[str] = Field(
+        default_factory=list, description="Consortium-wide permitted investigation purposes."
+    )
+
+
+class CrossBankQueryCapabilitiesResponse(BaseModel):
+    """Server-authoritative capabilities response for cross-bank intelligence query formulation."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    requesting_bank_id: str = Field(..., description="Authenticated requesting institution ID.")
+    consortia: list[CrossBankConsortiumCapability] = Field(
+        default_factory=list, description="Authorized consortia and available counterparties."
+    )
+

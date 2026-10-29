@@ -3622,6 +3622,7 @@ export interface CrossBankIntelligenceQueryPayload {
   require_established_psi?: boolean;
   protocol?: string;
   execution_mode?: 'SIMULATED_RESEARCH' | 'VERIFIED_OPERATIONAL';
+  idempotency_key?: string;
 }
 
 export interface CrossBankEvidenceAttachPayload {
@@ -3666,7 +3667,7 @@ export interface CaseIntelligenceEvidenceItem {
   uploaded_by: string;
   operational_status: string;
   is_authoritative: boolean;
-  disclosure_mode: 'ANONYMOUS_FLAG' | 'ATTRIBUTED_INSTITUTIONS' | string;
+  disclosure_mode: 'ATTRIBUTED_INSTITUTIONS' | 'ANONYMIZED_SUMMARY' | string;
   target_bank_id?: string | null;
   match_confirmed?: boolean | null;
   match_category?: string | null;
@@ -3674,10 +3675,33 @@ export interface CaseIntelligenceEvidenceItem {
   risk_level?: string | null;
   typology_indicators: string[];
   analyst_notes?: string | null;
-  verification_state: string;
+  verification_state: 'VERIFIED' | 'INTEGRITY_VERIFIED_ONLY' | 'INDETERMINATE' | 'FAILED_VERIFICATION' | string;
   retention_status: 'ACTIVE' | 'RETENTION_EXPIRED' | string;
   batch_expires_at?: string | null;
   explanation?: string | null;
+}
+
+export interface CrossBankCounterpartCapability {
+  counterpart_bank_id: string;
+  display_name: string;
+  is_authorized: boolean;
+  governance_status: string;
+  permitted_purposes: string[];
+  disclosure_modes: string[];
+  execution_readiness: string;
+}
+
+export interface CrossBankConsortiumCapability {
+  consortium_id: string;
+  name: string;
+  status: string;
+  counterparts: CrossBankCounterpartCapability[];
+  permitted_purposes: string[];
+}
+
+export interface CrossBankQueryCapabilitiesResponse {
+  requesting_bank_id: string;
+  consortia: CrossBankConsortiumCapability[];
 }
 
 export interface CounterpartyExecutionFailure {
@@ -3708,6 +3732,7 @@ export interface MultiCounterpartyIntelligenceQueryRequest {
   require_established_psi?: boolean;
   protocol?: string;
   execution_mode?: 'SIMULATED_RESEARCH' | 'VERIFIED_OPERATIONAL';
+  idempotency_key?: string;
 }
 
 export interface MultiCounterpartyIntelligenceQueryResponse {
@@ -3725,21 +3750,18 @@ export interface MultiCounterpartyIntelligenceQueryResponse {
 }
 
 export interface MultiCounterpartyEvidenceItem {
-  evidence_id: string;
   target_bank_id?: string | null;
   signal_id: string;
-  receipt_id?: string | null;
-  match_confirmed: boolean;
-  match_category?: string | null;
-  confidence: number;
-  risk_level: string;
+  evidence_id: string;
+  status: 'ATTACHED' | 'ALREADY_ATTACHED';
   content_hash: string;
-  uploaded_at: string;
-  is_replayed: boolean;
+  title: string;
+  disclosure_mode: 'ATTRIBUTED_INSTITUTIONS' | 'ANONYMIZED_SUMMARY' | string;
 }
 
-export interface CounterpartyFailureDetail {
-  target_bank_id: string;
+export interface MultiCounterpartyEvidenceAttachFailure {
+  target_bank_id?: string | null;
+  signal_id?: string | null;
   category: string;
   reason: string;
 }
@@ -3759,7 +3781,7 @@ export interface CrossBankMultiEvidenceAttachResponse {
   replayed_count: number;
   failed_count: number;
   attached_evidence: MultiCounterpartyEvidenceItem[];
-  omitted_or_failed: CounterpartyFailureDetail[];
+  omitted_or_failed: MultiCounterpartyEvidenceAttachFailure[];
   case_version: number;
   timeline_event_recorded: boolean;
   is_duplicate_submission: boolean;

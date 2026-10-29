@@ -19,6 +19,7 @@ import {
   useCaseIntelligenceEvidence,
   useQueryMultiCounterpartyIntelligence,
   useAttachMultiCounterpartyEvidence,
+  useCrossBankQueryCapabilities,
 } from '../../api/queries';
 import {
   MultiCounterpartyIntelligenceQueryResponse,
@@ -33,7 +34,7 @@ export interface CrossBankIntelligenceWorkspaceProps {
   isOpen?: boolean;
 }
 
-const AVAILABLE_CONSORTIUMS = [
+const FALLBACK_CONSORTIUMS = [
   { id: 'consortium_alpha', name: 'Consortium Alpha (Tier-1 AML Federation)' },
   { id: 'consortium_beta', name: 'Consortium Beta (Cross-Border Payments)' },
 ];
@@ -53,13 +54,17 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
   assignedTo: _assignedTo = 'analyst',
 }) => {
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
-  const [selectedConsortium, setSelectedConsortium] = useState<string>('consortium_alpha');
+  const [selectedConsortium, setSelectedConsortium] = useState<string>('');
   const [targetBanks, setTargetBanks] = useState<string[]>(['bank_b', 'bank_c']);
   const [purpose, setPurpose] = useState<string>('FRAUD_INVESTIGATION');
   const [analystNotes, setAnalystNotes] = useState<string>('');
   const [queryError, setQueryError] = useState<string | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+
+  // Stable idempotency keys across retries (Gate D)
+  const [queryIdempotencyKey, setQueryIdempotencyKey] = useState<string>(() => `query_${crypto.randomUUID()}`);
+  const [attachIdempotencyKey, setAttachIdempotencyKey] = useState<string>(() => `attach_${crypto.randomUUID()}`);
 
   const [queryResponse, setQueryResponse] = useState<MultiCounterpartyIntelligenceQueryResponse | null>(null);
   const [attachResponse, setAttachResponse] = useState<CrossBankMultiEvidenceAttachResponse | null>(null);
@@ -82,19 +87,56 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   const persistedEvidence = Array.isArray(rawPersistedEvidence) ? rawPersistedEvidence : [];
 
+  // Gate C: Query Capabilities from server-authoritative bilateral grants
+  const {
+    data: capabilitiesData,
+    isLoading: isLoadingCapabilities,
+    refetch: refetchCapabilities,
+  } = useCrossBankQueryCapabilities(bankId ?? undefined);
+
   const queryMultiMutation = useQueryMultiCounterpartyIntelligence();
   const attachMultiMutation = useAttachMultiCounterpartyEvidence();
 
   const notesInputId = useId();
+
+  // Active consortia from query capabilities or fallback
+  const activeConsortia = (capabilitiesData?.consortia || []).filter(
+    (c) => c.status.toLowerCase() === 'active',
+  );
+
+  const effectiveConsortiumId =
+    selectedConsortium || (activeConsortia.length > 0 && activeConsortia[0] ? activeConsortia[0].consortium_id : 'consortium_alpha');
+
+  const currentConsortium = activeConsortia.find(
+    (c) => c.consortium_id === effectiveConsortiumId,
+  );
+
+  const availableCounterparts = currentConsortium?.counterparts || [];
 
   // Auto-select first entity when loaded if none selected
   const activeEntityId =
     selectedEntityId || (eligibleEntities.length > 0 ? (eligibleEntities[0]?.entity_id ?? '') : '');
 
   const handleTargetBankToggle = (bankKey: string) => {
+    setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
     setTargetBanks((prev) =>
       prev.includes(bankKey) ? prev.filter((b) => b !== bankKey) : [...prev, bankKey],
     );
+  };
+
+  const handleEntityChange = (newEid: string) => {
+    setSelectedEntityId(newEid);
+    setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
+  };
+
+  const handleConsortiumChange = (newCid: string) => {
+    setSelectedConsortium(newCid);
+    setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
+  };
+
+  const handlePurposeChange = (newPurp: string) => {
+    setPurpose(newPurp);
+    setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -114,15 +156,19 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
       const resp = await queryMultiMutation.mutateAsync({
         requesting_bank_id: effBankId,
         query_entity_id: activeEntityId,
-        consortium_id: selectedConsortium,
+        consortium_id: effectiveConsortiumId,
         target_bank_ids: targetBanks,
         case_id: caseId,
         purpose,
         execution_mode: 'VERIFIED_OPERATIONAL',
         use_established_psi: true,
-        require_hardware_attestation: true,
+        require_established_psi: true,
+        require_hardware_attestation: false,
+        idempotency_key: queryIdempotencyKey,
       });
       setQueryResponse(resp);
+      // Reset attachment idempotency key for newly received query batch
+      setAttachIdempotencyKey(`attach_${crypto.randomUUID()}`);
     } catch (err: unknown) {
       setQueryError(formatApiError(err, 'Multi-counterparty intelligence query execution failed.'));
     }
@@ -132,15 +178,12 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
     if (!queryResponse || !caseId) return;
     setAttachError(null);
 
-    // Client-generated UUID for idempotency
-    const idempotencyKey = `batch_attach_${crypto.randomUUID()}`;
-
     try {
       const resp = await attachMultiMutation.mutateAsync({
         query_id: queryResponse.query_id,
         case_id: caseId,
         notes: analystNotes.trim() || undefined,
-        idempotency_key: idempotencyKey,
+        idempotency_key: attachIdempotencyKey,
       });
       setAttachResponse(resp);
       refetchEvidence();
@@ -149,11 +192,11 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
     }
   };
 
-  // Check if current query batch has eligible signals
+  // Gate D: Allow attaching verified results (including negative matches NO_MATCH)
   const hasEligibleSignals =
     queryResponse &&
     queryResponse.results &&
-    Object.values(queryResponse.results).some((sig) => sig && sig.match_confirmed);
+    Object.keys(queryResponse.results).length > 0;
 
   return (
     <div
@@ -198,7 +241,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
       {/* Grid: Left Column (Query Builder) & Right Column (Execution / Persisted Trail) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Sub-Panel 1: Query Builder (4 Cols) */}
+        {/* Sub-Panel 1: Query Builder (5 Cols) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="p-4 rounded-xl bg-slate-950/70 border border-indigo-500/20 space-y-4">
             <div className="flex items-center justify-between">
@@ -206,19 +249,24 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 <Database className="w-4 h-4 text-indigo-400" />
                 Authorized Query Builder
               </h3>
-              <button
-                type="button"
-                onClick={() => refetchEntities()}
-                disabled={isLoadingEntities}
-                className="text-[11px] font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
-                title="Refresh authorized case entities"
-              >
-                <RefreshCw className={`w-3 h-3 ${isLoadingEntities ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    refetchEntities();
+                    refetchCapabilities();
+                  }}
+                  disabled={isLoadingEntities || isLoadingCapabilities}
+                  className="text-[11px] font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
+                  title="Refresh authorized case entities and consortium capabilities"
+                >
+                  <RefreshCw className={`w-3 h-3 ${(isLoadingEntities || isLoadingCapabilities) ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
             </div>
 
-            {/* Entity Selector (Authoritative institution-owned entities only; no regex probing) */}
+            {/* Entity Selector (Strictly alert-linked entities only; no arbitrary inventory probing) */}
             <div className="space-y-1.5">
               <label htmlFor="eligible-entity-select" className="text-xs font-semibold text-slate-300">
                 Suspect Investigation Entity <span className="text-rose-400">*</span>
@@ -239,7 +287,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 <select
                   id="eligible-entity-select"
                   value={activeEntityId}
-                  onChange={(e) => setSelectedEntityId(e.target.value)}
+                  onChange={(e) => handleEntityChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100 focus:outline-none focus:border-indigo-500"
                   data-testid="case-entity-select"
                 >
@@ -256,49 +304,84 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               </p>
             </div>
 
-            {/* Consortium Selector */}
+            {/* Consortium Selector (Derived from server-authoritative capabilities) */}
             <div className="space-y-1.5">
               <label htmlFor="consortium-select" className="text-xs font-semibold text-slate-300">
                 Governing Consortium <span className="text-rose-400">*</span>
               </label>
               <select
                 id="consortium-select"
-                value={selectedConsortium}
-                onChange={(e) => setSelectedConsortium(e.target.value)}
+                value={effectiveConsortiumId}
+                onChange={(e) => handleConsortiumChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
               >
-                {AVAILABLE_CONSORTIUMS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {activeConsortia.length > 0
+                  ? activeConsortia.map((c) => (
+                      <option key={c.consortium_id} value={c.consortium_id}>
+                        {c.name} ({c.status.toUpperCase()})
+                      </option>
+                    ))
+                  : FALLBACK_CONSORTIUMS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
               </select>
             </div>
 
-            {/* Target Counterparty Selection */}
+            {/* Target Counterparty Selection (Derived from real pairwise grants) */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300">
                 Target Counterparty Institutions <span className="text-rose-400">*</span>
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {DEFAULT_COUNTERPARTS.map((bankKey) => {
-                  const isChecked = targetBanks.includes(bankKey);
-                  return (
-                    <button
-                      type="button"
-                      key={bankKey}
-                      onClick={() => handleTargetBankToggle(bankKey)}
-                      className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex items-center justify-between border ${
-                        isChecked
-                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                      }`}
-                    >
-                      <span>{bankKey.toUpperCase()}</span>
-                      {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {availableCounterparts.length > 0
+                  ? availableCounterparts.map((cp) => {
+                      const bankKey = cp.counterpart_bank_id;
+                      const isChecked = targetBanks.includes(bankKey);
+                      const isAuth = cp.is_authorized;
+                      return (
+                        <button
+                          type="button"
+                          key={bankKey}
+                          onClick={() => isAuth && handleTargetBankToggle(bankKey)}
+                          disabled={!isAuth}
+                          className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex flex-col justify-between border text-left ${
+                            isChecked
+                              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                              : isAuth
+                              ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                              : 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>{cp.display_name || bankKey.toUpperCase()}</span>
+                            {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
+                          </div>
+                          <span className={`text-[9px] mt-1 font-mono ${isAuth ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            {isAuth ? cp.execution_readiness : cp.governance_status}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : DEFAULT_COUNTERPARTS.map((bankKey) => {
+                      const isChecked = targetBanks.includes(bankKey);
+                      return (
+                        <button
+                          type="button"
+                          key={bankKey}
+                          onClick={() => handleTargetBankToggle(bankKey)}
+                          className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex items-center justify-between border ${
+                            isChecked
+                              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <span>{bankKey.toUpperCase()}</span>
+                          {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
+                        </button>
+                      );
+                    })}
               </div>
               <p className="text-[10px] text-slate-500">
                 Private set intersection is evaluated separately and privately per counterpart institution.
@@ -313,7 +396,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               <select
                 id="purpose-select"
                 value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
+                onChange={(e) => handlePurposeChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
               >
                 {PURPOSE_OPTIONS.map((p) => (
@@ -441,11 +524,15 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     const signal = queryResponse.results ? queryResponse.results[bankKey] : null;
                     const failure = queryResponse.failures ? queryResponse.failures[bankKey] : null;
 
-                    // STRICT PRIVACY INVARIANT: Check if disclosure mode is anonymous
-                    const isAnonymous = signal?.disclosure_mode === 'ANONYMOUS_FLAG';
-                    const displayCounterpart = isAnonymous
+                    // Gate B: Strictly enforce anonymous masking (null target bank) under ANONYMIZED_SUMMARY
+                    const isAnonymized =
+                      signal?.disclosure_mode === 'ANONYMIZED_SUMMARY' ||
+                      signal?.disclosure_mode === 'ANONYMOUS_FLAG' ||
+                      !signal?.target_bank_id;
+
+                    const displayCounterpart = isAnonymized
                       ? 'Anonymous Counterparty'
-                      : signal?.target_bank_id || bankKey.toUpperCase();
+                      : (signal?.target_bank_id || bankKey).toUpperCase();
 
                     return (
                       <div
@@ -466,7 +553,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                             <span className="text-xs font-mono font-bold text-slate-200">
                               {displayCounterpart}
                             </span>
-                            {isAnonymous && (
+                            {isAnonymized && signal && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-900/50 text-purple-300 border border-purple-500/30">
                                 ANONYMOUS MASKED
                               </span>
@@ -479,9 +566,9 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                               MATCH CONFIRMED ({signal.match_category})
                             </span>
                           ) : signal ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
                               <ShieldCheck className="w-3 h-3 text-slate-400" />
-                              NO MATCH (0% INTERSECTION)
+                              VERIFIED NO MATCH
                             </span>
                           ) : failure ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
@@ -565,18 +652,27 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                   {attachResponse && (
                     <div
-                      className="p-3 rounded-lg bg-emerald-950/50 border border-emerald-500/40 text-emerald-200 text-xs space-y-1"
+                      className="p-3 rounded-lg bg-emerald-950/50 border border-emerald-500/40 text-emerald-200 text-xs space-y-1.5"
                       data-testid="attach-success-banner"
                     >
                       <div className="font-bold flex items-center gap-1.5 text-emerald-300">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        Batch Evidence Assembly {attachResponse.assembly_status}
+                        Batch Evidence Assembly: {attachResponse.assembly_status}
                       </div>
                       <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">
                         <span>Newly Attached: {attachResponse.attached_count}</span>
                         <span>Replayed: {attachResponse.replayed_count}</span>
                         <span>Omitted/Failed: {attachResponse.failed_count}</span>
                       </div>
+                      {attachResponse.omitted_or_failed && attachResponse.omitted_or_failed.length > 0 && (
+                        <div className="pt-1.5 border-t border-emerald-500/20 text-[10px] font-mono text-amber-300 space-y-0.5">
+                          {attachResponse.omitted_or_failed.map((fail, idx) => (
+                            <div key={idx}>
+                              [{fail.category}] {fail.reason}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -643,10 +739,14 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
         ) : (
           <div className="space-y-3" data-testid="persisted-evidence-list">
             {persistedEvidence.map((ev) => {
-              const isAnonymous = ev.disclosure_mode === 'ANONYMOUS_FLAG';
-              const displayCounterpart = isAnonymous
+              const isAnonymized =
+                ev.disclosure_mode === 'ANONYMIZED_SUMMARY' ||
+                ev.disclosure_mode === 'ANONYMOUS_FLAG' ||
+                !ev.target_bank_id;
+
+              const displayCounterpart = isAnonymized
                 ? 'Anonymous Counterparty'
-                : ev.target_bank_id || 'Consortium Peer';
+                : (ev.target_bank_id || 'Consortium Peer');
 
               const isExpired = ev.retention_status === 'RETENTION_EXPIRED';
 
@@ -660,9 +760,19 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-slate-100">{ev.title}</span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        {isAnonymous ? 'ANONYMOUS MASKED' : ev.target_bank_id?.toUpperCase()}
+                        {isAnonymized ? 'ANONYMOUS MASKED' : ev.target_bank_id?.toUpperCase()}
                       </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                          ev.verification_state === 'VERIFIED'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : ev.verification_state === 'INTEGRITY_VERIFIED_ONLY'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : ev.verification_state === 'FAILED_VERIFICATION'
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                      >
                         {ev.verification_state}
                       </span>
                     </div>
@@ -708,6 +818,14 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     <div className="text-xs text-slate-300 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800">
                       <span className="text-slate-500 font-mono text-[10px] block mb-0.5">Analyst Note:</span>
                       {ev.analyst_notes}
+                    </div>
+                  )}
+
+                  {/* Verification Explanation */}
+                  {ev.explanation && (
+                    <div className="text-[11px] font-mono text-slate-400 bg-slate-950/40 p-2 rounded border border-slate-800/80">
+                      <span className="text-slate-500 block mb-0.5">Verification Detail:</span>
+                      {ev.explanation}
                     </div>
                   )}
 

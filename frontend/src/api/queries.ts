@@ -247,6 +247,7 @@ import type {
   CrossBankEvidenceAttachResponse,
   CaseEligibleEntity,
   CaseIntelligenceEvidenceItem,
+  CrossBankQueryCapabilitiesResponse,
   MultiCounterpartyIntelligenceQueryRequest,
   MultiCounterpartyIntelligenceQueryResponse,
   CrossBankMultiEvidenceAttachRequest,
@@ -3561,6 +3562,20 @@ export function useCaseIntelligenceEvidence(caseId: string | undefined) {
     },
     enabled: !!caseId,
     refetchInterval: 10_000,
+  });
+}
+
+export function useCrossBankQueryCapabilities(bankId?: string) {
+  return useQuery<CrossBankQueryCapabilitiesResponse>({
+    queryKey: ['cross-bank-query-capabilities', bankId],
+    queryFn: async () => {
+      const url = bankId
+        ? `/api/v1/intelligence/cross-bank/query-capabilities?requesting_bank_id=${encodeURIComponent(bankId)}`
+        : '/api/v1/intelligence/cross-bank/query-capabilities';
+      const { data } = await apiClient.get<CrossBankQueryCapabilitiesResponse>(url);
+      return data;
+    },
+    staleTime: 60_000,
   });
 }
 

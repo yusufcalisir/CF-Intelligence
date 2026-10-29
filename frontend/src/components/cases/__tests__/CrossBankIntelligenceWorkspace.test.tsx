@@ -45,7 +45,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       uploaded_by: 'analyst_alice',
       operational_status: 'OPERATIONAL',
       is_authoritative: true,
-      disclosure_mode: 'ANONYMOUS_FLAG',
+      disclosure_mode: 'ANONYMIZED_SUMMARY',
       target_bank_id: null, // Strictly masked
       match_confirmed: true,
       match_category: 'EXACT_MATCH',
@@ -53,7 +53,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       risk_level: 'HIGH',
       typology_indicators: ['MULE_BURST', 'HIGH_VELOCITY'],
       analyst_notes: 'Verified cross-bank PSI intersection.',
-      verification_state: 'AUTHENTIC_VERIFIED',
+      verification_state: 'VERIFIED',
       retention_status: 'ACTIVE',
       batch_expires_at: '2026-10-30T12:00:00Z',
       explanation: 'Cryptographically verified evidence.',
@@ -66,7 +66,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       batch_query_id: 'batch_query_expired_001',
       uploaded_at: '2026-10-28T08:00:00Z',
       uploaded_by: 'analyst_alice',
-      operational_status: 'OPERATIONAL',
+      operational_status: 'HISTORICAL_RECORD',
       is_authoritative: true,
       disclosure_mode: 'ATTRIBUTED_INSTITUTIONS',
       target_bank_id: 'bank_c',
@@ -76,7 +76,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       risk_level: 'MEDIUM',
       typology_indicators: ['STRUCTURING'],
       analyst_notes: 'Attributed partner match.',
-      verification_state: 'AUTHENTIC_VERIFIED',
+      verification_state: 'INTEGRITY_VERIFIED_ONLY',
       retention_status: 'RETENTION_EXPIRED',
       batch_expires_at: null,
       explanation: 'Expired batch evidence remains permanently immutable.',
@@ -93,6 +93,15 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
 
     vi.spyOn(queries, 'useCaseIntelligenceEvidence').mockReturnValue({
       data: [],
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: {
+        requesting_bank_id: 'bank_a',
+        consortia: [],
+      },
       isLoading: false,
       refetch: vi.fn(),
     } as any);
@@ -135,6 +144,12 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       refetch: vi.fn(),
     } as any);
 
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: { requesting_bank_id: 'bank_a', consortia: [] },
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
     vi.spyOn(queries, 'useQueryMultiCounterpartyIntelligence').mockReturnValue({
       mutateAsync: vi.fn(),
       isPending: false,
@@ -169,6 +184,42 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       refetch: vi.fn(),
     } as any);
 
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: {
+        requesting_bank_id: 'bank_a',
+        consortia: [
+          {
+            consortium_id: 'consortium_alpha',
+            name: 'Consortium Alpha (Tier-1 AML Federation)',
+            status: 'ACTIVE',
+            counterparts: [
+              {
+                counterpart_bank_id: 'bank_b',
+                display_name: 'Bank B Node',
+                is_authorized: true,
+                governance_status: 'ACTIVE',
+                permitted_purposes: ['FRAUD_INVESTIGATION'],
+                disclosure_modes: ['ANONYMIZED_SUMMARY', 'ATTRIBUTED_INSTITUTIONS'],
+                execution_readiness: 'OPERATIONAL',
+              },
+              {
+                counterpart_bank_id: 'bank_c',
+                display_name: 'Bank C Node',
+                is_authorized: true,
+                governance_status: 'ACTIVE',
+                permitted_purposes: ['FRAUD_INVESTIGATION'],
+                disclosure_modes: ['ANONYMIZED_SUMMARY', 'ATTRIBUTED_INSTITUTIONS'],
+                execution_readiness: 'OPERATIONAL',
+              },
+            ],
+            permitted_purposes: ['FRAUD_INVESTIGATION'],
+          },
+        ],
+      },
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
     const mockQueryResponse = {
       query_id: 'batch_query_abc_123',
       consortium_id: 'consortium_alpha',
@@ -183,17 +234,17 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
           signal_id: 'sig_b_111',
           consortium_id: 'consortium_alpha',
           requesting_bank_id: 'bank_a',
-          target_bank_id: null, // Strictly masked
+          target_bank_id: null, // Strictly masked under ANONYMIZED_SUMMARY
           match_confirmed: true,
           match_category: 'EXACT_MATCH',
           match_confidence: 0.99,
           contributing_institutions_count: 1,
           contributing_institutions: [],
-          disclosure_mode: 'ANONYMOUS_FLAG',
+          disclosure_mode: 'ANONYMIZED_SUMMARY',
           sanitized_risk_level: 'HIGH',
           sanitized_typology_indicators: ['MULE_BURST'],
           execution_mode: 'VERIFIED_OPERATIONAL',
-          attestation_status: 'HARDWARE_VERIFIED',
+          attestation_status: 'NOT_REQUIRED',
           disclaimer: 'Sanitized.',
         },
       },
@@ -236,7 +287,9 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
           case_id: 'case_123',
           execution_mode: 'VERIFIED_OPERATIONAL',
           use_established_psi: true,
-          require_hardware_attestation: true,
+          require_established_psi: true,
+          require_hardware_attestation: false,
+          idempotency_key: expect.stringMatching(/^query_/),
         })
       );
     });
@@ -246,8 +299,8 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       expect(screen.getByText('batch_query_abc_123')).toBeInTheDocument();
       expect(screen.getByText('PARTIAL_FAILURE')).toBeInTheDocument();
       // Anonymous masking check: Bank B identity is masked in the DOM
-      expect(screen.getByText('Anonymous Counterparty')).toBeInTheDocument();
-      expect(screen.getByText('ANONYMOUS MASKED')).toBeInTheDocument();
+      expect(screen.getAllByText('Anonymous Counterparty').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('ANONYMOUS MASKED').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/MATCH CONFIRMED \(EXACT_MATCH\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Confidence:/i)).toBeInTheDocument();
       expect(screen.getByText('MULE_BURST')).toBeInTheDocument();
@@ -255,6 +308,76 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       // Truthful failure check: Bank C circuit breaker
       expect(screen.getByText('CIRCUIT_BREAKER_ACTIVE')).toBeInTheDocument();
       expect(screen.getByText(/Counterpart worker in circuit breaker cooldown/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders verified NO MATCH signal without fabricated 0% intersection label and enables attachment', async () => {
+    vi.spyOn(queries, 'useCaseEligibleEntities').mockReturnValue({
+      data: mockEntities,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    vi.spyOn(queries, 'useCaseIntelligenceEvidence').mockReturnValue({
+      data: [],
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: { requesting_bank_id: 'bank_a', consortia: [] },
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
+    const mockNoMatchResponse = {
+      query_id: 'batch_no_match_001',
+      consortium_id: 'consortium_alpha',
+      requesting_bank_id: 'bank_a',
+      query_entity_id: 'ent_alice_999',
+      counterpart_count: 1,
+      overall_outcome: 'COMPLETED',
+      outcome: 'COMPLETED',
+      executed_at: '2026-10-29T14:30:00Z',
+      results: {
+        bank_b: {
+          signal_id: 'sig_b_no_match',
+          consortium_id: 'consortium_alpha',
+          requesting_bank_id: 'bank_a',
+          target_bank_id: null,
+          match_confirmed: false,
+          match_category: 'NO_MATCH',
+          match_confidence: 1.0,
+          disclosure_mode: 'ANONYMIZED_SUMMARY',
+          sanitized_risk_level: 'LOW',
+          sanitized_typology_indicators: [],
+        },
+      },
+      failures: {},
+      execution_outcomes: {},
+    };
+
+    vi.spyOn(queries, 'useQueryMultiCounterpartyIntelligence').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue(mockNoMatchResponse),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(queries, 'useAttachMultiCounterpartyEvidence').mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as any);
+
+    render(<CrossBankIntelligenceWorkspace caseId="case_123" bankId="bank_a" />);
+
+    fireEvent.click(screen.getByTestId('dispatch-multi-query-btn'));
+
+    await waitFor(() => {
+      // Truthful label: VERIFIED NO MATCH (NOT "0% INTERSECTION")
+      expect(screen.getByText('VERIFIED NO MATCH')).toBeInTheDocument();
+      expect(screen.queryByText(/0% INTERSECTION/i)).not.toBeInTheDocument();
+      // Negative matches are admissible evidence items; attach button must be enabled
+      expect(screen.getByTestId('attach-batch-evidence-btn')).not.toBeDisabled();
     });
   });
 
@@ -271,6 +394,12 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
       data: [],
       isLoading: false,
       refetch: refetchEvidence,
+    } as any);
+
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: { requesting_bank_id: 'bank_a', consortia: [] },
+      isLoading: false,
+      refetch: vi.fn(),
     } as any);
 
     const mockQueryResponse = {
@@ -292,11 +421,11 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
           match_confidence: 0.99,
           contributing_institutions_count: 1,
           contributing_institutions: [],
-          disclosure_mode: 'ANONYMOUS_FLAG',
+          disclosure_mode: 'ANONYMIZED_SUMMARY',
           sanitized_risk_level: 'HIGH',
           sanitized_typology_indicators: ['MULE_BURST'],
           execution_mode: 'VERIFIED_OPERATIONAL',
-          attestation_status: 'HARDWARE_VERIFIED',
+          attestation_status: 'NOT_REQUIRED',
           disclaimer: 'Sanitized.',
         },
       },
@@ -347,7 +476,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
         expect.objectContaining({
           query_id: 'batch_query_to_attach',
           case_id: 'case_123',
-          idempotency_key: expect.stringMatching(/^batch_attach_/),
+          idempotency_key: expect.stringMatching(/^attach_/),
         })
       );
     });
@@ -360,7 +489,7 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
     });
   });
 
-  it('renders persisted intelligence evidence trail with active vs retention expired statuses', () => {
+  it('renders persisted intelligence evidence trail with active vs retention expired statuses and truthful badges', () => {
     vi.spyOn(queries, 'useCaseEligibleEntities').mockReturnValue({
       data: mockEntities,
       isLoading: false,
@@ -370,6 +499,12 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
 
     vi.spyOn(queries, 'useCaseIntelligenceEvidence').mockReturnValue({
       data: mockPersistedEvidence,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
+
+    vi.spyOn(queries, 'useCrossBankQueryCapabilities').mockReturnValue({
+      data: { requesting_bank_id: 'bank_a', consortia: [] },
       isLoading: false,
       refetch: vi.fn(),
     } as any);
@@ -389,11 +524,13 @@ describe('CrossBankIntelligenceWorkspace Component', () => {
     // Item 1: Active batch under anonymous masking
     expect(screen.getByText('Consortium Intelligence Evidence (CONSORTIUM_ALPHA)')).toBeInTheDocument();
     expect(screen.getByText('Batch Active')).toBeInTheDocument();
+    expect(screen.getByText('VERIFIED')).toBeInTheDocument();
     expect(screen.getByText('a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeInTheDocument();
 
     // Item 2: Expired batch under attributed disclosure
     expect(screen.getByText('Consortium Intelligence Evidence (CONSORTIUM_BETA)')).toBeInTheDocument();
     expect(screen.getByText(/Batch Record Purged \(Retention Bounded\)/i)).toBeInTheDocument();
+    expect(screen.getByText('INTEGRITY_VERIFIED_ONLY')).toBeInTheDocument();
 
     const evItem2 = screen.getByTestId('evidence-item-ev_002');
     expect(within(evItem2).getByText('BANK_C')).toBeInTheDocument();

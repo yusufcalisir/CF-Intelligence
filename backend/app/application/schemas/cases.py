@@ -439,17 +439,18 @@ class CaseIntelligenceEvidenceResponse(BaseModel):
     uploaded_at: str = Field(..., description="ISO-8601 registration timestamp.")
     uploaded_by: str = Field(..., description="Investigator or system actor identity.")
     operational_status: str = Field(
-        "OPERATIONAL", description="Cryptographic assurance status (OPERATIONAL)."
+        ...,
+        description="Cryptographic assurance status (OPERATIONAL, HISTORICAL_RECORD, CONSENT_REVOKED, UNADMITTED, UNAVAILABLE, TAMPERED, CORRUPT).",
     )
     is_authoritative: bool = Field(
-        True, description="Indicates server-verified authentic issuance and admission."
+        ..., description="Indicates server-verified authentic issuance and admission."
     )
-    disclosure_mode: str = Field(
-        ..., description="Disclosure mode governing this signal (ANONYMOUS_FLAG or ATTRIBUTED_INSTITUTIONS)."
+    disclosure_mode: Literal["ATTRIBUTED_INSTITUTIONS", "ANONYMIZED_SUMMARY"] = Field(
+        ..., description="Disclosure mode governing this signal (ATTRIBUTED_INSTITUTIONS or ANONYMIZED_SUMMARY)."
     )
     target_bank_id: str | None = Field(
         None,
-        description="Responding counterpart institution ID (strictly masked to None under ANONYMOUS_FLAG).",
+        description="Responding counterpart institution ID (strictly masked to None under ANONYMIZED_SUMMARY).",
     )
     match_confirmed: bool | None = Field(
         None, description="Whether private set intersection confirmed a match."
@@ -469,8 +470,8 @@ class CaseIntelligenceEvidenceResponse(BaseModel):
     analyst_notes: str | None = Field(
         None, description="Analyst investigative notes captured upon attachment."
     )
-    verification_state: str = Field(
-        "AUTHENTIC_VERIFIED", description="Cryptographic admission verification state."
+    verification_state: Literal["VERIFIED", "INTEGRITY_VERIFIED_ONLY", "INDETERMINATE", "FAILED_VERIFICATION"] = Field(
+        ..., description="Cryptographic admission verification state (VERIFIED, INTEGRITY_VERIFIED_ONLY, INDETERMINATE, FAILED_VERIFICATION)."
     )
     retention_status: str = Field(
         "ACTIVE",

@@ -10,15 +10,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from app.application.schemas.cross_bank_intelligence import (
+    CrossBankConsortiumCapability,
+    CrossBankCounterpartCapability,
     CrossBankEvidenceAttachRequest,
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
     CrossBankMultiEvidenceAttachRequest,
     CrossBankMultiEvidenceAttachResponse,
+    CrossBankQueryCapabilitiesResponse,
     MultiCounterpartyIntelligenceQueryRequest,
     MultiCounterpartyIntelligenceQueryResponse,
 )
@@ -352,3 +355,110 @@ async def get_consortium_sharing_policy(
             "attestation_requirement": "OPTIONAL_FAIL_CLOSED_IF_REQUESTED",
         },
     }
+
+
+@router.get(
+    "/query-capabilities",
+    response_model=CrossBankQueryCapabilitiesResponse,
+    status_code=status.HTTP_200_OK,
+)
+@api_router.get(
+    "/query-capabilities",
+    response_model=CrossBankQueryCapabilitiesResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_cross_bank_query_capabilities(
+    principal: PrincipalDep,
+    requesting_bank_id: str | None = Query(None),
+    service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
+) -> CrossBankQueryCapabilitiesResponse:
+    """Retrieve server-authoritative consortia, active counterpart scope, and permitted purposes for query formulation."""
+    eff_bank = (requesting_bank_id or principal.tenant_id or "").lower().strip()
+    if not eff_bank:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Requesting bank ID must be provided or bound to authenticated principal tenant.",
+        )
+    if principal.tenant_id:
+        enforce_tenant_isolation(principal.tenant_id, eff_bank, roles=principal.roles)
+
+    from app.application.services.consortium_service import ConsortiumGovernanceService
+    consortium_svc = ConsortiumGovernanceService()
+    consortia_map = consortium_svc._consortia
+    consortia_res: list[CrossBankConsortiumCapability] = []
+
+    STANDARD_PURPOSES = [
+        "FRAUD_INVESTIGATION",
+        "AML_HIGH_RISK_MATCHING",
+        "SANCTIONS_SCREENING",
+        "REGULATORY_SAR_EVIDENCE",
+    ]
+
+    for c_id, c in consortia_map.items():
+        if c.status.value.lower() != "active":
+            continue
+        if eff_bank not in c.members or eff_bank in c.removed_members:
+            continue
+
+        counterparts_list: list[CrossBankCounterpartCapability] = []
+        for target_bank in sorted(c.members.keys()):
+            if target_bank.lower() == eff_bank:
+                continue
+            if target_bank in c.removed_members:
+                continue
+
+            authorized_purposes: list[str] = []
+            for purp in STANDARD_PURPOSES:
+                is_auth, _, _ = consortium_svc.resolve_pairwise_authorization(
+                    consortium_id=c.consortium_id,
+                    requesting_bank_id=eff_bank,
+                    counterpart_bank_id=target_bank,
+                    purpose=purp,
+                )
+                if is_auth:
+                    authorized_purposes.append(purp)
+
+            if authorized_purposes:
+                gov_status = "ACTIVE"
+                is_authorized = True
+                readiness = "OPERATIONAL"
+                disclosure_modes = ["ANONYMIZED_SUMMARY", "ATTRIBUTED_INSTITUTIONS"]
+            else:
+                p_grants = consortium_svc.list_pairwise_operational_grants(c.consortium_id, eff_bank)
+                target_g = [
+                    g for g in p_grants
+                    if (g.get("institution_a") == target_bank or g.get("institution_b") == target_bank)
+                ]
+                grant = target_g[0] if target_g else None
+                gov_status = "REVOKED" if grant and grant.get("revoked_at") else "MISSING_GRANT"
+                is_authorized = False
+                readiness = "UNAVAILABLE"
+                disclosure_modes = []
+
+            counterparts_list.append(
+                CrossBankCounterpartCapability(
+                    counterpart_bank_id=target_bank,
+                    display_name=f"{target_bank.replace('_', ' ').title()} Node",
+                    is_authorized=is_authorized,
+                    governance_status=gov_status,
+                    permitted_purposes=authorized_purposes,
+                    disclosure_modes=disclosure_modes,
+                    execution_readiness=readiness,
+                )
+            )
+
+        consortia_res.append(
+            CrossBankConsortiumCapability(
+                consortium_id=c.consortium_id,
+                name=c.name,
+                status=c.status.value,
+                counterparts=counterparts_list,
+                permitted_purposes=STANDARD_PURPOSES,
+            )
+        )
+
+    return CrossBankQueryCapabilitiesResponse(
+        requesting_bank_id=eff_bank,
+        consortia=consortia_res,
+    )
+
