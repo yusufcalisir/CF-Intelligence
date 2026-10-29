@@ -398,34 +398,6 @@ class DurableCrossBankBatchStore:
                 conn.commit()
                 return clean_case_id
 
-    def release_case_binding(self, query_id: str, case_id: str) -> bool:
-        """Atomically release destination case binding for an uncommitted batch.
-
-        Enforces:
-        1. Fenced conditional release: ONLY releases if query_id exists AND bound_case_id matches case_id.
-        2. Cannot release a batch that was created with an explicit case_id at query execution time (case_id IS NULL).
-        3. Returns True if binding was cleared, False otherwise.
-        """
-        clean_qid = (query_id or "").strip()
-        clean_case_id = (case_id or "").strip()
-        if not clean_qid or not clean_case_id:
-            return False
-
-        with self._lock:
-            with self._get_connection() as conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE cross_bank_batch_records
-                    SET bound_case_id = NULL
-                    WHERE query_id = ?
-                      AND bound_case_id = ?
-                      AND case_id IS NULL;
-                    """,
-                    (clean_qid, clean_case_id),
-                )
-                conn.commit()
-                return cursor.rowcount > 0
-
     def get_batch(self, query_id: str) -> dict[str, Any] | None:
         """Retrieve authoritative multi-counterparty batch record by query_id.
 

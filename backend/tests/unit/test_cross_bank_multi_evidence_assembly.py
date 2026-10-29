@@ -1643,17 +1643,20 @@ def test_defect_d_mandatory_receipt_query_entity_binding_enforced(multi_assembly
 
 
 # ==============================================================================
-# M6.5 Task 2 Acceptance-Blocking Fix: Safe Single-Case Binding Regressions
+# M6.5 Task 2 Final Concurrency Safety Correction: Single-Case Binding Guarantees
 # ==============================================================================
 
-def test_durable_batch_store_release_case_binding_fencing(multi_assembly_env: dict[str, Any]):
-    """Unit test for DurableCrossBankBatchStore.release_case_binding fenced guarantees."""
+def test_post_preflight_write_failure_retains_case_binding(multi_assembly_env: dict[str, Any]):
+    """Post-preflight write failure must retain case binding fail-closed to prevent cross-case hijack."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
     batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
 
-    # 1. Unbound batch: release_case_binding returns False
-    qid1 = f"batch_{uuid.uuid4().hex}"
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b")
+    query_id = f"batch_{uuid.uuid4().hex}"
     batch_store.record_batch(
-        query_id=qid1,
+        query_id=query_id,
         requesting_bank_id="bank_a",
         consortium_id="c_multi_test",
         query_entity_id="entity_alpha",
@@ -1661,37 +1664,84 @@ def test_durable_batch_store_release_case_binding_fencing(multi_assembly_env: di
         principal_tenant_id="bank_a",
         target_bank_ids=["bank_b"],
         execution_outcomes={"bank_b": {"status": "SUCCESS"}},
-        successful_signal_ids={},
-        receipt_ids={},
-        overall_outcome="FAILED",
-    )
-    assert not batch_store.release_case_binding(qid1, "case_any")
-
-    # 2. Batch bound at creation (case_id is not null): cannot be released
-    qid2 = f"batch_{uuid.uuid4().hex}"
-    batch_store.record_batch(
-        query_id=qid2,
-        requesting_bank_id="bank_a",
-        consortium_id="c_multi_test",
-        query_entity_id="entity_alpha",
-        principal_id="analyst_a1",
-        principal_tenant_id="bank_a",
-        case_id="case_fixed",
-        target_bank_ids=["bank_b"],
-        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
-        successful_signal_ids={},
-        receipt_ids={},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
         overall_outcome="COMPLETED",
     )
-    assert not batch_store.release_case_binding(qid2, "case_fixed")
-    rec2 = batch_store.get_batch(qid2)
-    assert rec2 is not None
-    assert rec2["bound_case_id"] == "case_fixed"
+    case_a = case_svc.create_case(title="Case A Initial", bank_id="bank_a")
+    case_b = case_svc.create_case(title="Case B Competing", bank_id="bank_a")
 
-    # 3. Batch dynamically bound: release with wrong case returns False
-    qid3 = f"batch_{uuid.uuid4().hex}"
+    # Hook attach_signal_to_case_evidence to fail during actual write (validate_only=False)
+    real_attach = cbi_svc.attach_signal_to_case_evidence
+    fail_write = True
+
+    def _flaky_attach(*args, **kwargs):
+        if not kwargs.get("validate_only", False) and fail_write:
+            raise ValueError("Simulated storage failure during evidence registration")
+        return real_attach(*args, **kwargs)
+
+    cbi_svc.attach_signal_to_case_evidence = _flaky_attach
+
+    # Attempt attachment to Case A -> pre-screening passes, binds Case A, but write fails
+    res_a = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=case_a.id,
+        principal=principal_a,
+    )
+    assert res_a.assembly_status == "FAILED"
+    assert res_a.attached_count == 0
+    assert len(res_a.omitted_or_failed) == 1
+
+    # Invariant: The batch REMAINS bound to Case A fail-closed!
+    rec = batch_store.get_batch(query_id)
+    assert rec is not None
+    assert rec["bound_case_id"] == case_a.id
+
+    # Competing attempt for Case B MUST fail closed
+    with pytest.raises(ConsortiumSecurityError) as exc:
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=query_id,
+            case_id=case_b.id,
+            principal=principal_a,
+        )
+    assert "already bound" in str(exc.value)
+
+    # Retry for Case A with working storage succeeds
+    fail_write = False
+    retry_res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=case_a.id,
+        principal=principal_a,
+    )
+    assert retry_res.assembly_status == "COMPLETED"
+    assert retry_res.attached_count == 1
+    assert batch_store.get_batch(query_id)["bound_case_id"] == case_a.id
+    cbi_svc.attach_signal_to_case_evidence = real_attach
+
+
+def test_deterministic_concurrency_a1_failure_a2_inflight_blocks_case_b(multi_assembly_env: dict[str, Any]):
+    """Deterministic Concurrency Regression:
+    1. Two authenticated operations A1 and A2 target the same unbound batch and Case A.
+    2. Both complete relevant preconditions; coordinate execution using barriers.
+    3. A1 encounters a legitimate post-preflight failure before committing evidence.
+    4. A2 remains in flight.
+    5. A third authorized operation attempts to bind the batch to Case B.
+    6. Case B must not acquire the batch.
+    7. A2 may complete evidence attachment to Case A.
+    8. Exactly one destination case remains authoritative.
+    9. The batch remains correctly bound after restart.
+    10. Same-case retry remains idempotent.
+    """
+    import threading
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b")
+    query_id = f"batch_{uuid.uuid4().hex}"
     batch_store.record_batch(
-        query_id=qid3,
+        query_id=query_id,
         requesting_bank_id="bank_a",
         consortium_id="c_multi_test",
         query_entity_id="entity_alpha",
@@ -1699,21 +1749,134 @@ def test_durable_batch_store_release_case_binding_fencing(multi_assembly_env: di
         principal_tenant_id="bank_a",
         target_bank_ids=["bank_b"],
         execution_outcomes={"bank_b": {"status": "SUCCESS"}},
-        successful_signal_ids={},
-        receipt_ids={},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
         overall_outcome="COMPLETED",
     )
-    batch_store.bind_case(qid3, "case_dest")
-    assert not batch_store.release_case_binding(qid3, "case_wrong")
-    rec3 = batch_store.get_batch(qid3)
-    assert rec3 is not None
-    assert rec3["bound_case_id"] == "case_dest"
+    case_a = case_svc.create_case(title="Case A Concurrency", bank_id="bank_a")
+    case_b = case_svc.create_case(title="Case B Competitor", bank_id="bank_a")
 
-    # 4. Release with matching bound_case_id and null initial case_id: returns True and resets
-    assert batch_store.release_case_binding(qid3, "case_dest")
-    rec3_after = batch_store.get_batch(qid3)
-    assert rec3_after is not None
-    assert rec3_after["bound_case_id"] is None
+    a1_preflight_done = threading.Event()
+    a1_failed = threading.Event()
+    a2_in_flight = threading.Event()
+    a2_proceed = threading.Event()
+
+    real_attach = cbi_svc.attach_signal_to_case_evidence
+
+    def hooked_attach_signal(*args, **kwargs):
+        thread_name = threading.current_thread().name
+        validate_only = kwargs.get("validate_only", False)
+
+        if thread_name == "Thread-A1" and not validate_only:
+            a1_preflight_done.set()
+            raise ValueError("Simulated legitimate post-preflight failure on A1 before committing evidence")
+
+        if thread_name == "Thread-A2" and not validate_only:
+            # A2 reached write phase: wait until A1 has completed its failure
+            a1_failed.wait(timeout=10.0)
+            a2_in_flight.set()
+            # Wait for main thread to attempt Case B and confirm rejection
+            a2_proceed.wait(timeout=10.0)
+            return real_attach(*args, **kwargs)
+
+        return real_attach(*args, **kwargs)
+
+    cbi_svc.attach_signal_to_case_evidence = hooked_attach_signal
+
+    res_a1: Any = None
+    res_a2: Any = None
+    err_a1: Exception | None = None
+    err_a2: Exception | None = None
+
+    def worker_a1():
+        nonlocal res_a1, err_a1
+        try:
+            res_a1 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+                query_id=query_id,
+                case_id=case_a.id,
+                principal=principal_a,
+            )
+        except Exception as e:
+            err_a1 = e
+        finally:
+            a1_failed.set()
+
+    def worker_a2():
+        nonlocal res_a2, err_a2
+        try:
+            res_a2 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+                query_id=query_id,
+                case_id=case_a.id,
+                principal=principal_a,
+            )
+        except Exception as e:
+            err_a2 = e
+
+    t1 = threading.Thread(target=worker_a1, name="Thread-A1")
+    t2 = threading.Thread(target=worker_a2, name="Thread-A2")
+
+    t1.start()
+    t2.start()
+
+    # Step 3: A1 completes and fails before committing evidence
+    t1.join(timeout=10.0)
+    assert not t1.is_alive(), "Thread-A1 did not terminate"
+    assert err_a1 is None
+    assert res_a1 is not None
+    assert res_a1.assembly_status == "FAILED"
+    assert res_a1.attached_count == 0
+
+    # Step 4: A2 remains in flight
+    assert a2_in_flight.wait(timeout=10.0), "Thread-A2 did not reach in-flight state"
+    assert t2.is_alive(), "Thread-A2 must remain in flight"
+
+    # Step 5 & 6: A third authorized operation attempts to bind the batch to Case B -> MUST NOT acquire
+    with pytest.raises(ConsortiumSecurityError) as exc_b:
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=query_id,
+            case_id=case_b.id,
+            principal=principal_a,
+        )
+    assert "already bound" in str(exc_b.value)
+
+    # Step 7: A2 may complete evidence attachment to Case A
+    a2_proceed.set()
+    t2.join(timeout=10.0)
+    assert not t2.is_alive(), "Thread-A2 did not terminate"
+    assert err_a2 is None
+    assert res_a2 is not None
+    assert res_a2.assembly_status == "COMPLETED"
+    assert res_a2.attached_count == 1
+
+    # Step 8: Exactly one destination case remains authoritative
+    rec = batch_store.get_batch(query_id)
+    assert rec is not None
+    assert rec["bound_case_id"] == case_a.id
+    ev_a = cbi_svc.evidence_service.get_case_evidence(case_a.id)
+    assert len(ev_a) == 1
+    ev_b = cbi_svc.evidence_service.get_case_evidence(case_b.id)
+    assert len(ev_b) == 0
+
+    # Step 9: The batch remains correctly bound after restart
+    db_path = batch_store.db_path
+    DurableCrossBankBatchStore.reset_instance()
+    restarted_store = DurableCrossBankBatchStore.get_instance(db_path=db_path)
+    cbi_svc.batch_store = restarted_store
+    rec_restarted = restarted_store.get_batch(query_id)
+    assert rec_restarted is not None
+    assert rec_restarted["bound_case_id"] == case_a.id
+
+    # Step 10: Same-case retry remains idempotent
+    cbi_svc.attach_signal_to_case_evidence = real_attach
+    retry_res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=query_id,
+        case_id=case_a.id,
+        principal=principal_a,
+    )
+    assert retry_res.assembly_status == "COMPLETED"
+    assert retry_res.is_duplicate_submission is True
+    assert retry_res.replayed_count == 1
+    assert retry_res.attached_count == 0
 
 
 def test_scenario_1_unbound_batch_missing_admitted_receipt_remains_unbound(multi_assembly_env: dict[str, Any]):

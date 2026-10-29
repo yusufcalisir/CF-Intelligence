@@ -4422,17 +4422,7 @@ class CrossBankIntelligenceService:
                         )
                     )
 
-            # 13. Fenced Release of Case Binding if Zero Evidence was Committed
-            if newly_attached_count == 0 and replayed_count == 0:
-                fresh_case_evidence = self.evidence_service.get_case_evidence(case_id)
-                has_committed_ev = any(
-                    (ev.get("metadata") or {}).get("batch_query_id") == clean_qid
-                    for ev in fresh_case_evidence
-                )
-                if not has_committed_ev:
-                    self.batch_store.release_case_binding(clean_qid, case_id)
-
-            # 14. Compute Overall Assembly Status
+            # 13. Compute Overall Assembly Status
             total_targets = len(target_bank_ids)
             successful_attachments = len(attached_items)
 
