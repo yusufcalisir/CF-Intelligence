@@ -11,7 +11,9 @@ import {
   useGenerateCopilotNarrative,
   useExportFinCENXml,
   useAlert,
+  useCaseEligibleEntities,
 } from '../api/queries';
+import { CrossBankIntelligenceWorkspace } from '../components/cases/CrossBankIntelligenceWorkspace';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
 import { formatApiError } from '../api/client';
@@ -189,56 +191,29 @@ export default function CaseDetailPage() {
   const { data: realSelectedAlert, isLoading: isSelectedAlertLoading } = useAlert(selectedAlertId || undefined);
 
   const { data: evidenceList } = useCaseEvidence(caseId);
+  const { data: eligibleCaseEntities } = useCaseEligibleEntities(caseId);
 
-  // Extract unique entity IDs from evidence items and title/content
-  const extractedEvidenceEntities = useMemo(() => {
-    if (!evidenceList || !evidenceList.length) return [];
-    const entitySet = new Set<string>();
-    const entityPattern = /(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/gi;
-
-    for (const ev of evidenceList) {
-      const textToScan = `${ev.title} ${ev.file_path} ${ev.content_hash}`;
-      const matches = textToScan.match(entityPattern);
-      if (matches) {
-        for (const m of matches) entitySet.add(m);
-      }
-      if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
-        const idMatch = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
-        if (idMatch && idMatch[1] && idMatch[1].length >= 3) {
-          entitySet.add(`ent_acc_${idMatch[1].toLowerCase()}`);
-        }
-      }
-    }
-    return Array.from(entitySet);
-  }, [evidenceList]);
-
-  // Combined suspect entities for this case (from linked alerts and registered evidence)
+  // Authoritative suspect entities for this case (from authentic case alerts and bank entities)
   const caseSuspectEntities = useMemo(() => {
-    const set = new Set<string>(extractedEvidenceEntities);
-    if (caseData?.alert_ids) {
-      for (const aId of caseData.alert_ids) {
-        set.add(`ent_acc_${aId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toLowerCase()}`);
-      }
+    if (eligibleCaseEntities && eligibleCaseEntities.length > 0) {
+      return eligibleCaseEntities.map((e) => e.entity_id);
     }
+    const set = new Set<string>();
     if (realSelectedAlert?.involved_entity_ids) {
       for (const ent of realSelectedAlert.involved_entity_ids) {
         set.add(ent);
       }
     }
     return Array.from(set);
-  }, [extractedEvidenceEntities, caseData?.alert_ids, realSelectedAlert]);
+  }, [eligibleCaseEntities, realSelectedAlert]);
 
-  // Helper to extract or generate consistent entity ID for evidence
+  // Helper to resolve authentic entity ID for evidence
   const getEvidenceEntityId = (ev: { id: string; title: string; file_path: string; content_hash: string }) => {
-    const match = `${ev.title} ${ev.file_path} ${ev.content_hash}`.match(/(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/i);
-    if (match) return match[0];
-    if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
-      const num = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
-      if (num && num[1]) return `ent_acc_${num[1].toLowerCase()}`;
+    if (eligibleCaseEntities && eligibleCaseEntities.length > 0) {
+      return eligibleCaseEntities[0]?.entity_id ?? ev.id;
     }
-    return `ent_acc_${ev.id.slice(0, 8)}`;
+    return ev.id;
   };
-
   const addEvidence = useAddEvidence();
 
   const handleAddNote = async () => {
@@ -945,6 +920,15 @@ export default function CaseDetailPage() {
         )}
       </motion.div>
 
+
+      {/* Cross-Bank Consortium Intelligence Workspace (M6.6 Task 1) */}
+      {caseId && (
+        <CrossBankIntelligenceWorkspace
+          caseId={caseId}
+          bankId={caseData?.bank_id}
+          assignedTo={caseData?.assigned_to}
+        />
+      )}
 
       {/* Evidence Registry */}
       <motion.div

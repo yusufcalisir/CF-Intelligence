@@ -569,6 +569,7 @@ export interface IntelligenceStats {
 
 export interface Case {
   id: string;
+  bank_id?: string | null;
   title: string;
   status: string;
   priority: string;
@@ -3597,7 +3598,7 @@ export interface CrossBankIntelligenceSignal {
   match_confidence: number;
   contributing_institutions_count: number;
   contributing_institutions: string[];
-  disclosure_mode?: 'ATTRIBUTED_INSTITUTIONS' | 'ANONYMIZED_SUMMARY';
+  disclosure_mode?: 'ATTRIBUTED_INSTITUTIONS' | 'ANONYMIZED_SUMMARY' | 'ANONYMOUS_FLAG';
   sanitized_risk_level: string;
   sanitized_typology_indicators: string[];
   graph_context?: Record<string, unknown>;
@@ -3644,4 +3645,123 @@ export interface CrossBankEvidenceAttachResponse {
   is_duplicate_submission?: boolean;
 }
 
+// ── M6.6 Multi-Counterparty Investigation Workspace Types ──
+
+export interface CaseEligibleEntity {
+  entity_id: string;
+  display_label: string;
+  entity_type: string;
+  risk_level: string;
+  bank_id: string;
+  source_alert_id?: string | null;
+}
+
+export interface CaseIntelligenceEvidenceItem {
+  evidence_id: string;
+  case_id: string;
+  title: string;
+  content_hash: string;
+  batch_query_id?: string | null;
+  uploaded_at: string;
+  uploaded_by: string;
+  operational_status: string;
+  is_authoritative: boolean;
+  disclosure_mode: 'ANONYMOUS_FLAG' | 'ATTRIBUTED_INSTITUTIONS' | string;
+  target_bank_id?: string | null;
+  match_confirmed?: boolean | null;
+  match_category?: string | null;
+  confidence?: number | null;
+  risk_level?: string | null;
+  typology_indicators: string[];
+  analyst_notes?: string | null;
+  verification_state: string;
+  retention_status: 'ACTIVE' | 'RETENTION_EXPIRED' | string;
+  batch_expires_at?: string | null;
+  explanation?: string | null;
+}
+
+export interface CounterpartyExecutionFailure {
+  target_bank_id: string;
+  error_category: string;
+  error_message: string;
+  failed_at: string;
+  retryable?: boolean;
+}
+
+export interface CounterpartyExecutionOutcome {
+  target_bank_id: string;
+  status: 'SUCCESS' | 'FAILED';
+  signal?: CrossBankIntelligenceSignal | null;
+  failure?: CounterpartyExecutionFailure | null;
+}
+
+export interface MultiCounterpartyIntelligenceQueryRequest {
+  requesting_bank_id: string;
+  query_entity_id: string;
+  privacy_id?: string;
+  consortium_id: string;
+  target_bank_ids: string[];
+  case_id?: string;
+  purpose?: string;
+  require_hardware_attestation?: boolean;
+  use_established_psi?: boolean;
+  require_established_psi?: boolean;
+  protocol?: string;
+  execution_mode?: 'SIMULATED_RESEARCH' | 'VERIFIED_OPERATIONAL';
+}
+
+export interface MultiCounterpartyIntelligenceQueryResponse {
+  query_id: string;
+  consortium_id: string;
+  requesting_bank_id: string;
+  query_entity_id: string;
+  counterpart_count: number;
+  overall_outcome: 'COMPLETED' | 'PARTIAL_FAILURE' | 'FAILED';
+  outcome?: 'COMPLETED' | 'PARTIAL_FAILURE' | 'FAILED';
+  results: Record<string, CrossBankIntelligenceSignal>;
+  failures: Record<string, CounterpartyExecutionFailure>;
+  execution_outcomes: Record<string, CounterpartyExecutionOutcome>;
+  executed_at: string;
+}
+
+export interface MultiCounterpartyEvidenceItem {
+  evidence_id: string;
+  target_bank_id?: string | null;
+  signal_id: string;
+  receipt_id?: string | null;
+  match_confirmed: boolean;
+  match_category?: string | null;
+  confidence: number;
+  risk_level: string;
+  content_hash: string;
+  uploaded_at: string;
+  is_replayed: boolean;
+}
+
+export interface CounterpartyFailureDetail {
+  target_bank_id: string;
+  category: string;
+  reason: string;
+}
+
+export interface CrossBankMultiEvidenceAttachRequest {
+  query_id: string;
+  case_id: string;
+  notes?: string;
+  idempotency_key?: string;
+}
+
+export interface CrossBankMultiEvidenceAttachResponse {
+  query_id: string;
+  case_id: string;
+  assembly_status: 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'NO_ADMISSIBLE_SIGNALS';
+  attached_count: number;
+  replayed_count: number;
+  failed_count: number;
+  attached_evidence: MultiCounterpartyEvidenceItem[];
+  omitted_or_failed: CounterpartyFailureDetail[];
+  case_version: number;
+  timeline_event_recorded: boolean;
+  is_duplicate_submission: boolean;
+}
 

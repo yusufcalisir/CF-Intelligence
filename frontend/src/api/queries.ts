@@ -245,6 +245,12 @@ import type {
   CrossBankIntelligenceQueryPayload,
   CrossBankEvidenceAttachPayload,
   CrossBankEvidenceAttachResponse,
+  CaseEligibleEntity,
+  CaseIntelligenceEvidenceItem,
+  MultiCounterpartyIntelligenceQueryRequest,
+  MultiCounterpartyIntelligenceQueryResponse,
+  CrossBankMultiEvidenceAttachRequest,
+  CrossBankMultiEvidenceAttachResponse,
 } from './types';
 
 
@@ -3524,6 +3530,75 @@ export function useAttachCrossBankEvidence() {
       queryClient.invalidateQueries({ queryKey: ['case', variables.case_id] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['evidence', variables.case_id] });
+    },
+  });
+}
+
+// ── M6.6 Multi-Counterparty Case Intelligence Workspace Queries & Mutations ──
+
+export function useCaseEligibleEntities(caseId: string | undefined) {
+  return useQuery<CaseEligibleEntity[]>({
+    queryKey: ['case-eligible-entities', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CaseEligibleEntity[]>(
+        `/api/v1/cases/${caseId}/eligible-entities`,
+      );
+      return data;
+    },
+    enabled: !!caseId,
+    staleTime: 30_000,
+  });
+}
+
+export function useCaseIntelligenceEvidence(caseId: string | undefined) {
+  return useQuery<CaseIntelligenceEvidenceItem[]>({
+    queryKey: ['case-intelligence-evidence', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CaseIntelligenceEvidenceItem[]>(
+        `/api/v1/cases/${caseId}/intelligence-evidence`,
+      );
+      return data;
+    },
+    enabled: !!caseId,
+    refetchInterval: 10_000,
+  });
+}
+
+export function useQueryMultiCounterpartyIntelligence() {
+  return useMutation<
+    MultiCounterpartyIntelligenceQueryResponse,
+    Error,
+    MultiCounterpartyIntelligenceQueryRequest
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<MultiCounterpartyIntelligenceQueryResponse>(
+        '/api/v1/intelligence/cross-bank/query-multi',
+        payload,
+      );
+      return data;
+    },
+  });
+}
+
+export function useAttachMultiCounterpartyEvidence() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    CrossBankMultiEvidenceAttachResponse,
+    Error,
+    CrossBankMultiEvidenceAttachRequest
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CrossBankMultiEvidenceAttachResponse>(
+        '/api/v1/intelligence/cross-bank/attach-multi-to-case',
+        payload,
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['case', variables.case_id] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case-evidence', variables.case_id] });
+      queryClient.invalidateQueries({ queryKey: ['case-intelligence-evidence', variables.case_id] });
     },
   });
 }

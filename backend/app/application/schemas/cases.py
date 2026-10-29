@@ -407,3 +407,79 @@ class ExportFinCENXmlResponse(BaseModel):
     sha256_hash: str | None = None
     filing_status: str | None = None
     pdf_download_url: str
+
+
+class CaseEligibleEntityResponse(BaseModel):
+    """Authoritative institution-owned entity linked to an investigation case."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    entity_id: str = Field(..., description="Unique entity identifier.")
+    display_label: str = Field(..., description="Masked/sanitized display label.")
+    entity_type: str = Field(..., description="Entity domain type (customer, merchant, device, card).")
+    risk_level: str = Field(..., description="Local entity risk level classification.")
+    bank_id: str = Field(..., description="Authoritative owning bank ID.")
+    source_alert_id: str | None = Field(
+        None, description="Source alert ID from which this entity was linked, if applicable."
+    )
+
+
+class CaseIntelligenceEvidenceResponse(BaseModel):
+    """Sanitized, investigator-facing read projection of verified cross-bank intelligence evidence."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    evidence_id: str = Field(..., description="Authoritative case evidence record ID.")
+    case_id: str = Field(..., description="Target investigation case ID.")
+    title: str = Field(..., description="Evidence item title.")
+    content_hash: str = Field(..., description="Cryptographic SHA-256 digest of persisted evidence payload.")
+    batch_query_id: str | None = Field(
+        None, description="Authoritative server-issued query execution batch ID."
+    )
+    uploaded_at: str = Field(..., description="ISO-8601 registration timestamp.")
+    uploaded_by: str = Field(..., description="Investigator or system actor identity.")
+    operational_status: str = Field(
+        "OPERATIONAL", description="Cryptographic assurance status (OPERATIONAL)."
+    )
+    is_authoritative: bool = Field(
+        True, description="Indicates server-verified authentic issuance and admission."
+    )
+    disclosure_mode: str = Field(
+        ..., description="Disclosure mode governing this signal (ANONYMOUS_FLAG or ATTRIBUTED_INSTITUTIONS)."
+    )
+    target_bank_id: str | None = Field(
+        None,
+        description="Responding counterpart institution ID (strictly masked to None under ANONYMOUS_FLAG).",
+    )
+    match_confirmed: bool | None = Field(
+        None, description="Whether private set intersection confirmed a match."
+    )
+    match_category: str | None = Field(
+        None, description="Match category (e.g. EXACT_MATCH, PROBABILISTIC_FUZZY, NO_MATCH)."
+    )
+    confidence: float | None = Field(
+        None, description="Match confidence or calibrated score."
+    )
+    risk_level: str | None = Field(
+        None, description="Sanitized counterpart risk level."
+    )
+    typology_indicators: list[str] = Field(
+        default_factory=list, description="Sanitized AML/fraud typology indicators."
+    )
+    analyst_notes: str | None = Field(
+        None, description="Analyst investigative notes captured upon attachment."
+    )
+    verification_state: str = Field(
+        "AUTHENTIC_VERIFIED", description="Cryptographic admission verification state."
+    )
+    retention_status: str = Field(
+        "ACTIVE",
+        description="Query batch retention status (ACTIVE or RETENTION_EXPIRED). Evidence ledger is permanent.",
+    )
+    batch_expires_at: str | None = Field(
+        None, description="ISO-8601 expiration timestamp for intermediate batch store record."
+    )
+    explanation: str | None = Field(
+        None, description="Human-readable provenance and cryptographic audit explanation."
+    )
+
