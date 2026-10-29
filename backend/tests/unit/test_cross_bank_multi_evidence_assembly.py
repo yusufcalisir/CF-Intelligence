@@ -40,7 +40,11 @@ from app.domain.enums import CaseStatus
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
-from app.infrastructure.storage.durable_batch_store import DurableCrossBankBatchStore
+from app.infrastructure.storage.durable_batch_store import (
+    BatchCaseBindingConflictError,
+    BatchStorageConflictError,
+    DurableCrossBankBatchStore,
+)
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.main import app
 
@@ -238,6 +242,7 @@ def _seed_operational_signal(
         "requesting_bank_id": requesting_bank_id,
         "target_bank_id": target_bank_id,
         "consortium_id": consortium_id,
+        "query_entity_id": query_entity_id,
         "content_hash": content_hash,
         "execution_mode": "VERIFIED_OPERATIONAL",
         "verified_at": now.isoformat(),
@@ -403,8 +408,24 @@ def test_legitimate_partial_failure_assembly(multi_assembly_env: dict[str, Any])
     """Demonstrate that when Bank B succeeds and Bank C fails, Bank B attaches and Bank C contributes NO fake evidence."""
     cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
     case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    gov_svc: ConsortiumGovernanceService = multi_assembly_env["gov_svc"]
     batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
     principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    # Register pairwise grant allowing attributed sharing between bank_a and bank_c
+    gov_svc.register_operational_data_sharing_grant(
+        consortium_id="c_multi_test",
+        grant_id="grant_ac_partial_test",
+        authority="FFIEC",
+        participating_banks=["bank_a", "bank_c"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        institution_jurisdictions={"bank_a": "EU", "bank_c": "EU"},
+        allow_institution_identity_sharing=True,
+        revision=1,
+        approving_bank_id="bank_a",
+        auth_token=multi_assembly_env["tokens"]["admin"],
+    )
 
     sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b")
     query_id = f"batch_{uuid.uuid4().hex}"
@@ -979,3 +1000,307 @@ def test_fastapi_attach_multi_to_case_routes(multi_assembly_env: dict[str, Any])
         headers={"Authorization": f"Bearer {token_a}", "X-Tenant-ID": "bank_a"},
     )
     assert resp_404.status_code == 404
+
+
+# ==============================================================================
+# Targeted Correction Regression Tests (Corrections A, B, C)
+# ==============================================================================
+
+
+def test_batch_store_immutable_insert_and_conflict_on_mutation(multi_assembly_env: dict[str, Any]):
+    """Correction A: DurableCrossBankBatchStore enforces insert-only immutable semantics; conflicting mutations raise BatchStorageConflictError."""
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    qid = f"batch_{uuid.uuid4().hex}"
+
+    # Initial authoritative recording
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": "sig_orig"},
+        receipt_ids={"bank_b": "rcp_orig"},
+        overall_outcome="COMPLETED",
+    )
+
+    # Mutation attempt 1: differing signal_ids
+    with pytest.raises(BatchStorageConflictError) as exc1:
+        batch_store.record_batch(
+            query_id=qid,
+            requesting_bank_id="bank_a",
+            consortium_id="c_multi_test",
+            query_entity_id="entity_alpha",
+            principal_id="analyst_a1",
+            principal_tenant_id="bank_a",
+            target_bank_ids=["bank_b"],
+            execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+            successful_signal_ids={"bank_b": "sig_MUTATED"},
+            receipt_ids={"bank_b": "rcp_orig"},
+            overall_outcome="COMPLETED",
+        )
+    assert "Immutable batch record conflict" in str(exc1.value)
+
+    # Mutation attempt 2: differing receipt_ids
+    with pytest.raises(BatchStorageConflictError) as exc2:
+        batch_store.record_batch(
+            query_id=qid,
+            requesting_bank_id="bank_a",
+            consortium_id="c_multi_test",
+            query_entity_id="entity_alpha",
+            principal_id="analyst_a1",
+            principal_tenant_id="bank_a",
+            target_bank_ids=["bank_b"],
+            execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+            successful_signal_ids={"bank_b": "sig_orig"},
+            receipt_ids={"bank_b": "rcp_MUTATED"},
+            overall_outcome="COMPLETED",
+        )
+    assert "receipt_ids" in str(exc2.value)
+
+    # Mutation attempt 3: differing requesting_bank_id
+    with pytest.raises(BatchStorageConflictError) as exc3:
+        batch_store.record_batch(
+            query_id=qid,
+            requesting_bank_id="bank_b",  # Differing tenant
+            consortium_id="c_multi_test",
+            query_entity_id="entity_alpha",
+            principal_id="analyst_a1",
+            principal_tenant_id="bank_a",
+            target_bank_ids=["bank_b"],
+            execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+            successful_signal_ids={"bank_b": "sig_orig"},
+            receipt_ids={"bank_b": "rcp_orig"},
+            overall_outcome="COMPLETED",
+        )
+    assert "requesting_bank_id" in str(exc3.value)
+
+
+def test_batch_store_idempotent_replay_preserves_immutable_record(multi_assembly_env: dict[str, Any]):
+    """Correction A: Identical batch recording replay succeeds idempotently and preserves existing record."""
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    qid = f"batch_{uuid.uuid4().hex}"
+
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": "sig_orig"},
+        receipt_ids={"bank_b": "rcp_orig"},
+        overall_outcome="COMPLETED",
+    )
+
+    rec1 = batch_store.get_batch(qid)
+    assert rec1 is not None
+
+    # Identical replay
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": "sig_orig"},
+        receipt_ids={"bank_b": "rcp_orig"},
+        overall_outcome="COMPLETED",
+    )
+
+    rec2 = batch_store.get_batch(qid)
+    assert rec2 is not None
+    assert rec1["created_at"] == rec2["created_at"]
+    assert rec1["query_id"] == rec2["query_id"]
+
+
+def test_batch_store_single_case_binding_and_conflict(multi_assembly_env: dict[str, Any]):
+    """Correction B: bind_case() establishes atomic single-case binding; conflicting bindings raise BatchCaseBindingConflictError."""
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    qid = f"batch_{uuid.uuid4().hex}"
+
+    # Record un-bound batch
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": "sig_b"},
+        receipt_ids={"bank_b": "rcp_b"},
+        overall_outcome="COMPLETED",
+    )
+
+    # First binding to case_1
+    bound = batch_store.bind_case(query_id=qid, case_id="case_1")
+    assert bound == "case_1"
+
+    # Replay binding to case_1 succeeds idempotently
+    bound_replay = batch_store.bind_case(query_id=qid, case_id="case_1")
+    assert bound_replay == "case_1"
+
+    # Competing binding to case_2 must fail closed
+    with pytest.raises(BatchCaseBindingConflictError) as exc:
+        batch_store.bind_case(query_id=qid, case_id="case_2")
+    assert "Cross-case binding violation" in str(exc.value)
+
+
+def test_batch_assembly_exact_receipt_binding_mismatch_fails_closed(multi_assembly_env: dict[str, Any]):
+    """Correction A: Assembly checks exact receipt binding against _admitted_receipts_store; mismatch is rejected without attaching fake evidence."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b")
+    qid = f"batch_{uuid.uuid4().hex}"
+
+    # Batch claims receipt is 'rcp_mismatched_unadmitted'
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": "rcp_mismatched_unadmitted"},
+        overall_outcome="COMPLETED",
+    )
+
+    case = case_svc.create_case(title="Receipt Mismatch Test Case", bank_id="bank_a")
+
+    res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid,
+        case_id=case.id,
+        principal=principal_a,
+    )
+
+    assert res.assembly_status == "FAILED"
+    assert res.attached_count == 0
+    assert res.failed_count == 1
+    assert len(res.attached_evidence) == 0
+    assert len(res.omitted_or_failed) == 1
+    assert res.omitted_or_failed[0].category == "GOVERNANCE_OR_ADMISSION_REJECTED"
+    assert "cryptographic" in res.omitted_or_failed[0].reason.lower() or "admission" in res.omitted_or_failed[0].reason.lower()
+
+    # Zero evidence persisted on case
+    ev_list = cbi_svc.evidence_service.get_case_evidence(case.id)
+    assert len(ev_list) == 0
+
+
+def test_batch_assembly_unbound_batch_first_case_binding_and_subsequent_conflict(multi_assembly_env: dict[str, Any]):
+    """Correction B: Unbound batch binds atomically to first case; attaching same batch to second case raises 409 / ConsortiumSecurityError."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    sig_b, rcp_b = _seed_operational_signal(cbi_svc, target_bank_id="bank_b")
+    qid = f"batch_{uuid.uuid4().hex}"
+
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_b"],
+        execution_outcomes={"bank_b": {"status": "SUCCESS"}},
+        successful_signal_ids={"bank_b": sig_b},
+        receipt_ids={"bank_b": rcp_b},
+        overall_outcome="COMPLETED",
+    )
+
+    case_1 = case_svc.create_case(title="Destination Case 1", bank_id="bank_a")
+    case_2 = case_svc.create_case(title="Destination Case 2", bank_id="bank_a")
+
+    # Attaching to Case 1 succeeds
+    res1 = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid,
+        case_id=case_1.id,
+        principal=principal_a,
+    )
+    assert res1.assembly_status == "COMPLETED"
+    assert res1.attached_count == 1
+
+    # Attaching same batch to Case 2 raises ConsortiumSecurityError (which maps to 409 HTTP Conflict)
+    with pytest.raises(ConsortiumSecurityError) as exc:
+        cbi_svc.attach_multi_counterparty_to_case_evidence(
+            query_id=qid,
+            case_id=case_2.id,
+            principal=principal_a,
+        )
+    assert "Cross-case binding violation" in str(exc.value)
+
+    # Case 2 remains unmodified
+    ev_case_2 = cbi_svc.evidence_service.get_case_evidence(case_2.id)
+    assert len(ev_case_2) == 0
+
+
+def test_batch_assembly_disclosure_safe_failed_outcomes_anonymity_preservation(multi_assembly_env: dict[str, Any]):
+    """Correction C: Anonymous failed counterpart returns target_bank_id=None, signal_id=None, and sanitized domain reason without leaking counterpart name or internal error text."""
+    cbi_svc: CrossBankIntelligenceService = multi_assembly_env["cbi_svc"]
+    case_svc: CaseManagementService = multi_assembly_env["case_svc"]
+    batch_store: DurableCrossBankBatchStore = multi_assembly_env["batch_store"]
+    principal_a = multi_assembly_env["principals"]["bank_a"]
+
+    qid = f"batch_{uuid.uuid4().hex}"
+    batch_store.record_batch(
+        query_id=qid,
+        requesting_bank_id="bank_a",
+        consortium_id="c_multi_test",
+        query_entity_id="entity_alpha",
+        principal_id="analyst_a1",
+        principal_tenant_id="bank_a",
+        target_bank_ids=["bank_c"],  # Bank C has NO attributed grant (strictly anonymous)
+        execution_outcomes={
+            "bank_c": {
+                "status": "FAILED",
+                "failure": {
+                    "error_category": "WORKER_TIMEOUT",
+                    "error_message": "Worker node secret_worker_42 at bank_c timed out on private PSI socket.",
+                },
+            },
+        },
+        successful_signal_ids={},
+        receipt_ids={},
+        overall_outcome="FAILED",
+    )
+
+    case = case_svc.create_case(title="Anonymous Failure Test Case", bank_id="bank_a")
+
+    res = cbi_svc.attach_multi_counterparty_to_case_evidence(
+        query_id=qid,
+        case_id=case.id,
+        principal=principal_a,
+    )
+
+    assert res.assembly_status == "FAILED"
+    assert len(res.omitted_or_failed) == 1
+    fail = res.omitted_or_failed[0]
+
+    # Confidentiality guarantees: target_bank_id and signal_id are strictly None
+    assert fail.target_bank_id is None
+    assert fail.signal_id is None
+
+    # Categorization and reason sanitization
+    assert fail.category in ("WORKER_TIMEOUT", "COUNTERPART_TIMEOUT")
+    assert fail.reason == "Counterpart execution timed out."
+    assert "bank_c" not in fail.reason
+    assert "secret_worker_42" not in fail.reason
+    assert "PSI" not in fail.reason

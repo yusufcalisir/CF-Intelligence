@@ -85,6 +85,8 @@ from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_batch_store import (
+    BatchCaseBindingConflictError,
+    BatchNotFoundError,
     DurableCrossBankBatchStore,
 )
 from app.infrastructure.storage.durable_circuit_breaker_store import (
@@ -3886,6 +3888,124 @@ class CrossBankIntelligenceService:
             )
             raise
 
+    def _is_counterparty_attributed_authorized(
+        self,
+        consortium: Any,
+        requesting_bank: str,
+        target_bank: str,
+        signal_record: dict[str, Any] | None = None,
+    ) -> bool:
+        """Evaluate whether counterpart identity disclosure is explicitly authorized under governance policy.
+
+        Fails closed (returns False) unless the governing operational grant or the admitted signal record
+        explicitly permits ATTRIBUTED_INSTITUTIONS disclosure mode.
+        """
+        if signal_record:
+            raw_sig_data = signal_record.get("signal_data")
+            sig_data: dict[str, Any] = raw_sig_data if isinstance(raw_sig_data, dict) else {}
+            mode = sig_data.get("disclosure_mode") or signal_record.get("disclosure_mode")
+            if mode == "ATTRIBUTED_INSTITUTIONS":
+                return True
+            if mode in ("ANONYMOUS_SUMMARY", "ANONYMIZED_SUMMARY", "ANONYMOUS_STATISTICAL", "PSEUDONYMIZED"):
+                return False
+
+        if consortium:
+            if hasattr(consortium, "find_pairwise_operational_grant"):
+                g = consortium.find_pairwise_operational_grant(requesting_bank, target_bank)
+                if g and isinstance(g, dict):
+                    is_active = g.get("is_active", True) and not g.get("revoked_by_institutions")
+                    if is_active and bool(g.get("allow_institution_identity_sharing", False)):
+                        return True
+
+            # Also check all operational data sharing grants as fallback
+            req_clean = requesting_bank.lower().strip()
+            tgt_clean = target_bank.lower().strip()
+            all_grants = getattr(consortium, "operational_data_sharing_grants", {}) or {}
+            for g in all_grants.values():
+                if isinstance(g, dict):
+                    parts = {str(b).lower().strip() for b in (g.get("participating_banks") or g.get("member_institutions") or [])}
+                    is_active = g.get("is_active", True) and not g.get("revoked_by_institutions")
+                    if is_active and req_clean in parts and tgt_clean in parts and bool(g.get("allow_institution_identity_sharing", False)):
+                        return True
+        return False
+
+    def _project_safe_attach_failure(
+        self,
+        target_bank: str,
+        category: str,
+        raw_reason: str,
+        consortium: Any,
+        requesting_bank: str,
+        signal_id: str | None = None,
+        signal_record: dict[str, Any] | None = None,
+    ) -> MultiCounterpartyEvidenceAttachFailure:
+        """Project a disclosure-safe, sanitized attach failure record without leaking sensitive identifiers.
+
+        Ensures:
+        - target_bank_id and signal_id are omitted (None) unless attributed disclosure is authorized.
+        - reason is mapped to carefully authored stable domain text, never raw exception strings or secrets.
+        - internal detailed errors are logged server-side for restricted auditability.
+        """
+        is_attributed = self._is_counterparty_attributed_authorized(
+            consortium=consortium,
+            requesting_bank=requesting_bank,
+            target_bank=target_bank,
+            signal_record=signal_record,
+        )
+
+        safe_target: str | None = target_bank if is_attributed else None
+        safe_sig_id: str | None = signal_id if is_attributed else None
+
+        # Map to stable public category and sanitized message
+        safe_category = category
+        raw_lower = raw_reason.lower()
+        if "timed out" in raw_lower or "timeout" in raw_lower or category in ("WORKER_TIMEOUT", "COUNTERPART_TIMEOUT"):
+            safe_category = "WORKER_TIMEOUT" if category == "WORKER_TIMEOUT" else "COUNTERPART_TIMEOUT"
+            safe_reason = "Counterpart execution timed out."
+        elif "circuit breaker" in raw_lower or category in ("CIRCUIT_BREAKER_ACTIVE", "CIRCUIT_BREAKER_OPEN"):
+            safe_category = "CIRCUIT_BREAKER_ACTIVE"
+            safe_reason = "Counterpart circuit breaker active."
+        elif "unavailable" in raw_lower or "offline" in raw_lower or "transport" in raw_lower or "refused" in raw_lower or category == "COUNTERPART_UNAVAILABLE":
+            safe_category = "COUNTERPART_UNAVAILABLE"
+            safe_reason = "Counterpart worker unavailable."
+        elif "revoked" in raw_lower:
+            safe_category = "GOVERNANCE_OR_ADMISSION_REJECTED"
+            safe_reason = "Operational grant was revoked or expired."
+        elif "consent" in raw_lower or "grant" in raw_lower:
+            safe_category = "GOVERNANCE_OR_ADMISSION_REJECTED"
+            safe_reason = "Consortium data sharing grant or consent is not active."
+        elif (
+            "admission" in raw_lower
+            or "digest" in raw_lower
+            or "binding" in raw_lower
+            or "tamper" in raw_lower
+            or "receipt" in raw_lower
+            or "integrity" in raw_lower
+        ):
+            safe_category = "GOVERNANCE_OR_ADMISSION_REJECTED"
+            safe_reason = "Signal cryptographic integrity or admission verification failed."
+        elif safe_category == "GOVERNANCE_OR_ADMISSION_REJECTED":
+            safe_reason = "Signal admission rejected under consortium governance or integrity policy."
+        elif safe_category == "NO_ADMISSIBLE_SIGNALS":
+            safe_reason = "Batch contains zero admissible operational signals for case evidence."
+        else:
+            safe_category = "COUNTERPART_EXECUTION_FAILURE"
+            safe_reason = "Counterpart execution did not produce an admissible operational signal."
+
+        logger.info(
+            "Sanitized attach failure projected for counterpart (attributed=%s, category=%s): raw_reason='%s'",
+            is_attributed,
+            safe_category,
+            raw_reason,
+        )
+
+        return MultiCounterpartyEvidenceAttachFailure(
+            target_bank_id=safe_target,
+            signal_id=safe_sig_id,
+            category=safe_category,
+            reason=safe_reason,
+        )
+
     def attach_multi_counterparty_to_case_evidence(
         self,
         query_id: str,
@@ -3948,7 +4068,7 @@ class CrossBankIntelligenceService:
 
             batch = self.batch_store.get_batch(clean_qid)
             if not batch:
-                raise ValueError(
+                raise BatchNotFoundError(
                     f"Authoritative multi-counterparty query '{clean_qid}' not found, has expired, or was never issued. "
                     "Client-fabricated or unauthorized batch attachment rejected."
                 )
@@ -3964,13 +4084,11 @@ class CrossBankIntelligenceService:
             if not batch_consortium_id:
                 raise ValueError(f"Corrupted batch record '{clean_qid}': missing consortium_id binding.")
 
-            # Case binding validation if query was bound to a specific case
-            bound_case_id = batch.get("case_id")
-            if bound_case_id and bound_case_id != case_id:
-                raise ConsortiumSecurityError(
-                    f"Cross-case binding violation: Multi-counterparty query '{clean_qid}' was bound to case "
-                    f"'{bound_case_id}', cannot be assembled into differing case '{case_id}'."
-                )
+            # Atomically establish single destination case binding (Correction B)
+            try:
+                self.batch_store.bind_case(query_id=clean_qid, case_id=case_id)
+            except BatchCaseBindingConflictError as e:
+                raise ConsortiumSecurityError(str(e)) from e
 
             # Revalidate Consortium Active Membership
             consortium = self.consortium_service.get_consortium(batch_consortium_id)
@@ -4036,17 +4154,19 @@ class CrossBankIntelligenceService:
                                     target_bank=t,
                                 )
 
-            # 6. Handle Batch with Zero Admissible/Successful Signals
+            # 6. Handle Batch with Zero Admissible/Successful Signals (Correction C: Disclosure-Safe Projection)
             if not successful_signal_ids:
                 omitted_failures: list[MultiCounterpartyEvidenceAttachFailure] = []
                 for t in target_bank_ids:
                     t_out = raw_failures.get(t) or {}
                     t_fail = t_out.get("failure") or {}
                     omitted_failures.append(
-                        MultiCounterpartyEvidenceAttachFailure(
-                            target_bank_id=t,
+                        self._project_safe_attach_failure(
+                            target_bank=t,
                             category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
-                            reason=t_fail.get("error_message", "Counterparty execution did not produce an admissible operational signal."),
+                            raw_reason=t_fail.get("error_message", "Counterparty execution did not produce an admissible operational signal."),
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
                         )
                     )
                 self._audit_attachment_rejection(
@@ -4078,21 +4198,83 @@ class CrossBankIntelligenceService:
             newly_attached_count = 0
             replayed_count = 0
 
+            batch_receipt_ids: dict[str, str] = dict(batch.get("receipt_ids") or {})
+
             for t in target_bank_ids:
                 if t not in successful_signal_ids:
                     t_out = raw_failures.get(t) or {}
                     t_fail = t_out.get("failure") or {}
                     omitted_failures.append(
-                        MultiCounterpartyEvidenceAttachFailure(
-                            target_bank_id=t,
-                            signal_id=None,
+                        self._project_safe_attach_failure(
+                            target_bank=t,
                             category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
-                            reason=t_fail.get("error_message", "Counterpart execution failed; no authoritative signal produced."),
+                            raw_reason=t_fail.get("error_message", "Counterpart execution failed; no authoritative signal produced."),
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
                         )
                     )
                     continue
 
                 sig_id = successful_signal_ids[t]
+                sig_rec = self._signal_store.get(sig_id)
+
+                # Correction A: Exact Receipt Binding Verification before attaching
+                expected_rcp_id = batch_receipt_ids.get(t)
+                if not expected_rcp_id:
+                    omitted_failures.append(
+                        self._project_safe_attach_failure(
+                            target_bank=t,
+                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                            raw_reason="Batch execution record lacks authentic cryptographic receipt binding.",
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            signal_id=sig_id,
+                            signal_record=sig_rec,
+                        )
+                    )
+                    continue
+
+                admitted_rcp = self._admitted_receipts_store.get(expected_rcp_id)
+                if not admitted_rcp:
+                    omitted_failures.append(
+                        self._project_safe_attach_failure(
+                            target_bank=t,
+                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                            raw_reason=f"Admitted receipt '{expected_rcp_id}' not found in cryptographic registry.",
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            signal_id=sig_id,
+                            signal_record=sig_rec,
+                        )
+                    )
+                    continue
+
+                # Verify consistent binding across query_id membership, signal, receipt, banks, and entity
+                if (
+                    admitted_rcp.get("signal_id") != sig_id
+                    or admitted_rcp.get("receipt_id") != expected_rcp_id
+                    or (admitted_rcp.get("requesting_bank_id") or "").lower().strip() != eff_case_bank.lower().strip()
+                    or (admitted_rcp.get("consortium_id") or "").lower().strip() != batch_consortium_id.lower().strip()
+                    or (admitted_rcp.get("target_bank_id") or "").lower().strip() != t.lower().strip()
+                    or (
+                        admitted_rcp.get("query_entity_id")
+                        and batch.get("query_entity_id")
+                        and str(admitted_rcp.get("query_entity_id")).strip() != str(batch.get("query_entity_id") or "").strip()
+                    )
+                ):
+                    omitted_failures.append(
+                        self._project_safe_attach_failure(
+                            target_bank=t,
+                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                            raw_reason=f"Receipt '{expected_rcp_id}' binding mismatch with batch execution identity.",
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            signal_id=sig_id,
+                            signal_record=sig_rec,
+                        )
+                    )
+                    continue
+
                 derived_signal_idem_key = (
                     f"{idempotency_key}:sig:{sig_id}" if idempotency_key else None
                 )
@@ -4108,7 +4290,6 @@ class CrossBankIntelligenceService:
                         batch_idempotency_key=idempotency_key,
                         batch_fingerprint=batch_fingerprint if idempotency_key else None,
                     )
-                    sig_rec = self._signal_store.get(sig_id)
                     sig_dict: dict[str, Any] = sig_rec if isinstance(sig_rec, dict) else {}
                     raw_sig_data = sig_dict.get("signal_data")
                     attached_sig_data: dict[str, Any] = raw_sig_data if isinstance(raw_sig_data, dict) else {}
@@ -4142,11 +4323,14 @@ class CrossBankIntelligenceService:
                     )
                 except (ConsortiumSecurityError, ValueError) as err:
                     omitted_failures.append(
-                        MultiCounterpartyEvidenceAttachFailure(
-                            target_bank_id=t,
-                            signal_id=sig_id,
+                        self._project_safe_attach_failure(
+                            target_bank=t,
                             category="GOVERNANCE_OR_ADMISSION_REJECTED",
-                            reason=str(err),
+                            raw_reason=str(err),
+                            consortium=consortium,
+                            requesting_bank=eff_case_bank,
+                            signal_id=sig_id,
+                            signal_record=sig_rec,
                         )
                     )
 
@@ -4196,7 +4380,7 @@ class CrossBankIntelligenceService:
                 attached_evidence=attached_items,
                 omitted_or_failed=omitted_failures,
                 case_version=current_version,
-                timeline_event_recorded=True,
+                timeline_event_recorded=newly_attached_count > 0,
                 is_duplicate_submission=is_all_duplicates,
             )
         except Exception as exc:

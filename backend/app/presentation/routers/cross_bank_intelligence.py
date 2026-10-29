@@ -31,6 +31,10 @@ from app.domain.consortium_governance import (
     CrossBankIdempotencyConflictError,
 )
 from app.domain.pilot_operations import PilotGovernanceError
+from app.infrastructure.storage.durable_batch_store import (
+    BatchCaseBindingConflictError,
+    BatchNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -214,22 +218,22 @@ async def attach_intelligence_to_case(
             notes=req.notes,
             idempotency_key=req.idempotency_key,
         )
-    except CaseNotFoundError as err:
+    except (CaseNotFoundError, BatchNotFoundError) as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(err),
         ) from err
-    except TerminalCaseImmutableError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
-    except CrossBankIdempotencyConflictError as err:
+    except (TerminalCaseImmutableError, BatchCaseBindingConflictError, CrossBankIdempotencyConflictError) as err:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(err),
         ) from err
     except ConsortiumSecurityError as err:
+        if "Cross-case binding violation" in str(err):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(err),
+            ) from err
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(err),
@@ -270,22 +274,22 @@ async def attach_multi_intelligence_to_case(
             notes=req.notes,
             idempotency_key=req.idempotency_key,
         )
-    except CaseNotFoundError as err:
+    except (CaseNotFoundError, BatchNotFoundError) as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(err),
         ) from err
-    except TerminalCaseImmutableError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
-    except CrossBankIdempotencyConflictError as err:
+    except (TerminalCaseImmutableError, BatchCaseBindingConflictError, CrossBankIdempotencyConflictError) as err:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(err),
         ) from err
     except ConsortiumSecurityError as err:
+        if "Cross-case binding violation" in str(err):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(err),
+            ) from err
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(err),

@@ -12,7 +12,6 @@ Verifies:
 
 from __future__ import annotations
 
-import datetime
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -268,16 +267,16 @@ class TestCrossBankIntelligenceIntegration:
         resp = client.post("/api/v1/intelligence/cross-bank/query", json=payload, headers=headers)
         assert resp.status_code == 403
 
-    def test_http_attach_authoritative_signal_to_case_evidence(
+    def test_http_rejects_simulated_research_signal_from_authoritative_case_evidence(
         self,
         client: TestClient,
         auth_tokens: dict[str, str],
         setup_consortium_entities: dict[str, Any],
     ) -> None:
-        """Test issuing an authoritative signal and attaching it via both routes."""
+        """Verify that simulated research intelligence signals are strictly rejected from authoritative case evidence over HTTP."""
         from app.application.services.case_service import CaseManagementService
 
-        # 1. Issue authoritative signal
+        # 1. Issue authentic simulated research signal via HTTP API
         query_payload = {
             "requesting_bank_id": "bank_a",
             "query_entity_id": setup_consortium_entities["entity_a_id"],
@@ -292,47 +291,9 @@ class TestCrossBankIntelligenceIntegration:
         )
         assert q_resp.status_code == 200
         signal_id = q_resp.json()["signal_id"]
+        assert q_resp.json()["execution_mode"] == "SIMULATED_RESEARCH"
 
-        # Mark signal authoritative and admitted for authoritative HTTP evidence attachment test
-        import hashlib
-        import json
-
-        from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
-        intel_svc = CrossBankIntelligenceService.get_instance()
-        record = intel_svc._signal_store.get(signal_id)
-        assert record is not None
-        rcp_id = f"rcp_{signal_id}"
-        sig_data = dict(record["signal_data"])
-        sig_data["execution_mode"] = "VERIFIED_OPERATIONAL"
-        sig_data["is_authoritative"] = True
-        sig_data["is_synthetic"] = False
-        record["signal_data"] = sig_data
-        record["content_hash"] = hashlib.sha256(json.dumps(sig_data, sort_keys=True).encode("utf-8")).hexdigest()
-        record["is_authoritative"] = True
-        record["is_synthetic"] = False
-        record["execution_mode"] = "VERIFIED_OPERATIONAL"
-        record["operational_status"] = "OPERATIONAL"
-        record["admission_status"] = "COMMITTED"
-        record["publication_status"] = "PUBLISHED"
-        record["is_attachable"] = True
-        record["target_bank_id"] = "bank_b"
-        record["receipt_id"] = rcp_id
-        intel_svc._signal_store.set(signal_id, record)
-        intel_svc._admitted_receipts_store.set(
-            rcp_id,
-            {
-                "admitted_at": datetime.datetime.now(datetime.UTC).isoformat(),
-                "signal_id": signal_id,
-                "receipt_id": rcp_id,
-                "content_hash": record["content_hash"],
-                "requesting_bank_id": "bank_a",
-                "target_bank_id": "bank_b",
-                "consortium_id": "integ_alliance",
-                "execution_mode": "VERIFIED_OPERATIONAL",
-            },
-        )
-
-        # 2. Create case
+        # 2. Create authoritative case
         case_svc = CaseManagementService()
         case = case_svc.create_case(
             title="Consortium Mules Review",
@@ -341,7 +302,8 @@ class TestCrossBankIntelligenceIntegration:
             priority=CasePriority.P1_CRITICAL,
         )
 
-        # 3. Attach via /api/v1/intelligence/cross-bank/attach-to-case
+        # 3. Attempt attach via /api/v1/intelligence/cross-bank/attach-to-case
+        # Must fail closed with HTTP 403 Forbidden without mutating server records
         attach_req = {
             "case_id": case.id,
             "signal_id": signal_id,
@@ -352,25 +314,18 @@ class TestCrossBankIntelligenceIntegration:
             json=attach_req,
             headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
         )
-        assert resp.status_code == 200, resp.text
-        data = resp.json()
-        assert data["case_id"] == case.id
-        assert data["signal_id"] == signal_id
-        assert data["evidence_type"] == "CROSS_BANK_INTELLIGENCE"
-        assert len(data["content_hash"]) == 64
-        assert data["timeline_event_recorded"] is True
+        assert resp.status_code == 403
+        assert "Simulated research signals cannot be attached to authoritative fraud investigation evidence" in resp.json()["detail"]
 
-        # 4. Attach via subresource /api/v1/cases/{case_id}/evidence/cross-bank-intelligence (idempotent replay)
+        # 4. Attempt attach via subresource /api/v1/cases/{case_id}/evidence/cross-bank-intelligence
+        # Must also fail closed with HTTP 403 Forbidden
         resp_sub = client.post(
             f"/api/v1/cases/{case.id}/evidence/cross-bank-intelligence",
             json={"signal_id": signal_id, "notes": "Subresource attach verification"},
             headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
         )
-        assert resp_sub.status_code == 200
-        data_sub = resp_sub.json()
-        assert data_sub["case_id"] == case.id
-        assert data_sub["signal_id"] == signal_id
-        assert data_sub["is_duplicate_submission"] is True
+        assert resp_sub.status_code == 403
+        assert "Simulated research signals cannot be attached to authoritative fraud investigation evidence" in resp_sub.json()["detail"]
 
     def test_http_forged_signal_attachment_returns_400(
         self,
