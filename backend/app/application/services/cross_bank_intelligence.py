@@ -4147,7 +4147,7 @@ class CrossBankIntelligenceService:
             else:
                 overall_status = "FAILED"
 
-            is_all_duplicates = bool(newly_attached_count == 0 and replayed_count > 0)
+            is_all_duplicates = newly_attached_count == 0 and replayed_count > 0
 
             # 9. Record Immutable Audit Event
             if newly_attached_count > 0 or replayed_count > 0:
