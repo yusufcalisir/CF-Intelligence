@@ -1087,7 +1087,7 @@ def test_authentic_operational_admission_with_matching_receipt_verified(
     assert ev_item["operational_status"] == "OPERATIONAL"
     assert ev_item["is_authoritative"] is True
     assert ev_item["retention_status"] == "ACTIVE"
-    expected_ev_id = getattr(attach_res, "evidence_id", attach_res["evidence_id"] if isinstance(attach_res, dict) else None)
+    expected_ev_id = getattr(attach_res, "evidence_id", None)
     assert ev_item["evidence_id"] == expected_ev_id
 
 
@@ -1353,7 +1353,7 @@ def test_adversarial_2_admitted_signal_with_altered_match_results_not_verified(
         record_in_batch_store=True,
     )
 
-    ev_id = getattr(attach_res, "evidence_id", attach_res["evidence_id"] if isinstance(attach_res, dict) else None)
+    ev_id = getattr(attach_res, "evidence_id", None)
     ev_rec = evidence_svc._evidence_store.get(ev_id)
     assert ev_rec is not None
     file_path = ev_rec["file_path"]
@@ -1553,7 +1553,7 @@ def test_adversarial_5_authentic_admitted_signal_attached_through_m65_pipeline_v
     assert ev_item["operational_status"] == "OPERATIONAL"
     assert ev_item["is_authoritative"] is True
     assert ev_item["retention_status"] == "ACTIVE"
-    expected_ev_id = getattr(attach_res, "evidence_id", attach_res["evidence_id"] if isinstance(attach_res, dict) else None)
+    expected_ev_id = getattr(attach_res, "evidence_id", None)
     assert ev_item["evidence_id"] == expected_ev_id
 
 
