@@ -1813,10 +1813,11 @@ class CrossBankIntelligenceService:
             json.dumps(signal_dict, sort_keys=True).encode("utf-8")
         ).hexdigest()
 
-        authoritative_record = {
+        authoritative_record: dict[str, Any] = {
             "signal_id": signal_id,
             "signal_data": signal_dict,
             "requesting_bank_id": clean_requesting,
+            "target_bank_id": (req.target_bank_id or "").lower().strip() if req.target_bank_id else None,
             "consortium_id": clean_consortium_id,
             "query_entity_id": req.query_entity_id,
             "issued_to_principal": audited_actor,
@@ -3498,7 +3499,19 @@ class CrossBankIntelligenceService:
                 )
 
             adm_target = admitted_receipt.get("target_bank_id")
-            target_bank = (record.get("target_bank_id") or "").lower().strip()
+            raw_target = (
+                record.get("target_bank_id")
+                or (record.get("signal_data") or {}).get("target_bank_id")
+                or (
+                    record["signal_data"]["contributing_institutions"][0]
+                    if isinstance(record.get("signal_data"), dict)
+                    and record["signal_data"].get("contributing_institutions")
+                    and len(record["signal_data"]["contributing_institutions"]) == 1
+                    else ""
+                )
+                or ""
+            )
+            target_bank = str(raw_target).lower().strip()
             if not adm_target or not target_bank or adm_target.lower() != target_bank:
                 raise ConsortiumSecurityError(
                     f"Admitted receipt '{receipt_id}' counterpart scope '{adm_target}' does not match signal target bank '{target_bank}'."
@@ -3549,16 +3562,17 @@ class CrossBankIntelligenceService:
 
                 is_grant_active = bool(grant.get("is_active", True) and grant.get("status") != "REVOKED")
                 revoked_institutions = set(grant.get("revoked_by_institutions") or [])
-                target_bank = record.get("target_bank_id") or (
+                target_bank_override = record.get("target_bank_id") or (
                     signal_data.get("provenance", {}).get("target_bank_id")
                     if isinstance(signal_data, dict)
                     else None
                 )
+                target_bank_check = str(target_bank_override).lower().strip() if target_bank_override else target_bank
                 if (
                     grant.get("grant_id") != grant_id
                     or not is_grant_active
                     or (eff_case_bank in revoked_institutions)
-                    or (target_bank and target_bank in revoked_institutions)
+                    or (target_bank_check and target_bank_check in revoked_institutions)
                 ):
                     raise ConsortiumSecurityError(
                         f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
@@ -3580,9 +3594,9 @@ class CrossBankIntelligenceService:
                         f"Institution '{eff_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
-                if target_bank and target_bank not in approvals:
+                if target_bank_check and target_bank_check not in approvals:
                     raise ConsortiumSecurityError(
-                        f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                        f"Target counterpart institution '{target_bank_check}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
 
