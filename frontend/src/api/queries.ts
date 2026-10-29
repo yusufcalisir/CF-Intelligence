@@ -3618,3 +3618,6 @@ export function useAttachMultiCounterpartyEvidence() {
   });
 }
 
+
+// ── Governed Two-Bank Pilot Operations Exports ────────────────────────────────────────
+export * from './pilots';

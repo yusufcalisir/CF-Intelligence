@@ -117,7 +117,68 @@ def _enforce_pause_authority(principal: AuthenticatedPrincipal, entity: PilotEnt
     )
 
 
-def _entity_to_response(entity: PilotEntity) -> PilotStatusResponse:
+def _compute_permitted_actions(entity: PilotEntity, principal: AuthenticatedPrincipal | None) -> list[str]:
+    """Derive permitted pilot actions strictly from current state, expiry, and principal authority."""
+    if not principal or not principal.is_authenticated:
+        return []
+
+    actions: list[str] = []
+    status = entity.status
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    roles = set(principal.roles or [])
+    is_op_tenant = caller_tenant in ("consortium", "operator", "admin", "system")
+    op_roles = {"admin", "super_admin", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
+    is_operator = principal.is_privileged or (is_op_tenant and bool(roles & op_roles))
+
+    participating = [b.lower().strip() for b in entity.config.participating_institutions]
+    is_participant = is_operator or (caller_tenant in participating)
+    has_expired = entity.has_expired()
+
+    # Preflight: participant or operator in pre-activation states
+    if status in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL) and is_participant:
+        actions.append("preflight")
+
+    # Approve: operator or participating bank in pre-activation states, not expired
+    if status in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL) and not has_expired and (is_operator or caller_tenant in participating):
+        actions.append("approve")
+
+    # Activate: operator only, in AUTHORIZED, not expired
+    if status == PilotStatus.AUTHORIZED and not has_expired and is_operator:
+        actions.append("activate")
+
+    # Pause: emergency pause authority in ACTIVE
+    if status == PilotStatus.ACTIVE:
+        bank_pause_roles = {"admin", "compliance", "compliance_officer", "security_officer", "risk_lead"}
+        can_pause = is_operator or (caller_tenant in participating and bool(roles & bank_pause_roles))
+        if can_pause:
+            actions.append("pause")
+
+    # Resume: operator in PAUSED, not expired, quota not exceeded
+    quota_exhausted = entity.queries_executed >= entity.config.query_quota_total
+    if status == PilotStatus.PAUSED and not has_expired and not quota_exhausted and is_operator:
+        actions.append("resume")
+
+    # Abort: operator in any non-terminal state
+    if status not in (PilotStatus.COMPLETED, PilotStatus.ABORTED, PilotStatus.FAILED) and is_operator:
+        actions.append("abort")
+
+    # Complete: operator in ACTIVE or PAUSED
+    if status in (PilotStatus.ACTIVE, PilotStatus.PAUSED) and is_operator:
+        actions.append("complete")
+
+    # Export dossier: auditor / compliance / operator / admin
+    dossier_roles = {"admin", "super_admin", "compliance", "compliance_officer", "auditor", "security_officer", "operator", "pilot_operator"}
+    if principal.is_privileged or bool(roles & dossier_roles):
+        actions.append("export_dossier")
+
+    return actions
+
+
+def _entity_to_response(entity: PilotEntity, principal: AuthenticatedPrincipal | None = None) -> PilotStatusResponse:
+    complete, missing = entity.has_all_required_approvals()
+    permitted_actions = _compute_permitted_actions(entity, principal)
+    has_expired = entity.has_expired()
+
     return PilotStatusResponse(
         pilot_id=entity.config.pilot_id,
         revision=entity.config.revision,
@@ -162,6 +223,9 @@ def _entity_to_response(entity: PilotEntity) -> PilotStatusResponse:
             )
             for k, v in entity.approvals.items()
         },
+        missing_approvals=missing,
+        has_expired=has_expired,
+        permitted_actions=permitted_actions,
     )
 
 
@@ -219,7 +283,7 @@ async def provision_pilot(
         )
     try:
         entity = service.provision_pilot(req=payload, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:
@@ -247,7 +311,7 @@ async def run_preflight(
     principal = _resolve_principal_or_fail(request)
     try:
         entity = service.run_preflight(pilot_id=pilot_id, principal=principal, preflight_req=payload)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -280,7 +344,7 @@ async def approve_pilot(
             notes=payload.notes,
             signature=payload.signature,
         )
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
@@ -309,7 +373,7 @@ async def activate_pilot(
     _enforce_operator_role(principal, "activate")
     try:
         entity = service.activate_pilot(pilot_id=pilot_id, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
@@ -342,7 +406,7 @@ async def pause_pilot(
     _enforce_pause_authority(principal, entity)
     try:
         entity = service.pause_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -369,7 +433,7 @@ async def resume_pilot(
     _enforce_operator_role(principal, "resume")
     try:
         entity = service.resume_pilot(pilot_id=pilot_id, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -397,7 +461,7 @@ async def abort_pilot(
     _enforce_operator_role(principal, "abort")
     try:
         entity = service.abort_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -424,7 +488,7 @@ async def complete_pilot(
     _enforce_operator_role(principal, "complete")
     try:
         entity = service.complete_pilot(pilot_id=pilot_id, principal=principal)
-        return _entity_to_response(entity)
+        return _entity_to_response(entity, principal)
     except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -452,7 +516,7 @@ async def get_pilot_status(
     if not entity:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Pilot '{pilot_id}' not found.")
     _enforce_pilot_read_access(principal, entity)
-    return _entity_to_response(entity)
+    return _entity_to_response(entity, principal)
 
 
 @router.get(
@@ -537,4 +601,4 @@ async def list_pilots(
     pilots = service.list_pilots()
     if not is_op:
         pilots = [p for p in pilots if caller_tenant in [b.lower().strip() for b in p.config.participating_institutions]]
-    return [_entity_to_response(p) for p in pilots]
+    return [_entity_to_response(p, principal) for p in pilots]

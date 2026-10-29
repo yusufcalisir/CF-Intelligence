@@ -1504,16 +1504,18 @@ class PilotOperationsService:
     def get_telemetry_summary(self, pilot_id: str) -> PilotTelemetrySummary:
         """Compile live operational telemetry summary for pilot visibility."""
         entity = self._get_required_pilot(pilot_id)
+        has_obs = bool(entity.latencies_ms)
+        sample_count = len(entity.latencies_ms)
         avg_lat = (
-            sum(entity.latencies_ms) / len(entity.latencies_ms)
-            if entity.latencies_ms
-            else 0.0
+            round(sum(entity.latencies_ms) / sample_count, 2)
+            if has_obs
+            else None
         )
         sorted_lats = sorted(entity.latencies_ms)
         p95_lat = (
-            sorted_lats[int(len(sorted_lats) * 0.95)]
-            if sorted_lats
-            else 0.0
+            round(sorted_lats[int(len(sorted_lats) * 0.95)], 2)
+            if has_obs
+            else None
         )
 
         return PilotTelemetrySummary(
@@ -1528,8 +1530,10 @@ class PilotOperationsService:
             queries_by_institution=entity.institution_query_counts,
             query_quota_total=entity.config.query_quota_total,
             quota_remaining=max(0, entity.config.query_quota_total - entity.queries_executed),
-            mean_latency_ms=round(avg_lat, 2),
-            p95_latency_ms=round(p95_lat, 2),
+            mean_latency_ms=avg_lat,
+            p95_latency_ms=p95_lat,
+            latency_sample_count=sample_count,
+            has_latency_observations=has_obs,
             institution_query_counts=entity.institution_query_counts,
             last_operation_at=entity.updated_at if entity.queries_executed > 0 else None,
             bilateral_authorization_valid=entity.is_fully_approved() and entity.status == PilotStatus.ACTIVE,

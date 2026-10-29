@@ -8,6 +8,7 @@ const NAV_SECTIONS = [
       { path: '/dashboard', label: 'Dashboard', icon: '◈' },
       { path: '/operations', label: 'Live Operations', icon: '📡' },
       { path: '/consortium', label: 'Cross-Bank Consortium', icon: '🌐' },
+      { path: '/pilots', label: 'Consortium Pilots', icon: '🎛️' },
     ],
   },
   {

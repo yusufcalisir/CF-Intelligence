@@ -3787,3 +3787,116 @@ export interface CrossBankMultiEvidenceAttachResponse {
   is_duplicate_submission: boolean;
 }
 
+
+// ── Governed Two-Bank Pilot Operations Types ──────────────────────────────────────────
+
+export type PilotStatus =
+  | 'DRAFT'
+  | 'PREFLIGHT'
+  | 'AWAITING_APPROVAL'
+  | 'AUTHORIZED'
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'COMPLETED'
+  | 'ABORTED'
+  | 'FAILED';
+
+export interface PreflightCheckItem {
+  check_name: string;
+  passed: boolean;
+  details: string;
+  checked_at: string;
+}
+
+export interface PilotApprovalItem {
+  approver_id: string;
+  approver_institution: string;
+  approver_role: string;
+  scope_digest: string;
+  approved_at: string;
+  signature?: string;
+  notes?: string;
+}
+
+export interface PilotStatusResponse {
+  pilot_id: string;
+  revision: number;
+  consortium_id: string;
+  status: PilotStatus;
+  status_reason: string;
+  scope_digest: string;
+  is_fully_approved: boolean;
+  passed: boolean;
+  queries_executed: number;
+  queries_denied: number;
+  queries_total_quota: number;
+  participating_institutions: string[];
+  allowed_purposes: string[];
+  allowed_jurisdictions: string[];
+  operational_grant_id: string;
+  starts_at: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  activated_at?: string | null;
+  terminated_at?: string | null;
+  termination_reason?: string | null;
+  preflight_checks: PreflightCheckItem[];
+  approvals: Record<string, PilotApprovalItem>;
+  permitted_actions?: string[];
+  missing_approvals?: string[];
+  has_expired?: boolean;
+}
+
+export interface PilotTelemetrySummary {
+  pilot_id: string;
+  status: string;
+  queries_executed: number;
+  queries_denied: number;
+  queries_total: number;
+  queries_successful: number;
+  queries_failed: number;
+  matches_found: number;
+  queries_by_institution: Record<string, number>;
+  query_quota_total: number;
+  quota_remaining: number;
+  mean_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  latency_sample_count?: number;
+  has_latency_observations?: boolean;
+  institution_query_counts: Record<string, number>;
+  last_operation_at: string | null;
+  bilateral_authorization_valid: boolean;
+}
+
+export interface PilotProvisionRequest {
+  pilot_id: string;
+  consortium_id: string;
+  participating_institutions: string[];
+  allowed_purposes?: string[];
+  allowed_jurisdictions?: string[];
+  approved_datasets?: Record<string, any> | string[];
+  authorized_operators?: string[];
+  operational_grant_id?: string;
+  topology?: Record<string, any>;
+  starts_at?: string;
+  expires_at?: string;
+  query_quota_total?: number;
+  query_quota_per_institution?: number;
+  duration_days?: number;
+}
+
+export interface PilotApprovalRequest {
+  approving_institution: string;
+  notes?: string;
+  signature?: string;
+}
+
+export interface PilotKillSwitchRequest {
+  reason: string;
+}
+
+export interface PilotPreflightRequest {
+  coordinator_url?: string;
+  worker_endpoints?: Record<string, string>;
+}

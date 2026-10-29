@@ -114,6 +114,9 @@ class PilotStatusResponse(BaseModel):
     termination_reason: str | None = None
     preflight_checks: list[PreflightCheckItem] = Field(default_factory=list)
     approvals: dict[str, PilotApprovalItem] = Field(default_factory=dict)
+    missing_approvals: list[str] = Field(default_factory=list)
+    has_expired: bool = False
+    permitted_actions: list[str] = Field(default_factory=list)
 
 
 class PilotTelemetrySummary(BaseModel):
@@ -130,8 +133,10 @@ class PilotTelemetrySummary(BaseModel):
     queries_by_institution: dict[str, int] = Field(default_factory=dict)
     query_quota_total: int = 0
     quota_remaining: int = 0
-    mean_latency_ms: float = 0.0
-    p95_latency_ms: float = 0.0
+    mean_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    latency_sample_count: int = 0
+    has_latency_observations: bool = False
     institution_query_counts: dict[str, int] = Field(default_factory=dict)
     last_operation_at: str | None = None
     bilateral_authorization_valid: bool = True

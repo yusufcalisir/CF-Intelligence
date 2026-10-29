@@ -25,6 +25,8 @@ const BenchmarkHubPage = lazy(() => import('./pages/BenchmarkHubPage'));
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'));
 const CounterfactualPage = lazy(() => import('./pages/CounterfactualPage'));
 const ConsortiumPage = lazy(() => import('./pages/ConsortiumPage'));
+const PilotOperationsPage = lazy(() => import('./pages/PilotOperationsPage'));
+const PilotDetailPage = lazy(() => import('./pages/PilotDetailPage'));
 
 const PageFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -106,6 +108,22 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <ConsortiumPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/pilots"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PilotOperationsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/pilots/:pilotId"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PilotDetailPage />
                   </Suspense>
                 }
               />
