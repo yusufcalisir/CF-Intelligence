@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -1040,6 +1040,7 @@ async def get_case_intelligence_evidence(
             or ev_meta.get("disclosure_mode")
             or "ANONYMIZED_SUMMARY"
         )
+        disclosure_mode: Literal["ATTRIBUTED_INSTITUTIONS", "ANONYMIZED_SUMMARY"]
         if raw_disclosure == "ATTRIBUTED_INSTITUTIONS":
             disclosure_mode = "ATTRIBUTED_INSTITUTIONS"
             target_bank = provenance.get("target_bank_id") or ev_meta.get("target_bank_id")
@@ -1061,6 +1062,9 @@ async def get_case_intelligence_evidence(
         consortium_id = payload.get("consortium_id") or ev_meta.get("consortium_id")
 
         # ── Gate A: Authentic Evidence Verification State Evaluation ──
+        verification_state: Literal[
+            "VERIFIED", "INTEGRITY_VERIFIED_ONLY", "INDETERMINATE", "FAILED_VERIFICATION"
+        ]
         if not content_integrity_valid:
             if is_tampered:
                 verification_state = "FAILED_VERIFICATION"

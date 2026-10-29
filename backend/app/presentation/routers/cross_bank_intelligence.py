@@ -8,7 +8,7 @@ Supports dual routing: /api/v1/intelligence/cross-bank and /v1/intelligence/cros
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
@@ -417,6 +417,11 @@ def get_cross_bank_query_capabilities(
                 )
                 if is_auth:
                     authorized_purposes.append(purp)
+
+            gov_status: Literal["ACTIVE", "REVOKED", "MISSING_GRANT", "EVICTED"]
+            readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE"]
+            is_authorized: bool
+            disclosure_modes: list[str]
 
             if authorized_purposes:
                 gov_status = "ACTIVE"
