@@ -466,3 +466,105 @@ class CrossBankEvidenceAttachResponse(BaseModel):
     case_version: int
     timeline_event_recorded: bool
     is_duplicate_submission: bool = False
+
+
+MultiEvidenceAssemblyStatus = Literal["COMPLETED", "PARTIAL", "FAILED", "NO_ADMISSIBLE_SIGNALS"]
+
+
+class MultiCounterpartyEvidenceItem(BaseModel):
+    """Sanitized evidence item attached or replayed from a multi-counterparty batch."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    target_bank_id: str | None = Field(
+        default=None,
+        description="Counterpart institution ID if disclosure policy permits; None in anonymous mode.",
+    )
+    signal_id: str = Field(..., description="Cross-bank signal ID.")
+    evidence_id: str = Field(..., description="ID of attached evidence record.")
+    status: Literal["ATTACHED", "ALREADY_ATTACHED"] = Field(..., description="Attachment status.")
+    content_hash: str = Field(..., description="Authoritative content hash of the attached evidence.")
+    title: str = Field(..., description="Evidence title.")
+    disclosure_mode: DisclosureMode = Field(..., description="Effective disclosure mode.")
+
+
+class MultiCounterpartyEvidenceAttachFailure(BaseModel):
+    """Omitted, ineligible, or failed counterpart execution/signal details during batch assembly."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    target_bank_id: str | None = Field(
+        default=None,
+        description="Counterpart institution ID if known and disclosure permits.",
+    )
+    signal_id: str | None = Field(default=None, description="Signal ID if known.")
+    category: str = Field(
+        ...,
+        description="Failure category (e.g. COUNTERPART_EXECUTION_FAILURE, SIGNAL_INELIGIBLE, REJECTED, GOVERNANCE_DENIED).",
+    )
+    reason: str = Field(..., description="Sanitized reason for attachment omission or failure.")
+
+
+class CrossBankMultiEvidenceAttachRequest(BaseModel):
+    """Request payload to assemble eligible intelligence signals from a multi-counterparty query batch into a case."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    query_id: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Authoritative, server-issued multi-counterparty query execution batch ID.",
+    )
+    case_id: str = Field(
+        ...,
+        min_length=2,
+        max_length=64,
+        description="Target investigation case ID.",
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Optional analyst investigation note.",
+    )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Optional idempotency key for batch assembly.",
+    )
+
+
+class CrossBankMultiEvidenceAttachResponse(BaseModel):
+    """Response returned upon assembling multi-counterparty batch evidence into a case."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    query_id: str = Field(..., description="Authoritative server-issued batch query ID.")
+    case_id: str = Field(..., description="Target investigation case ID.")
+    assembly_status: MultiEvidenceAssemblyStatus = Field(
+        ...,
+        description="Overall assembly status (COMPLETED, PARTIAL, FAILED, NO_ADMISSIBLE_SIGNALS).",
+    )
+    attached_count: int = Field(..., ge=0, description="Number of newly attached evidence items.")
+    replayed_count: int = Field(
+        ..., ge=0, description="Number of already attached (idempotently replayed) items."
+    )
+    failed_count: int = Field(
+        ..., ge=0, description="Number of counterparties/signals that failed or were ineligible."
+    )
+    attached_evidence: list[MultiCounterpartyEvidenceItem] = Field(
+        default_factory=list,
+        description="List of successfully attached or replayed evidence records.",
+    )
+    omitted_or_failed: list[MultiCounterpartyEvidenceAttachFailure] = Field(
+        default_factory=list,
+        description="List of omitted, ineligible, or failed counterparties/signals.",
+    )
+    case_version: int = Field(..., description="Case version after assembly.")
+    timeline_event_recorded: bool = Field(
+        default=True, description="Whether timeline audit event was recorded."
+    )
+    is_duplicate_submission: bool = Field(
+        default=False,
+        description="True if entire multi-attachment request was an idempotent duplicate.",
+    )

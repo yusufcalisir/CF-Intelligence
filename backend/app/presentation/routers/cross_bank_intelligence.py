@@ -17,6 +17,8 @@ from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
+    CrossBankMultiEvidenceAttachRequest,
+    CrossBankMultiEvidenceAttachResponse,
     MultiCounterpartyIntelligenceQueryRequest,
     MultiCounterpartyIntelligenceQueryResponse,
 )
@@ -220,6 +222,67 @@ async def attach_intelligence_to_case(
     except TerminalCaseImmutableError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+    except CrossBankIdempotencyConflictError as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(err),
+        ) from err
+    except ConsortiumSecurityError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        ) from err
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        ) from err
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+
+@router.post(
+    "/attach-multi-to-case",
+    response_model=CrossBankMultiEvidenceAttachResponse,
+    status_code=status.HTTP_200_OK,
+)
+@api_router.post(
+    "/attach-multi-to-case",
+    response_model=CrossBankMultiEvidenceAttachResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def attach_multi_intelligence_to_case(
+    req: CrossBankMultiEvidenceAttachRequest,
+    principal: PrincipalDep,
+    service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
+) -> CrossBankMultiEvidenceAttachResponse:
+    """Assemble eligible cross-bank intelligence signals from an authoritative multi-counterparty batch into a case."""
+    try:
+        return service.attach_multi_counterparty_to_case_evidence(
+            query_id=req.query_id,
+            case_id=req.case_id,
+            principal=principal,
+            notes=req.notes,
+            idempotency_key=req.idempotency_key,
+        )
+    except CaseNotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+    except TerminalCaseImmutableError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+    except CrossBankIdempotencyConflictError as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(err),
         ) from err
     except ConsortiumSecurityError as err:

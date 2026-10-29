@@ -21,7 +21,7 @@ import time
 import urllib.error
 import uuid
 from datetime import UTC
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from app.application.schemas.cross_bank_intelligence import (
     CounterpartyExecutionFailure,
@@ -29,10 +29,14 @@ from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
+    CrossBankMultiEvidenceAttachResponse,
     DisclosureMode,
     MatchCategory,
+    MultiCounterpartyEvidenceAttachFailure,
+    MultiCounterpartyEvidenceItem,
     MultiCounterpartyIntelligenceQueryRequest,
     MultiCounterpartyIntelligenceQueryResponse,
+    MultiEvidenceAssemblyStatus,
     OverallQueryOutcome,
     SanitizedRiskLevel,
 )
@@ -80,6 +84,9 @@ from app.domain.value_objects_investigation import (
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+from app.infrastructure.storage.durable_batch_store import (
+    DurableCrossBankBatchStore,
+)
 from app.infrastructure.storage.durable_circuit_breaker_store import (
     DurableCrossBankCircuitBreakerStore,
 )
@@ -185,6 +192,7 @@ class CrossBankIntelligenceService:
         idempotency_store: DurableCrossBankIdempotencyStore | None = None,
         budget_store: DurableCrossBankExecutionBudgetStore | None = None,
         circuit_breaker_store: DurableCrossBankCircuitBreakerStore | None = None,
+        batch_store: DurableCrossBankBatchStore | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -201,6 +209,7 @@ class CrossBankIntelligenceService:
         self.idempotency_store = idempotency_store or DurableCrossBankIdempotencyStore.get_instance()
         self.budget_store = budget_store or DurableCrossBankExecutionBudgetStore.get_instance()
         self.circuit_breaker_store = circuit_breaker_store or DurableCrossBankCircuitBreakerStore.get_instance()
+        self.batch_store = batch_store or DurableCrossBankBatchStore.get_instance()
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
@@ -2783,6 +2792,36 @@ class CrossBankIntelligenceService:
                 executed_at=now_iso,
             )
 
+            # Record server-authoritative multi-counterparty batch execution record
+            successful_signal_ids: dict[str, str] = {}
+            receipt_ids: dict[str, str] = {}
+            for t_bank, sig in results.items():
+                successful_signal_ids[t_bank] = sig.signal_id
+                prov = sig.provenance if isinstance(sig.provenance, dict) else {}
+                rcp = prov.get("receipt_id")
+                if rcp:
+                    receipt_ids[t_bank] = str(rcp)
+
+            execution_outcomes_dict: dict[str, Any] = {
+                t_bank: outcome.model_dump(mode="json")
+                for t_bank, outcome in execution_outcomes.items()
+            }
+
+            self.batch_store.record_batch(
+                query_id=response_obj.query_id,
+                requesting_bank_id=clean_requesting,
+                consortium_id=clean_consortium_id,
+                query_entity_id=req.query_entity_id,
+                principal_id=auth_principal.principal_id,
+                principal_tenant_id=caller_bank,
+                case_id=req.case_id,
+                target_bank_ids=clean_targets,
+                execution_outcomes=execution_outcomes_dict,
+                successful_signal_ids=successful_signal_ids,
+                receipt_ids=receipt_ids,
+                overall_outcome=overall_outcome,
+            )
+
             if effective_idem_key and idem_owner_id:
                 self.idempotency_store.complete(
                     consortium_id=clean_consortium_id,
@@ -2837,6 +2876,7 @@ class CrossBankIntelligenceService:
                 actor_id=actor,
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"case:{case_id}",
+                actor_institution=caller_bank or "unknown",
                 details={
                     "case_id": case_id,
                     "signal_id": signal_id,
@@ -3495,8 +3535,19 @@ class CrossBankIntelligenceService:
                 else None
             )
             if grant_id:
-                grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-                is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
+                grant: dict[str, Any] = {}
+                if hasattr(consortium, "get_pairwise_operational_grant"):
+                    grant = consortium.get_pairwise_operational_grant(grant_id) or {}
+                if not grant and hasattr(consortium, "pairwise_operational_grants"):
+                    grant = (consortium.pairwise_operational_grants or {}).get(grant_id) or {}
+                if not grant and hasattr(consortium, "metadata"):
+                    grant = (consortium.metadata or {}).get("pairwise_operational_grants", {}).get(grant_id) or {}
+                if not grant and hasattr(consortium, "metadata"):
+                    global_grant = (consortium.metadata or {}).get("operational_data_sharing_grant") or {}
+                    if global_grant.get("grant_id") == grant_id:
+                        grant = global_grant
+
+                is_grant_active = bool(grant.get("is_active", True) and grant.get("status") != "REVOKED")
                 revoked_institutions = set(grant.get("revoked_by_institutions") or [])
                 target_bank = record.get("target_bank_id") or (
                     signal_data.get("provenance", {}).get("target_bank_id")
@@ -3681,6 +3732,7 @@ class CrossBankIntelligenceService:
                 "attachment_fingerprint": attachment_fingerprint,
                 "is_authoritative": True,
                 "operational_status": "OPERATIONAL",
+                "batch_query_id": kwargs.get("batch_query_id"),
             }
             content_json = json.dumps(payload, sort_keys=True, indent=2)
             payload_digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
@@ -3704,6 +3756,9 @@ class CrossBankIntelligenceService:
                         "operational_status": "OPERATIONAL",
                         "disclosure_mode": effective_disclosure_mode,
                         "notes": notes,
+                        "batch_query_id": kwargs.get("batch_query_id"),
+                        "batch_idempotency_key": kwargs.get("batch_idempotency_key"),
+                        "batch_fingerprint": kwargs.get("batch_fingerprint"),
                     },
                     expected_case_version=initial_case_version,
                 )
@@ -3773,6 +3828,7 @@ class CrossBankIntelligenceService:
                 actor_id=f"user:{uploader}@{eff_case_bank}",
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"evidence:{ev['id']}",
+                actor_institution=eff_case_bank,
                 details={
                     "case_id": case_id,
                     "evidence_id": ev["id"],
@@ -3813,6 +3869,331 @@ class CrossBankIntelligenceService:
                 uploader=uploader,
                 caller_bank=caller_bank,
                 consortium_id=consortium_id,
+            )
+            raise
+
+    def attach_multi_counterparty_to_case_evidence(
+        self,
+        query_id: str,
+        case_id: str,
+        principal: AuthenticatedPrincipal | None = None,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        notes: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> CrossBankMultiEvidenceAttachResponse:
+        """Assemble eligible cross-bank intelligence signals from an authoritative multi-counterparty batch into a case."""
+        uploader = "unknown"
+        caller_bank = "unknown"
+        batch_consortium_id: str | None = None
+
+        try:
+            # 1. Caller Authentication & Institutional Role Verification
+            auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
+            caller_bank = (auth_principal.tenant_id or "").lower().strip()
+            if not caller_bank:
+                raise PermissionError(
+                    "Unauthenticated or unassociated principal: Institutional tenant_id is required for evidence attachment."
+                )
+            uploader = auth_principal.principal_id
+
+            if not any(r in PERMITTED_INTELLIGENCE_ROLES for r in auth_principal.roles):
+                raise PermissionError(
+                    f"Principal '{auth_principal.principal_id}' lacks permitted role to attach evidence. "
+                    f"Permitted roles: {sorted(PERMITTED_INTELLIGENCE_ROLES)}."
+                )
+
+            if actor and actor.lower().strip() != uploader.lower().strip():
+                raise PermissionError(
+                    f"Caller-supplied actor identity ('{actor}') does not match authenticated principal ('{uploader}')."
+                )
+
+            # 2. Case Verification & Tenant Isolation
+            case = self.case_service.get_case(case_id)
+            if not case:
+                raise CaseNotFoundError(f"Case '{case_id}' not found.")
+
+            eff_case_bank = str(getattr(case, "bank_id", "") or "").lower().strip()
+            if not eff_case_bank:
+                raise ValueError(f"Case '{case_id}' lacks authoritative institution binding (bank_id).")
+
+            # Strict Case-Write Tenant Ownership: caller bank MUST match case bank
+            if caller_bank != eff_case_bank:
+                raise PermissionError(
+                    f"Tenant isolation violation: Caller institution '{caller_bank}' cannot modify "
+                    f"or attach evidence to case '{case_id}' owned by institution '{eff_case_bank}'. "
+                    "Authoritative case evidence writes require caller-bank ownership regardless of administrative roles."
+                )
+
+            # 3. Retrieve Server-Authoritative Batch Execution Record
+            clean_qid = (query_id or "").strip()
+            if not clean_qid:
+                raise ValueError(
+                    "Mandatory query_id missing. Multi-counterparty evidence assembly requires an authoritative server-issued query_id."
+                )
+
+            batch = self.batch_store.get_batch(clean_qid)
+            if not batch:
+                raise ValueError(
+                    f"Authoritative multi-counterparty query '{clean_qid}' not found, has expired, or was never issued. "
+                    "Client-fabricated or unauthorized batch attachment rejected."
+                )
+
+            batch_req_bank = str(batch.get("requesting_bank_id") or "").lower().strip()
+            if not batch_req_bank or batch_req_bank != eff_case_bank or batch_req_bank != caller_bank:
+                raise PermissionError(
+                    f"Cross-tenant batch violation: Authoritative query '{clean_qid}' was issued to institution "
+                    f"'{batch_req_bank}', cannot be assembled into case belonging to institution '{eff_case_bank}'."
+                )
+
+            batch_consortium_id = str(batch.get("consortium_id") or "").lower().strip()
+            if not batch_consortium_id:
+                raise ValueError(f"Corrupted batch record '{clean_qid}': missing consortium_id binding.")
+
+            # Case binding validation if query was bound to a specific case
+            bound_case_id = batch.get("case_id")
+            if bound_case_id and bound_case_id != case_id:
+                raise ConsortiumSecurityError(
+                    f"Cross-case binding violation: Multi-counterparty query '{clean_qid}' was bound to case "
+                    f"'{bound_case_id}', cannot be assembled into differing case '{case_id}'."
+                )
+
+            # Revalidate Consortium Active Membership
+            consortium = self.consortium_service.get_consortium(batch_consortium_id)
+            if not consortium:
+                raise ConsortiumSecurityError(f"Consortium '{batch_consortium_id}' no longer exists.")
+            if consortium.status != ConsortiumStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Consortium '{batch_consortium_id}' is in non-active status '{consortium.status.value}'."
+                )
+            if eff_case_bank in consortium.removed_members:
+                raise ConsortiumSecurityError(
+                    f"Institution '{eff_case_bank}' has been revoked/evicted from consortium '{batch_consortium_id}'."
+                )
+            if eff_case_bank not in consortium.members:
+                raise ConsortiumSecurityError(
+                    f"Institution '{eff_case_bank}' is not an active member of consortium '{batch_consortium_id}'."
+                )
+
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
+                )
+
+            # 4. Batch-Level Idempotency and Conflict Check
+            batch_fingerprint = hashlib.sha256(
+                f"{clean_qid}:{case_id}:{notes or ''}".encode()
+            ).hexdigest()
+
+            existing_evidence = self.evidence_service.get_case_evidence(case_id)
+            if idempotency_key:
+                for ev in existing_evidence:
+                    ev_meta = ev.get("metadata") or {}
+                    if ev_meta.get("batch_idempotency_key") == idempotency_key:
+                        if ev_meta.get("batch_query_id") != clean_qid:
+                            raise CrossBankIdempotencyConflictError(
+                                f"Idempotency conflict for key '{idempotency_key}': Key was already used on case '{case_id}' "
+                                f"for batch query '{ev_meta.get('batch_query_id')}', cannot be reused for differing query '{clean_qid}'."
+                            )
+                        if ev_meta.get("batch_fingerprint") and ev_meta.get("batch_fingerprint") != batch_fingerprint:
+                            raise CrossBankIdempotencyConflictError(
+                                f"Idempotency conflict for key '{idempotency_key}': Key was already used on case '{case_id}' "
+                                f"with differing material batch payload or analyst notes."
+                            )
+
+            target_bank_ids = list(batch.get("target_bank_ids") or [])
+            successful_signal_ids: dict[str, str] = dict(batch.get("successful_signal_ids") or {})
+            raw_failures: dict[str, Any] = dict(batch.get("execution_outcomes") or {})
+
+            # 5. Pre-validate Shared Analyst Notes Policy against Any Anonymous Target
+            if notes:
+                for t in target_bank_ids:
+                    sig_id = successful_signal_ids.get(t)
+                    if sig_id:
+                        sig_rec = self._signal_store.get(sig_id)
+                        if sig_rec:
+                            sig_data = sig_rec.get("signal_data") if isinstance(sig_rec.get("signal_data"), dict) else {}
+                            sig_mode = sig_data.get("disclosure_mode") or sig_rec.get("disclosure_mode") or "ANONYMIZED_SUMMARY"
+                            if sig_mode != "ATTRIBUTED_INSTITUTIONS":
+                                self._validate_anonymous_notes_policy(
+                                    notes=notes,
+                                    consortium=consortium,
+                                    requesting_bank=eff_case_bank,
+                                    target_bank=t,
+                                )
+
+            # 6. Handle Batch with Zero Admissible/Successful Signals
+            if not successful_signal_ids:
+                omitted_failures: list[MultiCounterpartyEvidenceAttachFailure] = []
+                for t in target_bank_ids:
+                    t_out = raw_failures.get(t) or {}
+                    t_fail = t_out.get("failure") or {}
+                    omitted_failures.append(
+                        MultiCounterpartyEvidenceAttachFailure(
+                            target_bank_id=t,
+                            category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
+                            reason=t_fail.get("error_message", "Counterparty execution did not produce an admissible operational signal."),
+                        )
+                    )
+                self._audit_attachment_rejection(
+                    case_id=case_id,
+                    signal_id=None,
+                    reason="Batch contains zero successful operational signals for evidence assembly.",
+                    error_type="NO_ADMISSIBLE_SIGNALS",
+                    uploader=uploader,
+                    caller_bank=caller_bank,
+                    consortium_id=batch_consortium_id,
+                )
+                return CrossBankMultiEvidenceAttachResponse(
+                    query_id=clean_qid,
+                    case_id=case_id,
+                    assembly_status="FAILED" if omitted_failures else "NO_ADMISSIBLE_SIGNALS",
+                    attached_count=0,
+                    replayed_count=0,
+                    failed_count=len(target_bank_ids),
+                    attached_evidence=[],
+                    omitted_or_failed=omitted_failures,
+                    case_version=getattr(case, "version", 1),
+                    timeline_event_recorded=False,
+                    is_duplicate_submission=False,
+                )
+
+            # 7. Assemble Eligible Signals into Case Evidence
+            attached_items: list[MultiCounterpartyEvidenceItem] = []
+            omitted_failures = []
+            newly_attached_count = 0
+            replayed_count = 0
+
+            for t in target_bank_ids:
+                if t not in successful_signal_ids:
+                    t_out = raw_failures.get(t) or {}
+                    t_fail = t_out.get("failure") or {}
+                    omitted_failures.append(
+                        MultiCounterpartyEvidenceAttachFailure(
+                            target_bank_id=t,
+                            signal_id=None,
+                            category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
+                            reason=t_fail.get("error_message", "Counterpart execution failed; no authoritative signal produced."),
+                        )
+                    )
+                    continue
+
+                sig_id = successful_signal_ids[t]
+                derived_signal_idem_key = (
+                    f"{idempotency_key}:sig:{sig_id}" if idempotency_key else None
+                )
+
+                try:
+                    attach_res = self.attach_signal_to_case_evidence(
+                        case_id=case_id,
+                        signal_id=sig_id,
+                        principal=auth_principal,
+                        notes=notes,
+                        idempotency_key=derived_signal_idem_key,
+                        batch_query_id=clean_qid,
+                        batch_idempotency_key=idempotency_key,
+                        batch_fingerprint=batch_fingerprint if idempotency_key else None,
+                    )
+                    sig_rec = self._signal_store.get(sig_id)
+                    sig_dict: dict[str, Any] = sig_rec if isinstance(sig_rec, dict) else {}
+                    raw_sig_data = sig_dict.get("signal_data")
+                    attached_sig_data: dict[str, Any] = raw_sig_data if isinstance(raw_sig_data, dict) else {}
+                    raw_mode = attached_sig_data.get("disclosure_mode") or sig_dict.get("disclosure_mode")
+                    eff_mode: DisclosureMode = (
+                        "ATTRIBUTED_INSTITUTIONS"
+                        if raw_mode == "ATTRIBUTED_INSTITUTIONS"
+                        else "ANONYMIZED_SUMMARY"
+                    )
+
+                    reported_target = t if eff_mode == "ATTRIBUTED_INSTITUTIONS" else None
+
+                    status_val: Literal["ATTACHED", "ALREADY_ATTACHED"]
+                    if attach_res.is_duplicate_submission:
+                        replayed_count += 1
+                        status_val = "ALREADY_ATTACHED"
+                    else:
+                        newly_attached_count += 1
+                        status_val = "ATTACHED"
+
+                    attached_items.append(
+                        MultiCounterpartyEvidenceItem(
+                            target_bank_id=reported_target,
+                            signal_id=sig_id,
+                            evidence_id=attach_res.evidence_id,
+                            status=status_val,
+                            content_hash=attach_res.content_hash,
+                            title=attach_res.title,
+                            disclosure_mode=eff_mode,
+                        )
+                    )
+                except (ConsortiumSecurityError, ValueError) as err:
+                    omitted_failures.append(
+                        MultiCounterpartyEvidenceAttachFailure(
+                            target_bank_id=t,
+                            signal_id=sig_id,
+                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                            reason=str(err),
+                        )
+                    )
+
+            # 8. Compute Overall Assembly Status
+            total_targets = len(target_bank_ids)
+            successful_attachments = len(attached_items)
+
+            if successful_attachments == total_targets and not omitted_failures:
+                overall_status: MultiEvidenceAssemblyStatus = "COMPLETED"
+            elif successful_attachments > 0:
+                overall_status = "PARTIAL"
+            else:
+                overall_status = "FAILED"
+
+            is_all_duplicates = bool(newly_attached_count == 0 and replayed_count > 0)
+
+            # 9. Record Immutable Audit Event
+            if newly_attached_count > 0 or replayed_count > 0:
+                ImmutableAuditChain.get_instance().append_event(
+                    event_type="CROSS_BANK_INTELLIGENCE_MULTI_EVIDENCE_ATTACHED",
+                    actor_id=f"user:{uploader}@{eff_case_bank}",
+                    action=f"attach_cross_bank_multi_evidence:{case_id}",
+                    resource_id=f"batch:{clean_qid}",
+                    actor_institution=eff_case_bank,
+                    details={
+                        "case_id": case_id,
+                        "query_id": clean_qid,
+                        "consortium_id": batch_consortium_id,
+                        "assembly_status": overall_status,
+                        "attached_count": newly_attached_count,
+                        "replayed_count": replayed_count,
+                        "failed_count": len(omitted_failures),
+                        "is_duplicate_submission": is_all_duplicates,
+                    },
+                )
+
+            updated_case = self.case_service.get_case(case_id)
+            current_version = getattr(updated_case, "version", getattr(case, "version", 1))
+
+            return CrossBankMultiEvidenceAttachResponse(
+                query_id=clean_qid,
+                case_id=case_id,
+                assembly_status=overall_status,
+                attached_count=newly_attached_count,
+                replayed_count=replayed_count,
+                failed_count=len(omitted_failures),
+                attached_evidence=attached_items,
+                omitted_or_failed=omitted_failures,
+                case_version=current_version,
+                timeline_event_recorded=True,
+                is_duplicate_submission=is_all_duplicates,
+            )
+        except Exception as exc:
+            self._audit_attachment_rejection(
+                case_id=case_id,
+                signal_id=None,
+                reason=str(exc),
+                error_type=exc.__class__.__name__,
+                uploader=uploader,
+                caller_bank=caller_bank,
+                consortium_id=batch_consortium_id,
             )
             raise
 

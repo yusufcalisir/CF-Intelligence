@@ -275,7 +275,9 @@ def test_multi_counterparty_docker_psi_execution(
         "typologies": [],
     })
 
-    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
     ent_a = Entity(
         id="ent_target_a",
         entity_type=EntityType.CUSTOMER,
@@ -345,7 +347,9 @@ def test_multi_counterparty_preflight_revocation_denial(
     monkeypatch.setenv("CFI_COORDINATOR_URL", f"http://127.0.0.1:{port_coord}")
 
     shared_identifier = "TR880001112223334445556667"
-    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
     ent_a = Entity(
         id="ent_target_rev",
         entity_type=EntityType.CUSTOMER,
@@ -550,7 +554,9 @@ def test_multi_counterparty_docker_psi_controlled_worker_failure(
         "typologies": ["ORGANIZED_CRIME"],
     })
 
-    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
     ent_a = Entity(
         id="ent_partial_a",
         entity_type=EntityType.CUSTOMER,
@@ -651,7 +657,9 @@ def test_multi_counterparty_docker_psi_circuit_breaker_recovery(
         "typologies": ["ORGANIZED_CRIME"],
     })
 
-    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
     ent_a = Entity(
         id="ent_cb_rec_a",
         entity_type=EntityType.CUSTOMER,
@@ -785,7 +793,9 @@ def test_multi_counterparty_docker_psi_case_evidence_admission_lifecycle(
         "typologies": [],
     })
 
-    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
     ent_a = Entity(
         id="ent_target_e2e_a",
         entity_type=EntityType.CUSTOMER,
@@ -955,3 +965,216 @@ def test_multi_counterparty_docker_psi_case_evidence_admission_lifecycle(
             signal_id=unpub_sig_id,
             auth_token=token_a,
         )
+
+
+def test_multi_counterparty_docker_batch_case_evidence_assembly(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Genuine Four-Container Docker Acceptance Test for Multi-Counterparty Batch Evidence Assembly (M6.5 Task 2).
+
+    Verifies:
+    1. Authenticated Bank A query against Bank B and Bank C with genuine OpenMined PSI.
+    2. Authentic PSI execution and independently verified counterpart results.
+    3. Authoritative server batch record stored in durable batch store.
+    4. Legitimate Bank A case creation.
+    5. Batch evidence assembly via HTTP POST /api/v1/intelligence/cross-bank/attach-multi-to-case.
+    6. Verifies persisted evidence records, hash integrity, and batch correlation metadata.
+    7. Verifies actual audit event in ImmutableAuditChain.
+    8. Safe idempotent replay without duplicate evidence or version drift.
+    9. Genuine partial-failure scenario: Bank C worker stopped -> Bank B attaches, Bank C is omitted as failure,
+       assembly_status is PARTIAL, zero fabricated Bank C evidence written.
+    """
+    gov_svc, token_a, _, _ = isolated_tri_governance_env
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+    port_coord: int = three_bank_docker_topology["port_coord"]
+    container_c = three_bank_docker_topology["container_worker_c"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    # 1. Setup entities in worker private datasets
+    shared_identifier = "TR880001112223334445559999"
+    clean_identifier = "TR772233445566778899008888"
+
+    client_a.store_private_entity({
+        "id": "ent_batch_docker_a",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["CORRUPTION_FACILITATION"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_batch_docker_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["CORRUPTION_FACILITATION"],
+    })
+    client_c.store_private_entity({
+        "id": "ent_batch_docker_c",
+        "bank_id": "bank_c",
+        "entity_type": "account",
+        "raw_identifier": clean_identifier,
+        "risk_level": "low",
+        "typologies": [],
+    })
+
+    cbi_service = CrossBankIntelligenceService.get_instance()
+    cbi_service.consortium_service = gov_svc
+    CrossBankIntelligenceService._instance = cbi_service
+    ent_a = Entity(
+        id="ent_batch_docker_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Docker Batch Target A",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_batch_docker_a", _entity_to_dict(ent_a))
+
+    # 2. Execute genuine authenticated OpenMined PSI query against Bank B and Bank C
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id="c_tri_m63_docker",
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="ent_batch_docker_a",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        use_established_psi=True,
+        require_established_psi=True,
+    )
+
+    query_response: MultiCounterpartyIntelligenceQueryResponse = (
+        cbi_service.query_multi_counterparty_intelligence(req=req, auth_token=token_a)
+    )
+
+    assert query_response.overall_outcome == "COMPLETED"
+    assert "bank_b" in query_response.results
+    assert "bank_c" in query_response.results
+
+    # 3. Verify server-authoritative batch record in durable batch store
+    batch_record = cbi_service.batch_store.get_batch(query_response.query_id)
+    assert batch_record is not None
+    assert batch_record["requesting_bank_id"] == "bank_a"
+    assert "bank_b" in batch_record["successful_signal_ids"]
+    assert "bank_c" in batch_record["successful_signal_ids"]
+
+    # 4. Create legitimate Bank A investigation case
+    case = cbi_service.case_service.create_case(
+        title="Docker Batch Evidence Assembly Case",
+        bank_id="bank_a",
+    )
+    assert case.id is not None
+    assert case.bank_id == "bank_a"
+
+    # 5. Assemble batch into case via actual FastAPI HTTP endpoint
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/intelligence/cross-bank/attach-multi-to-case",
+        json={
+            "query_id": query_response.query_id,
+            "case_id": case.id,
+            "notes": "Docker batch assembled multi-counterparty intelligence evidence",
+            "idempotency_key": "docker_batch_attach_key_1",
+        },
+        headers={"Authorization": f"Bearer {token_a}", "X-Tenant-ID": "bank_a"},
+    )
+    assert resp.status_code == 200, f"Attach multi error: {resp.status_code} {resp.text}"
+    data = resp.json()
+    assert data["assembly_status"] == "COMPLETED"
+    assert data["attached_count"] == 2
+    assert data["replayed_count"] == 0
+    assert data["is_duplicate_submission"] is False
+    assert len(data["attached_evidence"]) == 2
+
+    # 6. Verify persisted evidence records and batch correlation
+    evidence_list = cbi_service.evidence_service.get_case_evidence(case.id)
+    assert len(evidence_list) == 2
+    for ev in evidence_list:
+        ev_path = Path(ev["file_path"])
+        assert ev_path.exists()
+        persisted = json.loads(ev_path.read_text(encoding="utf-8"))
+        assert persisted["is_authoritative"] is True
+        assert persisted["batch_query_id"] == query_response.query_id
+
+    # 7. Verify audit event
+    audit_events = ImmutableAuditChain.get_instance().get_snapshot()
+    matched_audit = [
+        e for e in audit_events
+        if e.event_type == "CROSS_BANK_INTELLIGENCE_MULTI_EVIDENCE_ATTACHED"
+        and e.details.get("query_id") == query_response.query_id
+        and e.details.get("case_id") == case.id
+    ]
+    assert len(matched_audit) >= 1
+    assert "tri_analyst_a" in matched_audit[0].actor_id
+
+    # 8. Safe idempotent replay without duplicate evidence
+    resp_rep = client.post(
+        "/api/v1/intelligence/cross-bank/attach-multi-to-case",
+        json={
+            "query_id": query_response.query_id,
+            "case_id": case.id,
+            "notes": "Docker batch assembled multi-counterparty intelligence evidence",
+            "idempotency_key": "docker_batch_attach_key_1",
+        },
+        headers={"Authorization": f"Bearer {token_a}", "X-Tenant-ID": "bank_a"},
+    )
+    assert resp_rep.status_code == 200
+    data_rep = resp_rep.json()
+    assert data_rep["is_duplicate_submission"] is True
+    assert data_rep["attached_count"] == 0
+    assert data_rep["replayed_count"] == 2
+    assert len(cbi_service.evidence_service.get_case_evidence(case.id)) == 2
+
+    # 9. Demonstrate genuine partial-failure scenario where Bank C worker is stopped
+    _run_cmd(["docker", "stop", container_c], check=True)
+    try:
+        req_partial = MultiCounterpartyIntelligenceQueryRequest(
+            consortium_id="c_tri_m63_docker",
+            requesting_bank_id="bank_a",
+            target_bank_ids=["bank_b", "bank_c"],
+            query_entity_id="ent_batch_docker_a",
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+            use_established_psi=True,
+            require_established_psi=True,
+        )
+        query_resp_partial = cbi_service.query_multi_counterparty_intelligence(
+            req=req_partial, auth_token=token_a
+        )
+        assert query_resp_partial.overall_outcome == "PARTIAL_FAILURE"
+        assert "bank_b" in query_resp_partial.results
+        assert "bank_c" in query_resp_partial.failures
+
+        case_partial = cbi_service.case_service.create_case(
+            title="Docker Partial Failure Assembly Case",
+            bank_id="bank_a",
+        )
+
+        resp_p = client.post(
+            "/api/v1/intelligence/cross-bank/attach-multi-to-case",
+            json={
+                "query_id": query_resp_partial.query_id,
+                "case_id": case_partial.id,
+                "notes": "Partial assembly with unavailable Bank C",
+            },
+            headers={"Authorization": f"Bearer {token_a}", "X-Tenant-ID": "bank_a"},
+        )
+        assert resp_p.status_code == 200
+        data_p = resp_p.json()
+        assert data_p["assembly_status"] == "PARTIAL"
+        assert data_p["attached_count"] == 1
+        assert data_p["failed_count"] == 1
+        assert len(data_p["attached_evidence"]) == 1
+        assert len(data_p["omitted_or_failed"]) == 1
+        assert data_p["omitted_or_failed"][0]["target_bank_id"] == "bank_c"
+        assert len(cbi_service.evidence_service.get_case_evidence(case_partial.id)) == 1
+    finally:
+        _run_cmd(["docker", "start", container_c], check=True)
