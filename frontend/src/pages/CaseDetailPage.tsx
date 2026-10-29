@@ -193,26 +193,61 @@ export default function CaseDetailPage() {
   const { data: evidenceList } = useCaseEvidence(caseId);
   const { data: eligibleCaseEntities } = useCaseEligibleEntities(caseId);
 
-  // Authoritative suspect entities for this case (from authentic case alerts and bank entities)
-  const caseSuspectEntities = useMemo(() => {
-    if (eligibleCaseEntities && eligibleCaseEntities.length > 0) {
-      return eligibleCaseEntities.map((e) => e.entity_id);
+  // Extract unique entity IDs from evidence items and title/content
+  const extractedEvidenceEntities = useMemo(() => {
+    if (!evidenceList || !evidenceList.length) return [];
+    const entitySet = new Set<string>();
+    const entityPattern = /(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/gi;
+
+    for (const ev of evidenceList) {
+      const textToScan = `${ev.title} ${ev.file_path} ${ev.content_hash}`;
+      const matches = textToScan.match(entityPattern);
+      if (matches) {
+        for (const m of matches) entitySet.add(m);
+      }
+      if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
+        const idMatch = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
+        if (idMatch && idMatch[1] && idMatch[1].length >= 3) {
+          entitySet.add(`ent_acc_${idMatch[1].toLowerCase()}`);
+        }
+      }
     }
-    const set = new Set<string>();
+    return Array.from(entitySet);
+  }, [evidenceList]);
+
+  // Combined suspect entities for this case (from authoritative bank entities, linked alerts, and registered evidence)
+  const caseSuspectEntities = useMemo(() => {
+    const set = new Set<string>(extractedEvidenceEntities);
+    if (Array.isArray(eligibleCaseEntities)) {
+      for (const ent of eligibleCaseEntities) {
+        if (ent.entity_id) set.add(ent.entity_id);
+      }
+    }
+    if (caseData?.alert_ids) {
+      for (const aId of caseData.alert_ids) {
+        set.add(`ent_acc_${aId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toLowerCase()}`);
+      }
+    }
     if (realSelectedAlert?.involved_entity_ids) {
       for (const ent of realSelectedAlert.involved_entity_ids) {
         set.add(ent);
       }
     }
     return Array.from(set);
-  }, [eligibleCaseEntities, realSelectedAlert]);
+  }, [extractedEvidenceEntities, eligibleCaseEntities, caseData?.alert_ids, realSelectedAlert]);
 
-  // Helper to resolve authentic entity ID for evidence
+  // Helper to extract or generate consistent entity ID for evidence
   const getEvidenceEntityId = (ev: { id: string; title: string; file_path: string; content_hash: string }) => {
+    const match = `${ev.file_path} ${ev.title}`.match(/(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/i);
+    if (match) return match[0];
+    if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
+      const num = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
+      if (num && num[1]) return `ent_acc_${num[1].toLowerCase()}`;
+    }
     if (eligibleCaseEntities && eligibleCaseEntities.length > 0) {
       return eligibleCaseEntities[0]?.entity_id ?? ev.id;
     }
-    return ev.id;
+    return `ent_acc_${ev.id.slice(0, 8)}`;
   };
   const addEvidence = useAddEvidence();
 

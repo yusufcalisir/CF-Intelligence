@@ -3543,7 +3543,7 @@ export function useCaseEligibleEntities(caseId: string | undefined) {
       const { data } = await apiClient.get<CaseEligibleEntity[]>(
         `/api/v1/cases/${caseId}/eligible-entities`,
       );
-      return data;
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!caseId,
     staleTime: 30_000,
@@ -3557,7 +3557,7 @@ export function useCaseIntelligenceEvidence(caseId: string | undefined) {
       const { data } = await apiClient.get<CaseIntelligenceEvidenceItem[]>(
         `/api/v1/cases/${caseId}/intelligence-evidence`,
       );
-      return data;
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!caseId,
     refetchInterval: 10_000,

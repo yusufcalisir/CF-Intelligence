@@ -66,17 +66,21 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   // Queries & Mutations
   const {
-    data: eligibleEntities,
+    data: rawEligibleEntities,
     isLoading: isLoadingEntities,
     error: entitiesError,
     refetch: refetchEntities,
   } = useCaseEligibleEntities(caseId);
 
+  const eligibleEntities = Array.isArray(rawEligibleEntities) ? rawEligibleEntities : [];
+
   const {
-    data: persistedEvidence,
+    data: rawPersistedEvidence,
     isLoading: isLoadingEvidence,
     refetch: refetchEvidence,
   } = useCaseIntelligenceEvidence(caseId);
+
+  const persistedEvidence = Array.isArray(rawPersistedEvidence) ? rawPersistedEvidence : [];
 
   const queryMultiMutation = useQueryMultiCounterpartyIntelligence();
   const attachMultiMutation = useAttachMultiCounterpartyEvidence();
@@ -85,7 +89,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   // Auto-select first entity when loaded if none selected
   const activeEntityId =
-    selectedEntityId || (eligibleEntities && eligibleEntities.length > 0 ? (eligibleEntities[0]?.entity_id ?? '') : '');
+    selectedEntityId || (eligibleEntities.length > 0 ? (eligibleEntities[0]?.entity_id ?? '') : '');
 
   const handleTargetBankToggle = (bankKey: string) => {
     setTargetBanks((prev) =>
@@ -227,7 +231,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-mono">
                   Failed to load entities: {formatApiError(entitiesError)}
                 </div>
-              ) : !eligibleEntities || eligibleEntities.length === 0 ? (
+              ) : eligibleEntities.length === 0 ? (
                 <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs leading-relaxed">
                   No institution-owned entities currently linked to this case. Please link alerts or ensure bank customer/merchant entities exist.
                 </div>
@@ -611,7 +615,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               Persisted Authoritative Intelligence Evidence Trail
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Cryptographically verified evidence items permanently committed to case {caseId}
+              Cryptographically verified evidence items permanently committed to this investigation dossier
             </p>
           </div>
           <button
@@ -629,7 +633,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
           <div className="py-8 text-center text-xs font-mono text-slate-500 animate-pulse">
             Loading persisted evidence ledger...
           </div>
-        ) : !persistedEvidence || persistedEvidence.length === 0 ? (
+        ) : persistedEvidence.length === 0 ? (
           <div
             className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-800 text-slate-400 text-xs font-mono"
             data-testid="no-persisted-evidence"
