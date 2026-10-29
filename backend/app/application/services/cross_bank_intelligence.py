@@ -3115,6 +3115,7 @@ class CrossBankIntelligenceService:
         notes: str | None = None,
         idempotency_key: str | None = None,
         case_bank: str | None = None,
+        validate_only: bool = False,
         **kwargs: Any,
     ) -> CrossBankEvidenceAttachResponse:
         """Attach verified authoritative cross-bank intelligence signal into case evidence ledger."""
@@ -3756,6 +3757,21 @@ class CrossBankIntelligenceService:
             file_path = f"storage/evidence/case_{case_id}_signal_{resolved_signal_id}_{payload_digest[:16]}.json"
             title = f"Consortium Intelligence Evidence ({consortium_id.upper()})"
 
+            if validate_only:
+                return CrossBankEvidenceAttachResponse(
+                    evidence_id="DRY_RUN_VALIDATED",
+                    case_id=case_id,
+                    signal_id=resolved_signal_id,
+                    evidence_type="CROSS_BANK_INTELLIGENCE",
+                    title=title,
+                    content_hash=payload_digest,
+                    uploaded_at=now.isoformat(),
+                    uploaded_by=uploader,
+                    case_version=initial_case_version,
+                    timeline_event_recorded=False,
+                    is_duplicate_submission=False,
+                )
+
             try:
                 ev = self.evidence_service.register_evidence(
                     case_id=case_id,
@@ -3878,15 +3894,16 @@ class CrossBankIntelligenceService:
                 is_duplicate_submission=False,
             )
         except Exception as exc:
-            self._audit_attachment_rejection(
-                case_id=case_id,
-                signal_id=resolved_signal_id,
-                reason=str(exc),
-                error_type=exc.__class__.__name__,
-                uploader=uploader,
-                caller_bank=caller_bank,
-                consortium_id=consortium_id,
-            )
+            if not validate_only:
+                self._audit_attachment_rejection(
+                    case_id=case_id,
+                    signal_id=resolved_signal_id,
+                    reason=str(exc),
+                    error_type=exc.__class__.__name__,
+                    uploader=uploader,
+                    caller_bank=caller_bank,
+                    consortium_id=consortium_id,
+                )
             raise
 
     def _is_counterparty_attributed_authorized(
@@ -4174,108 +4191,70 @@ class CrossBankIntelligenceService:
                                 f"with differing material batch payload or analyst notes."
                             )
 
-            # 8. Handle Batch with Zero Admissible/Successful Signals (Correction C: Do NOT Bind Case!)
-            if not successful_signal_ids:
-                omitted_failures: list[MultiCounterpartyEvidenceAttachFailure] = []
-                for t in target_bank_ids:
-                    t_out = raw_failures.get(t) or {}
-                    t_fail = t_out.get("failure") or {}
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
-                            raw_reason=t_fail.get("error_message", "Counterparty execution did not produce an admissible operational signal."),
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                        )
-                    )
-                self._audit_attachment_rejection(
-                    case_id=case_id,
-                    signal_id=None,
-                    reason="Batch contains zero successful operational signals for evidence assembly.",
-                    error_type="NO_ADMISSIBLE_SIGNALS",
-                    uploader=uploader,
-                    caller_bank=caller_bank,
-                    consortium_id=batch_consortium_id,
+            # 8. Check Destination Case Binding Upfront (Pre-flight Cross-Case Binding Conflict)
+            existing_bound_case = batch.get("bound_case_id")
+            if existing_bound_case and existing_bound_case != case_id:
+                raise ConsortiumSecurityError(
+                    f"Cross-case binding violation: Multi-counterparty query '{clean_qid}' is already bound to destination case "
+                    f"'{existing_bound_case}', cannot be assembled into differing case '{case_id}'."
                 )
-                return CrossBankMultiEvidenceAttachResponse(
-                    query_id=clean_qid,
-                    case_id=case_id,
-                    assembly_status="FAILED" if omitted_failures else "NO_ADMISSIBLE_SIGNALS",
-                    attached_count=0,
-                    replayed_count=0,
-                    failed_count=len(target_bank_ids),
-                    attached_evidence=[],
-                    omitted_or_failed=omitted_failures,
-                    case_version=getattr(case, "version", 1),
-                    timeline_event_recorded=False,
-                    is_duplicate_submission=False,
+            if batch.get("case_id") and batch.get("case_id") != case_id:
+                raise ConsortiumSecurityError(
+                    f"Cross-case binding violation: Multi-counterparty query '{clean_qid}' was bound to case "
+                    f"'{batch.get('case_id')}', cannot be assembled into differing case '{case_id}'."
                 )
 
-            # 9. Atomically Establish Single Destination Case Binding (Correction C)
-            try:
-                self.batch_store.bind_case(query_id=clean_qid, case_id=case_id)
-            except BatchCaseBindingConflictError as e:
-                raise ConsortiumSecurityError(str(e)) from e
-
-            # 10. Assemble Eligible Signals into Case Evidence
-            attached_items: list[MultiCounterpartyEvidenceItem] = []
-            omitted_failures = []
-            newly_attached_count = 0
-            replayed_count = 0
-
+            # 9. Pre-screen Candidate Signals BEFORE Permanent Binding
             batch_receipt_ids: dict[str, str] = dict(batch.get("receipt_ids") or {})
+            batch_entity = str(batch.get("query_entity_id") or "").strip()
+
+            eligible_targets: list[str] = []
+            prescreen_failures: dict[str, MultiCounterpartyEvidenceAttachFailure] = {}
 
             for t in target_bank_ids:
                 if t not in successful_signal_ids:
                     t_out = raw_failures.get(t) or {}
                     t_fail = t_out.get("failure") or {}
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
-                            raw_reason=t_fail.get("error_message", "Counterpart execution failed; no authoritative signal produced."),
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                        )
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category=t_fail.get("error_category", "COUNTERPART_EXECUTION_FAILURE"),
+                        raw_reason=t_fail.get("error_message", "Counterpart execution failed; no authoritative signal produced."),
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
                     )
                     continue
 
                 sig_id = successful_signal_ids[t]
                 sig_rec = self._signal_store.get(sig_id)
 
-                # Correction A: Exact Receipt Binding Verification before attaching
+                # Receipt binding check
                 expected_rcp_id = batch_receipt_ids.get(t)
                 if not expected_rcp_id:
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
-                            raw_reason="Batch execution record lacks authentic cryptographic receipt binding.",
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                            signal_id=sig_id,
-                            signal_record=sig_rec,
-                        )
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                        raw_reason="Batch execution record lacks authentic cryptographic receipt binding.",
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        signal_id=sig_id,
+                        signal_record=sig_rec,
                     )
                     continue
 
                 admitted_rcp = self._admitted_receipts_store.get(expected_rcp_id)
                 if not admitted_rcp:
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
-                            raw_reason=f"Admitted receipt '{expected_rcp_id}' not found in cryptographic registry.",
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                            signal_id=sig_id,
-                            signal_record=sig_rec,
-                        )
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                        raw_reason=f"Admitted receipt '{expected_rcp_id}' not found in cryptographic registry.",
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        signal_id=sig_id,
+                        signal_record=sig_rec,
                     )
                     continue
 
-                # Verify consistent binding across query_id membership, signal, receipt, banks, and entity
+                # Identity & scope check
                 rcp_sig_id = str(admitted_rcp.get("signal_id") or "").strip()
                 rcp_rcp_id = str(admitted_rcp.get("receipt_id") or "").strip()
                 rcp_req_bank = str(admitted_rcp.get("requesting_bank_id") or "").lower().strip()
@@ -4289,36 +4268,100 @@ class CrossBankIntelligenceService:
                     or rcp_consortium != batch_consortium_id
                     or rcp_target_bank != t.lower().strip()
                 ):
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
-                            raw_reason=f"Receipt '{expected_rcp_id}' binding mismatch with batch execution identity.",
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                            signal_id=sig_id,
-                            signal_record=sig_rec,
-                        )
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                        raw_reason=f"Receipt '{expected_rcp_id}' binding mismatch with batch execution identity.",
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        signal_id=sig_id,
+                        signal_record=sig_rec,
                     )
                     continue
 
-                # Mandatory Non-Empty Query Entity Binding (Correction D)
+                # Mandatory non-empty query_entity_id check
                 rcp_entity = str(admitted_rcp.get("query_entity_id") or "").strip()
-                batch_entity = str(batch.get("query_entity_id") or "").strip()
                 if not rcp_entity or not batch_entity or rcp_entity != batch_entity:
-                    omitted_failures.append(
-                        self._project_safe_attach_failure(
-                            target_bank=t,
-                            category="GOVERNANCE_OR_ADMISSION_REJECTED",
-                            raw_reason=f"Receipt '{expected_rcp_id}' query_entity_id ('{rcp_entity}') missing, empty, or mismatched with batch entity ('{batch_entity}').",
-                            consortium=consortium,
-                            requesting_bank=eff_case_bank,
-                            signal_id=sig_id,
-                            signal_record=sig_rec,
-                        )
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                        raw_reason=f"Receipt '{expected_rcp_id}' query_entity_id ('{rcp_entity}') missing, empty, or mismatched with batch entity ('{batch_entity}').",
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        signal_id=sig_id,
+                        signal_record=sig_rec,
                     )
                     continue
 
+                # Authoritative signal validation check (dry run)
+                derived_signal_idem_key = (
+                    f"{idempotency_key}:sig:{sig_id}" if idempotency_key else None
+                )
+                try:
+                    self.attach_signal_to_case_evidence(
+                        case_id=case_id,
+                        signal_id=sig_id,
+                        principal=auth_principal,
+                        notes=notes,
+                        idempotency_key=derived_signal_idem_key,
+                        batch_query_id=clean_qid,
+                        batch_idempotency_key=idempotency_key,
+                        batch_fingerprint=batch_fingerprint if idempotency_key else None,
+                        validate_only=True,
+                    )
+                    eligible_targets.append(t)
+                except (ConsortiumSecurityError, ValueError, PermissionError) as err:
+                    prescreen_failures[t] = self._project_safe_attach_failure(
+                        target_bank=t,
+                        category="GOVERNANCE_OR_ADMISSION_REJECTED",
+                        raw_reason=str(err),
+                        consortium=consortium,
+                        requesting_bank=eff_case_bank,
+                        signal_id=sig_id,
+                        signal_record=sig_rec,
+                    )
+
+            # 10. Handle Batch with Zero Eligible Signals (DO NOT BIND CASE!)
+            if not eligible_targets:
+                omitted_failures = [prescreen_failures[t] for t in target_bank_ids if t in prescreen_failures]
+                self._audit_attachment_rejection(
+                    case_id=case_id,
+                    signal_id=None,
+                    reason="Batch contains zero eligible operational signals for evidence assembly.",
+                    error_type="NO_ELIGIBLE_SIGNALS",
+                    uploader=uploader,
+                    caller_bank=caller_bank,
+                    consortium_id=batch_consortium_id,
+                )
+                return CrossBankMultiEvidenceAttachResponse(
+                    query_id=clean_qid,
+                    case_id=case_id,
+                    assembly_status="FAILED",
+                    attached_count=0,
+                    replayed_count=0,
+                    failed_count=len(target_bank_ids),
+                    attached_evidence=[],
+                    omitted_or_failed=omitted_failures,
+                    case_version=getattr(case, "version", 1),
+                    timeline_event_recorded=False,
+                    is_duplicate_submission=False,
+                )
+
+            # 11. Atomically Establish Single Destination Case Binding
+            try:
+                self.batch_store.bind_case(query_id=clean_qid, case_id=case_id)
+            except BatchCaseBindingConflictError as e:
+                raise ConsortiumSecurityError(str(e)) from e
+
+            # 12. Assemble Eligible Signals into Case Evidence
+            attached_items: list[MultiCounterpartyEvidenceItem] = []
+            omitted_failures = [prescreen_failures[t] for t in target_bank_ids if t in prescreen_failures]
+            newly_attached_count = 0
+            replayed_count = 0
+
+            for t in eligible_targets:
+                sig_id = successful_signal_ids[t]
+                sig_rec = self._signal_store.get(sig_id)
                 derived_signal_idem_key = (
                     f"{idempotency_key}:sig:{sig_id}" if idempotency_key else None
                 )
@@ -4333,6 +4376,7 @@ class CrossBankIntelligenceService:
                         batch_query_id=clean_qid,
                         batch_idempotency_key=idempotency_key,
                         batch_fingerprint=batch_fingerprint if idempotency_key else None,
+                        validate_only=False,
                     )
                     sig_dict: dict[str, Any] = sig_rec if isinstance(sig_rec, dict) else {}
                     raw_sig_data = sig_dict.get("signal_data")
@@ -4378,7 +4422,17 @@ class CrossBankIntelligenceService:
                         )
                     )
 
-            # 8. Compute Overall Assembly Status
+            # 13. Fenced Release of Case Binding if Zero Evidence was Committed
+            if newly_attached_count == 0 and replayed_count == 0:
+                fresh_case_evidence = self.evidence_service.get_case_evidence(case_id)
+                has_committed_ev = any(
+                    (ev.get("metadata") or {}).get("batch_query_id") == clean_qid
+                    for ev in fresh_case_evidence
+                )
+                if not has_committed_ev:
+                    self.batch_store.release_case_binding(clean_qid, case_id)
+
+            # 14. Compute Overall Assembly Status
             total_targets = len(target_bank_ids)
             successful_attachments = len(attached_items)
 
