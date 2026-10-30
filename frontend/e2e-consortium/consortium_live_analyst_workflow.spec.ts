@@ -225,13 +225,17 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
     };
 
     expect(queryData.overall_outcome).toBe('COMPLETED');
-    expect(queryData.results.bank_b.match_confirmed).toBe(true);
-    expect(queryData.results.bank_b.match_category).toBe('PROBABILISTIC_FUZZY');
-    expect(queryData.results.bank_b.disclosure_mode).toBe('ATTRIBUTED_INSTITUTIONS');
-    expect(queryData.results.bank_b.provenance.protocol).toBe('OPENMINED-PSI-2.0.6-ECDH');
-    expect(queryData.results.bank_c.match_confirmed).toBe(false);
-    expect(queryData.results.bank_c.match_category).toBe('NO_MATCH');
-    expect(queryData.results.bank_c.disclosure_mode).toBe('ANONYMIZED_SUMMARY');
+    const bankBResult = queryData.results.bank_b;
+    const bankCResult = queryData.results.bank_c;
+    expect(bankBResult).toBeDefined();
+    expect(bankCResult).toBeDefined();
+    expect(bankBResult?.match_confirmed).toBe(true);
+    expect(bankBResult?.match_category).toBe('PROBABILISTIC_FUZZY');
+    expect(bankBResult?.disclosure_mode).toBe('ATTRIBUTED_INSTITUTIONS');
+    expect(bankBResult?.provenance.protocol).toBe('OPENMINED-PSI-2.0.6-ECDH');
+    expect(bankCResult?.match_confirmed).toBe(false);
+    expect(bankCResult?.match_category).toBe('NO_MATCH');
+    expect(bankCResult?.disclosure_mode).toBe('ANONYMIZED_SUMMARY');
 
     // 7. Verify UI rendering of authentic Bank B MATCH and anonymized Bank C NO_MATCH
     await expect(workspace).toContainText(queryData.query_id);
@@ -389,7 +393,8 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
       expect(partialJson.overall_outcome).toBe('PARTIAL_FAILURE');
       expect(partialJson.results.bank_b).toBeTruthy();
       expect(partialJson.results.bank_c).toBeUndefined();
-      expect(partialJson.failures.bank_c).toBeTruthy();
+      const bankCFailure = partialJson.failures.bank_c;
+      expect(bankCFailure).toBeDefined();
 
       await expect(workspace).toContainText('PARTIAL_FAILURE');
       await expect(page.getByTestId('outcome-card-bank_b')).toContainText(
@@ -397,7 +402,7 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
       );
       const failedCard = page.getByTestId('outcome-card-anonymized-1');
       await expect(failedCard).toBeVisible();
-      await expect(failedCard).toContainText(partialJson.failures.bank_c.error_category);
+      await expect(failedCard).toContainText(bankCFailure?.error_category ?? '');
       await expect(failedCard).not.toContainText('MATCH CONFIRMED');
       await expect(failedCard).not.toContainText('VERIFIED NO MATCH');
     } finally {
