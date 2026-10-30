@@ -256,7 +256,7 @@ class TestRedisPredictionEvidenceAtomicity:
         # Invariant 1: has_active_shared_storage immediately reports False
         assert engine._store.is_live() is False
         assert engine._store.has_active_shared_storage() is False
-        assert engine._store._redis_failed is True
+        assert engine._store._redis_failed
 
         # Invariant 2: log_prediction in production fails closed rather than silently falling back
         with pytest.raises(RuntimeError) as exc_info:
