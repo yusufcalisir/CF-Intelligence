@@ -18,8 +18,9 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (approvableOptions.length > 0 && !approvableOptions.includes(approvingInstitution)) {
-      setApprovingInstitution(approvableOptions[0]);
+    const firstOption = approvableOptions[0];
+    if (firstOption && !approvableOptions.includes(approvingInstitution)) {
+      setApprovingInstitution(firstOption);
     }
   }, [approvableOptions, approvingInstitution]);
 
