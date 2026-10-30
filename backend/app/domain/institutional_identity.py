@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
+import logging
+import os
 import re
 from typing import Any
 
@@ -428,10 +431,35 @@ class InstitutionalVerificationRegistry:
     - Prevents unauthenticated replacement of enrolled institutional keys.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, bootstrap_env: bool = True) -> None:
         self._enrolled_keys: dict[str, EnrolledInstitutionalPublicKey] = {}
         self._public_keys: dict[str, ed25519.Ed25519PublicKey] = {}
         self._key_versions: dict[str, int] = {}
+        if bootstrap_env:
+            self._load_from_environment()
+
+    def _load_from_environment(self) -> None:
+        raw_env = (
+            os.environ.get("CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON")
+            or os.environ.get("INSTITUTIONAL_PUBLIC_KEYS_JSON")
+        )
+        if not raw_env:
+            return
+        try:
+            mapping = json.loads(raw_env)
+            if isinstance(mapping, dict):
+                for bank_id, pub_key in mapping.items():
+                    if isinstance(pub_key, str) and pub_key.strip():
+                        self.register_public_key(
+                            bank_id=bank_id,
+                            public_key=pub_key.strip(),
+                            trust_source="ENVIRONMENT_BOOTSTRAP",
+                            allow_overwrite=True,
+                        )
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Failed to load institutional public keys from environment: %s", exc
+            )
 
     def register_public_key(
         self,

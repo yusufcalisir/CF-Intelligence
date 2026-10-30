@@ -1,0 +1,414 @@
+# ==============================================================================
+# Cross-Bank Federated Intelligence (CFI) — Consortium Deployment Specification
+# Integrated Multi-Bank Deployment Topology: 3 Institutional Workers,
+# PSI Coordinator, Operational FastAPI Backend, React Frontend, Gateway,
+# PostgreSQL 16, and Redis 7.2.
+#
+# Usage:
+#   1. Generate authoritative secrets:
+#      python scripts/generate_consortium_deployment_secrets.py
+#   2. Start consortium environment:
+#      docker compose -f docker-compose.consortium.yml --env-file .env.consortium up -d
+#   3. Bootstrap consortium governance & private entity vaults:
+#      python scripts/bootstrap_consortium_deployment.py
+# ==============================================================================
+
+services:
+  # ── 1. Enterprise Security Gateway & Reverse Proxy ──────────────────────────
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: cfi-gateway
+    restart: unless-stopped
+    ports:
+      - "${CFI_PORT_HTTP:-80}:80"
+      - "${CFI_PORT_HTTPS:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - consortium-core-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/gateway-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 2. Frontend Web Container (React 19 SPA) ────────────────────────────────
+  frontend:
+    image: cfi-intelligence/frontend:latest
+    container_name: cfi-frontend
+    restart: unless-stopped
+    ports:
+      - "${CFI_PORT_FRONTEND:-3000}:80"
+    networks:
+      - consortium-core-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # ── 3. Database Schema Migrations ───────────────────────────────────────────
+  migrations:
+    image: cfi-intelligence/backend:latest
+    container_name: cfi-consortium-migrations
+    restart: "no"
+    working_dir: /app/backend
+    environment:
+      - APP_ENV=production
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-cfi_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-cfi_fraud_db}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - consortium-core-net
+
+  # ── 4. Operational FastAPI Backend & Federation Engine ──────────────────────
+  backend:
+    image: cfi-intelligence/backend:latest
+    container_name: cfi-api-server
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-cfi_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-cfi_fraud_db}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - TRAINING_JOB_DB_URL=postgresql://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SIGNING_SECRET=${SECRET_KEY}
+      - OIDC_JWT_SIGNING_SECRET=${OIDC_JWT_SIGNING_SECRET}
+      - PAYLOAD_SIGNING_SECRET=${PAYLOAD_SIGNING_SECRET}
+      - TRAINING_COORDINATOR_TOKEN=${TRAINING_COORDINATOR_TOKEN}
+      - TRAINING_WORKER_TOKEN=${TRAINING_WORKER_TOKEN}
+      - IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - CFI_AUDIT_LEDGER_SECRET=${CFI_AUDIT_LEDGER_SECRET}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT}
+      - CFI_REGULATORY_ENVELOPE_SECRET=${CFI_REGULATORY_ENVELOPE_SECRET}
+      - CFI_CRON_SECRET=${CFI_CRON_SECRET}
+      - CFI_COORDINATOR_URL=http://coordinator:8200
+      - CFI_COORDINATOR_SECRET=${CFI_COORDINATOR_SECRET}
+      - CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON=${CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON}
+      - CFI_STORAGE_DIR=/app/storage
+    ports:
+      - "${CFI_PORT_BACKEND:-8000}:8000"
+    volumes:
+      - consortium-backend-storage:/app/storage
+    networks:
+      - consortium-core-net
+      - consortium-mesh-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+      coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 5
+
+  # ── 5. Private Set Intersection (PSI) Coordinator ───────────────────────────
+  coordinator:
+    image: cfi-institutional-worker:latest
+    container_name: cfi-coordinator
+    restart: unless-stopped
+    command:
+      - "python"
+      - "-m"
+      - "app.application.services.isolated_matching_service"
+      - "--role"
+      - "coordinator"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8200"
+      - "--worker-a-bank"
+      - "bank_a"
+      - "--worker-a-url"
+      - "http://worker-bank-a:8100"
+      - "--worker-a-token"
+      - "${WORKER_BANK_A_MATCHING_TOKEN}"
+      - "--worker-b-bank"
+      - "bank_b"
+      - "--worker-b-url"
+      - "http://worker-bank-b:8100"
+      - "--worker-b-token"
+      - "${WORKER_BANK_B_MATCHING_TOKEN}"
+      - "--worker-c-bank"
+      - "bank_c"
+      - "--worker-c-url"
+      - "http://worker-bank-c:8100"
+      - "--worker-c-token"
+      - "${WORKER_BANK_C_MATCHING_TOKEN}"
+    environment:
+      - APP_ENV=production
+      - CFI_ROLE=coordinator
+      - CFI_COORDINATOR_SECRET=${CFI_COORDINATOR_SECRET}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - CFI_AUDIT_LEDGER_SECRET=${CFI_AUDIT_LEDGER_SECRET}
+      - JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SIGNING_SECRET=${SECRET_KEY}
+      - CFI_STORAGE_DIR=/vault
+      - CFI_ACCOUNT_STORE_PATH=/vault/auth_identity_store.json
+      - CFI_IDENTITY_STORE_PATH=/vault/auth_identity_store.json
+      - CFI_CONSORTIUM_STORE_PATH=/vault/consortium_governance_store.json
+    volumes:
+      - consortium-coordinator-vault:/vault
+    ports:
+      - "${CFI_PORT_COORDINATOR:-8200}:8200"
+    networks:
+      - consortium-mesh-net
+    depends_on:
+      worker-bank-a:
+        condition: service_healthy
+      worker-bank-b:
+        condition: service_healthy
+      worker-bank-c:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8200/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 6. Institutional Worker: Bank A ─────────────────────────────────────────
+  worker-bank-a:
+    image: cfi-institutional-worker:latest
+    container_name: cfi-worker-bank-a
+    restart: unless-stopped
+    command:
+      - "python"
+      - "-m"
+      - "app.application.services.isolated_matching_service"
+      - "--role"
+      - "worker"
+      - "--bank-id"
+      - "bank_a"
+      - "--port"
+      - "8100"
+      - "--host"
+      - "0.0.0.0"
+      - "--storage-root"
+      - "/vault"
+    environment:
+      - APP_ENV=production
+      - BANK_ID=bank_a
+      - STORAGE_ROOT=/vault
+      - CFI_STORAGE_DIR=/vault
+      - WORKER_PORT=8100
+      - WORKER_HOST=0.0.0.0
+      - WORKER_AUTH_SECRET=${WORKER_BANK_A_AUTH_SECRET}
+      - WORKER_SIGNING_KEY=${WORKER_BANK_A_SIGNING_KEY}
+      - WORKER_MATCHING_TOKEN=${WORKER_BANK_A_MATCHING_TOKEN}
+      - WORKER_INGESTION_TOKEN=${WORKER_BANK_A_INGESTION_TOKEN}
+      - WORKER_ADMIN_TOKEN=${WORKER_BANK_A_ADMIN_TOKEN}
+      - WORKER_TRUSTED_PEERS_JSON=${WORKER_BANK_A_TRUSTED_PEERS_JSON}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SIGNING_SECRET=${SECRET_KEY}
+    ports:
+      - "${CFI_PORT_WORKER_A:-8101}:8100"
+    volumes:
+      - consortium-vault-bank-a:/vault
+    networks:
+      - consortium-mesh-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 7. Institutional Worker: Bank B ─────────────────────────────────────────
+  worker-bank-b:
+    image: cfi-institutional-worker:latest
+    container_name: cfi-worker-bank-b
+    restart: unless-stopped
+    command:
+      - "python"
+      - "-m"
+      - "app.application.services.isolated_matching_service"
+      - "--role"
+      - "worker"
+      - "--bank-id"
+      - "bank_b"
+      - "--port"
+      - "8100"
+      - "--host"
+      - "0.0.0.0"
+      - "--storage-root"
+      - "/vault"
+    environment:
+      - APP_ENV=production
+      - BANK_ID=bank_b
+      - STORAGE_ROOT=/vault
+      - CFI_STORAGE_DIR=/vault
+      - WORKER_PORT=8100
+      - WORKER_HOST=0.0.0.0
+      - WORKER_AUTH_SECRET=${WORKER_BANK_B_AUTH_SECRET}
+      - WORKER_SIGNING_KEY=${WORKER_BANK_B_SIGNING_KEY}
+      - WORKER_MATCHING_TOKEN=${WORKER_BANK_B_MATCHING_TOKEN}
+      - WORKER_INGESTION_TOKEN=${WORKER_BANK_B_INGESTION_TOKEN}
+      - WORKER_ADMIN_TOKEN=${WORKER_BANK_B_ADMIN_TOKEN}
+      - WORKER_TRUSTED_PEERS_JSON=${WORKER_BANK_B_TRUSTED_PEERS_JSON}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SIGNING_SECRET=${SECRET_KEY}
+    ports:
+      - "${CFI_PORT_WORKER_B:-8102}:8100"
+    volumes:
+      - consortium-vault-bank-b:/vault
+    networks:
+      - consortium-mesh-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 8. Institutional Worker: Bank C ─────────────────────────────────────────
+  worker-bank-c:
+    image: cfi-institutional-worker:latest
+    container_name: cfi-worker-bank-c
+    restart: unless-stopped
+    command:
+      - "python"
+      - "-m"
+      - "app.application.services.isolated_matching_service"
+      - "--role"
+      - "worker"
+      - "--bank-id"
+      - "bank_c"
+      - "--port"
+      - "8100"
+      - "--host"
+      - "0.0.0.0"
+      - "--storage-root"
+      - "/vault"
+    environment:
+      - APP_ENV=production
+      - BANK_ID=bank_c
+      - STORAGE_ROOT=/vault
+      - CFI_STORAGE_DIR=/vault
+      - WORKER_PORT=8100
+      - WORKER_HOST=0.0.0.0
+      - WORKER_AUTH_SECRET=${WORKER_BANK_C_AUTH_SECRET}
+      - WORKER_SIGNING_KEY=${WORKER_BANK_C_SIGNING_KEY}
+      - WORKER_MATCHING_TOKEN=${WORKER_BANK_C_MATCHING_TOKEN}
+      - WORKER_INGESTION_TOKEN=${WORKER_BANK_C_INGESTION_TOKEN}
+      - WORKER_ADMIN_TOKEN=${WORKER_BANK_C_ADMIN_TOKEN}
+      - WORKER_TRUSTED_PEERS_JSON=${WORKER_BANK_C_TRUSTED_PEERS_JSON}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SECRET=${SECRET_KEY}
+      - CFI_JWT_SIGNING_SECRET=${SECRET_KEY}
+    ports:
+      - "${CFI_PORT_WORKER_C:-8103}:8100"
+    volumes:
+      - consortium-vault-bank-c:/vault
+    networks:
+      - consortium-mesh-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 9. PostgreSQL 16 Enterprise Database ────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfi-consortium-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cfi_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cfi_fraud_db}
+    ports:
+      - "${CFI_PORT_PG:-5432}:5432"
+    volumes:
+      - consortium-postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - consortium-core-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cfi_admin} -d ${POSTGRES_DB:-cfi_fraud_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 10. Redis 7.2 In-Memory Cache & Message Broker ──────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: cfi-consortium-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy volatile-lru
+    ports:
+      - "${CFI_PORT_REDIS:-6379}:6379"
+    volumes:
+      - consortium-redis-data:/data
+    networks:
+      - consortium-core-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+networks:
+  consortium-core-net:
+    driver: bridge
+    name: cfi-consortium-core-net
+  consortium-mesh-net:
+    driver: bridge
+    name: cfi-consortium-mesh-net
+
+volumes:
+  consortium-postgres-data:
+  consortium-redis-data:
+  consortium-backend-storage:
+  consortium-vault-bank-a:
+  consortium-vault-bank-b:
+  consortium-vault-bank-c:
+  consortium-coordinator-vault:
