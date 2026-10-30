@@ -746,7 +746,7 @@ class TestOperationalRecoveryAndRedisReconnection:
         mock_client.ping.side_effect = ConnectionError("Transient Redis container restart")
         assert store.is_live() is False
         assert store.has_active_shared_storage() is False
-        assert store._redis_failed is True
+        assert store._redis_failed
 
         with pytest.raises(RuntimeError, match="Redis store unavailable in production"):
             store.get("probe_key")
@@ -762,5 +762,5 @@ class TestOperationalRecoveryAndRedisReconnection:
         # Store automatically reconnects without manual restart
         assert store.has_active_shared_storage() is True
         assert store.is_live() is True
-        assert store._redis_failed is False
+        assert not store._redis_failed
         assert store.get("probe_key") == "recovered_value"

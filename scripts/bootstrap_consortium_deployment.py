@@ -208,7 +208,7 @@ def provision_or_verify_institutional_user(
 
     try:
         from app.infrastructure.security.auth_service import verify_password
-        password_matches = bool(verify_password(effective_password, existing.password_hash))
+        password_matches = verify_password(effective_password, existing.password_hash)
     except Exception:
         password_matches = bool(auth_svc.authenticate(username, effective_password)[0])
     bank_matches = existing.bank_id == effective_bank_id
