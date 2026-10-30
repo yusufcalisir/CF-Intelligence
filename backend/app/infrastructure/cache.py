@@ -167,10 +167,50 @@ class CacheService:
                                 continue
                 except Exception:
                     pass
-            self.__class__._unavailable = True
-            self.__class__._last_unavailable_at = time.monotonic()
-            self.__class__._client = None
+            self._record_connection_failure()
             return False
+
+    @classmethod
+    def _is_connection_error(cls, exc: Exception) -> bool:
+        """Determine if an exception represents a Redis socket/connection drop or timeout."""
+        if isinstance(
+            exc,
+            (
+                aioredis.ConnectionError,
+                aioredis.TimeoutError,
+                ConnectionError,
+                ConnectionRefusedError,
+                ConnectionResetError,
+                OSError,
+                asyncio.TimeoutError,
+            ),
+        ):
+            return True
+        exc_name = type(exc).__name__
+        return any(
+            err in exc_name
+            for err in (
+                "ConnectionError",
+                "TimeoutError",
+                "ConnectionRefusedError",
+                "ConnectionResetError",
+                "CannotConnectError",
+            )
+        )
+
+    @classmethod
+    def _record_connection_failure(cls, exc: Exception | None = None) -> None:
+        """Mark Redis unavailable, record monotonic timestamp, and clear cached client."""
+        cls._unavailable = True
+        cls._last_unavailable_at = time.monotonic()
+        cls._client = None
+        if exc:
+            logger.warning(
+                "Redis connection failure recorded: %s (%s). Cache disabled for %ss cooldown.",
+                exc,
+                type(exc).__name__,
+                cls._RECONNECT_COOLDOWN_SECONDS,
+            )
 
     # ── Generic helpers ────────────────────────────────────────────────
 
@@ -182,7 +222,10 @@ class CacheService:
             raw = await c.get(key)
             return json.loads(raw) if raw else None
         except Exception as exc:
-            logger.debug("Cache GET miss/error key=%s: %s", key, exc)
+            if self._is_connection_error(exc):
+                self._record_connection_failure(exc)
+            else:
+                logger.debug("Cache GET miss/error key=%s: %s", key, exc)
             return None
 
     async def _set(self, key: str, value: Any, ttl: int) -> None:
@@ -192,7 +235,10 @@ class CacheService:
         try:
             await c.set(key, json.dumps(value), ex=ttl)
         except Exception as exc:
-            logger.debug("Cache SET error key=%s: %s", key, exc)
+            if self._is_connection_error(exc):
+                self._record_connection_failure(exc)
+            else:
+                logger.debug("Cache SET error key=%s: %s", key, exc)
 
     async def _delete(self, *keys: str) -> None:
         c = self.client
@@ -201,7 +247,10 @@ class CacheService:
         try:
             await c.delete(*keys)
         except Exception as exc:
-            logger.debug("Cache DEL error keys=%s: %s", keys, exc)
+            if self._is_connection_error(exc):
+                self._record_connection_failure(exc)
+            else:
+                logger.debug("Cache DEL error keys=%s: %s", keys, exc)
 
     # ── Alert cache ────────────────────────────────────────────────────
 
@@ -286,7 +335,10 @@ class CacheService:
             channel = f"channel:training:{simulation_id}"
             await c.publish(channel, json.dumps(event))
         except Exception as exc:
-            logger.debug("Pub/sub publish error simulation=%s: %s", simulation_id, exc)
+            if self._is_connection_error(exc):
+                self._record_connection_failure(exc)
+            else:
+                logger.debug("Pub/sub publish error simulation=%s: %s", simulation_id, exc)
 
     # ── Rate limiting (sliding window counter) ─────────────────────────
 
@@ -308,6 +360,8 @@ class CacheService:
                     await c.expire(rk, window)
                 return count <= limit
             except Exception as exc:
+                if self._is_connection_error(exc):
+                    self._record_connection_failure(exc)
                 logger.warning(
                     "Redis rate limit check failed key=%s: %s; falling back to local sliding window",
                     key,
@@ -401,7 +455,7 @@ class CacheService:
                         break
                 except Exception as exc:
                     logger.debug("Redis distributed lock error key=%s: %s - falling back to in-memory lock", lock_key, exc)
-                    self.__class__._unavailable = True
+                    self._record_connection_failure(exc)
                     redis_failed = True
                     break
                 await asyncio.sleep(retry_interval_sec)

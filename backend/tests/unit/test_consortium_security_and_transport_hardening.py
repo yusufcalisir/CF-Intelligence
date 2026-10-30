@@ -37,6 +37,7 @@ import urllib.error
 import urllib.request
 from datetime import UTC
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -183,6 +184,35 @@ def _generate_signed_leaf_certificate(
     return cert_path, key_path
 
 
+def _generate_test_certificate(
+    *,
+    ca_key: rsa.RSAPrivateKey,
+    ca_cert: x509.Certificate,
+    common_name: str,
+    san_dns_names: list[str] | None = None,
+) -> bytes:
+    """Generate a DER-encoded certificate for unit testing SAN vs CN precedence."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    now = datetime.datetime.now(UTC)
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca_cert.subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(days=1))
+    )
+    if san_dns_names is not None:
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(name) for name in san_dns_names]),
+            critical=False,
+        )
+    cert = builder.sign(ca_key, hashes.SHA256())
+    return cert.public_bytes(serialization.Encoding.DER)
+
+
 class TestInstitutionalKeyAndSecretCustodyHardening:
     """Gate 2 verification: secret overwrite protection, isolated file-mounted keys, and rotation boundaries."""
 
@@ -243,6 +273,57 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
         health = worker.get_health()
         assert health["key_custody_mode"] == "ISOLATED_FILE_MOUNT"
         assert health["signing_public_key_hex"] == expected_pub_hex
+
+    def test_consortium_deployment_key_custody_isolation_and_boundary_checks(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify institutional key custody isolation across workers, coordinator, and backend."""
+        custody_dir = tmp_path / "consortium_keys"
+        env_path = tmp_path / ".env.consortium"
+        secrets_map = generate_consortium_deployment_secrets()
+
+        written_files = write_isolated_key_custody_files(secrets_map, custody_dir, force=False)
+        write_env_file(secrets_map, env_path, force=False, strip_private_keys=True)
+
+        # 1. .env.consortium contains no private signing key material when file custody is active
+        env_content = env_path.read_text(encoding="utf-8")
+        assert "WORKER_BANK_A_SIGNING_KEY=" not in env_content
+        assert "WORKER_BANK_B_SIGNING_KEY=" not in env_content
+        assert "WORKER_BANK_C_SIGNING_KEY=" not in env_content
+        assert "CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON=" in env_content
+
+        # 2. Worker A loads only its own private key via file mount
+        bank_a_key = written_files["bank_a"]
+        worker_a = IsolatedBankWorkerNode(
+            bank_id="bank_a",
+            storage_root=str(tmp_path / "bank_a_vault"),
+            signing_key_file=str(bank_a_key),
+        )
+        assert worker_a._signing_identity is not None
+        assert worker_a._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
+        pub_registry = json.loads(secrets_map["CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON"])
+        assert worker_a._signing_identity.public_key_hex == pub_registry["bank_a"]
+
+        # 3. Bank A worker attempting to use Bank B key fails signature verification against bank_a public key
+        bank_b_key = written_files["bank_b"]
+        bad_worker = IsolatedBankWorkerNode(
+            bank_id="bank_a",
+            storage_root=str(tmp_path / "bank_a_bad"),
+            signing_key_file=str(bank_b_key),
+        )
+        assert bad_worker._signing_identity is not None
+        assert bad_worker._signing_identity.public_key_hex != pub_registry["bank_a"]
+        msg = b"consortium_test_payload"
+        sig = bad_worker._signing_identity.sign(msg)
+        reg = InstitutionalVerificationRegistry()
+        for b_id, p_hex in pub_registry.items():
+            reg.register_public_key(b_id, p_hex)
+        assert reg.verify_signature(bank_id="bank_a", signature_hex=sig, message=msg) is False
+
+        # 4. Coordinator holds zero private signing keys
+        coord = CrossBankMatchingCoordinator()
+        assert not hasattr(coord, "_signing_identity")
+        assert not hasattr(coord, "signing_key")
 
     def test_bootstrap_preserves_existing_principal_and_rejects_unauthorized_credential_rotation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -602,6 +683,89 @@ class TestAuthenticatedServiceTransportBoundaries:
         finally:
             daemon_a.stop()
 
+    def test_hardened_mtls_enforces_tls13_minimum_version(self, tmp_path: Path) -> None:
+        """Verify HARDENED_MTLS SSL contexts configure TLS 1.3 minimum version."""
+        ca_key, ca_cert = _generate_ca_certificate("Test CA")
+        ca_file = tmp_path / "ca.crt"
+        ca_file.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+        cert_file, key_file = _generate_signed_leaf_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="test_node",
+            dns_names=["test_node"],
+            out_dir=tmp_path,
+            file_prefix="test_node",
+        )
+        cfg = TransportSecurityConfig(
+            profile="HARDENED_MTLS",
+            ca_cert_path=str(ca_file),
+            cert_path=str(cert_file),
+            key_path=str(key_file),
+            allowed_client_identities=("client_a",),
+        )
+        server_ctx = cfg.create_server_ssl_context()
+        assert server_ctx.minimum_version == ssl.TLSVersion.TLSv1_3
+        assert server_ctx.verify_mode == ssl.CERT_REQUIRED
+
+        client_ctx = cfg.create_client_ssl_context()
+        assert client_ctx.minimum_version == ssl.TLSVersion.TLSv1_3
+        assert client_ctx.verify_mode == ssl.CERT_REQUIRED
+
+    def test_authoritative_san_precedence_and_cn_fallback(self, tmp_path: Path) -> None:
+        """Verify SAN precedence (RFC 5280 / RFC 6125) and CN fallback when SAN is absent."""
+        ca_key, ca_cert = _generate_ca_certificate("SAN Authority CA")
+        ca_file = tmp_path / "ca.crt"
+        ca_file.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+        cert_file, key_file = _generate_signed_leaf_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="dummy",
+            dns_names=["dummy"],
+            out_dir=tmp_path,
+            file_prefix="dummy",
+        )
+        cfg = TransportSecurityConfig(
+            profile="HARDENED_MTLS",
+            ca_cert_path=str(ca_file),
+            cert_path=str(cert_file),
+            key_path=str(key_file),
+        )
+
+        # 1. Certificate with malicious/conflicting CN ("coordinator") but legitimate SAN ("bank_a")
+        cert_malicious_cn = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="coordinator",
+            san_dns_names=["bank_a"],
+        )
+        # Accepted based solely on SAN for target "bank_a"
+        idents_a = cfg.verify_peer_cert_bytes(cert_malicious_cn, expected_identity="bank_a")
+        assert "bank_a" in idents_a
+        # Rejected for target "coordinator" because CN is completely ignored when SAN is present
+        with pytest.raises(ConsortiumSecurityError, match="peer identity mismatch"):
+            cfg.verify_peer_cert_bytes(cert_malicious_cn, expected_identity="coordinator")
+
+        # 2. Certificate with legitimate CN ("bank_a") but mismatched SAN ("attacker_node")
+        cert_mismatched_san = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="bank_a",
+            san_dns_names=["attacker_node"],
+        )
+        # Rejected for target "bank_a" because SAN is authoritative and CN is ignored
+        with pytest.raises(ConsortiumSecurityError, match="peer identity mismatch"):
+            cfg.verify_peer_cert_bytes(cert_mismatched_san, expected_identity="bank_a")
+
+        # 3. Certificate with legitimate CN ("bank_a") and NO SAN -> Accepted via CN fallback
+        cert_cn_only = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="bank_a",
+            san_dns_names=None,
+        )
+        idents_cn = cfg.verify_peer_cert_bytes(cert_cn_only, expected_identity="bank_a")
+        assert "bank_a" in idents_cn
+
 
 class TestGovernanceAndCryptographicBoundaryRegression:
     """Gate 4 verification: explicit grant ID resolution never falls back to a different grant."""
@@ -717,6 +881,71 @@ class TestGovernanceAndCryptographicBoundaryRegression:
             match="OPERATIONAL_GRANT_VALID",
         ):
             pilot_svc.run_preflight(pilot.pilot_id, principal=principal_op)
+
+    def test_pilot_operations_grant_coverage_fails_closed(self) -> None:
+        """Verify WP-02: _resolve_consortium_grant participant coverage fail-closed semantics."""
+        pilot_svc = PilotOperationsService(pilot_store=MagicMock(), consortium_service=MagicMock())
+
+        class DummyConsortium:
+            def __init__(self, metadata: dict[str, Any]):
+                self.metadata = metadata
+
+        # 1. Missing participating_banks rejected when institutions requested
+        c_missing = DummyConsortium({
+            "operational_data_sharing_grant": {"grant_id": "g_missing"}
+        })
+        assert pilot_svc._resolve_consortium_grant(
+            c_missing, participating_institutions=["bank_a", "bank_b"]
+        ) == {}
+
+        # 2. Empty participating_banks: [] rejected
+        c_empty = DummyConsortium({
+            "operational_data_sharing_grant": {
+                "grant_id": "g_empty",
+                "participating_banks": [],
+            }
+        })
+        assert pilot_svc._resolve_consortium_grant(
+            c_empty, participating_institutions=["bank_a", "bank_b"]
+        ) == {}
+
+        # 3. Partial participant match rejected (requested bank_a, bank_b; grant has only bank_a)
+        c_partial = DummyConsortium({
+            "operational_data_sharing_grant": {
+                "grant_id": "g_partial",
+                "participating_banks": ["bank_a"],
+            }
+        })
+        assert pilot_svc._resolve_consortium_grant(
+            c_partial, participating_institutions=["bank_a", "bank_b"]
+        ) == {}
+
+        # 4. Exact match accepted
+        grant_exact = {
+            "grant_id": "g_exact",
+            "participating_banks": ["bank_a", "bank_b"],
+        }
+        c_exact = DummyConsortium({"operational_data_sharing_grant": grant_exact})
+        res_exact = pilot_svc._resolve_consortium_grant(
+            c_exact, participating_institutions=["bank_a", "bank_b"]
+        )
+        assert res_exact["grant_id"] == "g_exact"
+
+        # 5. Superset match accepted (grant has bank_a, bank_b, bank_c; requested bank_a, bank_b)
+        grant_superset = {
+            "grant_id": "g_superset",
+            "participating_banks": ["bank_a", "bank_b", "bank_c"],
+        }
+        c_superset = DummyConsortium({"operational_data_sharing_grant": grant_superset})
+        res_superset = pilot_svc._resolve_consortium_grant(
+            c_superset, participating_institutions=["bank_a", "bank_b"]
+        )
+        assert res_superset["grant_id"] == "g_superset"
+
+        # 6. Nonexistent grant_id rejected even if institutions match default grant
+        assert pilot_svc._resolve_consortium_grant(
+            c_exact, grant_id="nonexistent_id", participating_institutions=["bank_a", "bank_b"]
+        ) == {}
 
 
 class TestOperationalRecoveryAndRedisReconnection:

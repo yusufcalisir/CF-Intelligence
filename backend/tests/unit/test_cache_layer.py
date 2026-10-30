@@ -12,7 +12,7 @@ Tests:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -133,3 +133,55 @@ async def test_cache_invalidation_on_write(cache_service: CacheService) -> None:
 
     await cache_service.invalidate_alert("alert-777", "bank_alpha")
     mock_redis.delete.assert_called_once_with("alert:alert-777", "alerts:bank:bank_alpha")
+
+
+@pytest.mark.asyncio
+async def test_cache_service_operation_level_reconnection_and_cooldown_transition(
+    cache_service: CacheService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify active Redis connection drop during operations triggers cooldown and auto-reconnection."""
+    import time
+
+    import redis.asyncio as aioredis
+
+    mock_broken_client = AsyncMock()
+    mock_broken_client.get.side_effect = aioredis.ConnectionError("Connection lost to Redis server")
+    mock_broken_client.set.side_effect = aioredis.ConnectionError("Connection lost to Redis server")
+    mock_broken_client.delete.side_effect = aioredis.ConnectionError("Connection lost to Redis server")
+
+    CacheService._client = mock_broken_client
+    CacheService._unavailable = False
+    CacheService._last_unavailable_at = 0.0
+
+    # 1. Operation-level failure (_get) triggers unavailable state, records timestamp, clears _client
+    val = await cache_service._get("test:transient:key")
+    assert val is None
+    assert CacheService._unavailable is True
+    assert CacheService._client is None
+    assert CacheService._last_unavailable_at > 0
+
+    failure_timestamp = CacheService._last_unavailable_at
+
+    # 2. Subsequent operations during cooldown fail gracefully without re-instantiating client or socket I/O
+    mock_broken_client.get.reset_mock()
+    val_during_cooldown = await cache_service._get("test:transient:key")
+    assert val_during_cooldown is None
+    mock_broken_client.get.assert_not_called()
+    assert CacheService._client is None
+    assert CacheService._unavailable is True
+
+    # 3. Simulate cooldown expiration
+    monotonic_counter = failure_timestamp + CacheService._RECONNECT_COOLDOWN_SECONDS + 5.0
+    monkeypatch.setattr(time, "monotonic", lambda: monotonic_counter)
+
+    # 4. First operation after cooldown re-attempts connection
+    mock_recovered_client = AsyncMock()
+    mock_recovered_client.get.return_value = '{"recovered": true}'
+    mock_from_url = MagicMock(return_value=mock_recovered_client)
+    monkeypatch.setattr(aioredis, "from_url", mock_from_url)
+
+    val_recovered = await cache_service._get("test:transient:key")
+    assert val_recovered == {"recovered": True}
+    assert CacheService._unavailable is False
+    assert CacheService._client is mock_recovered_client
+    mock_recovered_client.get.assert_called_once_with("test:transient:key")

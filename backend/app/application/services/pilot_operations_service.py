@@ -111,8 +111,10 @@ class PilotOperationsService:
                 return True
             raw_banks = grant_dict.get("participating_banks") or []
             if not raw_banks:
-                return True
+                return False
             grant_banks = {str(b).lower().strip() for b in raw_banks if b}
+            if not grant_banks:
+                return False
             return req_set.issubset(grant_banks)
 
         op_grant = c_meta.get("operational_data_sharing_grant") or {}

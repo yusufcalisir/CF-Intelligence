@@ -182,3 +182,8 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+
+# Consortium institutional private key files
+deploy/consortium/keys/*.pem
+deploy/consortium/keys/*.key
+deploy/consortium/keys/*.json

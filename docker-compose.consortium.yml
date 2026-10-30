@@ -244,7 +244,7 @@ services:
       - WORKER_PORT=8100
       - WORKER_HOST=0.0.0.0
       - WORKER_AUTH_SECRET=${WORKER_BANK_A_AUTH_SECRET}
-      - WORKER_SIGNING_KEY=${WORKER_BANK_A_SIGNING_KEY}
+      - WORKER_SIGNING_KEY_FILE=/run/secrets/worker_signing_key.pem
       - WORKER_MATCHING_TOKEN=${WORKER_BANK_A_MATCHING_TOKEN}
       - WORKER_INGESTION_TOKEN=${WORKER_BANK_A_INGESTION_TOKEN}
       - WORKER_ADMIN_TOKEN=${WORKER_BANK_A_ADMIN_TOKEN}
@@ -258,6 +258,7 @@ services:
       - "127.0.0.1:${CFI_PORT_WORKER_A:-8101}:8100"
     volumes:
       - consortium-vault-bank-a:/vault
+      - ./deploy/consortium/keys/bank_a_signing_key.pem:/run/secrets/worker_signing_key.pem:ro
     networks:
       - consortium-mesh-net
     healthcheck:
@@ -293,7 +294,7 @@ services:
       - WORKER_PORT=8100
       - WORKER_HOST=0.0.0.0
       - WORKER_AUTH_SECRET=${WORKER_BANK_B_AUTH_SECRET}
-      - WORKER_SIGNING_KEY=${WORKER_BANK_B_SIGNING_KEY}
+      - WORKER_SIGNING_KEY_FILE=/run/secrets/worker_signing_key.pem
       - WORKER_MATCHING_TOKEN=${WORKER_BANK_B_MATCHING_TOKEN}
       - WORKER_INGESTION_TOKEN=${WORKER_BANK_B_INGESTION_TOKEN}
       - WORKER_ADMIN_TOKEN=${WORKER_BANK_B_ADMIN_TOKEN}
@@ -307,6 +308,7 @@ services:
       - "127.0.0.1:${CFI_PORT_WORKER_B:-8102}:8100"
     volumes:
       - consortium-vault-bank-b:/vault
+      - ./deploy/consortium/keys/bank_b_signing_key.pem:/run/secrets/worker_signing_key.pem:ro
     networks:
       - consortium-mesh-net
     healthcheck:
@@ -342,7 +344,7 @@ services:
       - WORKER_PORT=8100
       - WORKER_HOST=0.0.0.0
       - WORKER_AUTH_SECRET=${WORKER_BANK_C_AUTH_SECRET}
-      - WORKER_SIGNING_KEY=${WORKER_BANK_C_SIGNING_KEY}
+      - WORKER_SIGNING_KEY_FILE=/run/secrets/worker_signing_key.pem
       - WORKER_MATCHING_TOKEN=${WORKER_BANK_C_MATCHING_TOKEN}
       - WORKER_INGESTION_TOKEN=${WORKER_BANK_C_INGESTION_TOKEN}
       - WORKER_ADMIN_TOKEN=${WORKER_BANK_C_ADMIN_TOKEN}
@@ -356,6 +358,7 @@ services:
       - "127.0.0.1:${CFI_PORT_WORKER_C:-8103}:8100"
     volumes:
       - consortium-vault-bank-c:/vault
+      - ./deploy/consortium/keys/bank_c_signing_key.pem:/run/secrets/worker_signing_key.pem:ro
     networks:
       - consortium-mesh-net
     healthcheck:

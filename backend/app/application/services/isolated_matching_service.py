@@ -139,19 +139,25 @@ def _extract_x509_peer_identities(der_cert_bytes: bytes | None) -> set[str]:
             "Mutual TLS verification failed: peer X.509 certificate is outside its validity window."
         )
 
-    identities: set[str] = set()
-    for attr in cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
-        val = attr.value if isinstance(attr.value, str) else attr.value.decode("utf-8", errors="ignore")
-        identities.update(_normalize_peer_identity_token(val))
-
+    san_identities: set[str] = set()
     with contextlib.suppress(x509.ExtensionNotFound):
         san_ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
         for dns_name in san_ext.value.get_values_for_type(x509.DNSName):
-            identities.update(_normalize_peer_identity_token(dns_name))
+            san_identities.update(_normalize_peer_identity_token(dns_name))
         for uri_name in san_ext.value.get_values_for_type(x509.UniformResourceIdentifier):
-            identities.update(_normalize_peer_identity_token(uri_name))
+            san_identities.update(_normalize_peer_identity_token(uri_name))
 
-    return identities
+    # Standard X.509 (RFC 5280 / RFC 6125): When SAN is present, SAN is authoritative; CN is ignored.
+    if san_identities:
+        return san_identities
+
+    # Fall back to Subject CN if and only if no SAN entries are present.
+    cn_identities: set[str] = set()
+    for attr in cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
+        val = attr.value if isinstance(attr.value, str) else attr.value.decode("utf-8", errors="ignore")
+        cn_identities.update(_normalize_peer_identity_token(val))
+
+    return cn_identities
 
 
 @dataclass(frozen=True)
@@ -195,7 +201,7 @@ class TransportSecurityConfig:
                 "HARDENED_MTLS server profile requires a non-empty client certificate allowlist."
             )
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_3
         ctx.verify_mode = ssl.CERT_REQUIRED
         assert self.ca_cert_path and self.cert_path and self.key_path
         ctx.load_verify_locations(cafile=self.ca_cert_path)
@@ -205,7 +211,7 @@ class TransportSecurityConfig:
     def create_client_ssl_context(self) -> ssl.SSLContext:
         self.validate_files()
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_3
         ctx.verify_mode = ssl.CERT_REQUIRED
         ctx.check_hostname = False
         assert self.ca_cert_path and self.cert_path and self.key_path
@@ -524,6 +530,7 @@ class IsolatedBankWorkerNode:
         require_operation_ticket: bool = False,
         consortium_service: Any | None = None,
         signing_key: InstitutionalSigningIdentity | str | None = None,
+        signing_key_file: str | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -538,7 +545,8 @@ class IsolatedBankWorkerNode:
 
         # Asymmetric institutional signing identity (strictly tenant-sovereign)
         key_file = (
-            os.environ.get("WORKER_SIGNING_KEY_FILE")
+            signing_key_file
+            or os.environ.get("WORKER_SIGNING_KEY_FILE")
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_FILE_{self.bank_id.upper()}")
         )
         signing_key_candidate = (
@@ -3808,6 +3816,11 @@ if __name__ == "__main__":
         help="Institutional sovereign Ed25519 private signing key (64 hex characters)",
     )
     parser.add_argument(
+        "--signing-key-file",
+        default=os.environ.get("WORKER_SIGNING_KEY_FILE"),
+        help="Path to institutional private signing key file (64 hex characters or 32 bytes)",
+    )
+    parser.add_argument(
         "--trusted-peers", default=None, help="JSON mapping of trusted peer verification keys"
     )
 
@@ -3940,6 +3953,7 @@ if __name__ == "__main__":
             storage_root=cli_args.storage_root,
             auth_secret=env_auth,
             signing_key=env_signing,
+            signing_key_file=cli_args.signing_key_file,
             matching_token=env_matching,
             ingestion_token=env_ingest,
             admin_token=env_admin,
