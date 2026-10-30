@@ -198,8 +198,37 @@ describe('PilotDetailPage Component', () => {
   });
 
   it('switches to Approvals tab and renders Bank A, Bank B, and Operator cards', () => {
+    const pilotWithUppercaseOperator: PilotStatusResponse = {
+      ...mockActivePilot,
+      approvals: {
+        bank_a: {
+          approver_id: 'user_admin_a',
+          approver_institution: 'bank_a',
+          approver_role: 'admin',
+          scope_digest: '9f8e7d6c5b4a3120fedcba0987654321',
+          approved_at: '2026-01-01T01:00:00Z',
+          signature: 'sig_ed25519_bank_a',
+        },
+        bank_b: {
+          approver_id: 'user_admin_b',
+          approver_institution: 'bank_b',
+          approver_role: 'admin',
+          scope_digest: '9f8e7d6c5b4a3120fedcba0987654321',
+          approved_at: '2026-01-01T01:05:00Z',
+          signature: 'sig_ed25519_bank_b',
+        },
+        OPERATOR: {
+          approver_id: 'operator_chief',
+          approver_institution: 'OPERATOR',
+          approver_role: 'operator',
+          scope_digest: '9f8e7d6c5b4a3120fedcba0987654321',
+          approved_at: '2026-01-01T01:10:00Z',
+        },
+      },
+    };
+
     mockUsePilotStatus.mockReturnValue({
-      data: mockActivePilot,
+      data: pilotWithUppercaseOperator,
       isLoading: false,
       isError: false,
       error: null,
@@ -226,6 +255,55 @@ describe('PilotDetailPage Component', () => {
     expect(screen.getByText('BANK_A')).toBeInTheDocument();
     expect(screen.getByText('BANK_B')).toBeInTheDocument();
     expect(screen.getByText('Consortium Operator')).toBeInTheDocument();
+    // All 3 entities rendered as APPROVED (no false AWAITING)
+    expect(screen.getAllByText('APPROVED').length).toBe(3);
+    expect(screen.queryByText('AWAITING')).not.toBeInTheDocument();
+  });
+
+  it('renders restricted approval form when user is authorized for specific institution', () => {
+    const awaitingPilot: PilotStatusResponse = {
+      ...mockActivePilot,
+      status: 'AWAITING_APPROVAL',
+      is_fully_approved: false,
+      approvals: {},
+      permitted_actions: ['approve'],
+      approvable_institutions: ['bank_a'],
+      caller_approver_id: 'user_admin_a',
+      canonical_signing_challenge: 'PILOT_APPROVAL:pilot-alpha-001:1:9f8e7d6c5b4a3120fedcba0987654321:bank_a:user_admin_a',
+    };
+
+    mockUsePilotStatus.mockReturnValue({
+      data: awaitingPilot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    });
+    mockUsePilotTelemetry.mockReturnValue({
+      data: mockTelemetryNoLatency,
+      isLoading: false,
+      error: null,
+    });
+    mockUsePilotDossier.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
+
+    renderComponent();
+
+    const approvalsTab = screen.getByText('Institutional Approvals');
+    fireEvent.click(approvalsTab);
+
+    // Form is rendered
+    expect(screen.getByText('Submit Authorized Institutional Approval')).toBeInTheDocument();
+    // In dropdown, only BANK_A option is present (no OPERATOR or BANK_B options)
+    expect(screen.getAllByText('BANK_A').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('CONSORTIUM OPERATOR')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'BANK_B' })).not.toBeInTheDocument();
+    // Canonical challenge is exposed
+    expect(screen.getByText(/PILOT_APPROVAL:pilot-alpha-001:1:9f8e7d6c5b4a3120fedcba0987654321:bank_a:user_admin_a/i)).toBeInTheDocument();
   });
 
   it('displays honest empty state for latency observations in Telemetry tab', () => {

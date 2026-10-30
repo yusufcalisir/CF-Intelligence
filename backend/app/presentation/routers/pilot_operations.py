@@ -117,6 +117,72 @@ def _enforce_pause_authority(principal: AuthenticatedPrincipal, entity: PilotEnt
     )
 
 
+def _derive_approval_capabilities(
+    entity: PilotEntity, principal: AuthenticatedPrincipal | None
+) -> tuple[list[str], str | None, str | None]:
+    """Derive (approvable_institutions, caller_approver_id, canonical_challenge) for authenticated principal."""
+    if not principal or not principal.is_authenticated:
+        return [], None, None
+
+    status = entity.status
+    has_expired = entity.has_expired()
+    if status not in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL) or has_expired:
+        return [], principal.principal_id, None
+
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    roles = set(principal.roles or [])
+    participating = [b.lower().strip() for b in entity.config.participating_institutions]
+    current_digest = entity.config.compute_scope_digest()
+
+    approvable: list[str] = []
+
+    # 1. Institutional bank approval authority
+    if caller_tenant in participating:
+        inst_roles = {"admin", "super_admin", "compliance", "compliance_officer", "security_officer", "institutional_approver"}
+        if principal.is_privileged or bool(roles & inst_roles):
+            rec = entity.approvals.get(caller_tenant)
+            if not rec or rec.scope_digest != current_digest:
+                # Also check that this principal hasn't already submitted the OPERATOR approval
+                op_rec = entity.approvals.get("OPERATOR")
+                if not (op_rec and op_rec.approver_id.lower().strip() == principal.principal_id.lower().strip()):
+                    approvable.append(caller_tenant)
+
+    # 2. Independent operator approval authority
+    if caller_tenant not in participating:
+        is_valid_op_tenant = (
+            caller_tenant in ("consortium", "operator", "pilot_operator", "consortium_operator", "system", entity.config.consortium_id.lower().strip())
+            or principal.is_privileged
+        )
+        is_in_authorized_ops = bool(
+            entity.config.authorized_operators
+            and principal.principal_id.lower().strip() in [op.lower().strip() for op in entity.config.authorized_operators]
+        )
+        has_op_role = any(r in {"operator", "pilot_operator", "consortium_operator", "system_admin"} for r in roles) or (
+            is_valid_op_tenant and any(r in {"admin", "super_admin"} for r in roles)
+        )
+        if is_valid_op_tenant and (has_op_role or is_in_authorized_ops):
+            op_rec = entity.approvals.get("OPERATOR")
+            if not op_rec or op_rec.scope_digest != current_digest:
+                # Also check that operator principal has not approved for any participating bank
+                bank_approvers = {
+                    rec.approver_id.lower().strip()
+                    for k, rec in entity.approvals.items()
+                    if k != "OPERATOR"
+                }
+                if principal.principal_id.lower().strip() not in bank_approvers:
+                    approvable.append("OPERATOR")
+
+    challenge = None
+    if approvable:
+        challenge_inst = approvable[0].lower().strip()
+        challenge = (
+            f"PILOT_APPROVAL:{entity.config.pilot_id}:{entity.config.revision}:"
+            f"{current_digest}:{challenge_inst}:{principal.principal_id}"
+        )
+
+    return approvable, principal.principal_id, challenge
+
+
 def _compute_permitted_actions(entity: PilotEntity, principal: AuthenticatedPrincipal | None) -> list[str]:
     """Derive permitted pilot actions strictly from current state, expiry, and principal authority."""
     if not principal or not principal.is_authenticated:
@@ -126,11 +192,14 @@ def _compute_permitted_actions(entity: PilotEntity, principal: AuthenticatedPrin
     status = entity.status
     caller_tenant = (principal.tenant_id or "").lower().strip()
     roles = set(principal.roles or [])
-    is_op_tenant = caller_tenant in ("consortium", "operator", "admin", "system")
-    op_roles = {"admin", "super_admin", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
-    is_operator = principal.is_privileged or (is_op_tenant and bool(roles & op_roles))
-
     participating = [b.lower().strip() for b in entity.config.participating_institutions]
+
+    is_op_tenant = caller_tenant in ("consortium", "operator", "admin", "system", entity.config.consortium_id.lower().strip())
+    op_roles = {"admin", "super_admin", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
+    is_operator = (caller_tenant not in participating) and (
+        principal.is_privileged or (is_op_tenant and bool(roles & op_roles))
+    )
+
     is_participant = is_operator or (caller_tenant in participating)
     has_expired = entity.has_expired()
 
@@ -138,8 +207,9 @@ def _compute_permitted_actions(entity: PilotEntity, principal: AuthenticatedPrin
     if status in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL) and is_participant:
         actions.append("preflight")
 
-    # Approve: operator or participating bank in pre-activation states, not expired
-    if status in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL) and not has_expired and (is_operator or caller_tenant in participating):
+    # Approve: based on genuine caller-specific approval authority
+    approvable, _, _ = _derive_approval_capabilities(entity, principal)
+    if approvable:
         actions.append("approve")
 
     # Activate: operator only, in AUTHORIZED, not expired
@@ -177,6 +247,7 @@ def _compute_permitted_actions(entity: PilotEntity, principal: AuthenticatedPrin
 def _entity_to_response(entity: PilotEntity, principal: AuthenticatedPrincipal | None = None) -> PilotStatusResponse:
     complete, missing = entity.has_all_required_approvals()
     permitted_actions = _compute_permitted_actions(entity, principal)
+    approvable, caller_approver_id, challenge = _derive_approval_capabilities(entity, principal)
     has_expired = entity.has_expired()
 
     return PilotStatusResponse(
@@ -226,6 +297,9 @@ def _entity_to_response(entity: PilotEntity, principal: AuthenticatedPrincipal |
         missing_approvals=missing,
         has_expired=has_expired,
         permitted_actions=permitted_actions,
+        approvable_institutions=approvable,
+        caller_approver_id=caller_approver_id,
+        canonical_signing_challenge=challenge,
     )
 
 
@@ -275,15 +349,28 @@ async def provision_pilot(
 ) -> PilotStatusResponse:
     """Provision a new two-bank controlled pilot with immutable configuration and scope digest."""
     principal = _resolve_principal_or_fail(request)
-    permitted_roles = {"admin", "security_officer", "system_admin", "compliance"}
-    if not (principal.is_privileged or any(r in permitted_roles for r in principal.roles)):
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    participating = [b.lower().strip() for b in payload.participating_institutions]
+    if caller_tenant in participating and not principal.is_privileged:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Principal '{principal.principal_id}' lacks permitted role to provision pilots.",
+            detail=f"Principal from participating bank '{caller_tenant}' cannot provision a consortium pilot.",
+        )
+    is_op_tenant = (
+        caller_tenant in ("consortium", "operator", "consortium_operator", "system", payload.consortium_id.lower().strip())
+        or principal.is_privileged
+    )
+    op_roles = {"operator", "pilot_operator", "consortium_operator", "system_admin", "admin", "super_admin"}
+    if not (is_op_tenant and (principal.is_privileged or any(r in op_roles for r in principal.roles))):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Principal '{principal.principal_id}' lacks consortium operator authority to provision pilots.",
         )
     try:
         entity = service.provision_pilot(req=payload, principal=principal)
         return _entity_to_response(entity, principal)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:

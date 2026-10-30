@@ -327,13 +327,16 @@ class PilotEntity:
             else:
                 approver_identities.add(rec.approver_id.lower().strip())
 
+        if len(self.config.participating_institutions) >= 2 and len(approver_identities) < len([i for i in self.config.participating_institutions if self.approvals.get(i.lower().strip())]):
+            missing.append("INDEPENDENT_INSTITUTIONAL_AUTHORITY")
+
         op_rec = self.approvals.get("OPERATOR")
         if not op_rec or op_rec.scope_digest != current_digest or op_rec.approver_institution != "OPERATOR":
             missing.append("OPERATOR")
         else:
             op_actor = op_rec.approver_id.lower().strip()
-            if len(self.config.participating_institutions) >= 2 and op_actor in approver_identities and len(approver_identities) == 1:
-                missing.append("INDEPENDENT_INSTITUTIONAL_AUTHORITY")
+            if op_actor in approver_identities:
+                missing.append("INDEPENDENT_OPERATOR_AUTHORITY")
 
         return len(missing) == 0, missing
 

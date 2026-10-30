@@ -156,7 +156,7 @@ describe('PilotOperationsPage Component', () => {
     expect(screen.queryByText('pilot-alpha-001')).not.toBeInTheDocument();
   });
 
-  it('filters pilots by status dropdown', () => {
+  it('filters pilots by status dropdown and verifies real PilotStatus options', () => {
     mockUsePilotsList.mockReturnValue({
       data: mockPilots,
       isLoading: false,
@@ -169,13 +169,28 @@ describe('PilotOperationsPage Component', () => {
     renderComponent();
 
     const select = screen.getByRole('combobox');
+    const options = Array.from(select.querySelectorAll('option')).map((o) => o.value);
+    // Gate C: Must match real PilotStatus enum, no nonexistent statuses
+    expect(options).toEqual([
+      'ALL',
+      'DRAFT',
+      'PREFLIGHT',
+      'AWAITING_APPROVAL',
+      'AUTHORIZED',
+      'ACTIVE',
+      'PAUSED',
+      'COMPLETED',
+      'ABORTED',
+      'FAILED',
+    ]);
+
     fireEvent.change(select, { target: { value: 'DRAFT' } });
 
     expect(screen.getByText('pilot-beta-002')).toBeInTheDocument();
     expect(screen.queryByText('pilot-alpha-001')).not.toBeInTheDocument();
   });
 
-  it('opens provision modal when provision button is clicked', () => {
+  it('opens provision modal with clean inputs and no hardcoded localhost endpoints', () => {
     mockUsePilotsList.mockReturnValue({
       data: mockPilots,
       isLoading: false,
@@ -191,7 +206,18 @@ describe('PilotOperationsPage Component', () => {
     fireEvent.click(provisionBtn);
 
     expect(screen.getByText('Provision Governed Two-Bank Controlled Pilot')).toBeInTheDocument();
-    expect(screen.getByText(/Participating Institution A/i)).toBeInTheDocument();
-    expect(screen.getByText(/Participating Institution B/i)).toBeInTheDocument();
+
+    // Verify empty defaults (no hardcoded bank_a, bank_b, localhost)
+    const pilotIdInput = screen.getByPlaceholderText(/pilot_bilateral_2026_q4/i) as HTMLInputElement;
+    expect(pilotIdInput.value).toBe('');
+
+    const bankAInput = screen.getByPlaceholderText(/bank_a/i) as HTMLInputElement;
+    expect(bankAInput.value).toBe('');
+
+    const bankBInput = screen.getByPlaceholderText(/bank_b/i) as HTMLInputElement;
+    expect(bankBInput.value).toBe('');
+
+    const coordUrlInput = screen.getByPlaceholderText(/coordinator\.consortium/i) as HTMLInputElement;
+    expect(coordUrlInput.value).toBe('');
   });
 });

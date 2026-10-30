@@ -410,12 +410,32 @@ class PilotOperationsService:
                     f"Institution '{inst}' is not an active member of consortium '{clean_consortium_id}'."
                 )
 
+        # Check caller authorization if authenticated principal provided
+        if isinstance(principal, AuthenticatedPrincipal):
+            caller_tenant = (principal.tenant_id or "").lower().strip()
+            roles = set(getattr(principal, "roles", []) or [])
+            participating = [b.lower().strip() for b in req.participating_institutions]
+            if caller_tenant in participating and not principal.is_privileged:
+                raise PermissionError(
+                    f"Principal from participating bank '{caller_tenant}' cannot provision a consortium pilot. "
+                    "Pilot provisioning requires independent consortium operator authority."
+                )
+            is_op_tenant = (
+                caller_tenant in ("consortium", "operator", "consortium_operator", "system", clean_consortium_id)
+                or principal.is_privileged
+            )
+            op_roles = {"operator", "pilot_operator", "consortium_operator", "system_admin", "admin", "super_admin"}
+            if not (is_op_tenant and (principal.is_privileged or bool(roles & op_roles))):
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' lacks consortium operator authority to provision pilots."
+                )
+
         # Bind operational grant from consortium metadata if not specified
         c_meta = getattr(consortium, "metadata", {}) or {}
         op_grant = c_meta.get("operational_data_sharing_grant") or {}
-        grant_id = req.operational_grant_id or op_grant.get("grant_id", f"grant_{clean_consortium_id}")
-        grant_revision = int(op_grant.get("revision", 1))
-        grant_scope_digest = str(op_grant.get("scope_digest", ""))
+        grant_id = req.operational_grant_id or str(op_grant.get("grant_id") or "")
+        grant_revision = int(op_grant.get("revision", 1)) if op_grant else 1
+        grant_scope_digest = str(op_grant.get("scope_digest", "")) if op_grant else ""
 
         now = datetime.datetime.now(UTC)
         starts_at = req.starts_at or now.isoformat()
@@ -439,6 +459,11 @@ class PilotOperationsService:
                 if inst_prefix not in clean_insts:
                     raise ValueError(f"Topology worker endpoint for unapproved institution '{inst_prefix}' rejected.")
 
+        authorized_operators = (
+            req.authorized_operators
+            or ([principal.principal_id] if isinstance(principal, AuthenticatedPrincipal) and principal.principal_id else [])
+        )
+
         config = PilotOperationalConfig(
             pilot_id=clean_pilot_id,
             revision=1,
@@ -447,7 +472,7 @@ class PilotOperationsService:
             allowed_purposes=req.allowed_purposes,
             allowed_jurisdictions=req.allowed_jurisdictions,
             approved_datasets=req.approved_datasets,
-            authorized_operators=req.authorized_operators or ([principal.principal_id] if principal else ["operator_admin"]),
+            authorized_operators=authorized_operators,
             operational_grant_id=grant_id,
             grant_revision=grant_revision,
             grant_scope_digest=grant_scope_digest,
@@ -684,36 +709,12 @@ class PilotOperationsService:
     ) -> PilotEntity:
         """Record independent institutional or operator approval for a pilot."""
         clean_inst = approving_institution.lower().strip()
-        is_operator = clean_inst in ("operator", "pilot_operator", "admin", "consortium")
+        is_operator = clean_inst in ("operator", "pilot_operator", "consortium")
 
         if not isinstance(principal, AuthenticatedPrincipal) or not principal.is_authenticated:
             raise PermissionError(
                 "Authentication required: Independent institutional approval requires an authenticated principal."
             )
-
-        caller_tenant = (principal.tenant_id or "").lower().strip()
-        if not is_operator:
-            # Institution approval: strictly require caller_tenant == clean_inst
-            # An operator or admin cannot manufacture a bank's institutional approval!
-            if caller_tenant != clean_inst:
-                raise PermissionError(
-                    f"Cross-bank approval rejected: Principal from institution '{caller_tenant}' "
-                    f"cannot approve pilot on behalf of '{approving_institution}'. "
-                    "Consortium operators and platform administrators cannot manufacture institutional approvals."
-                )
-            inst_roles = {"admin", "super_admin", "compliance", "compliance_officer", "security_officer", "institutional_approver"}
-            roles = getattr(principal, "roles", []) or []
-            if not principal.is_privileged and not any(r in inst_roles for r in roles):
-                raise PermissionError(
-                    f"Principal '{principal.principal_id}' lacks required institutional approval role for '{approving_institution}'."
-                )
-        else:
-            gov_roles = {"admin", "super_admin", "ml_lead", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
-            roles = getattr(principal, "roles", []) or []
-            if not principal.is_privileged and not any(r in gov_roles for r in roles):
-                raise PermissionError(
-                    f"Principal '{principal.principal_id}' lacks operator authority to grant OPERATOR pilot approval."
-                )
 
         entity = self._get_required_pilot(pilot_id)
         if entity.status not in (PilotStatus.AWAITING_APPROVAL, PilotStatus.PREFLIGHT, PilotStatus.DRAFT):
@@ -721,33 +722,133 @@ class PilotOperationsService:
                 f"Cannot record approval for pilot '{pilot_id}' in status '{entity.status.value}'. Must be in AWAITING_APPROVAL."
             )
 
-        target_inst_key = "OPERATOR" if is_operator else clean_inst
-        if not is_operator and clean_inst not in [b.lower().strip() for b in entity.config.participating_institutions]:
-            raise PermissionError(
-                f"Institution '{clean_inst}' is not a participating bank of pilot '{pilot_id}'."
+        caller_tenant = (principal.tenant_id or "").lower().strip()
+        roles = set(getattr(principal, "roles", []) or [])
+        participating_tenants = [b.lower().strip() for b in entity.config.participating_institutions]
+
+        if not is_operator:
+            # Institutional Bank Approval
+            if clean_inst not in participating_tenants:
+                raise PermissionError(
+                    f"Institution '{clean_inst}' is not a participating bank of pilot '{pilot_id}'."
+                )
+            if caller_tenant != clean_inst:
+                raise PermissionError(
+                    f"Cross-bank approval rejected: Principal from institution '{caller_tenant}' "
+                    f"cannot approve pilot on behalf of '{approving_institution}'. "
+                    "Consortium operators and platform administrators cannot manufacture institutional approvals."
+                )
+            inst_roles = {"admin", "super_admin", "compliance", "compliance_officer", "security_officer", "institutional_approver"}
+            if not principal.is_privileged and not bool(roles & inst_roles):
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' lacks required institutional approval role for '{approving_institution}'."
+                )
+
+            # Check identity separation from OPERATOR approval
+            op_rec = entity.approvals.get("OPERATOR")
+            if op_rec and op_rec.approver_id.lower().strip() == principal.principal_id.lower().strip():
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' has already submitted the OPERATOR approval for pilot '{pilot_id}'. "
+                    "A participating bank approval cannot share identity with the independent consortium operator."
+                )
+
+            # Check identity separation from other participating banks
+            for other_inst, other_rec in entity.approvals.items():
+                if (
+                    other_inst != clean_inst
+                    and other_inst != "OPERATOR"
+                    and other_rec.approver_id.lower().strip() == principal.principal_id.lower().strip()
+                ):
+                    raise PermissionError(
+                        f"Principal '{principal.principal_id}' has already approved for institution '{other_inst}'. "
+                        "Independent institutional approvals cannot share principal identity."
+                    )
+
+            # Verification key and cryptographic signature mandatory
+            has_key = self.institutional_registry.has_key(clean_inst)
+            if not has_key:
+                raise PilotAuthorizationError(
+                    f"Institution '{clean_inst}' has no enrolled Ed25519 verification key in the institutional registry. "
+                    "Cryptographic assurance cannot be established; institutional approval is unavailable."
+                )
+            if not signature:
+                raise PilotAuthorizationError(
+                    f"Missing cryptographic signature: Institution '{clean_inst}' has an enrolled Ed25519 verification key. "
+                    "Institutional approval must be cryptographically signed."
+                )
+
+            challenge_bytes = canonical_pilot_approval_bytes(
+                pilot_id=entity.config.pilot_id,
+                revision=entity.config.revision,
+                scope_digest=entity.config.compute_scope_digest(),
+                approver_institution=clean_inst,
+                approver_id=principal.principal_id,
             )
-
-        challenge_bytes = canonical_pilot_approval_bytes(
-            pilot_id=entity.config.pilot_id,
-            revision=entity.config.revision,
-            scope_digest=entity.config.compute_scope_digest(),
-            approver_institution=target_inst_key,
-            approver_id=principal.principal_id,
-        )
-
-        has_key = self.institutional_registry.has_key(clean_inst)
-        if signature:
             verified = self.institutional_registry.verify_signature(clean_inst, signature, challenge_bytes)
             if not verified:
                 raise PilotAuthorizationError(
                     f"Cryptographic signature verification failed for institution '{clean_inst}'. "
                     "Approval signature is invalid or does not match enrolled public key."
                 )
-        elif has_key and not is_operator:
-            raise PilotAuthorizationError(
-                f"Missing cryptographic signature: Institution '{clean_inst}' has an enrolled Ed25519 verification key. "
-                "Approval must be cryptographically signed."
+
+            target_inst_key = clean_inst
+            approver_role = principal.roles[0] if principal.roles else "institutional_approver"
+
+        else:
+            # Independent Consortium Operator Approval
+            if caller_tenant in participating_tenants:
+                raise PermissionError(
+                    f"Cross-role governance violation: Principal from participating bank '{caller_tenant}' "
+                    "cannot act as the independent consortium operator or grant OPERATOR approval."
+                )
+
+            is_valid_op_tenant = (
+                caller_tenant in ("consortium", "operator", "pilot_operator", "consortium_operator", "system", entity.config.consortium_id.lower().strip())
+                or principal.is_privileged
             )
+            is_in_authorized_ops = bool(
+                entity.config.authorized_operators
+                and principal.principal_id.lower().strip() in [op.lower().strip() for op in entity.config.authorized_operators]
+            )
+            has_op_role = any(r in {"operator", "pilot_operator", "consortium_operator", "system_admin"} for r in roles) or (
+                is_valid_op_tenant and any(r in {"admin", "super_admin"} for r in roles)
+            )
+            if not (is_valid_op_tenant and (has_op_role or is_in_authorized_ops)):
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' lacks independent operator authority to grant OPERATOR pilot approval."
+                )
+
+            # Check identity separation from institutional bank approvers
+            existing_inst_approvers = {
+                rec.approver_id.lower().strip()
+                for inst, rec in entity.approvals.items()
+                if inst != "OPERATOR"
+            }
+            if principal.principal_id.lower().strip() in existing_inst_approvers:
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' has already submitted an institutional approval for pilot '{pilot_id}'. "
+                    "The independent consortium operator approval cannot share identity with a participating bank approver."
+                )
+
+            target_inst_key = "OPERATOR"
+            approver_role = "operator"
+
+            challenge_bytes = canonical_pilot_approval_bytes(
+                pilot_id=entity.config.pilot_id,
+                revision=entity.config.revision,
+                scope_digest=entity.config.compute_scope_digest(),
+                approver_institution="OPERATOR",
+                approver_id=principal.principal_id,
+            )
+            if signature:
+                op_key_id = clean_inst if self.institutional_registry.has_key(clean_inst) else ("operator" if self.institutional_registry.has_key("operator") else None)
+                if op_key_id:
+                    verified = self.institutional_registry.verify_signature(op_key_id, signature, challenge_bytes)
+                    if not verified:
+                        raise PilotAuthorizationError(
+                            f"Cryptographic signature verification failed for operator '{clean_inst}'. "
+                            "Approval signature is invalid or does not match enrolled public key."
+                        )
 
         approver_id = principal.principal_id
         approver_role = "operator" if is_operator else (principal.roles[0] if principal.roles else "institutional_approver")

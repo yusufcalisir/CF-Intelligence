@@ -3846,6 +3846,9 @@ export interface PilotStatusResponse {
   permitted_actions?: string[];
   missing_approvals?: string[];
   has_expired?: boolean;
+  approvable_institutions?: string[];
+  caller_approver_id?: string | null;
+  canonical_signing_challenge?: string | null;
 }
 
 export interface PilotTelemetrySummary {

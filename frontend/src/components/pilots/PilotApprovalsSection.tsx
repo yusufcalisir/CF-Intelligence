@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PilotStatusResponse } from '../../api/types';
 import { useApprovePilot } from '../../api/pilots';
 import { formatApiError } from '../../api/client';
-import { CheckCircle2, Clock, AlertTriangle, Key, Send, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Key, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 interface PilotApprovalsSectionProps {
   pilot: PilotStatusResponse;
 }
 
 export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionProps) {
-  const [approvingInstitution, setApprovingInstitution] = useState<string>('bank_a');
+  const approvableOptions = pilot.approvable_institutions || [];
+  const [approvingInstitution, setApprovingInstitution] = useState<string>(
+    approvableOptions[0] || ''
+  );
   const [notes, setNotes] = useState<string>('');
   const [signature, setSignature] = useState<string>('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (approvableOptions.length > 0 && !approvableOptions.includes(approvingInstitution)) {
+      setApprovingInstitution(approvableOptions[0]);
+    }
+  }, [approvableOptions, approvingInstitution]);
 
   const approvePilotMutation = useApprovePilot();
 
@@ -41,8 +50,23 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
   const currentDigest = pilot.scope_digest;
 
   const canApprove =
-    pilot.permitted_actions?.includes('approve') ??
-    (['DRAFT', 'PREFLIGHT', 'AWAITING_APPROVAL'].includes(pilot.status) && !pilot.has_expired);
+    Boolean(pilot.permitted_actions?.includes('approve')) &&
+    approvableOptions.length > 0 &&
+    !pilot.has_expired;
+
+  const getApprovalRecord = (entityId: string) => {
+    const trimmed = entityId.trim();
+    if (pilot.approvals[trimmed]) return pilot.approvals[trimmed];
+    if (trimmed.toUpperCase() === 'OPERATOR') {
+      return pilot.approvals['OPERATOR'] || pilot.approvals['operator'];
+    }
+    return pilot.approvals[trimmed.toLowerCase()] || pilot.approvals[trimmed.toUpperCase()];
+  };
+
+  const activeChallenge =
+    pilot.canonical_signing_challenge && approvingInstitution === approvableOptions[0]
+      ? pilot.canonical_signing_challenge
+      : `PILOT_APPROVAL:${pilot.pilot_id}:${pilot.revision}:${currentDigest}:${(approvingInstitution || 'institution').toLowerCase()}:${pilot.caller_approver_id || '{actor_id}'}`;
 
   return (
     <div className="space-y-6">
@@ -88,8 +112,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       {/* Required Approvals Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {requiredEntities.map((entityId) => {
-          const cleanId = entityId.toLowerCase().trim();
-          const approval = pilot.approvals[cleanId];
+          const approval = getApprovalRecord(entityId);
           const isApproved = Boolean(approval);
           const isStale = Boolean(approval && approval.scope_digest !== currentDigest);
 
@@ -164,7 +187,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       </div>
 
       {/* Submit Approval Form */}
-      {canApprove && (
+      {canApprove ? (
         <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-4">
           <div className="flex items-center gap-2">
             <Send className="w-4 h-4 text-cyan-400" />
@@ -177,19 +200,22 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">
-                  Approving Institution / Authority
+                  Approving Authority (Restricted to Effective Role)
                 </label>
                 <select
                   value={approvingInstitution}
                   onChange={(e) => setApprovingInstitution(e.target.value)}
                   className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
                 >
-                  {requiredEntities.map((inst) => (
-                    <option key={inst} value={inst.toLowerCase()}>
-                      {inst.toUpperCase()}
+                  {approvableOptions.map((inst) => (
+                    <option key={inst} value={inst}>
+                      {inst === 'OPERATOR' ? 'CONSORTIUM OPERATOR' : inst.toUpperCase()}
                     </option>
                   ))}
                 </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Only institutions you are authorized to represent for this pilot are listed.
+                </span>
               </div>
 
               <div>
@@ -206,20 +232,29 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-400">
+                Canonical Signing Challenge
+              </label>
+              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono break-all text-cyan-300 select-all">
+                {activeChallenge}
+              </div>
+              <span className="text-[10px] text-slate-500 block">
+                Sign these exact UTF-8 bytes using the institution's enrolled sovereign Ed25519 private key.
+              </span>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">
-                Institutional Ed25519 Signature Hex (Optional for Operator, Required for Strict Bank Authentication)
+                Institutional Ed25519 Signature Hex (Required for Bank Approval)
               </label>
               <input
                 type="text"
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
-                placeholder="128-char hex Ed25519 signature computed over canonical approval bytes"
+                placeholder="128-char hex Ed25519 signature computed over canonical approval bytes above"
                 className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
-              <span className="text-[10px] text-slate-500 mt-1 block">
-                Challenge format: <code className="text-slate-400">PILOT_APPROVAL:{pilot.pilot_id}:{pilot.revision}:{currentDigest.slice(0, 8)}...:{'{institution}'}:{'{actor}'}</code>
-              </span>
             </div>
 
             <div className="flex justify-end">
@@ -232,6 +267,17 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               </button>
             </div>
           </form>
+        </div>
+      ) : (
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 text-slate-400 text-xs flex items-center gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" />
+          <span>
+            {pilot.is_fully_approved
+              ? 'All required institutional and operator approvals have been recorded for the current scope digest.'
+              : approvableOptions.length === 0
+              ? 'Institutional approval submission requires compliance or admin clearance for your institution.'
+              : 'Pilot scope is not currently open for approvals or has expired.'}
+          </span>
         </div>
       )}
     </div>

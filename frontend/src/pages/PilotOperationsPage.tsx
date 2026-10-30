@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePilotsList } from '../api/pilots';
+import { useCurrentUserQuery } from '../api/queries';
 import type { PilotStatusResponse, PilotStatus } from '../api/types';
 import PilotStatusBadge from '../components/pilots/PilotStatusBadge';
 import PilotProvisionModal from '../components/pilots/PilotProvisionModal';
@@ -20,22 +21,34 @@ import {
 const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'ALL', label: 'All Statuses' },
   { value: 'DRAFT', label: 'Draft' },
-  { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'PREFLIGHT_READY', label: 'Preflight Ready' },
+  { value: 'PREFLIGHT', label: 'Preflight' },
+  { value: 'AWAITING_APPROVAL', label: 'Awaiting Approval' },
+  { value: 'AUTHORIZED', label: 'Authorized' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'PAUSED', label: 'Paused' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'ABORTED', label: 'Aborted' },
+  { value: 'FAILED', label: 'Failed' },
 ];
 
 export default function PilotOperationsPage() {
   const navigate = useNavigate();
   const { data: pilots, isLoading, isError, error, refetch, isFetching } = usePilotsList();
+  const { data: currentUser } = useCurrentUserQuery();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
+
+  // Check provisioning authority (Consortium Operator or System Admin)
+  const canProvision = useMemo(() => {
+    if (!currentUser) return true; // allow attempt; backend strictly enforces 403
+    const tenant = (currentUser.tenant_id || currentUser.bank_id || '').toLowerCase().trim();
+    const isOpTenant = ['consortium', 'operator', 'consortium_operator', 'system'].includes(tenant);
+    const opRoles = ['admin', 'super_admin', 'operator', 'pilot_operator', 'consortium_operator', 'system_admin'];
+    const hasOpRole = currentUser.roles?.some((r) => opRoles.includes(r.toLowerCase()));
+    return isOpTenant || hasOpRole;
+  }, [currentUser]);
 
   // Compute summary metrics
   const metrics = useMemo(() => {
@@ -43,8 +56,12 @@ export default function PilotOperationsPage() {
     return {
       total: pilots.length,
       active: pilots.filter((p) => p.status === 'ACTIVE').length,
-      pending: pilots.filter((p) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PREFLIGHT_READY'].includes(p.status)).length,
-      halted: pilots.filter((p) => ['PAUSED', 'ABORTED', 'COMPLETED', 'QUOTA_EXCEEDED'].includes(p.status)).length,
+      pending: pilots.filter((p) =>
+        ['DRAFT', 'PREFLIGHT', 'AWAITING_APPROVAL', 'AUTHORIZED'].includes(p.status)
+      ).length,
+      halted: pilots.filter((p) =>
+        ['PAUSED', 'ABORTED', 'COMPLETED', 'FAILED'].includes(p.status)
+      ).length,
     };
   }, [pilots]);
 
@@ -100,13 +117,15 @@ export default function PilotOperationsPage() {
             <span>Refresh</span>
           </button>
 
-          <button
-            onClick={() => setIsProvisionModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Provision Pilot</span>
-          </button>
+          {canProvision && (
+            <button
+              onClick={() => setIsProvisionModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Provision Pilot</span>
+            </button>
+          )}
         </div>
       </div>
 

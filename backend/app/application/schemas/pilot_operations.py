@@ -117,6 +117,18 @@ class PilotStatusResponse(BaseModel):
     missing_approvals: list[str] = Field(default_factory=list)
     has_expired: bool = False
     permitted_actions: list[str] = Field(default_factory=list)
+    approvable_institutions: list[str] = Field(
+        default_factory=list,
+        description="Institutions the authenticated caller is authorized to approve for this pilot",
+    )
+    caller_approver_id: str | None = Field(
+        default=None,
+        description="Principal ID of the authenticated caller to bind into signing challenges",
+    )
+    canonical_signing_challenge: str | None = Field(
+        default=None,
+        description="Exact canonical challenge bytes format expected by backend signature verification",
+    )
 
 
 class PilotTelemetrySummary(BaseModel):
