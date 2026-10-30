@@ -26,7 +26,7 @@ def test_property_terraform_template_provider_validity(provider: str):
 
 
 def generate_hypothesis_report():
-    report_md = """# Hypothesis Property-Based Testing Report — Multi-Cloud Terraform IaC
+    report_md = """# Hypothesis Property-Based Testing Report - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

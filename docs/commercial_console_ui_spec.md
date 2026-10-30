@@ -86,6 +86,8 @@ The application shell provides access to 16 distinct production views organized 
 │ 1. Live Operations      │ `/dashboard`            │ Consortium Overview & Node Status  │
 │                         │ `/operations`           │ Real-Time Verification HUD Grid    │
 │                         │ `/operations/:id`       │ Specific Simulation Round Telemetry│
+│                         │ `/pilots`               │ Controlled Pilot Operations Grid   │
+│                         │ `/pilots/:pilotId`      │ Pilot Scope, Preflight & Approvals │
 │ 2. AML Intelligence     │ `/investigation`        │ SHAP Attributions & Smurfing Radar │
 │                         │ `/alerts`               │ Real-Time Transaction Alert Stream │
 │                         │ `/cases`                │ Multi-Bank Case Management Board   │
@@ -167,6 +169,9 @@ The application shell provides access to 16 distinct production views organized 
   * AI Copilot generates an exhaustive FinCEN SAR narrative, 4-Eyes supervisor briefing, and top SHAP anomaly driver breakdown via `/api/v1/copilot/generate-sar-narrative`.
   * **Case-Scoped Session Cache (`cfi_copilot_case_${caseId}`)**: The synthesized narrative, supervisor summary, and risk factor attributions are cached in browser `sessionStorage`. Analysts can navigate away to Live Operations, Entity Graph, or Alerts and return without losing generated narratives or triggering duplicate LLM API invocations.
   * **Cache State & Purge Controls**: Visual session cache indicators (`💾 Restored from Session Cache` / `Session Cache Active`) and active storage key pill display cache status. Analysts can re-synthesize at any time or manually purge the session cache via "Clear Cache".
+* **Cross-Bank Intelligence & Genuine PSI Evidence Attachment ([`CrossBankIntelligenceWorkspace.tsx`](../frontend/src/components/cases/CrossBankIntelligenceWorkspace.tsx))**:
+  * Direct integration within active case details allows investigators to initiate authentic multi-counterparty OpenMined PSI matching against registered peer bank nodes.
+  * Discovered match records produce cryptographically sealed `CaseEvidenceAttachment` records that attach directly to the case dossier (`POST /api/v1/cases/{id}/evidence`), providing verifiable match proof without disclosing non-overlapping client records.
 
 ### 5.5. Entity Graph Explorer & Deep Linking (`/graph`)
 * **Component**: [`GraphPage.tsx`](../frontend/src/pages/GraphPage.tsx)
@@ -196,6 +201,14 @@ The application shell provides access to 16 distinct production views organized 
 
 ---
 
+### 5.8. Controlled Pilot Operations & Multi-Party Approvals Console (`/pilots`, `/pilots/:pilotId`)
+* **Components**: [`PilotOperationsPage.tsx`](../frontend/src/pages/PilotOperationsPage.tsx) and [`PilotDetailPage.tsx`](../frontend/src/pages/PilotDetailPage.tsx)
+* **Preflight Readiness Engine**: Live inspection panel querying system health, database migration parity, Redis durability mode, and institutional worker daemon status before provisioning.
+* **Scope Challenge & Ed25519 Multi-Signature Signing**: Displays canonical SHA-256 scope challenge digest; authorized compliance officers submit cryptographic signatures with sovereign audit tracking.
+* **Operational Controls & Tamper-Evident Dossier**: Dedicated action triggers for activation, emergency pause kill-switch, resumption, and cryptographically verified JSON audit dossier export.
+
+---
+
 ## 6. Real-Time Streaming & WebSocket Engine
 
 The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](../frontend/src/hooks/useRealTimeFraudStream.ts) displayed globally in the application header:
@@ -218,7 +231,9 @@ The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](..
 
 ---
 
-## 7. Accessibility, Resilience & Form Hardening
+## 7. Accessibility, Resilience & Institutional Session Isolation
+
+### 7.1. Accessibility, Zero CLS & Form Hardening
 
 1. **Modal Accessibility (`useModalA11y.ts`)**:
    * Escape key dismiss listener.
@@ -228,6 +243,14 @@ The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](..
    * Critical sub-components (e.g., WebGL Canvas, dynamic charts) are wrapped in isolated error boundaries. A rendering failure in a chart displays a clean fallback card without crashing the rest of the application shell.
 3. **Form Hardening & Mutex Locks**:
    * In-flight mutation buttons display animated spinner states and disable repeated clicks to prevent double-submission during round triggers or case closures.
+
+---
+
+### 7.2. Browser Institutional Session Isolation & Epoch Lifecycle
+To prevent cross-tenant data leakage and stale authorization states in multi-bank operations:
+* **Session Epoch Counter (`advanceInstitutionalSessionEpoch`)**: Incremented upon institutional login, principal change, or logout, invalidating all in-flight and cached queries instantly.
+* **Query Cache Cancellation**: React Query `cancelQueries` and `clear` are dispatched before switching identity context, preventing background responses from rendering in a newly selected bank context.
+* **Session Storage Tenant Guarding (`__cached_tenant_id`)**: Case narratives, evidence drafts, and token payloads verify current session tenant matches storage before hydration; mismatched storage items are immediately wiped.
 
 ---
 

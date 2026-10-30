@@ -1,4 +1,4 @@
-﻿# Security Audit & Regulatory Compliance Evaluation — Audit Logging Subsystem
+﻿# Security Audit & Regulatory Compliance Evaluation - Audit Logging Subsystem
 
 This document presents an in-depth security audit and regulatory compliance evaluation of the Audit Logging subsystem. It systematically evaluates 8 compliance pillars: audit completeness, traceability, event correlation, chronological consistency, forensic usefulness, regulatory readiness, retention schedules, and cryptographic integrity guarantees.
 

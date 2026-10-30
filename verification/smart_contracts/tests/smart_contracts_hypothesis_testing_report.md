@@ -1,4 +1,4 @@
-# Hypothesis Property-Based Testing Report — Smart Contracts Subsystem
+# Hypothesis Property-Based Testing Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

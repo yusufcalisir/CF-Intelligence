@@ -1,4 +1,4 @@
-# Performance, Memory, & Scalability Benchmark Report — Explainability (XAI) Subsystem
+# Performance, Memory, & Scalability Benchmark Report - Explainability (XAI) Subsystem
 
 **Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`)  
 **Test Script:** `scratch/explainability_benchmark_scalability.py`  
@@ -111,4 +111,4 @@ explain_gnn_embedding         O(|E_subgraph|)    O(|E_subgraph|) O(|E_subgraph|)
 
 ---
 
-*End of Performance, Memory, & Scalability Benchmark Report — Explainability (XAI) Subsystem*
+*End of Performance, Memory, & Scalability Benchmark Report - Explainability (XAI) Subsystem*

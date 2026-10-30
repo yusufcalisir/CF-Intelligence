@@ -1,18 +1,18 @@
 """European FIU & UNODC goAML / AMLA Regulatory Reporting API Router (Phase 109).
 
 Endpoints:
-- POST /api/v1/regulatory/reports                 — Create report draft (STR, SAR, TTR, AIF)
-- GET  /api/v1/regulatory/reports                 — List reports (filtered by type/status)
-- GET  /api/v1/regulatory/reports/{report_id}     — Get comprehensive report details
-- POST /api/v1/regulatory/reports/{report_id}/submit   — Submit report for supervisory sign-off
-- POST /api/v1/regulatory/reports/{report_id}/signoff  — Dual-control supervisory sign-off
-- GET  /api/v1/regulatory/reports/{report_id}/xml      — Export UNODC goAML 4.0 XML
-- GET  /api/v1/regulatory/reports/{report_id}/amla-json — Export EU AMLA Single Rulebook JSON
-- POST /api/v1/regulatory/reports/{report_id}/validate  — Validate against official goAML schema
-- GET  /api/v1/regulatory/reports/{report_id}/envelope  — Get cryptographic digital envelope
-- POST /api/v1/regulatory/reports/{report_id}/transmit  — Transmit approved filing to European FIU
-- GET  /api/v1/regulatory/reports/{report_id}/audit-trail — Audit trail & SHA-256 chain verification
-- GET  /api/v1/regulatory/metrics                 — Aggregate European filing metrics
+- POST /api/v1/regulatory/reports                 - Create report draft (STR, SAR, TTR, AIF)
+- GET  /api/v1/regulatory/reports                 - List reports (filtered by type/status)
+- GET  /api/v1/regulatory/reports/{report_id}     - Get comprehensive report details
+- POST /api/v1/regulatory/reports/{report_id}/submit   - Submit report for supervisory sign-off
+- POST /api/v1/regulatory/reports/{report_id}/signoff  - Dual-control supervisory sign-off
+- GET  /api/v1/regulatory/reports/{report_id}/xml      - Export UNODC goAML 4.0 XML
+- GET  /api/v1/regulatory/reports/{report_id}/amla-json - Export EU AMLA Single Rulebook JSON
+- POST /api/v1/regulatory/reports/{report_id}/validate  - Validate against official goAML schema
+- GET  /api/v1/regulatory/reports/{report_id}/envelope  - Get cryptographic digital envelope
+- POST /api/v1/regulatory/reports/{report_id}/transmit  - Transmit approved filing to European FIU
+- GET  /api/v1/regulatory/reports/{report_id}/audit-trail - Audit trail & SHA-256 chain verification
+- GET  /api/v1/regulatory/metrics                 - Aggregate European filing metrics
 
 Dual-routing supported under /api/v1/regulatory and /v1/regulatory.
 """

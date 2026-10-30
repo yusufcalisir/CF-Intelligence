@@ -588,7 +588,7 @@ export default function PoliciesPage() {
                       </option>
                       {suspiciousAlerts.slice(0, 5).map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.transaction_id || a.id} — Score: {a.risk_score} ({a.bank_id})
+                          {a.transaction_id || a.id} - Score: {a.risk_score} ({a.bank_id})
                         </option>
                       ))}
                     </select>

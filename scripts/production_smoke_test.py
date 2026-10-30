@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Production Smoke Test Script — Phase 43.2.
+"""Production Smoke Test Script.
 
 Executes post-deployment automated health checks, SLA validation, cron status,
 and OpenAPI documentation availability against a target environment.

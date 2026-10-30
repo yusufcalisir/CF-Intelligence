@@ -1,4 +1,4 @@
-﻿# Claim Classification Review — Risk Scoring & Decision Engine Subsystem
+﻿# Claim Classification Review - Risk Scoring & Decision Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine, Policy AST Evaluator & Decision Infrastructure  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -38,7 +38,7 @@ Each claim is evaluated against empirical verification evidence, refactored code
 
 ```
 ===================================================================================
-      RISK SCORING ENGINE SUBSYSTEM — SCIENTIFIC CLAIM CLASSIFICATION SUMMARY
+      RISK SCORING ENGINE SUBSYSTEM - SCIENTIFIC CLAIM CLASSIFICATION SUMMARY
 ===================================================================================
 Total Scientific Claims Evaluated : 12
 Supported Claims                  : 12 (100.0%)

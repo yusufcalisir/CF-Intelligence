@@ -1,4 +1,4 @@
-# Scientific Verification Roadmap — Explainability (XAI) Module
+# Scientific Verification Roadmap - Explainability (XAI) Suite
 
 **Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_investigation.py`)  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
@@ -53,7 +53,7 @@ This document establishes a rigorous scientific verification roadmap for the **E
      - *Dummy / Null Player Axiom:* If feature $i$ has no impact on predictions, $\phi_i = 0$.
    - **Rationale:** Ensures attribution vectors satisfy theoretical game-theoretic guarantees.
 
-3. **Sanity Checks (Model & Label Randomization Tests — Adebayo et al., NeurIPS 2018):**
+3. **Sanity Checks (Model & Label Randomization Tests - Adebayo et al., NeurIPS 2018):**
    - **Method:** Cascading model weight randomization test. Progressively randomize PyTorch model layer weights from top to bottom and compute SHAP attributions at each step.
    - **Rationale:** If SHAP attributions remain unchanged when model weights are randomized, the explainer is insensitive to model parameters and merely acting as an edge detector or feature scaler.
    - **Target Metric:** Rank correlation (Spearman $\rho$) between trained model attributions and randomized model attributions must approach $0.0$.
@@ -187,4 +187,4 @@ Upon execution of this roadmap, the following scientific verification artifacts 
 
 ---
 
-*End of Scientific Verification Roadmap — Explainability (XAI) Module*
+*End of Scientific Verification Roadmap - Explainability (XAI) Suite*

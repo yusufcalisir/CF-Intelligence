@@ -246,7 +246,7 @@ def pilot_test_env(
 
 
 # ==============================================================================
-# Gate A — Secure Institutional Onboarding
+# Gate A - Secure Institutional Onboarding
 # ==============================================================================
 def test_gate_a_secure_onboarding_and_identity_boundary(
     pilot_test_env: dict[str, Any],
@@ -352,7 +352,7 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
 
 
 # ==============================================================================
-# Gate B — Pilot State Machine, Governance & Kill Switch
+# Gate B - Pilot State Machine, Governance & Kill Switch
 # ==============================================================================
 def test_gate_b_pilot_state_machine_and_kill_switch(
     pilot_test_env: dict[str, Any],
@@ -564,7 +564,7 @@ def test_gate_b_pilot_state_machine_and_kill_switch(
 
 
 # ==============================================================================
-# Gate C & D — Reproducible Docker Deployment & Real Analyst Investigation
+# Gate C & D - Reproducible Docker Deployment & Real Analyst Investigation
 # ==============================================================================
 def test_gate_c_and_d_real_docker_investigation_workflow(
     docker_topology: dict[str, Any],
@@ -803,7 +803,7 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
 
 
 # ==============================================================================
-# Gate E — Operational Resilience & Incident Containment
+# Gate E - Operational Resilience & Incident Containment
 # ==============================================================================
 def test_gate_e_operational_resilience_and_incident_containment(
     docker_topology: dict[str, Any],
@@ -1707,7 +1707,7 @@ def test_gate_e_operational_resilience_and_incident_containment(
 
 
 # ==============================================================================
-# Gate F — Pilot Evidence & Durable Audit Dossier Export
+# Gate F - Pilot Evidence & Durable Audit Dossier Export
 # ==============================================================================
 def test_gate_f_audit_dossier_and_evidence_export(
     docker_topology: dict[str, Any],

@@ -1,1 +1,1 @@
-"""Application layer — services, schemas, and interface contracts."""
+"""Application layer - services, schemas, and interface contracts."""

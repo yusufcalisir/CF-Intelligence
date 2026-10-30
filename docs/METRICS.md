@@ -173,6 +173,7 @@ $$
 ## 4. Distribution Drift & Population Stability Metrics
 
 ### 4.1 Population Stability Index (PSI)
+*(Note: Population Stability Index (PSI) evaluates feature and prediction distribution drift across evaluation batches; it is mathematically distinct from cryptographic OpenMined PSI 2.0.6 (Private Set Intersection) used for zero-knowledge cross-bank entity resolution.)*
 
 #### Mathematical Definition
 The Population Stability Index measures the shift between a baseline reference distribution $P$ (e.g. historical baseline or training partition) and an actual production distribution $Q$ partitioned across $B$ bins (default deciles $B=10$):

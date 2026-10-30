@@ -1,4 +1,4 @@
-"""Bank Onboarding API Router — Multi-Prefix PKI & Institutional Lifecycle.
+"""Bank Onboarding API Router - Multi-Prefix PKI & Institutional Lifecycle.
 
 Admin endpoints for registering new bank nodes, issuing mTLS certificates,
 provisioning tenant schemas, downloading root CA trust bundles, and retrieving onboarding bundles.
@@ -635,7 +635,7 @@ async def rotate_bank_cert(
     if updated is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Bank node {bank_id!r} disappeared after cert rotation — state inconsistency.",
+            detail=f"Bank node {bank_id!r} disappeared after cert rotation - state inconsistency.",
         )
 
     return CertRotationResponse(

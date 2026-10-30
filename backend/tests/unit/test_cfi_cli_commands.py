@@ -1,4 +1,4 @@
-"""Unit tests for cfi-cli real command implementations — Section 36.2.
+"""Unit tests for cfi-cli real command implementations - Section 36.2.
 
 All tests use unittest.mock to patch urllib network calls; no live coordinator needed.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest.mock as mock
-from pathlib import Path  # noqa: TC003  (pytest fixture — not moveable)
+from pathlib import Path  # noqa: TC003  (pytest fixture - not moveable)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

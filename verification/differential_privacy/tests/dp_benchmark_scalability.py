@@ -72,7 +72,7 @@ def generate_report(data: dict[str, Any]):
     report_path = Path(__file__).parent / "dp_scalability_benchmark_report.md"
 
     lines = [
-        "# Scalability Benchmark Report — Differential Privacy Subsystem",
+        "# Scalability Benchmark Report - Differential Privacy Subsystem",
         "",
         "## Executive Summary",
         "",

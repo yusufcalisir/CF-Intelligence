@@ -146,7 +146,7 @@ class RedisStore:
         if self._redis_client is None:
             url = self.settings.redis_url
             if not url:
-                # Redis not configured — silently use in-memory storage
+                # Redis not configured - silently use in-memory storage
                 self._redis_failed = True
                 RedisStore._global_redis_unavailable = True
                 return None

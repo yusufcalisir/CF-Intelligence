@@ -106,7 +106,7 @@ To strictly uphold `AGENTS.md` (no fabricated runtime truth or premature state t
 
 1. **`ANALYST_RECEIVED`**: Ingestion request received by the service or REST endpoint (`/api/v1/feedback/ingest`), validated against zero-PII requirements. Direct analyst submissions default to `validated_for_training=False`.
 2. **`DURABLY_RECORDED`**: Serialized to local on-premises tenant disk storage (`storage/{tenant_id}/label_buffer.json`). Disk write failures raise `FeedbackPersistenceError` and roll back in-memory changes.
-3. **`EVIDENCE_CORRELATED`**: Correlated with authoritative historical prediction evidence in `ModelEvaluationEngine` via genuine transaction ID.
+3. **`EVIDENCE_CORRELATED`**: Correlated with authoritative historical prediction evidence in `ModelEvaluationEngine` via genuine transaction ID or verified cross-bank `CaseEvidenceAttachment` records generated through OpenMined PSI 2.0.6 (Curve25519 ECDH) matching sessions.
 4. **`VALIDATED_FOR_TRAINING`**: Institutional alert ownership and formal case resolution verified. Published strictly *after* successful CAS persistence (`update_conditional`). Uncommitted or rejected case transitions write zero feedback.
 5. **`CONSUMED_IN_TRAINING`**: Committed only after a genuine federated retraining round produces verified execution evidence matching the reserved `job_id` (`feedback_lineage_verified=True`). Unrelated runs release reservations back to the pool.
 

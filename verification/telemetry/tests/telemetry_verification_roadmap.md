@@ -1,4 +1,4 @@
-# Scientific Verification Roadmap — Telemetry & Observability Subsystem
+# Scientific Verification Roadmap - Telemetry & Observability Subsystem
 
 **Subsystem:** Telemetry, Metrics, Distributed Tracing, SIEM Logging & SLA Monitoring  
 **Audited Modules:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `alert_service.py`, `support_diagnostics.py`, `metrics_service.py`, `monitoring.py`, `health.py`, `dashboard.py`  
@@ -220,4 +220,4 @@ The verification strategy is structured across seven complementary validation me
 
 ---
 
-*End of Scientific Verification Roadmap — Telemetry & Observability Subsystem*
+*End of Scientific Verification Roadmap - Telemetry & Observability Subsystem*

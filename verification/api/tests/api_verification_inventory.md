@@ -1,4 +1,4 @@
-﻿# Scientific Verification Inventory — API Subsystem
+﻿# Scientific Verification Inventory - API Subsystem
 
 This document provides a comprehensive scientific audit inventory of the API implementation for the Privacy-Preserving Cross-Bank Fraud Detection platform. It systematically analyzes every component, endpoint specification, request/response contract, invariant, risk, edge case, engineering claim, and appropriate verification methodology.
 

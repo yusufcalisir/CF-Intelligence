@@ -25,3 +25,7 @@ backend/app/static/** -filter -diff -merge
 
 # Ensure canonical JSON benchmark raw artifacts retain exact POSIX LF line endings across all platforms
 benchmarks/results/raw/*.json text eol=lf
+
+# Ensure shell scripts retain POSIX LF line endings in Docker/Linux environments and batch files retain CRLF
+*.sh text eol=lf
+*.bat text eol=crlf

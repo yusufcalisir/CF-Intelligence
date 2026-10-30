@@ -1,4 +1,4 @@
-"""Bank Daemon Configuration Loader with Vault Secrets Resolution — Section 41.1."""
+"""Bank Daemon Configuration Loader with Vault Secrets Resolution - Section 41.1."""
 
 from __future__ import annotations
 

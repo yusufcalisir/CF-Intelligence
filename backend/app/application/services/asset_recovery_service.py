@@ -175,7 +175,7 @@ class AssetRecoveryService:
         now = datetime.now(UTC)
 
         seed_events: list[dict[str, Any]] = [
-            # APP fraud mule chain — rapid freeze within minutes
+            # APP fraud mule chain - rapid freeze within minutes
             {
                 "event_type": "RECALL_SUCCESS",
                 "amount_eur": Decimal("18450.00"),
@@ -198,7 +198,7 @@ class AssetRecoveryService:
                 "recall_message_id": "CAMT056-2026-002-BETA",
                 "finint_ticket_id": "FININT-2026-0002",
             },
-            # Smurfing below €10,000 — multiple small recalls
+            # Smurfing below €10,000 - multiple small recalls
             {
                 "event_type": "RECALL_SUCCESS",
                 "amount_eur": Decimal("9870.00"),
@@ -221,7 +221,7 @@ class AssetRecoveryService:
                 "recall_message_id": "CAMT056-2026-004-BETA",
                 "finint_ticket_id": "FININT-2026-0004",
             },
-            # Dormant burst velocity — large single transfer
+            # Dormant burst velocity - large single transfer
             {
                 "event_type": "PROVISIONAL_HOLD",
                 "amount_eur": Decimal("142000.00"),
@@ -233,7 +233,7 @@ class AssetRecoveryService:
                 "recall_message_id": "CAMT056-2026-005-GAMMA",
                 "finint_ticket_id": "FININT-2026-0005",
             },
-            # High-risk corridor flight — cross-border EUR transfer
+            # High-risk corridor flight - cross-border EUR transfer
             {
                 "event_type": "RECALL_SUCCESS",
                 "amount_eur": Decimal("56750.00"),
@@ -269,7 +269,7 @@ class AssetRecoveryService:
                 "recall_message_id": "CAMT056-2026-008-GAMMA",
                 "finint_ticket_id": "FININT-2026-0008",
             },
-            # Crypto gateway cashout — still under provisional hold
+            # Crypto gateway cashout - still under provisional hold
             {
                 "event_type": "PROVISIONAL_HOLD",
                 "amount_eur": Decimal("211400.00"),
@@ -293,7 +293,7 @@ class AssetRecoveryService:
                 "recall_message_id": "CAMT056-2026-010-BETA",
                 "finint_ticket_id": "FININT-2026-0010",
             },
-            # Latest APP fraud — very recent
+            # Latest APP fraud - very recent
             {
                 "event_type": "RECALL_SUCCESS",
                 "amount_eur": Decimal("37200.00"),
@@ -391,7 +391,7 @@ class AssetRecoveryService:
         evt.mttr_minutes = evt.compute_mttr()
         self._record_event(evt)
         logger.info(
-            "AssetRecoveryService: recorded %s event %s — €%s — %s",
+            "AssetRecoveryService: recorded %s event %s - €%s - %s",
             event_type,
             evt.event_id,
             amount_eur,

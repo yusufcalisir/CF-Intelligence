@@ -1,4 +1,4 @@
-# Scientific Verification Inventory — Connector Framework
+# Scientific Verification Inventory - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Modules:** `app.application.interfaces.bank_connector`, `app.infrastructure.connectors.*`, `app.application.services.bank_onboarding_service`, `app.infrastructure.client_daemon.*`  
@@ -377,6 +377,6 @@ A total of **20 distinct connector abstractions, transport protocol adapters, da
 
 ---
 
-*Scientific Verification Inventory — Connector Framework*  
+*Scientific Verification Inventory - Connector Framework*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

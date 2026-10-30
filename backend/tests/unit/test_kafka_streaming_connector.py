@@ -1038,7 +1038,7 @@ class TestKafkaDistributedIdempotencyRedis:
             engine = IdempotencyEngine(ttl_seconds=60)
             key = f"test-prod-failclosed-{uuid.uuid4().hex}"
 
-            # Must fail closed — returning False rather than silently executing process-locally
+            # Must fail closed - returning False rather than silently executing process-locally
             assert engine.try_acquire(key) is False
             assert engine.is_duplicate(key) is True
         finally:

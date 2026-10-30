@@ -382,7 +382,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Interactive Minimum Remediating Feature Path Simulator — Ingests live alert parameters and derives minimal actionable signal perturbations to clear AML threshold.
+              Interactive Minimum Remediating Feature Path Simulator - Ingests live alert parameters and derives minimal actionable signal perturbations to clear AML threshold.
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Benchmark & Scalability Evaluation Report — Federation Coordinator Subsystem
+# Benchmark & Scalability Evaluation Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`, `client.py`  
 **Test Script:** `scratch/federation_coordinator_benchmark_scalability.py`  
@@ -103,4 +103,4 @@ Quorum aggregation triggering (`on_gradient_received` on the $k_{\text{min}}$-th
 
 ---
 
-*End of Benchmark & Scalability Evaluation Report — Federation Coordinator Subsystem*
+*End of Benchmark & Scalability Evaluation Report - Federation Coordinator Subsystem*

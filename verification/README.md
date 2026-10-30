@@ -90,16 +90,16 @@ verification/
 
 Every report in this registry follows the same structure:
 
-1. **Executive Summary** — key findings, overall confidence score, and classification breakdown
-2. **Architecture Analysis** — component topology, data flows, and identified coverage gaps
-3. **Mathematical Correctness** — formal invariant definitions and claim classifications (`SUPPORTED` / `PARTIALLY SUPPORTED` / `UNSUPPORTED`)
-4. **Property-Based Testing** — Hypothesis framework results across randomized input spaces
-5. **Adversarial Robustness & Security Testing** — fault injection, tamper detection, and stress tests
-6. **Compliance Assessment** — regulatory mandate coverage (EU AI Act, GDPR, FinCEN BSA, ISO 27001, SOC 2 design patterns)
-7. **Performance Evaluation** — latency, throughput, memory, and asymptotic complexity analysis
-8. **Threats to Validity** — internal, external, and construct validity limitations
-9. **Limitations** — architectural gaps and open engineering risks
-10. **Recommendations** — prioritized remediation actions
+1. **Executive Summary** - key findings, overall confidence score, and classification breakdown
+2. **Architecture Analysis** - component topology, data flows, and identified coverage gaps
+3. **Mathematical Correctness** - formal invariant definitions and claim classifications (`SUPPORTED` / `PARTIALLY SUPPORTED` / `UNSUPPORTED`)
+4. **Property-Based Testing** - Hypothesis framework results across randomized input spaces
+5. **Adversarial Robustness & Security Testing** - fault injection, tamper detection, and stress tests
+6. **Compliance Assessment** - regulatory mandate coverage (EU AI Act, GDPR, FinCEN BSA, ISO 27001, SOC 2 design patterns)
+7. **Performance Evaluation** - latency, throughput, memory, and asymptotic complexity analysis
+8. **Threats to Validity** - internal, external, and construct validity limitations
+9. **Limitations** - architectural gaps and open engineering risks
+10. **Recommendations** - prioritized remediation actions
 
 ---
 
@@ -135,27 +135,27 @@ Every report in this registry follows the same structure:
 
 All internal self-verifications are conducted using a multi-phase testing methodology:
 
-### Phase 1 — Architecture & Claim Inventory
+### Section 1 - Architecture & Claim Inventory
 - Source code mapping of all components, interfaces, and data flows
 - Engineering claim extraction from README files and inline docstrings
 - Claim classification: `SUPPORTED`, `PARTIALLY SUPPORTED`, or `UNSUPPORTED`
 
-### Phase 2 — Mathematical Reference Verification
+### Section 2 - Mathematical Reference Verification
 - Independent pure-Python reference implementations of all mathematical formulas
 - Numerical comparison against production implementations (Max Absolute Error target: < 1e-10)
 - Formal invariant verification for cryptographic and statistical operations
 
-### Phase 3 — Property-Based Testing (Hypothesis)
+### Section 3 - Property-Based Testing (Hypothesis)
 - Randomized input generation across full domain boundaries
 - Invariant verification across 100+ trials per property
 - Edge case discovery (boundary values, negative inputs, empty collections)
 
-### Phase 4 — Adversarial Robustness & Fault Injection
+### Section 4 - Adversarial Robustness & Fault Injection
 - Structured fault injection across all identified failure modes
 - Attack scenario testing (SQL injection, XSS, SSRF, path traversal, oversized payloads)
 - Tamper detection and integrity verification under adversarial conditions
 
-### Phase 5 — Performance Benchmarking
+### Section 5 - Performance Benchmarking
 - Throughput measurements under sustained load
 - Latency profiling at P50/P95/P99 percentiles
 - Memory footprint and asymptotic complexity analysis

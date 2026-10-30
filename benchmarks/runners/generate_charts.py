@@ -1,4 +1,4 @@
-"""Benchmark Chart Generator — Produces publication-grade figures from raw benchmark JSON outputs.
+"""Benchmark Chart Generator - Produces publication-grade figures from raw benchmark JSON outputs.
 
 Generates:
   1. docs/figures/benchmark_auc_comparison.png (Centralized vs FedAvg on PaySim & IEEE-CIS)

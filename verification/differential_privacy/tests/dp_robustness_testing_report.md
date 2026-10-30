@@ -1,4 +1,4 @@
-﻿# Adversarial Robustness & Failure Injection Report — Differential Privacy Subsystem
+﻿# Adversarial Robustness & Failure Injection Report - Differential Privacy Subsystem
 
 This document presents the empirical results of adversarial stress testing and failure injection on the Differential Privacy (DP), PETs, and Privacy Audit subsystem.
 

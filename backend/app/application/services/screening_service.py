@@ -4,19 +4,19 @@ Implements a high-performance multi-jurisdiction watchlist screening engine with
 
 - Multi-source watchlists: EU Consolidated, UN Security Council, OFAC SDN,
   HM Treasury, PEP Global, and Institution-level Goodlist.
-- Matching algorithms (all implemented in pure Python stdlib — no heavy deps):
-    • EXACT         — normalised string equality
-    • LEVENSHTEIN   — edit distance (typos, transpositions)
-    • JARO_WINKLER  — prefix-weighted similarity
-    • DOUBLE_METAPHONE — phonetic encoding (cross-language sound equivalence)
-    • TRANSLITERATION  — Cyrillic/Greek/Arabic → Latin script mapping
+- Matching algorithms (all implemented in pure Python stdlib - no heavy deps):
+    • EXACT         - normalised string equality
+    • LEVENSHTEIN   - edit distance (typos, transpositions)
+    • JARO_WINKLER  - prefix-weighted similarity
+    • DOUBLE_METAPHONE - phonetic encoding (cross-language sound equivalence)
+    • TRANSLITERATION  - Cyrillic/Greek/Arabic → Latin script mapping
 - Scoring: 0–100 composite score; configurable alert threshold (default 75).
 - Goodlist / false-positive suppression: institution-level approved entity cache.
 - Portfolio re-screening: bulk re-screen all registered entities against updated lists.
 - Audit trail: SHA-256 hash-chained immutable screening event log.
 
 Privacy invariants:
-- No raw PII stored in screening hit records — only hashed entity keys.
+- No raw PII stored in screening hit records - only hashed entity keys.
 - Watchlist entry names stored as normalised tokens; no cleartext IBAN/passport.
 - All screening results are in-memory; no external persistence in this module.
 """
@@ -420,7 +420,7 @@ class ScreeningService:
 
         entity_key_hash = _entity_hash(query_name, date_of_birth, nationalities or [])
 
-        # Check goodlist — suppress if pre-approved false positive
+        # Check goodlist - suppress if pre-approved false positive
         with self._lock:
             if entity_key_hash in self._goodlist:
                 result = ScreeningResult(

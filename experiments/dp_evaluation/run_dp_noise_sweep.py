@@ -511,7 +511,7 @@ def _write_dossier(suite: DPSweepResults, path: Path) -> None:
         "",
         "**Verification Engine:** PyTorch Opacus `PrivacyEngine(accountant='prv')`  ",
         "**Privacy Accountant:** PRVAccountant (Privacy Random Variables, Gopi et al. 2021)  ",
-        "**Sweep Type:** Fixed-noise-multiplier (σ ∈ {3.0, 2.0, 1.0, 0.5, 0.0}) — NOT target-ε calibration  ",
+        "**Sweep Type:** Fixed-noise-multiplier (σ ∈ {3.0, 2.0, 1.0, 0.5, 0.0}) - NOT target-ε calibration  ",
         f"**Dataset:** Synthetic Banking (N={suite.dataset_metadata['n_samples']:,}, 15 features, "
         f"prevalence={suite.dataset_metadata['fraud_rate']*100:.1f}%)  ",
         f"**Test Support:** {suite.dataset_metadata['test_fraud_count']} fraud transactions out of "
@@ -596,7 +596,7 @@ def _generate_figure(suite: DPSweepResults, output_path: Path) -> None:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
-        logger.warning("matplotlib unavailable — skipping figure generation")
+        logger.warning("matplotlib unavailable - skipping figure generation")
         return
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 9))

@@ -4,7 +4,7 @@
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Lead Cyber Security Architect & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE (9 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED) — Vault PKI Root CA keys bound to FIPS 140-2 Level 3 HSM enclaves (`vault_hsm_pki_binder.py`)  
+**Audit Status:** COMPLETE (9 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED) - Vault PKI Root CA keys bound to FIPS 140-2 Level 3 HSM enclaves (`vault_hsm_pki_binder.py`)  
 
 ---
 
@@ -58,7 +58,7 @@ $$
 
 ## 5. Recommendations for Production Engineering
 
-1. **✅ RESOLVED — Hardware Security Module (HSM) Integration:** `vault_hsm_pki_binder.py` binds Vault PKI Root CA keys to FIPS 140-2 Level 3 HSM devices (`is_exportable = False`).
+1. **✅ RESOLVED - Hardware Security Engine (HSM) Integration:** `vault_hsm_pki_binder.py` binds Vault PKI Root CA keys to FIPS 140-2 Level 3 HSM devices (`is_exportable = False`).
 2. **Short-Lived Cert TTLs:** Enforce 24-hour mTLS leaf certificate expiry with automated background renewal daemon.
 
 ---

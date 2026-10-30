@@ -47,7 +47,7 @@ _DEFAULT_ORDERS: list[float] = [
 
 # Minimum noise multiplier for binary search calibration
 _SIGMA_MIN: float = 0.01
-# Maximum noise multiplier — beyond σ=100 the privacy cost is effectively 0
+# Maximum noise multiplier - beyond σ=100 the privacy cost is effectively 0
 _SIGMA_MAX: float = 100.0
 
 

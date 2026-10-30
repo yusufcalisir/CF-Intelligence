@@ -11,6 +11,7 @@ The Collaborative Fraud Intelligence (CFI) platform delivers enterprise security
 │                   SECURITY EVENT EXPORTING PIPELINE                    │
 │                                                                        │
 │  [ Platform Security & Audit Events ]                                  │
+│  (Includes: PILOT_ACTIVATED, MATCH_EVIDENCE_ATTACHED, REDIS_RECONNECT) │
 │   - Byzantine Gradient Poisoning Detected                              │
 │   - Model Promoted to Active Production                                │
 │   - Four-Eyes Case Dual-Signed & Closed                                │

@@ -592,7 +592,7 @@ def test_scoped_redis_cache_does_not_overwrite_global_alias(monkeypatch: pytest.
 
 
 # ---------------------------------------------------------------------------
-# Test N: Production Feature Truthfulness — ScoreTransaction Country Enforcement
+# Test N: Production Feature Truthfulness - ScoreTransaction Country Enforcement
 # ---------------------------------------------------------------------------
 def test_production_score_transaction_without_country_fails_422(monkeypatch: pytest.MonkeyPatch) -> None:
     """Requirement A: Production /api/v1/score-transaction without country fails HTTP 422."""

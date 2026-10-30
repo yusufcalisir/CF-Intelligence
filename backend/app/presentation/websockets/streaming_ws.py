@@ -130,7 +130,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
         except Exception:
             # Fallback: Dual-path in-process ring-buffer replay + engine status polling
             logger.info(
-                "Redis unavailable for scenario %s — switching to dual-path in-process dispatcher",
+                "Redis unavailable for scenario %s - switching to dual-path in-process dispatcher",
                 scenario_id[:8],
             )
             # 1. Replay in-process history ring-buffer for late-joining clients

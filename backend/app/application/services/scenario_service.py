@@ -187,7 +187,7 @@ class ScenarioSimulator:
                         "reason_codes": ["VEL-001", "GEO-RISK"],
                         "confidence": 0.62,
                         "description": f"{BANK_NAMES[bank_id]}: Suspicious velocity pattern",
-                        "individual_assessment": "Medium confidence — possible false positive",
+                        "individual_assessment": "Medium confidence - possible false positive",
                     },
                 )
             )
@@ -206,7 +206,7 @@ class ScenarioSimulator:
                     "banks_reporting": BANK_IDS,
                     "combined_confidence": 0.91,
                     "description": "Cross-institution correlation: shared device/IP across 3 banks, 4 entities",
-                    "collaborative_assessment": "HIGH confidence — fraud ring detected",
+                    "collaborative_assessment": "HIGH confidence - fraud ring detected",
                 },
             )
         )
@@ -362,8 +362,8 @@ class ScenarioSimulator:
                 delay_ms=delay,
                 payload={
                     "combined_confidence": 0.94,
-                    "description": "Same entity targeted at 2 banks — account takeover confirmed",
-                    "collaborative_assessment": "CRITICAL — coordinated ATO across Meridian + Nexus",
+                    "description": "Same entity targeted at 2 banks - account takeover confirmed",
+                    "collaborative_assessment": "CRITICAL - coordinated ATO across Meridian + Nexus",
                 },
             )
         )
@@ -443,7 +443,7 @@ class ScenarioSimulator:
                         "confidence": 0.35,
                         "reason_codes": ["AMT-ANOM", "GEO-RISK"],
                         "description": f"{BANK_NAMES[bank_id]}: Wire transfers within normal range",
-                        "individual_assessment": "Low confidence — amounts below reporting threshold individually",
+                        "individual_assessment": "Low confidence - amounts below reporting threshold individually",
                     },
                 )
             )
@@ -460,7 +460,7 @@ class ScenarioSimulator:
                     "total_amount_detected": 50000,
                     "layering_hops": 3,
                     "description": "Layering pattern: $50K split across 3 banks, 6 transfers, reconsolidated",
-                    "collaborative_assessment": "HIGH — classic layering pattern, individually invisible",
+                    "collaborative_assessment": "HIGH - classic layering pattern, individually invisible",
                 },
             )
         )
@@ -553,7 +553,7 @@ class ScenarioSimulator:
                     "combined_confidence": 0.92,
                     "cards_identified": len(stolen_cards),
                     "description": f"Card testing detected: {len(stolen_cards)} cards tested across 2 banks",
-                    "collaborative_assessment": "CRITICAL — distributed card testing ring identified",
+                    "collaborative_assessment": "CRITICAL - distributed card testing ring identified",
                 },
             )
         )

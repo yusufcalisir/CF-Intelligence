@@ -121,7 +121,7 @@ class TestCrossTenantSameIdCollision:
         assert "bank_a:" + shared_tx_id in graph._seen_transactions
         assert "bank_b:" + shared_tx_id in graph._seen_transactions
 
-        # 3. Retry Bank A — Bank B must remain completely unaffected
+        # 3. Retry Bank A - Bank B must remain completely unaffected
         initial_bank_b_edge = graph._seen_transactions["bank_b:" + shared_tx_id]
         graph.add_transaction({
             "bank_id": "bank_a",

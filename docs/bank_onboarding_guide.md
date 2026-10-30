@@ -64,16 +64,16 @@ Before initiating node registration, the institution's IT/Security team must ver
 
 > [!IMPORTANT]
 > All CF-Intelligence bank→coordinator communication is **mandatory mTLS over gRPC**.
-> Plain HTTP connections and TLS 1.2 are **refused at the transport layer** — there is no insecure fallback.
+> Plain HTTP connections and TLS 1.2 are **refused at the transport layer** - there is no insecure fallback.
 
 | Requirement | Detail |
 |---|---|
 | **Protocol** | gRPC over TLS 1.3 only (TLS 1.2 rejected) |
 | **Port** | TCP `50051` outbound from bank network to coordinator |
-| **Authentication** | Mutual TLS — both client and server present X.509 certificates |
+| **Authentication** | Mutual TLS - both client and server present X.509 certificates |
 | **Client Cert CN** | Must match `{bank_id}.client.cf-intelligence.io` (issued by onboarding API) |
-| **HTTP Fallback** | None — insecure channels are rejected at the server interceptor level |
-| **Coordinator FQDN** | `coordinator.cf-intelligence.io` — add to institutional firewall allowlist |
+| **HTTP Fallback** | None - insecure channels are rejected at the server interceptor level |
+| **Coordinator FQDN** | `coordinator.cf-intelligence.io` - add to institutional firewall allowlist |
 | **Cert Rotation** | gRPC client auto-detects cert file changes and recycles the channel |
 
 ### Firewall Rule Configuration (Linux `iptables` Example)
@@ -374,3 +374,41 @@ pytest backend/tests/unit/test_bank_onboarding.py backend/tests/unit/test_bank_o
 | `UNAVAILABLE: Name resolution failed` | Outbound TCP port 50051 blocked by firewall | Verify firewall allowlist permits outbound traffic to `coordinator.cf-intelligence.io:50051`. |
 | `SQLState 42501 (insufficient_privilege)` | Process attempting cross-tenant database access | Ensure `get_tenant_session(bank_id)` sets `search_path TO tenant_{bank_id}, public`. |
 | `gRPC Registration Rejected (is_accepted=False)` | Anti-TOFU barrier triggered or cert spoofing detected | Verify node was properly onboarded via API and presents the authentic fingerprint issued during onboarding. |
+
+---
+
+## 7. Institutional Worker Node Onboarding (OpenMined PSI Matching Grid)
+
+In addition to the federated learning training client daemon, participating institutions deploy an **Institutional Worker Node** to participate in Private Set Intersection (PSI) collaborative investigations:
+
+### 7.1 Sovereign Ed25519 Key Custody Provisioning
+Each participating institution generates a dedicated Ed25519 signing keypair stored in isolated custody:
+```bash
+# Automated isolated key generation with 0600 file permissions
+python scripts/generate_consortium_deployment_secrets.py --env-file .env.consortium
+```
+- The private key is mounted into the worker container at `/app/secrets/worker_signing_key.hex` (`0600` root/owner-only permissions) and mapped to `WORKER_SIGNING_KEY_FILE`.
+- The public key is enrolled in the coordinator's [`InstitutionalVerificationRegistry`](../backend/app/domain/institutional_identity.py).
+- Runtime key overwrite is strictly prohibited; updates require a cryptographically signed rotation request (`rotate_public_key`).
+
+### 7.2 Containerized Worker Daemon Deployment
+The bank deploys its isolated worker container (`IsolatedBankWorkerNode` / `InstitutionalWorkerDaemon`):
+- Internal HTTP/RPC endpoint (e.g. port 8100 for Bank A, 8101 for Bank B, 8102 for Bank C).
+- Mounts the institution's private entity vault (`storage/{bank_id}/private_entities/`).
+- Binds to the coordinator daemon (`InstitutionalCoordinatorDaemon`) on port 8200.
+
+### 7.3 Health & Custody Verification
+Verify worker node health and sovereign key enrollment:
+```bash
+curl -f http://127.0.0.1:8100/worker/health
+```
+Returns:
+```json
+{
+  "bank_id": "bank_a",
+  "status": "ONLINE",
+  "key_custody_mode": "ISOLATED_FILE_MOUNT",
+  "signing_public_key_hex": "3909772bf62c7e0766100ebc...",
+  "enrolled_in_registry": true
+}
+```

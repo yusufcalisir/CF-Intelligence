@@ -1,4 +1,4 @@
-# Pure-Python Reference Verification Report — Real-World Fraud ETL Pipeline
+# Pure-Python Reference Verification Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

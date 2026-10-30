@@ -314,7 +314,7 @@ class WebSocketConnectionManager:
 
         loop = self._event_loop
         if loop is None or not loop.is_running():
-            # No event loop available yet — history is preserved, delivery skipped.
+            # No event loop available yet - history is preserved, delivery skipped.
             logger.debug(
                 "broadcast_to_room_sync: no running event loop for room %s; event buffered only",
                 room,

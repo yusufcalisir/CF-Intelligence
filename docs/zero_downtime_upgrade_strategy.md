@@ -98,6 +98,15 @@ To avoid locking or breaking active transactions during the `DUAL_VERSION_ACTIVE
 
 ---
 
+## 🏦 Consortium Node & Isolated Worker Rolling Upgrades
+
+In a multi-bank consortium topology (`docker-compose.consortium.yml`), rolling upgrades operate under strict institutional sovereignty:
+- **Worker Node Independence**: Each per-bank worker daemon (`cfi-worker-bank-a`, `bank-b`, `bank-c`) can be upgraded independently without draining peer bank nodes. Private signing keys mounted under `0600` permissions remain sovereign and immutable across image upgrades.
+- **Pilot Scope Digest Durability**: Active controlled pilots maintain cryptographic validity across coordinator upgrades. The canonical SHA-256 scope digest and Ed25519 participant signatures are persisted durably, allowing in-flight pilots to resume matching without requiring re-approval.
+- **Redis Dynamic Auto-Reconnect**: When API or worker nodes restart during rolling upgrades, they cleanly reattach to Redis within 1.0 second without requiring manual Redis restarts.
+
+---
+
 ## 🧪 Automated Test Suite Validation
 
 ```bash

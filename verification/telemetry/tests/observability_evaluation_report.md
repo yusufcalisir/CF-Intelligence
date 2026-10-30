@@ -1,4 +1,4 @@
-# Observability Engineering Assessment Report — Telemetry Subsystem
+# Observability Engineering Assessment Report - Telemetry Subsystem
 
 **Audited Modules:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `alert_service.py`, `support_diagnostics.py`, `metrics_service.py`, `monitoring.py`, `health.py`, `dashboard.py`  
 **Evaluation Script:** `scratch/telemetry_observability_evaluation.py`  
@@ -115,4 +115,4 @@ The telemetry implementation provides **sub-microsecond metric recording latency
 
 ---
 
-*End of Observability Engineering Assessment Report — Telemetry Subsystem*
+*End of Observability Engineering Assessment Report - Telemetry Subsystem*

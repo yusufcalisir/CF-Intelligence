@@ -64,7 +64,7 @@ def run_scalability_benchmark() -> dict[str, Any]:
             "deployment_gas": base_deployment_gas,
         })
 
-    report_md = f"""# Scalability & EVM Gas Benchmark Report — Smart Contracts Subsystem
+    report_md = f"""# Scalability & EVM Gas Benchmark Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

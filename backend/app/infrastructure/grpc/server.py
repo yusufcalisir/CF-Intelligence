@@ -1,4 +1,4 @@
-"""gRPC Server Lifecycle Manager — Phase 37.1: Mandatory mTLS Hardening.
+"""gRPC Server Lifecycle Manager - Mandatory mTLS Hardening.
 
 All bank→coordinator communication is enforced over mutual TLS.
 Insecure fallback is completely removed. The BankCertificateInterceptor
@@ -38,7 +38,7 @@ def _lookup_bank_active_sync(bank_id: str) -> bool:
 
     grpc.ServerInterceptor.intercept_service is called in gRPC's thread pool
     (not an async context), so we bridge to asyncio here.
-    Fully mocked in unit tests — no real DB or event loop required.
+    Fully mocked in unit tests - no real DB or event loop required.
     """
     try:
         loop = asyncio.get_event_loop()
@@ -103,7 +103,7 @@ class BankCertificateInterceptor(grpc.ServerInterceptor):
         match = _CN_PATTERN.match(raw_cn)
         if not match:
             logger.warning(
-                "mTLS interceptor: invalid or missing CN '%s' — PERMISSION_DENIED", raw_cn
+                "mTLS interceptor: invalid or missing CN '%s' - PERMISSION_DENIED", raw_cn
             )
             return grpc.unary_unary_rpc_method_handler(
                 _abort_handler(
@@ -118,7 +118,7 @@ class BankCertificateInterceptor(grpc.ServerInterceptor):
 
         if not is_active:
             logger.warning(
-                "mTLS interceptor: bank_id='%s' not registered or not ACTIVE — PERMISSION_DENIED",
+                "mTLS interceptor: bank_id='%s' not registered or not ACTIVE - PERMISSION_DENIED",
                 bank_id,
             )
             return grpc.unary_unary_rpc_method_handler(
@@ -201,7 +201,7 @@ class GRPCServerManager:
             except Exception as exc:
                 logger.exception("Failed to generate fallback mTLS certs: %s", exc)
                 raise RuntimeError(
-                    f"mTLS credentials not configured — refusing insecure mode. "
+                    f"mTLS credentials not configured - refusing insecure mode. "
                     f"Missing env vars: {', '.join(missing)}"
                 ) from exc
 

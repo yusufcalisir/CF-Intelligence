@@ -41,7 +41,7 @@ where:
 
 ### 2.2 Standalone RDP Moments Accountant (`rdp_accountant.py`)
 - **Location**: [`backend/app/infrastructure/security/rdp_accountant.py`](../../backend/app/infrastructure/security/rdp_accountant.py)
-- **Purpose**: Provides a self-contained, decoupled accountant for offline noise calibration, empirical sweep evaluation, and CI-bound verification — separate from the live Opacus engine.
+- **Purpose**: Provides a self-contained, decoupled accountant for offline noise calibration, empirical sweep evaluation, and CI-bound verification - separate from the live Opacus engine.
 - **API Surface**:
 
 | Method | Description |
@@ -52,7 +52,7 @@ where:
 | `sweep_noise_multipliers(σ_list, q, T)` | Batch sweep across $\sigma$ configurations |
 | `run_noise_calibration_sweep(σ, q, T_list, ε)` | Full $σ \times T$ empirical grid |
 
-### 2.3 Phase 15.1 — Empirical Noise Calibration & Utility Frontier
+### 2.3 Empirical Noise Calibration & Utility Frontier
 - **Experiment**: [`experiments/dp_evaluation/run_dp_noise_sweep.py`](../../experiments/dp_evaluation/run_dp_noise_sweep.py)
 - **Grid**: $\sigma \in \{0.5, 1.0, 1.5, 2.0\}$ × $T \in \{5, 10, 20, 50\}$ rounds, $\delta = 10^{-5}$, $q = 0.05$
 - **Target budget**: $\epsilon \le 2.0$ at $T = 50$
@@ -91,9 +91,9 @@ RDP composition is **tighter** than naïve basic composition at all tested order
 | :--- | :--- | :---: |
 | [`backend/tests/unit/test_privacy_service.py`](../../backend/tests/unit/test_privacy_service.py) | `PrivacyService`, `PrivacyBudget`, RDP composition, clipping, thread safety | 22 |
 | [`backend/tests/unit/test_dp_benchmark_methodology.py`](../../backend/tests/unit/test_dp_benchmark_methodology.py) | Canonical Opacus DP-SGD benchmark methodology, PRV accountant, sample std (ddof=1) | 10 |
-| [`verification/differential_privacy/tests/test_dp_bounds.py`](../../verification/differential_privacy/tests/test_dp_bounds.py) | `RDPMomentsAccountant` — per-step, composition, calibration, sweep, exhaustion | 26 |
+| [`verification/differential_privacy/tests/test_dp_bounds.py`](../../verification/differential_privacy/tests/test_dp_bounds.py) | `RDPMomentsAccountant` - per-step, composition, calibration, sweep, exhaustion | 26 |
 | [`verification/differential_privacy/tests/test_dp_robustness.py`](../../verification/differential_privacy/tests/test_dp_robustness.py) | Adversarial injection, NaN/Inf, edge cases | 25 |
-| [`verification/differential_privacy/tests/test_dp_hypothesis.py`](../../verification/differential_privacy/tests/test_dp_hypothesis.py) | Property-based Hypothesis tests | — |
+| [`verification/differential_privacy/tests/test_dp_hypothesis.py`](../../verification/differential_privacy/tests/test_dp_hypothesis.py) | Property-based Hypothesis tests | - |
 
 - **Benchmark Runner**: [`benchmarks/runners/run_dp_tradeoff.py`](../../benchmarks/runners/run_dp_tradeoff.py)
 - **Experiment Suite**: [`experiments/dp_evaluation/run_dp_noise_sweep.py`](../../experiments/dp_evaluation/run_dp_noise_sweep.py)

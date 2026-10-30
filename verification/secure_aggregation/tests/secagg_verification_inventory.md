@@ -1,4 +1,4 @@
-﻿# Scientific Verification Inventory — Secure Aggregation Subsystem
+﻿# Scientific Verification Inventory - Secure Aggregation Subsystem
 
 This document presents a complete scientific audit and verification inventory of the Secure Aggregation (SecAgg), Trusted Execution Environment (TEE), and Cryptographic Key Management (KMS) subsystem within the privacy-preserving cross-bank fraud detection platform.
 

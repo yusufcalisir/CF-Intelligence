@@ -1,4 +1,4 @@
-# Scientific Claim Classification Review — Federation Coordinator Subsystem
+# Scientific Claim Classification Review - Federation Coordinator Subsystem
 
 **Subsystem:** Federation Coordinator & Distributed Orchestration Engine  
 **Module Paths:** `coordinator_service.py`, `servicer.py`, `client.py`, `flower_engine.py`, `region_failover.py`, `dr_coordinator.py`  
@@ -123,4 +123,4 @@ To ensure publication-quality scientific integrity, the following claims must be
 
 ---
 
-*End of Scientific Claim Classification Review — Federation Coordinator Subsystem*
+*End of Scientific Claim Classification Review - Federation Coordinator Subsystem*

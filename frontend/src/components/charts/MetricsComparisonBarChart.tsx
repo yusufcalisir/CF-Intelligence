@@ -29,7 +29,7 @@ export default function MetricsComparisonBarChart({ banks }: MetricsComparisonBa
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Model Performance Comparison — All Banks
+            Model Performance Comparison - All Banks
           </h3>
           <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
             Grouped evaluation metrics comparing siloed local baselines vs collaborative federated models

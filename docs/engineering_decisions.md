@@ -22,7 +22,7 @@ Build a custom in-process FL engine for educational transparency and rapid local
 1. **Failure injection control**: We need deterministic dropout, reconnection, and latency simulation per round. Flower's client lifecycle is managed by the framework, making fine-grained failure injection harder.
 2. **UI observability**: The simulator's value proposition is round-by-round progress visible in the dashboard. Our custom engine emits progress callbacks at every step.
 3. **Single-process simulation**: All three "banks" run in the same process for testing. Flower's architecture assumes separate client processes communicating over gRPC.
-4. **Educational clarity**: The custom engine code is self-documenting — readers can follow the FedAvg algorithm step by step.
+4. **Educational clarity**: The custom engine code is self-documenting - readers can follow the FedAvg algorithm step by step.
 
 ### Tradeoff
 
@@ -45,7 +45,7 @@ Generate synthetic Non-IID transaction data with three distinct bank profiles fo
 
 ### Rationale
 
-1. **Non-IID control**: We can precisely control fraud ratios, transaction patterns, and feature distributions per bank — the core of what makes FL interesting.
+1. **Non-IID control**: We can precisely control fraud ratios, transaction patterns, and feature distributions per bank - the core of what makes FL interesting.
 2. **Reproducibility**: Deterministic generation with fixed seeds means identical results across runs.
 3. **No licensing**: No data distribution restrictions for demo environments.
 4. **Narrative**: Each bank has a named identity (Meridian National, Nexus Digital, Heritage Regional) with distinct fraud patterns that tell a story.
@@ -587,7 +587,7 @@ Enterprise banking and FinTech vendor procurement processes require zero unpatch
 
 ### Context
 
-While unit and integration test suites (1,196 Pytest, 249 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
+While unit and integration test suites (1,196 Pytest, 249 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows-such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability-required verification against real browser rendering engines.
 
 ### Decision
 
@@ -1307,3 +1307,21 @@ Implement dual-layer credential and connection auto-healing across the local orc
 ### Tradeoff
 
 * Adds targeted retry logic during development initialization; execution path is completely bypassed when direct connection succeeds on first try.
+
+
+---
+
+## ADR-031: Integrated 10-Service Multi-Bank Consortium Sandbox & Self-Healing Redis Reconnection
+
+### Context
+Testing multi-counterparty private set intersection (OpenMined PSI 2.0.6) and controlled pilot governance required a reproducible multi-container topology where bank worker nodes custody their private keys independently. Furthermore, transient network partitions between containers must not cause permanent API server failure or unrecoverable cache states.
+
+### Decision
+1. Implement `docker-compose.consortium.yml` orchestrating 10 isolated containers (`cfi-gateway`, `cfi-frontend`, `cfi-consortium-migrations`, `cfi-postgres`, `cfi-redis`, `cfi-api-server`, `cfi-psi-coordinator`, and 3 bank matching worker daemons `cfi-worker-bank-a`, `bank-b`, `bank-c`).
+2. Classify the environment truthfully as `LOCAL_HTTP_SANDBOX`, acknowledging single-host development boundaries.
+3. Implement dynamic auto-reconnect in [redis_store.py](../backend/app/infrastructure/persistence/redis_store.py) (`_attempt_auto_reconnect`, `_RECONNECT_COOLDOWN_SECONDS = 1.0`) with truthful `durability="ephemeral"` status reporting on `/health` during downtime and automatic return to `durability="durable"` upon recovery.
+4. Enforce POSIX `0600` permissions on sovereign Ed25519 worker private key files.
+
+### Consequences
+- Enables end-to-end multi-bank matching and browser-driven analyst workflows without mock data.
+- Guarantees zero request drops and self-healing recovery during temporary Redis disconnections.

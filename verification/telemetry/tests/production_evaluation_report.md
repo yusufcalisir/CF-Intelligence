@@ -1,4 +1,4 @@
-# Reliability & Production Engineering Assessment Report — Telemetry Subsystem
+# Reliability & Production Engineering Assessment Report - Telemetry Subsystem
 
 **Audited Modules:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `support_diagnostics.py`, `health.py`  
 **Evaluation Script:** `scratch/telemetry_production_evaluation.py`  
@@ -48,8 +48,8 @@ The telemetry implementation exhibits **strong fallback tracing resilience, dete
 - **Status:** **PARTIALLY RESILIENT**
 - **Evaluation:**
   - **SIEM Audit Logs:** High resilience via local JSONL file buffering (`siem_retry_queue.jsonl`).
-  - **Prometheus Metrics:** Low resilience — in-memory counters reset to zero if process crashes before Prometheus scrapes.
-  - **gRPC Latency Telemetry:** High resilience — `finally` block ensures 100% sample capture regardless of handler exceptions.
+  - **Prometheus Metrics:** Low resilience - in-memory counters reset to zero if process crashes before Prometheus scrapes.
+  - **gRPC Latency Telemetry:** High resilience - `finally` block ensures 100% sample capture regardless of handler exceptions.
 
 ---
 
@@ -111,4 +111,4 @@ The telemetry implementation exhibits **strong fallback tracing resilience, dete
 
 ---
 
-*End of Reliability & Production Engineering Assessment Report — Telemetry Subsystem*
+*End of Reliability & Production Engineering Assessment Report - Telemetry Subsystem*

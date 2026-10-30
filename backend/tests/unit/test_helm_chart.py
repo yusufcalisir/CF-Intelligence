@@ -2,7 +2,7 @@
 
 These tests validate Chart.yaml schema, required values keys,
 and that template files are syntactically well-formed YAML fragments.
-No Kubernetes cluster is required — these are offline linting checks.
+No Kubernetes cluster is required - these are offline linting checks.
 """
 
 from __future__ import annotations

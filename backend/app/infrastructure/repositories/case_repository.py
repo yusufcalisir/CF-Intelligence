@@ -1,4 +1,4 @@
-"""Case repository — production AsyncSession CRUD for CaseModel.
+"""Case repository - production AsyncSession CRUD for CaseModel.
 
 Replaces in-memory dict storage. PostgreSQL is the single source of truth.
 """

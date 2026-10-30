@@ -154,7 +154,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <span className="text-xs font-mono text-slate-200">
-              {settlementBlockNumber ? `Block #${settlementBlockNumber.toLocaleString()}` : 'Block #—'}
+              {settlementBlockNumber ? `Block #${settlementBlockNumber.toLocaleString()}` : 'Block #-'}
             </span>
             {settlementStatus === 'SUCCESS' && (
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold flex items-center gap-1 border border-emerald-500/30">

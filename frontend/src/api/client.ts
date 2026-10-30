@@ -86,6 +86,7 @@ export async function advanceInstitutionalSessionEpoch(
   purgeInstitutionalBrowserState(options);
 
   if (queryClient) {
+    queryClient.clear();
     try {
       if (typeof queryClient.cancelQueries === 'function') {
         await queryClient.cancelQueries();
@@ -93,7 +94,6 @@ export async function advanceInstitutionalSessionEpoch(
     } catch {
       // ignore query cancellation error
     }
-    queryClient.clear();
   }
   return _sessionEpoch;
 }
@@ -201,6 +201,7 @@ export function switchActiveTenant(
   queryClient: { cancelQueries?: () => Promise<void>; clear: () => void },
   newTenantId: string,
 ): void {
+  queryClient.clear();
   void advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: true });
   setClientTenant(newTenantId);
 }

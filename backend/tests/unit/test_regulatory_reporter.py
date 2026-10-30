@@ -1,5 +1,5 @@
 # ruff: noqa: TC003
-"""Automated Unit Test Suite for Regulatory Reporter & EU AI Act Compliance — Section 45.1."""
+"""Automated Unit Test Suite for Regulatory Reporter & EU AI Act Compliance - Section 45.1."""
 
 from __future__ import annotations
 

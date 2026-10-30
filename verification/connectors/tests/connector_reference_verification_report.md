@@ -1,4 +1,4 @@
-# Independent Reference Verification Report — Connector Framework
+# Independent Reference Verification Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Modules:** `app.application.interfaces.bank_connector`, `app.infrastructure.connectors.*`, `app.application.services.bank_onboarding_service`, `app.infrastructure.client_daemon.*`  
@@ -134,4 +134,4 @@ Production Policy Guard Enforcement:               VERIFIED (100% Exception Trig
 
 ---
 
-*End of Independent Reference Verification Report — Connector Framework*
+*End of Independent Reference Verification Report - Connector Framework*

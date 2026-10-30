@@ -420,7 +420,7 @@ class GraphAnalyticsService:
 
                 if src_norm > 0 and tgt_norm > 0:
                     similarity = float(np.dot(src_arr, tgt_arr) / (src_norm * tgt_norm))
-                    # Clamp to [0, 1] — negative similarity means structurally dissimilar
+                    # Clamp to [0, 1] - negative similarity means structurally dissimilar
                     edge_weight = max(0.0, similarity)
                 else:
                     edge_weight = 0.5

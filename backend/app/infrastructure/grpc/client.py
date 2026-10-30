@@ -1,4 +1,4 @@
-"""High-performance gRPC client driver for bank node operations — Phase 37.1.
+"""High-performance gRPC client driver for bank node operations.
 
 Connects to the coordinator over a real mTLS gRPC channel.
 Implements automatic reconnect (3 retries, 5 s back-off) and cert-rotation
@@ -128,7 +128,7 @@ class GRPCBankClient:
         current_mtime = _cert_mtime(self.cert_path)
         if current_mtime != self._cert_mtime_snapshot:
             logger.info(
-                "Cert file modified (mtime %s → %s) — recycling gRPC channel",
+                "Cert file modified (mtime %s → %s) - recycling gRPC channel",
                 self._cert_mtime_snapshot,
                 current_mtime,
             )

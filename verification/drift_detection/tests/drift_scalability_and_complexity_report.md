@@ -1,4 +1,4 @@
-# Scalability & Performance Benchmark Report — Model Drift Detection
+# Scalability & Performance Benchmark Report - Model Drift Detection
 
 **Module:** `drift_service.py`, `retraining_trigger_engine.py`  
 **Audit Standard:** Publication-Quality Asymptotics & Empirical Performance Review  
@@ -105,7 +105,7 @@ Execution time of `analyze_feature_drift` (KS-Test + Wasserstein + PSI per featu
 
 | Feature Count ($F$) | Peak Allocated Memory (KB) | Peak Allocated Memory (MB) | Incremental Memory per Feature |
 |:---:|:---:|:---:|:---:|
-| **$F = 1$** | $7,815.50 \text{ KB}$ | $7.632 \text{ MB}$ | — |
+| **$F = 1$** | $7,815.50 \text{ KB}$ | $7.632 \text{ MB}$ | - |
 | **$F = 10$** | $7,820.92 \text{ KB}$ | $7.638 \text{ MB}$ | $0.60 \text{ KB}$ / feature |
 | **$F = 50$** | $7,834.63 \text{ KB}$ | $7.651 \text{ MB}$ | $0.39 \text{ KB}$ / feature |
 | **$F = 100$** | $7,845.07 \text{ KB}$ | $7.661 \text{ MB}$ | $0.30 \text{ KB}$ / feature |

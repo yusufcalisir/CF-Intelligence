@@ -211,7 +211,7 @@
       "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
       "raw_artifact": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
       "runner_script": "benchmarks/runners/run_graph_benchmark.py --dataset-mode real --epochs 15",
-      "notes": "Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph. PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 \u00b1 0.0482 PR-AUC and 0.8325 \u00b1 0.0078 ROC-AUC across seeds (42, 123, 456) under strict past-to-future temporal split (train 1-30, val 31-34, test 35-49) with validation-only checkpoint selection and validation-calibrated operating threshold. Architectural negative result preserved: Tabular MLP baseline (0.5778) outperforms GraphSAGE on out-of-time test set.",
+      "notes": "Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph. PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 ± 0.0482 PR-AUC and 0.8325 ± 0.0078 ROC-AUC across seeds (42, 123, 456) under strict past-to-future temporal split (train 1-30, val 31-34, test 35-49) with validation-only checkpoint selection and validation-calibrated operating threshold. Architectural negative result preserved: Tabular MLP baseline (0.5778) outperforms GraphSAGE on out-of-time test set.",
       "claim_type": "MEASURED"
     },
     {
@@ -229,7 +229,7 @@
       "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
       "raw_artifact": "experiments/credit_card/multi_seed_controlled_results.json",
       "runner_script": "experiments/credit_card/run_creditcard_benchmark.py",
-      "notes": "Under controlled optimization budget parity (10 dataset passes / ~35.6k optimizer steps across 3 seeds 42, 123, 456), Centralized and FedAvg showed similar observed mean performance across the three evaluated seeds (0.8219 \u00b1 0.0364 vs 0.8248 \u00b1 0.0417 PR-AUC; observed mean difference +0.0029; Seed 42: 0.7800 vs 0.7788). Legacy unequal-budget (2 epochs) centralized baseline achieved 0.7449 \u00b1 0.0385 (Seed 42: 0.7059). Unpopulated 0.0/0.5 template in benchmarks/results/raw/fraud_benchmark_credit_card.json is marked SUPERSEDED_PLACEHOLDER.",
+      "notes": "Under controlled optimization budget parity (10 dataset passes / ~35.6k optimizer steps across 3 seeds 42, 123, 456), Centralized and FedAvg showed similar observed mean performance across the three evaluated seeds (0.8219 ± 0.0364 vs 0.8248 ± 0.0417 PR-AUC; observed mean difference +0.0029; Seed 42: 0.7800 vs 0.7788). Legacy unequal-budget (2 epochs) centralized baseline achieved 0.7449 ± 0.0385 (Seed 42: 0.7059). Unpopulated 0.0/0.5 template in benchmarks/results/raw/fraud_benchmark_credit_card.json is marked SUPERSEDED_PLACEHOLDER.",
       "legacy_artifact": {
         "source": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
         "status": "SUPERSEDED_PLACEHOLDER -- unpopulated 0.0/0.5 template superseded by canonical controlled multi-seed benchmark"
@@ -251,7 +251,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine, accountant='prv') with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via PRVAccountant [Gopi et al. 2021]: epsilon=0.3497) yields PR-AUC 0.3465 \u00b1 0.1580 and ROC-AUC 0.8720 \u00b1 0.0551 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1), reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
+      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine, accountant='prv') with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via PRVAccountant [Gopi et al. 2021]: epsilon=0.3497) yields PR-AUC 0.3465 ± 0.1580 and ROC-AUC 0.8720 ± 0.0551 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1), reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
       "legacy_artifact": {
         "pr_auc": 0.1963,
         "source": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json (legacy commit f0705141 / 7e32f409)",
@@ -275,7 +275,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 \u00b1 0.0078 and ROC-AUC 0.9872 \u00b1 0.0050 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1).",
+      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 ± 0.0078 and ROC-AUC 0.9872 ± 0.0050 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1).",
       "legacy_artifact": {
         "pr_auc": 0.6272,
         "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype"
@@ -452,7 +452,7 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 543.0 \u00b1 23.6 successful 2xx req/s at C=50 across 3 independent repetitions (3,000 requests, 100% 2xx success, pooled p50=89.02ms, pooled p99=156.81ms). Following the complete pure-ASGI conversion of all middleware (active custom BaseHTTPMiddleware depth = 0), successful throughput across tiers: C=1: 134.9 \u00b1 2.4 req/s (pooled p50=7.12ms, p99=10.85ms); C=10: 452.8 \u00b1 14.0 req/s (pooled p50=20.48ms, p99=39.96ms); C=50: 543.0 \u00b1 23.6 req/s (pooled p50=89.02ms, p99=156.81ms); C=100: 520.8 \u00b1 37.6 req/s (pooled p50=178.50ms, p99=289.42ms); C=250: 431.9 \u00b1 29.6 req/s (pooled p50=474.97ms, p99=950.14ms); C=500: 401.7 \u00b1 26.7 req/s (pooled p50=1060.89ms, pooled p99=1760.77ms). Historical baselines: Pre-intervention (89.0 req/s peak) in latency_http_service_benchmark_pre_intervention.json; Post-APIVersion (233.7 req/s peak) in latency_http_service_benchmark_post_apiversion.json; Post-W3C (327.9 req/s peak) in latency_http_service_benchmark_post_w3c.json; Post-MTLS (369.0 req/s peak) in latency_http_service_benchmark.json; HTTPX measurements (191.0 req/s at C=10 collapsing to 41.6 req/s at C=500 due to client event-loop starvation) in latency_http_service_benchmark_httpx.json.",
+      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 543.0 ± 23.6 successful 2xx req/s at C=50 across 3 independent repetitions (3,000 requests, 100% 2xx success, pooled p50=89.02ms, pooled p99=156.81ms). Following the complete pure-ASGI conversion of all middleware (active custom BaseHTTPMiddleware depth = 0), successful throughput across tiers: C=1: 134.9 ± 2.4 req/s (pooled p50=7.12ms, p99=10.85ms); C=10: 452.8 ± 14.0 req/s (pooled p50=20.48ms, p99=39.96ms); C=50: 543.0 ± 23.6 req/s (pooled p50=89.02ms, p99=156.81ms); C=100: 520.8 ± 37.6 req/s (pooled p50=178.50ms, p99=289.42ms); C=250: 431.9 ± 29.6 req/s (pooled p50=474.97ms, p99=950.14ms); C=500: 401.7 ± 26.7 req/s (pooled p50=1060.89ms, pooled p99=1760.77ms). Historical baselines: Pre-intervention (89.0 req/s peak) in latency_http_service_benchmark_pre_intervention.json; Post-APIVersion (233.7 req/s peak) in latency_http_service_benchmark_post_apiversion.json; Post-W3C (327.9 req/s peak) in latency_http_service_benchmark_post_w3c.json; Post-MTLS (369.0 req/s peak) in latency_http_service_benchmark.json; HTTPX measurements (191.0 req/s at C=10 collapsing to 41.6 req/s at C=500 due to client event-loop starvation) in latency_http_service_benchmark_httpx.json.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
@@ -478,14 +478,14 @@
         "notes": "Post-MTLS pure-ASGI state (BaseHTTP depth 2) yielded 369.0 req/s peak at C=10 and 277.6 req/s at C=500."
       },
       "historical_httpx_artifact": {
-        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS \u2014 SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS - SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
         "historical_c10_throughput_rps": 191.0,
         "historical_c500_throughput_rps": 55.8,
         "reason": "HTTPX client-side event loop starvation under high concurrency suppressed client throughput to ~41-56 req/s while aiohttp achieved 118-141 req/s on the identical unchanged server."
       },
       "legacy_artifact": {
-        "status": "SUPERSEDED \u2014 RATE-LIMIT CONTAMINATED",
+        "status": "SUPERSEDED - RATE-LIMIT CONTAMINATED",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_superseded_v1.json",
         "legacy_throughput_rps": 72.9,
         "reason": "SlowAPI rate limiter (60 req/min) active during benchmark, mixing 2xx and 429 responses and counting wall-clock benchmark time without isolating 2xx population."
@@ -534,13 +534,13 @@
         "baseline_p99_ms": 10.13
       },
       "historical_httpx_artifact": {
-        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS \u2014 SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS - SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
         "historical_p50_ms": 10.77,
         "historical_p99_ms": 15.21
       },
       "legacy_artifact": {
-        "status": "SUPERSEDED \u2014 RATE-LIMIT CONTAMINATED",
+        "status": "SUPERSEDED - RATE-LIMIT CONTAMINATED",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_superseded_v1.json",
         "legacy_p50_ms": 2.6,
         "reason": "Single-client median of 2.60ms was dominated by SlowAPI 429 Too Many Requests responses rather than full inference pipeline execution."
@@ -624,7 +624,7 @@
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "5,195 Collected Tests Across Test Suites",
+      "dataset_scale": "6,970 Collected Tests Across Test Suites",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -634,7 +634,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "Automated test inventory comprises 5,195 uniquely collected tests across independent runner discovery: 4,370 backend pytests, 410 scientific verification tests across 21 modules, 11 Python SDK tests, 373 frontend vitest tests across 87 test files, and 31 smart contract tests. Core Python suites (4,780 collected tests [4,791 with SDK]: 4,370 backend + 410 verification) maintain 100% pass rate in CI.",
+      "notes": "Automated test inventory comprises 6,970 uniquely collected tests across independent runner discovery: 6,118 backend pytests, 410 scientific verification tests across 22 suites, 11 Python SDK tests, 400 frontend vitest tests across 91 test files, and 31 smart contract tests. Core Python suites (6,539 collected tests [6,550 with SDK]: 6,118 backend + 410 verification) maintain 100% pass rate in CI.",
       "claim_type": "MEASURED"
     },
     {
@@ -774,11 +774,30 @@
       "raw_artifact": "benchmarks/results/raw/byzantine_federated_canonical.json",
       "runner_script": "python benchmarks/runners/run_byzantine_federated_benchmark.py --canonical",
       "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
-      "seeds": [42, 123, 456],
+      "seeds": [
+        42,
+        123,
+        456
+      ],
       "per_seed_results": [
-        {"seed": 42, "pr_auc": 0.699227, "roc_auc": 0.982998, "retention_of_clean": 0.963971},
-        {"seed": 123, "pr_auc": 0.723040, "roc_auc": 0.970877, "retention_of_clean": 1.041121},
-        {"seed": 456, "pr_auc": 0.719899, "roc_auc": 0.974828, "retention_of_clean": 0.981035}
+        {
+          "seed": 42,
+          "pr_auc": 0.699227,
+          "roc_auc": 0.982998,
+          "retention_of_clean": 0.963971
+        },
+        {
+          "seed": 123,
+          "pr_auc": 0.72304,
+          "roc_auc": 0.970877,
+          "retention_of_clean": 1.041121
+        },
+        {
+          "seed": 456,
+          "pr_auc": 0.719899,
+          "roc_auc": 0.974828,
+          "retention_of_clean": 0.981035
+        }
       ],
       "attack_parameters": {
         "attack_type": "scaled_sign_inversion",
@@ -812,11 +831,30 @@
       "raw_artifact": "benchmarks/results/raw/byzantine_federated_canonical.json",
       "runner_script": "python benchmarks/runners/run_byzantine_federated_benchmark.py --canonical",
       "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
-      "seeds": [42, 123, 456],
+      "seeds": [
+        42,
+        123,
+        456
+      ],
       "per_seed_results": [
-        {"seed": 42, "pr_auc": 0.726572, "roc_auc": 0.980072, "retention_of_clean": 1.001670},
-        {"seed": 123, "pr_auc": 0.725066, "roc_auc": 0.975871, "retention_of_clean": 1.044039},
-        {"seed": 456, "pr_auc": 0.666740, "roc_auc": 0.972911, "retention_of_clean": 0.908593}
+        {
+          "seed": 42,
+          "pr_auc": 0.726572,
+          "roc_auc": 0.980072,
+          "retention_of_clean": 1.00167
+        },
+        {
+          "seed": 123,
+          "pr_auc": 0.725066,
+          "roc_auc": 0.975871,
+          "retention_of_clean": 1.044039
+        },
+        {
+          "seed": 456,
+          "pr_auc": 0.66674,
+          "roc_auc": 0.972911,
+          "retention_of_clean": 0.908593
+        }
       ],
       "attack_parameters": {
         "attack_type": "scaled_sign_inversion",
@@ -839,7 +877,7 @@
       "stated_value": 0.7189,
       "stated_unit": "PR-AUC",
       "empirical_measured_value": 0.718874,
-      "sample_sd": 0.017070,
+      "sample_sd": 0.01707,
       "mean_retention_ratio": 1.002334,
       "retention_sd": 0.051216,
       "centralized_baseline_value": null,
@@ -849,11 +887,30 @@
       "raw_artifact": "benchmarks/results/raw/byzantine_federated_canonical.json",
       "runner_script": "python benchmarks/runners/run_byzantine_federated_benchmark.py --canonical",
       "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
-      "seeds": [42, 123, 456],
+      "seeds": [
+        42,
+        123,
+        456
+      ],
       "per_seed_results": [
-        {"seed": 42, "pr_auc": 0.723322, "roc_auc": 0.983059, "retention_of_clean": 0.997189},
-        {"seed": 123, "pr_auc": 0.733280, "roc_auc": 0.984222, "retention_of_clean": 1.055866},
-        {"seed": 456, "pr_auc": 0.700021, "roc_auc": 0.977889, "retention_of_clean": 0.953946}
+        {
+          "seed": 42,
+          "pr_auc": 0.723322,
+          "roc_auc": 0.983059,
+          "retention_of_clean": 0.997189
+        },
+        {
+          "seed": 123,
+          "pr_auc": 0.73328,
+          "roc_auc": 0.984222,
+          "retention_of_clean": 1.055866
+        },
+        {
+          "seed": 456,
+          "pr_auc": 0.700021,
+          "roc_auc": 0.977889,
+          "retention_of_clean": 0.953946
+        }
       ],
       "attack_parameters": {
         "attack_type": "alie_omniscient",

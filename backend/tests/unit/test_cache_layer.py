@@ -1,4 +1,4 @@
-"""Unit and integration tests for Section 35.2 — Cache Layer & Graceful Degradation.
+"""Unit and integration tests for Section 35.2 - Cache Layer & Graceful Degradation.
 
 Tests:
   1. CacheService initialization & singleton instance.
@@ -43,10 +43,14 @@ async def test_cache_service_singleton(cache_service: CacheService) -> None:
 
 
 @pytest.mark.asyncio
-async def test_graceful_degradation_when_redis_unavailable(cache_service: CacheService) -> None:
+async def test_graceful_degradation_when_redis_unavailable(
+    cache_service: CacheService, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When Redis is unavailable or unconfigured, all methods must return None/default without raising exceptions."""
     # Force unavailable state
     CacheService._unavailable = True
+    CacheService._client = None
+    monkeypatch.setattr(CacheService, "client", property(lambda self: None))
 
     # Reads should return None
     assert await cache_service.get_alert("alert-123") is None
@@ -80,7 +84,9 @@ async def test_ttl_constants() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cache_miss_falls_back_to_db(cache_service: CacheService) -> None:
+async def test_cache_miss_falls_back_to_db(
+    cache_service: CacheService, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Mock Redis miss -> assert DB function is called -> assert result returned."""
     mock_db_func = AsyncMock(return_value={"id": "alert-999", "status": "new"})
 
@@ -90,6 +96,8 @@ async def test_cache_miss_falls_back_to_db(cache_service: CacheService) -> None:
 
     # Force cache miss
     CacheService._unavailable = True
+    CacheService._client = None
+    monkeypatch.setattr(CacheService, "client", property(lambda self: None))
 
     res = await get_alert_from_db(None, "alert-999")
     assert res == {"id": "alert-999", "status": "new"}

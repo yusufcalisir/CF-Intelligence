@@ -1,6 +1,6 @@
 """Production-grade FastAPI Request Tests: MODULE 01-B.5.
 
-Workstream: 01-B.5 — REST Sign-Off Authentication Token Propagation
+Workstream: 01-B.5 - REST Sign-Off Authentication Token Propagation
 Verifies:
 - API-SIGN-01: Valid authenticated ML engineer successfully signs off.
 - API-SIGN-02: Valid authenticated compliance officer successfully signs off.

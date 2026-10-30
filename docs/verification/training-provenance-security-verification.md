@@ -1,13 +1,13 @@
-# CF-Intelligence — Production Training Provenance Security Verification Report
+# CF-Intelligence - Production Training Provenance Security Verification Report
 
-**Project**: CF-Intelligence — Privacy-preserving cross-bank fraud detection using Federated Learning<br/>
+**Project**: CF-Intelligence - Privacy-preserving cross-bank fraud detection using Federated Learning<br/>
 **Repository**: https://github.com/yusufcalisir/CF-Intelligence<br/>
 **Verification Date**: 2026-10-11<br/>
 **Scope**: Production Training Provenance, Federated Worker Isolation, Aggregation Lineage, Receipt Authority Separation, and PostgreSQL Authorization Hardening.
 
 ---
 
-## Section A — Git and Runtime Identity
+## Section A - Git and Runtime Identity
 
 | Property | Value / Evidence |
 | :--- | :--- |
@@ -25,7 +25,7 @@
 
 ---
 
-## Section B — Root-Cause Remediation (Defects A–G)
+## Section B - Root-Cause Remediation (Defects A–G)
 
 | Defect | Original Vulnerable Function | Actual Fix | Production Enforcement Point | Negative Test | Observed Outcome | Source File |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -39,7 +39,7 @@
 
 ---
 
-## Section C — Trust-Boundary Architecture
+## Section C - Trust-Boundary Architecture
 
 ```mermaid
 flowchart TD
@@ -102,7 +102,7 @@ flowchart TD
 
 ---
 
-## Section D — J01–J14 Acceptance Matrix
+## Section D - J01–J14 Acceptance Matrix
 
 | Gate | Original Guarantee | Implementation Evidence | Adversarial Evidence | Integration Evidence | Deployment Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -123,7 +123,7 @@ flowchart TD
 
 ---
 
-## Section E — Individual J01–J14 Proofs
+## Section E - Individual J01–J14 Proofs
 
 ### J01: Authenticated Training Worker Workload Identity
 - **Requirement**: Training workers must authenticate using high-entropy workload tokens with per-bank identity.
@@ -228,7 +228,7 @@ flowchart TD
 
 ---
 
-## Section F — Direct Security Bypass Verification (LC-01 to LC-07)
+## Section F - Direct Security Bypass Verification (LC-01 to LC-07)
 
 | Scenario | Attempted Attack / Bypass | Enforcing Mechanism | Observed Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -242,7 +242,7 @@ flowchart TD
 
 ---
 
-## Section G — Bank Isolation and Workload Identity (BI-01 to BI-10)
+## Section G - Bank Isolation and Workload Identity (BI-01 to BI-10)
 
 | Scenario | Attack / Isolation Verification | Enforcing Mechanism | Observed Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -259,7 +259,7 @@ flowchart TD
 
 ---
 
-## Section H — Execution Accounting (AC-01 to AC-10)
+## Section H - Execution Accounting (AC-01 to AC-10)
 
 ### Canonical Accounting Semantics
 - **Canonical Sequential Epochs**: $E_{\text{canonical}} = \sum_{r=1}^{R} \max_{b \in B_r} (e_{r,b})$. In synchronous federated rounds, the global model progresses sequentially through each round by the maximum local epoch budget of participating workers.
@@ -281,7 +281,7 @@ flowchart TD
 
 ---
 
-## Section I — Aggregation Provenance (AG-01 to AG-12)
+## Section I - Aggregation Provenance (AG-01 to AG-12)
 
 | Scenario | Aggregation Lineage Condition | Enforcing Mechanism | Observed Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -300,7 +300,7 @@ flowchart TD
 
 ---
 
-## Section J — Cryptographic Receipt Signing and Verification (CR-01 to CR-10)
+## Section J - Cryptographic Receipt Signing and Verification (CR-01 to CR-10)
 
 | Scenario | Signing & Verification Condition | Enforcing Mechanism | Observed Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -317,7 +317,7 @@ flowchart TD
 
 ---
 
-## Section K — PostgreSQL Verification (DB-01 to DB-14)
+## Section K - PostgreSQL Verification (DB-01 to DB-14)
 
 | Scenario | Database Security Policy | Enforcing Mechanism | Observed Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -338,7 +338,7 @@ flowchart TD
 
 ---
 
-## Section L — Real End-to-End Training Trace
+## Section L - Real End-to-End Training Trace
 
 A genuine end-to-end federated training cycle was executed across independent processes:
 1. **Job Scheduling**: Job `job_genuine_trace_01` scheduled with expected rounds = 2, permitted workers = `["BANK_A", "BANK_B", "BANK_C"]`, architecture = `FraudDetectionNN`, schema = `v1.0`.
@@ -372,7 +372,7 @@ A genuine end-to-end federated training cycle was executed across independent pr
 
 ---
 
-## Section M — End-to-End Negative Adversarial Scenarios (E2E-NEG-01 to E2E-NEG-20)
+## Section M - End-to-End Negative Adversarial Scenarios (E2E-NEG-01 to E2E-NEG-20)
 
 | Scenario ID | Adversarial Test Scenario | Observed Error / Behavior | Final Authority State | Receipt & Registry Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -399,7 +399,7 @@ A genuine end-to-end federated training cycle was executed across independent pr
 
 ---
 
-## Section N — Test Execution Ledger
+## Section N - Test Execution Ledger
 
 | Command ID | Exact Command Executed | Working Directory | Collected | Passed | Failed | Skipped | Exit Code | Evidence Path |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -411,7 +411,7 @@ A genuine end-to-end federated training cycle was executed across independent pr
 
 ---
 
-## Section O — Test Authenticity Review
+## Section O - Test Authenticity Review
 
 Every test in this verification suite strictly adheres to the repository rule `AGENTS.md` (Runtime Truth, No Fabrication):
 - **Real PostgreSQL**: Evaluated against genuine embedded PostgreSQL 18.1 (`pg0.Pg0()`) communicating over native PostgreSQL client binary protocol via `psycopg 3.3.6`. Zero in-memory dictionary or mock DB substitutions.
@@ -421,7 +421,7 @@ Every test in this verification suite strictly adheres to the repository rule `A
 
 ---
 
-## Section P — Regression Protection
+## Section P - Regression Protection
 
 All fourteen original acceptance gates (J01 through J14) remain 100% verified.
 - The 51 original tests across `test_trusted_job_execution.py`, `test_training_execution_observations.py`, `test_training_job_concurrency.py`, `test_federated_training_provenance_integration.py`, `test_failure_injection_fl.py`, and `test_postgres_authority.py` were re-run and passed without error.
@@ -429,7 +429,7 @@ All fourteen original acceptance gates (J01 through J14) remain 100% verified.
 
 ---
 
-## Section Q — Source Evidence Index
+## Section Q - Source Evidence Index
 
 | Claim | Final Source File | Exact Test Function | Runtime Evidence |
 | :--- | :--- | :--- | :--- |
@@ -443,7 +443,7 @@ All fourteen original acceptance gates (J01 through J14) remain 100% verified.
 
 ---
 
-## Section R — Git Verification
+## Section R - Git Verification
 
 ```
 $ git log origin/main..HEAD --format="%h %s"
@@ -474,8 +474,8 @@ $ git diff --check HEAD~4 HEAD
 
 ---
 
-## Section S — Final Decision
+## Section S - Final Decision
 
 ```text
-TRAINING PROVENANCE SECURITY HARDENING COMPLETE — ALL J01–J14 GUARANTEES VERIFIED
+TRAINING PROVENANCE SECURITY HARDENING COMPLETE - ALL J01–J14 GUARANTEES VERIFIED
 ```

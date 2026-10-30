@@ -1,4 +1,4 @@
-"""Bank Onboarding Service — Phase 36.1.
+"""Bank Onboarding Service.
 
 Manages automated registration, mTLS certificate issuance, database schema
 provisioning, Vault transit key mapping, and connector configuration generation

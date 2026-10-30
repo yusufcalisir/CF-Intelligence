@@ -1,4 +1,4 @@
-# Security & Threat Model Review — Multi-Cloud Terraform IaC
+# Security & Threat Model Review - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

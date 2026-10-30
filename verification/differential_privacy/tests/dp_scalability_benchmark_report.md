@@ -1,4 +1,4 @@
-# Scalability Benchmark Report — Differential Privacy Subsystem
+# Scalability Benchmark Report - Differential Privacy Subsystem
 
 ## Executive Summary
 

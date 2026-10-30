@@ -1,4 +1,4 @@
-"""Training Execution Authority Tables — Phase 45.
+"""Training Execution Authority Tables.
 
 Creates the 6 core persistence tables for the Training Job Authority:
 - cfi_scheduled_jobs

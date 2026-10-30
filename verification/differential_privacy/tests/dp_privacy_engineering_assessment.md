@@ -1,4 +1,4 @@
-﻿# Privacy Engineering & Threat Mitigation Assessment — Differential Privacy Subsystem
+﻿# Privacy Engineering & Threat Mitigation Assessment - Differential Privacy Subsystem
 
 This document provides a comprehensive privacy engineering assessment of the Differential Privacy (DP), PETs, and Privacy Audit subsystem within the federated fraud detection platform.
 

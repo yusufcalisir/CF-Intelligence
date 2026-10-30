@@ -47,7 +47,7 @@ def run_reference_verification() -> dict[str, Any]:
         assert decision == expected, f"Expected {expected} for {role}/{act}, got {decision}"
         passed += 1
 
-    report_md = f"""# Pure-Python Reference Verification Report — Zero Trust PKI & ABAC
+    report_md = f"""# Pure-Python Reference Verification Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI, mTLS & ABAC Infrastructure  
 **Date:** August 2026  

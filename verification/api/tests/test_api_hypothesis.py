@@ -214,7 +214,7 @@ def test_property_case_idempotency_key_invariant(title, key):
 )
 def test_property_abac_tenant_isolation_invariant(user_bank, resource_bank):
     """INVARIANT 6: Cross-tenant resource access (user_bank != resource_bank) is strictly denied (allowed: False)."""
-    # ABACEvalRequest uses flat fields — not a nested user/resource dict.
+    # ABACEvalRequest uses flat fields - not a nested user/resource dict.
     abac_payload = {
         "user_username": "test_user",
         "user_bank_id": user_bank,

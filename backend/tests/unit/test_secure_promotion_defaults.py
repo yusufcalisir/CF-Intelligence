@@ -1,6 +1,6 @@
 """Adversarial and Security Verification Suite: MODULE 01-B.4.
 
-Workstream: 01-B.4 — Secure Promotion Defaults & Orphan Artifact Cleanup
+Workstream: 01-B.4 - Secure Promotion Defaults & Orphan Artifact Cleanup
 Verifies:
 - SAVE-01: save_version() without explicit promotion -> inactive candidate.
 - SAVE-02: Verified federated training registers an inactive candidate.

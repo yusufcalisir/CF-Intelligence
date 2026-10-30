@@ -116,7 +116,7 @@ To maintain engineering integrity, the following limitations are explicitly docu
 
 1. **No Defense Against Poisoning by Default**: Standard Federated Learning trusts all client updates. Without Byzantine defenses (Krum, Bulyan), a single compromised bank node can destroy model accuracy or install fraud evasion backdoors.
 2. **Topology & Intersection Leakage in Graph Intelligence**: When banks perform Private Set Intersection (PSI) on hashed customer identifiers (e.g., shared card numbers or mule phone numbers), the **cardinality of the intersection** ($\lvert A \cap B \rvert$) is revealed to both parties.
-3. **Membership Inference Residual Risk**: Empirically measured via Yeom et al. (2018) loss-threshold oracle (`mia_auditor.py`). Unprotected models: ASR = 0.949, advantage = 0.449. At $\sigma = 2.0$ ($\epsilon \approx 0.87$), DP-SGD reduces advantage to 0.039 — a **91% mitigation** (exceeds $\ge 50\%$ threshold). See `experiments/privacy/mia_results.json`.
+3. **Membership Inference Residual Risk**: Empirically measured via Yeom et al. (2018) loss-threshold oracle (`mia_auditor.py`). Unprotected models: ASR = 0.949, advantage = 0.449. At $\sigma = 2.0$ ($\epsilon \approx 0.87$), DP-SGD reduces advantage to 0.039 - a **91% mitigation** (exceeds $\ge 50\%$ threshold). See `experiments/privacy/mia_results.json`.
 4. **Metadata Leakage**: Packet timing, update payload sizes, and communication timestamps are visible to network observers unless routed over Tor/I2P or padded with dummy traffic.
 
 ---
@@ -141,7 +141,7 @@ Formal empirical privacy audits are conducted in `backend/app/infrastructure/sec
 | Moderate DP | 1.0 | 1.7675 | 0.9100 | 0.4100 | PARTIAL |
 | Strong DP | 2.0 | 0.8714 | 0.5390 | 0.0390 | **MITIGATED** |
 
-At $\sigma = 2.0$, the adversarial advantage drops from 0.449 to 0.039 — a **91% reduction**, exceeding the $\ge 50\%$ mitigation threshold.
+At $\sigma = 2.0$, the adversarial advantage drops from 0.449 to 0.039 - a **91% reduction**, exceeding the $\ge 50\%$ mitigation threshold.
 
 ### 7.2 Deep Leakage from Gradients (Zhu 2019 Cosine-Similarity Proxy)
 
@@ -155,13 +155,13 @@ DP noise destroys gradient directional alignment, reducing DLG reconstruction vi
 
 ### 7.3 Verification Test Coverage
 
-Scientific verification: `verification/differential_privacy/tests/test_mia_defense.py` — **29 passing tests** covering RDP epsilon bounds, MIA loss-threshold oracle, DLG cosine-similarity proxy, full audit pipeline, and edge case validation.
+Scientific verification: `verification/differential_privacy/tests/test_mia_defense.py` - **29 passing tests** covering RDP epsilon bounds, MIA loss-threshold oracle, DLG cosine-similarity proxy, full audit pipeline, and edge case validation.
 
 ---
 
-## 8. Authentic Two-Bank Private Set Intersection (DH-PSI) & Institutional Process Separation
+## 8. Authentic Multi-Bank Private Set Intersection (OpenMined PSI 2.0.6 & DH-PSI) & Institutional Process Separation
 
-In Milestone 4, CF-Intelligence establishes an authentic two-bank private matching protocol implementing 2048-bit MODP Diffie-Hellman Private Set Intersection (DH-PSI) across independently isolated institutional worker nodes.
+In the production multi-bank consortium architecture, CF-Intelligence establishes authentic private matching protocols across independently isolated institutional worker nodes using OpenMined PSI 2.0.6 (Curve25519 ECDH) with Bloom filters and commutative 2048-bit MODP Diffie-Hellman PSI.
 
 ### 8.1 Cryptographic Mathematical Formulation
 

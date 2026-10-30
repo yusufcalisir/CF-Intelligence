@@ -5,8 +5,8 @@ round-by-round progress updates as JSON messages.
 
 Dual-Path In-Process Event Dispatcher (Phase 70)
 -------------------------------------------------
-Primary path  — Redis pub/sub:  used when Redis is available (shared connection pool).
-Fallback path — In-process bus: used when Redis is absent (e.g. HF Spaces).
+Primary path  - Redis pub/sub:  used when Redis is available (shared connection pool).
+Fallback path - In-process bus: used when Redis is absent (e.g. HF Spaces).
 
 In the fallback path the handler:
   1. Replays history from the manager's in-process ring-buffer.
@@ -159,26 +159,26 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             await asyncio.wait_for(redis_client.ping(), timeout=2.5)
             redis_available = True
             logger.debug(
-                "Redis available for simulation %s via %s — using primary path",
+                "Redis available for simulation %s via %s - using primary path",
                 simulation_id,
                 redact_redis_url(redis_url),
             )
         except TimeoutError:
             logger.info(
-                "Redis CONNECT_TIMEOUT for simulation %s — switching to in-process event bus",
+                "Redis CONNECT_TIMEOUT for simulation %s - switching to in-process event bus",
                 simulation_id,
             )
             redis_client = None
         except Exception as exc:
             logger.info(
-                "Redis connection failed for simulation %s (%s) — switching to in-process event bus",
+                "Redis connection failed for simulation %s (%s) - switching to in-process event bus",
                 simulation_id,
                 type(exc).__name__,
             )
             redis_client = None
     else:
         logger.debug(
-            "Redis not configured for simulation %s — using in-process event bus",
+            "Redis not configured for simulation %s - using in-process event bus",
             simulation_id,
         )
 
@@ -192,7 +192,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
                     return
                 # Genuine Redis transport failure while socket is still alive
                 logger.warning(
-                    "Redis streaming failed for simulation %s (%s) — activating in-process fallback",
+                    "Redis streaming failed for simulation %s (%s) - activating in-process fallback",
                     simulation_id,
                     type(stream_exc).__name__,
                 )
@@ -256,13 +256,13 @@ async def _stream_via_redis(
         )
     except TimeoutError:
         logger.warning(
-            "Redis REPLAY_READ_TIMEOUT reading %s (>2.0s) — falling back to worker-local buffer",
+            "Redis REPLAY_READ_TIMEOUT reading %s (>2.0s) - falling back to worker-local buffer",
             events_key,
         )
         past_events = training_ws_manager.get_room_history(room_name) if room_name else []
     except Exception as exc:
         logger.warning(
-            "Redis replay read failed for %s (%s) — falling back to worker-local buffer",
+            "Redis replay read failed for %s (%s) - falling back to worker-local buffer",
             events_key,
             type(exc).__name__,
         )
@@ -340,7 +340,7 @@ async def _stream_via_redis(
                     timeout=0.5,
                 )
             except TimeoutError:
-                # Normal idle polling timeout — no message currently available
+                # Normal idle polling timeout - no message currently available
                 message = None
             except Exception as read_exc:
                 logger.warning(

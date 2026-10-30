@@ -1,4 +1,4 @@
-# Scalability & Rendering Benchmark Report — Multi-Cloud Terraform IaC
+# Scalability & Rendering Benchmark Report - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

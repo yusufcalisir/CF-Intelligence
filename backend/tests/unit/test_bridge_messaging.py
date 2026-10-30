@@ -3,7 +3,7 @@
 Validates:
 - Encrypted ticket creation with Curve25519 ECDH + AES-256-GCM.
 - SHA-256 evidence attachment and verification.
-- Ticket state machine — valid transitions and rejection of invalid ones.
+- Ticket state machine - valid transitions and rejection of invalid ones.
 - Immutable SHA-256 audit chain integrity (compute + verify).
 - FININT bridge API endpoints (FastAPI TestClient).
 - Metrics aggregation.
@@ -54,7 +54,7 @@ def keypair() -> tuple[str, str]:
 def sample_payload() -> bytes:
     return json.dumps({
         "subject_hash": hashlib.sha256(b"account-XYZ").hexdigest(),
-        "reason": "Suspected mule account — rapid pass-through velocity detected.",
+        "reason": "Suspected mule account - rapid pass-through velocity detected.",
         "amount_eur": 49_750,
         "reference": "TXN-2026-09-22-001",
     }).encode("utf-8")

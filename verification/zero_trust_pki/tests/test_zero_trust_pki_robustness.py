@@ -53,7 +53,7 @@ def test_robustness_abac_cross_tenant_access_denied():
 
 
 def generate_robustness_report():
-    report_md = """# Adversarial Robustness Report — Zero Trust PKI & ABAC
+    report_md = """# Adversarial Robustness Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

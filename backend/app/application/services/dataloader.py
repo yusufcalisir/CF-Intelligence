@@ -177,9 +177,9 @@ def compute_file_sha256(file_path: Path | str) -> str:
 # ===========================================================================
 
 # Real dataset layout:
-#   elliptic_txs_features.csv  — 166 feature columns (f1…f166) + txId
-#   elliptic_txs_classes.csv   — txId, class (1=illicit, 2=licit, unknown)
-#   elliptic_txs_edgelist.csv  — txId1, txId2
+#   elliptic_txs_features.csv  - 166 feature columns (f1…f166) + txId
+#   elliptic_txs_classes.csv   - txId, class (1=illicit, 2=licit, unknown)
+#   elliptic_txs_edgelist.csv  - txId1, txId2
 
 ELLIPTIC_FEATURE_DIM = 166
 ELLIPTIC_ILLICIT_RATIO = 0.021  # ~2% in the real dataset
@@ -260,23 +260,23 @@ def load_elliptic(
     Returns
     -------
     dict with keys:
-        ``X``               : np.ndarray (N, 166) — node feature matrix (col 0: timestep, cols 1..165: features)
-        ``y``               : np.ndarray (N,)     — node labels (1=illicit, 0=licit, -1=unknown if include_unknown)
-        ``edges``           : list[tuple[int,int]] — directed edge list (src, dst)
-        ``edge_index``      : np.ndarray (2, E)   — PyG-compatible 2xE edge index array
-        ``adjacency_lists`` : list[list[int]]     — per-node neighbor lists for message passing
-        ``timesteps``       : np.ndarray (N,)     — discrete timestep per transaction (1..49)
-        ``tx_ids``          : np.ndarray (N,)     — original transaction IDs
-        ``tx_to_idx``       : dict[str, int]      — map from transaction ID to node index
-        ``idx_to_tx``       : dict[int, str]      — map from node index to transaction ID
-        ``source``          : str                 — "real_parquet" | "real_csv"
-        ``provenance``      : str                 — "EMPIRICAL_EXTERNAL_DATA"
-        ``artifact_origin`` : str                 — "external_physical_file"
-        ``scientific_origin``: str                — "empirical"
-        ``is_synthetic``    : bool                — False
-        ``fraud_ratio``     : float               — ratio of illicit nodes among labeled nodes
-        ``to_pyg_data``     : callable            — exports graph to PyTorch Geometric Data object or dict
-        ``to_networkx``     : callable            — exports graph to NetworkX DiGraph
+        ``X``               : np.ndarray (N, 166) - node feature matrix (col 0: timestep, cols 1..165: features)
+        ``y``               : np.ndarray (N,)     - node labels (1=illicit, 0=licit, -1=unknown if include_unknown)
+        ``edges``           : list[tuple[int,int]] - directed edge list (src, dst)
+        ``edge_index``      : np.ndarray (2, E)   - PyG-compatible 2xE edge index array
+        ``adjacency_lists`` : list[list[int]]     - per-node neighbor lists for message passing
+        ``timesteps``       : np.ndarray (N,)     - discrete timestep per transaction (1..49)
+        ``tx_ids``          : np.ndarray (N,)     - original transaction IDs
+        ``tx_to_idx``       : dict[str, int]      - map from transaction ID to node index
+        ``idx_to_tx``       : dict[int, str]      - map from node index to transaction ID
+        ``source``          : str                 - "real_parquet" | "real_csv"
+        ``provenance``      : str                 - "EMPIRICAL_EXTERNAL_DATA"
+        ``artifact_origin`` : str                 - "external_physical_file"
+        ``scientific_origin``: str                - "empirical"
+        ``is_synthetic``    : bool                - False
+        ``fraud_ratio``     : float               - ratio of illicit nodes among labeled nodes
+        ``to_pyg_data``     : callable            - exports graph to PyTorch Geometric Data object or dict
+        ``to_networkx``     : callable            - exports graph to NetworkX DiGraph
     """
     target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else (kwargs.get("n_samples") or kwargs.get("n_mock_nodes"))))
     root = resolve_dataset_dir("elliptic", path)
@@ -490,11 +490,11 @@ def load_elliptic(
 # ===========================================================================
 
 # Canonical IBM AMLSim simulator layout:
-#   transactions.csv — TX_ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, TX_TYPE,
+#   transactions.csv - TX_ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, TX_TYPE,
 #                      TX_AMOUNT, TIMESTAMP, IS_FRAUD, ALERT_ID
-#   accounts.csv     — ACCOUNT_ID, CUSTOMER_ID, INIT_BALANCE, COUNTRY, ACCOUNT_TYPE,
+#   accounts.csv     - ACCOUNT_ID, CUSTOMER_ID, INIT_BALANCE, COUNTRY, ACCOUNT_TYPE,
 #                      IS_FRAUD, TX_BEHAVIOR_ID
-#   alerts.csv       — ALERT_ID, ALERT_TYPE (fan_in, cycle, fan_out), IS_FRAUD,
+#   alerts.csv       - ALERT_ID, ALERT_TYPE (fan_in, cycle, fan_out), IS_FRAUD,
 #                      TX_ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, TX_TYPE, TX_AMOUNT, TIMESTAMP
 
 AMLSIM_FEATURE_COLS = [
@@ -731,19 +731,19 @@ def load_amlsim(
     Returns
     -------
     dict with keys:
-        ``X``               : np.ndarray (N, 6) — transaction feature matrix
-        ``y``               : np.ndarray (N,)   — binary label (1=SAR / fraud, 0=legit)
-        ``feature_names``   : list[str]         — column names of X
-        ``edges``           : list[tuple[int, int]] — graph edge pairs
-        ``edge_index``      : np.ndarray (2, E) — PyTorch Geometric compatible edge index
-        ``source``          : str               — 'real_parquet' or 'real_csv'
-        ``provenance``      : str               — 'PUBLIC_SIMULATED_DATASET'
-        ``artifact_origin`` : str               — 'external_physical_file'
-        ``scientific_origin``: str              — 'simulated'
-        ``is_synthetic``    : bool              — False
-        ``fraud_ratio``     : float             — fraud class prevalence
-        ``to_pyg_data``     : Callable          — export to PyTorch Geometric Data
-        ``to_networkx``     : Callable          — export to NetworkX DiGraph
+        ``X``               : np.ndarray (N, 6) - transaction feature matrix
+        ``y``               : np.ndarray (N,)   - binary label (1=SAR / fraud, 0=legit)
+        ``feature_names``   : list[str]         - column names of X
+        ``edges``           : list[tuple[int, int]] - graph edge pairs
+        ``edge_index``      : np.ndarray (2, E) - PyTorch Geometric compatible edge index
+        ``source``          : str               - 'real_parquet' or 'real_csv'
+        ``provenance``      : str               - 'PUBLIC_SIMULATED_DATASET'
+        ``artifact_origin`` : str               - 'external_physical_file'
+        ``scientific_origin``: str              - 'simulated'
+        ``is_synthetic``    : bool              - False
+        ``fraud_ratio``     : float             - fraud class prevalence
+        ``to_pyg_data``     : Callable          - export to PyTorch Geometric Data
+        ``to_networkx``     : Callable          - export to NetworkX DiGraph
     """
     if all_rows:
         target_nrows = None
@@ -911,16 +911,16 @@ def load_paysim(
     Returns
     -------
     dict with keys:
-        ``X``               : np.ndarray (N, 13) — transaction feature matrix
-        ``y``               : np.ndarray (N,)    — binary label (1=fraud, 0=legit)
-        ``feature_names``   : list[str]          — column names of X
-        ``source``          : str                — 'real_parquet' or 'real_csv'
-        ``provenance``      : str                — 'PUBLIC_SIMULATED_DATASET'
-        ``artifact_origin`` : str                — 'external_physical_file'
-        ``scientific_origin``: str               — 'simulated'
-        ``is_synthetic``    : bool               — False
-        ``fraud_ratio``     : float              — fraud class prevalence
-        ``steps``           : np.ndarray | None  — simulation step / timestep
+        ``X``               : np.ndarray (N, 13) - transaction feature matrix
+        ``y``               : np.ndarray (N,)    - binary label (1=fraud, 0=legit)
+        ``feature_names``   : list[str]          - column names of X
+        ``source``          : str                - 'real_parquet' or 'real_csv'
+        ``provenance``      : str                - 'PUBLIC_SIMULATED_DATASET'
+        ``artifact_origin`` : str                - 'external_physical_file'
+        ``scientific_origin``: str               - 'simulated'
+        ``is_synthetic``    : bool               - False
+        ``fraud_ratio``     : float              - fraud class prevalence
+        ``steps``           : np.ndarray | None  - simulation step / timestep
     """
     if all_rows:
         target_nrows = None
@@ -1000,10 +1000,10 @@ def load_paysim(
 # ===========================================================================
 
 # Real IEEE-CIS layout:
-#   train_transaction.csv — TransactionID, isFraud, TransactionDT, TransactionAmt,
+#   train_transaction.csv - TransactionID, isFraud, TransactionDT, TransactionAmt,
 #                          ProductCD, card1-card6, addr1-addr2, dist1-dist2,
 #                          P_emaildomain, R_emaildomain, C1-C14, D1-D15, M1-M9, V1-V339
-#   train_identity.csv    — TransactionID, id_01-id_38, DeviceType, DeviceInfo
+#   train_identity.csv    - TransactionID, id_01-id_38, DeviceType, DeviceInfo
 
 IEEE_CIS_FEATURE_DIM = 40  # Curated top numerical/engineered features
 IEEE_CIS_REAL_FRAUD_RATIO = 0.035  # ~3.5% in real IEEE-CIS
@@ -1596,8 +1596,8 @@ def partition_dataset_non_iid(
 # ===========================================================================
 
 # Canonical SynthAML layout:
-#   synthetic_alerts.csv       — ALERT_ID, ACCOUNT_ID, DATE, TIMESTAMP, OUTCOME
-#   synthetic_transactions.csv — TRANSACTION_ID, ALERT_ID, ACCOUNT_ID, TIMESTAMP,
+#   synthetic_alerts.csv       - ALERT_ID, ACCOUNT_ID, DATE, TIMESTAMP, OUTCOME
+#   synthetic_transactions.csv - TRANSACTION_ID, ALERT_ID, ACCOUNT_ID, TIMESTAMP,
 #                                DATE, ENTRY, TYPE, SIZE, AMOUNT_DKK
 
 SYNTHAML_FEATURE_COLS = [

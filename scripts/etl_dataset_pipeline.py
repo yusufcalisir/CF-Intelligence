@@ -108,7 +108,7 @@ def main() -> None:
         X = processed[feature_names].fillna(0).values.astype(np.float32)
         y = processed[label_col].values.astype(int)
     else:
-        logger.info("No raw input file specified — loading dataset via dataloader")
+        logger.info("No raw input file specified - loading dataset via dataloader")
         ds = load_dataset(
             args.dataset,
             n_mock_txns=args.max_rows or (6000 if args.dataset != "elliptic" else 2000),

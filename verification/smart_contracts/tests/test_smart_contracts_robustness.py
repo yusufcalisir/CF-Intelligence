@@ -85,7 +85,7 @@ def test_robustness_unallocated_participant_claim():
 
 
 def generate_robustness_report():
-    report_md = """# Adversarial Robustness & Vulnerability Report — Smart Contracts Subsystem
+    report_md = """# Adversarial Robustness & Vulnerability Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

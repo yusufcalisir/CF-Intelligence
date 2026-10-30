@@ -1,4 +1,4 @@
-# Reliability & Production Engineering Assessment Report — Federation Coordinator Subsystem
+# Reliability & Production Engineering Assessment Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`, `client.py`, `region_failover.py`  
 **Evaluation Date:** 2026-08-01  
@@ -88,4 +88,4 @@ The coordinator exhibits **strong security logging, mTLS channel recycling, and 
 
 ---
 
-*End of Reliability & Production Engineering Assessment Report — Federation Coordinator Subsystem*
+*End of Reliability & Production Engineering Assessment Report - Federation Coordinator Subsystem*

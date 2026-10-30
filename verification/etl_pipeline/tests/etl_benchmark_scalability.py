@@ -60,7 +60,7 @@ def run_scalability_benchmark() -> dict[str, Any]:
             "throughput_samples_per_sec": int(throughput_samples_per_sec),
         })
 
-    report_md = f"""# Scalability & Throughput Benchmark Report — Real-World Fraud ETL Pipeline
+    report_md = f"""# Scalability & Throughput Benchmark Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

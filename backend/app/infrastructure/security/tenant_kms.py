@@ -1,5 +1,5 @@
 # ruff: noqa: S106
-"""Per-Tenant Encryption Key Management & Cryptographic Isolation — Section 40.1.
+"""Per-Tenant Encryption Key Management & Cryptographic Isolation - Section 40.1.
 
 Implements multi-version envelope encryption, automated key rotation,
 live re-encryption (rewrapping), and retired key invalidation/revocation lifecycle.

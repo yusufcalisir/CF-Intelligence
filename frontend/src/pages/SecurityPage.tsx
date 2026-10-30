@@ -754,7 +754,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                    <span>🛡️ Vault PKI Root CA — PKCS#11 Hardware HSM Interface</span>
+                    <span>🛡️ Vault PKI Root CA - PKCS#11 Hardware HSM Interface</span>
                   </h3>
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
@@ -808,7 +808,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 border border-purple-500/30 bg-purple-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                    <span>⚡ On-Chain Governance — Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
+                    <span>⚡ On-Chain Governance - Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
                   </h3>
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
                     2/3 THRESHOLD GOVERNANCE
@@ -892,7 +892,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
-                    🔗 X25519 Key Exchange Topology — Round #{secaggRound}
+                    🔗 X25519 Key Exchange Topology - Round #{secaggRound}
                   </h3>
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -940,7 +940,7 @@ export default function SecurityPage() {
                         onClick={() => toggleDropout(node.id)}
                         className="cursor-pointer group"
                       >
-                        <title>{`${node.label} (${node.broadcast ? 'Active' : 'Dropped'}) — Click to toggle dropout`}</title>
+                        <title>{`${node.label} (${node.broadcast ? 'Active' : 'Dropped'}) - Click to toggle dropout`}</title>
                         {/* Node circle */}
                         <circle
                           cx="40" cy="40" r="32"
@@ -976,7 +976,7 @@ export default function SecurityPage() {
                 {/* Protocol note */}
                 <p className="text-[10px] text-[var(--color-text-muted)] leading-relaxed">
                   Dashed edges represent pairwise HKDF-SHA256 channels derived from X25519 ECDH.
-                  The coordinator is a stateless relay — it stores only authenticated public key bundles
+                  The coordinator is a stateless relay - it stores only authenticated public key bundles
                   and never computes shared secrets or holds plaintext model weights.
                 </p>
               </div>
@@ -1033,7 +1033,7 @@ export default function SecurityPage() {
                       { label: 'Threshold Scheme', value: `Shamir (${shamirThreshold}, 4) Galois Polynomial` },
                       { label: 'Authentication',   value: 'HMAC-SHA256 over (bank_id ∥ round_id ∥ pk)' },
                       { label: 'Zero-Sum Proof',   value: 'Σ y_u ≡ Σ w_u (mod 2^32)' },
-                      { label: 'Server Knowledge', value: 'None — pure relay, ε=0 information' },
+                      { label: 'Server Knowledge', value: 'None - pure relay, ε=0 information' },
                       { label: 'Protocol Ver.',    value: '2.0.0' },
                     ].map((item) => (
                       <div key={item.label} className="flex justify-between gap-2 p-2 rounded bg-[var(--color-surface-alt)]">

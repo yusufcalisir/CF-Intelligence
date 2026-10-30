@@ -6,7 +6,7 @@ This directory houses the unified operational CLI, benchmarking harnesses, secur
 
 ## 1. Scripts Taxonomy & Directory Index
 
-The 37 operational, benchmarking, and verification scripts are organized into five primary engineering domains:
+The 40 operational, benchmarking, and verification scripts are organized into five primary engineering domains:
 
 ```text
 scripts/
@@ -44,12 +44,15 @@ scripts/
 │
 ├── [4. Security, Governance & Regulatory Compliance]
 │   ├── generate_secrets.py              # Cryptographically secure 256-bit secret generator for .env
+│   ├── generate_consortium_deployment_secrets.py # Multi-bank consortium deployment secrets & mTLS certs generator
 │   ├── generate_sbom.py                 # Automated CycloneDX 1.5 & SPDX JSON SBOM generator with pip-audit
 │   ├── export_compliance_report.py      # EU AI Act & Article 13/14 compliance report generator
 │   ├── init_vault_pki.py                # HashiCorp Vault mTLS intermediate CA & certificate provisioning
 │   └── setup_cloudflare_waf.py          # Cloudflare WAF perimeter rules, rate limits & TLS 1.3 setup
 │
 └── [5. Deployment, Scientific Provenance & Verification]
+    ├── bootstrap_consortium_deployment.py # Automated consortium 3-bank deployment bootstrapper & verifier
+    ├── verify_full_test_baseline.ps1    # Root-level PowerShell script executing the full multi-tier test baseline
     ├── verify_benchmark_evidence.py     # Master scientific evidence provenance & mathematical reconciliation CLI
     ├── verify_b1_reconstruction.py      # Independent Class B1 HTTP latency percentile & sample math verifier
     ├── verify_reproducibility.py        # 38-Item platform reproducibility & empirical parity sweep

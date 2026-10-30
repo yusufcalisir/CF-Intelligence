@@ -1,4 +1,4 @@
-# Robustness Testing Report — Explainability (XAI) Subsystem
+# Robustness Testing Report - Explainability (XAI) Subsystem
 
 **Module:** `explainability_service.py`, `realtime_explainer.py`  
 **Test Suite:** `scratch/test_explainability_robustness.py`  
@@ -42,7 +42,7 @@ Fourteen boundary-injection robustness tests were executed against the `Explaina
 | GEX3a | +Inf transaction amount | **PASS** | Clamps `min(1.0, inf / 10000.0) = 1.0` correctly |
 | GEX3b | -Inf alert risk score | ❌ **FAIL (BUG-EX-01)** | `OverflowError` during ASCII progress bar formatting |
 
-**BUG-EX-01 — OverflowError on Negative Infinity Risk Score**
+**BUG-EX-01 - OverflowError on Negative Infinity Risk Score**
 
 ```python
 # Location: explainability_service.py L168
@@ -82,7 +82,7 @@ bar_len = int(signal.normalized_score * 20)
 |------|----------|--------|-------------|
 | GEX7 | Non-numeric string in `transaction_amount` | ❌ **FAIL (BUG-EX-02)** | `ValueError: could not convert string to float: 'invalid_string_1000'` |
 
-**BUG-EX-02 — ValueError on Non-Numeric String Feature**
+**BUG-EX-02 - ValueError on Non-Numeric String Feature**
 
 ```python
 # Location: explainability_service.py L247
@@ -154,4 +154,4 @@ elif name == "transaction_amount":
 
 ---
 
-*End of Robustness Testing Report — Explainability (XAI) Subsystem*
+*End of Robustness Testing Report - Explainability (XAI) Subsystem*

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-%E2%89%A50.115-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%E2%89%A52.4-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Tests Collected](https://img.shields.io/badge/tests-6952_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Tests Collected](https://img.shields.io/badge/tests-6970_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -77,7 +77,7 @@ Financial institutions operate under structurally fragmented information horizon
 
 To prevent ambiguity between production-grade components, algorithmic research explorations, and test simulations, the repository enforces a strict three-tier classification:
 
-- **Tier 1 — Production-Oriented Core:**
+- **Tier 1 - Production-Oriented Core:**
   - Real-time fraud scoring and inference gateway (`predict.py`, 2.57 ms in-process fast-path compute, scaling with concurrency to 105.02 ms p99 at C=100; fails closed with HTTP 503 `ModelNotAvailableError` if model unverified/missing).
   - 9-signal composite risk scoring pipeline (velocity, FATF country, merchant, device, amount, behavioral, graph community, consortium flags).
   - SHAP explainability (`KernelExplainer`, counterfactual sensitivity analysis).
@@ -92,14 +92,14 @@ To prevent ambiguity between production-grade components, algorithmic research e
   - Security perimeter: BOLA/IDOR tenant isolation, SSRF defense (RFC 1918 / loopback / cloud metadata blocking), slowapi rate limiting.
   - Enterprise persistence & messaging: PostgreSQL multi-tenant schema isolation, Redis Sentinel HA integration, Kafka streaming connectors with stale-worker reservation idempotency.
 
-- **Tier 2 — Research & Experimental Prototypes:**
+- **Tier 2 - Research & Experimental Prototypes:**
   - *Fully Homomorphic Encryption (FHE):* Microsoft SEAL / TenSEAL CKKS homomorphic context generation and ciphertext addition/averaging (`fhe_driver.py`).
   - *Zero-Knowledge Proofs (ZKP):* Groth16 zk-SNARK model weight attestation proof structures over the BN254 elliptic curve (`zk_snark_verifier.py`).
   - *Hardware TEE Emulation:* Software emulator modeling Intel SGX / AWS Nitro remote attestation measurement structures (`tee_driver.py`).
   - *Post-Quantum Cryptography (PQC):* CRYSTALS-Kyber-768 KEM key encapsulation prototype for quantum-resistant SecAgg (`pqc_secagg_driver.py`).
   - *Blockchain & Smart Contracts:* Solidity ERC-20 Shapley incentive distribution contracts and Layer-2 cross-chain settlement bridge (`contracts/`).
 
-- **Tier 3 — Demonstrations & Consortium Simulations:**
+- **Tier 3 - Demonstrations & Consortium Simulations:**
   - Multi-bank synthetic transaction stream generators and consortium coordinator simulations.
   - Network latency, client dropout, and disconnection injection harnesses.
   - Simulated adversarial poisoning attacks (label flipping, sign inversion, Gaussian noise) for defense benchmarking.
@@ -111,18 +111,18 @@ To prevent ambiguity between production-grade components, algorithmic research e
 
 | Component / Subsystem | Architectural Tier | Implementation Status | Concrete Repository Evidence |
 |:---|:---|:---|:---|
-| **Real-Time Fraud Scoring** | Tier 1 (Production Core) | **Implemented** | `app/application/services/risk_engine.py`, `app/presentation/routers/predict.py` |
-| **Federated Learning Loop** | Tier 1 (Production Core) | **Implemented** | `app/application/services/fl_engine.py`, `app/application/services/operational_federation_service.py`, `backend/tests/unit/test_fl_engine.py`, `backend/tests/unit/test_operational_federation_integration.py` |
-| **Training Provenance Authority** | Tier 1 (Production Core) | **Implemented** | Ed25519 receipts in `training_provenance_service.py`, Postgres ACID locks in `training_authority_backends.py` |
-| **Model Registry & Admission Gating** | Tier 1 (Production Core) | **Implemented** | Four-Eyes dual control & Redis cache purge in `model_registry.py`, `model_governance.py` |
-| **Differential Privacy** | Tier 1 (Production Core) | **Implemented** | PyTorch Opacus, RDP accounting in `app/application/services/privacy_service.py` |
-| **Secure Aggregation (SecAgg)** | Tier 1 (Production Core) | **Implemented** | Curve25519 ECDH in `p2p_secagg_driver.py`, Shamir secret sharing in `shamir_engine.py` |
-| **Byzantine Robust Defense** | Tier 1 (Production Core) | **Implemented** | Krum, Trimmed Mean, Bulyan in `byzantine_defense.py`, Spectral SVD in `spectral_defense.py` |
-| **Graph Intelligence (GraphSAGE)** | Tier 1 (Production Core) | **Implemented** | PyTorch 2-layer GraphSAGE in `graph_embedding_model.py`, MinHash PSI in `psi_service.py` |
-| **SHAP Model Explainability** | Tier 1 (Production Core) | **Implemented** | `shap.KernelExplainer` in `explainability_service.py`, counterfactual search |
-| **SSRF & Network Boundary** | Tier 1 (Production Core) | **Implemented** | RFC 1918 / loopback / metadata filter in `perimeter_waf.py` & `webhook_dispatcher.py` |
-| **Multi-Tenant BOLA Isolation** | Tier 1 (Production Core) | **Implemented** | Dynamic ABAC in `abac_engine.py`, schema isolation in `database/__init__.py` |
-| **Governed Pilot Operations Console** | Tier 1 (Production Core) | **Implemented** | Explicit 7-stage lifecycle & kill switch in `pilot_operations_service.py`, `pilot_operations.py`, `006_pilot_operations_table.py` |
+| **Real-Time Fraud Scoring** | Tier 1 (Production Core) | **Implemented** | `backend/app/domain/risk_engine.py`, `backend/app/presentation/routers/predict.py` |
+| **Federated Learning Loop** | Tier 1 (Production Core) | **Implemented** | `backend/app/application/services/fl_engine.py`, `backend/app/application/services/operational_federation_service.py`, `backend/tests/unit/test_fl_engine.py`, `backend/tests/unit/test_operational_federation_integration.py` |
+| **Training Provenance Authority** | Tier 1 (Production Core) | **Implemented** | Ed25519 receipts in `backend/app/application/services/training_provenance_service.py`, Postgres ACID locks in `backend/app/infrastructure/database/training_authority_backends.py` |
+| **Model Registry & Admission Gating** | Tier 1 (Production Core) | **Implemented** | Four-Eyes dual control & Redis cache purge in `backend/app/presentation/routers/model_registry.py`, `backend/app/domain/model_governance.py` |
+| **Differential Privacy** | Tier 1 (Production Core) | **Implemented** | PyTorch Opacus, RDP accounting in `backend/app/application/services/privacy_service.py` |
+| **Secure Aggregation (SecAgg)** | Tier 1 (Production Core) | **Implemented** | Curve25519 ECDH in `backend/app/infrastructure/security/p2p_secagg_driver.py`, Shamir secret sharing in `backend/app/infrastructure/security/shamir_engine.py` |
+| **Byzantine Robust Defense** | Tier 1 (Production Core) | **Implemented** | Krum, Trimmed Mean, Bulyan in `backend/app/domain/byzantine_defense.py`, Spectral SVD in `backend/app/domain/spectral_defense.py` |
+| **Graph Intelligence (GraphSAGE)** | Tier 1 (Production Core) | **Implemented** | PyTorch 2-layer GraphSAGE in `backend/app/application/services/graph_embedding_model.py`, MinHash PSI in `backend/app/domain/psi_service.py` |
+| **SHAP Model Explainability** | Tier 1 (Production Core) | **Implemented** | `shap.KernelExplainer` in `backend/app/application/services/explainability_service.py`, counterfactual search |
+| **SSRF & Network Boundary** | Tier 1 (Production Core) | **Implemented** | RFC 1918 / loopback / metadata filter in `backend/app/infrastructure/security/perimeter_waf.py` & `backend/app/infrastructure/webhook_dispatcher.py` |
+| **Multi-Tenant BOLA Isolation** | Tier 1 (Production Core) | **Implemented** | Dynamic ABAC in `backend/app/infrastructure/security/abac_engine.py`, schema isolation in `backend/app/infrastructure/database/__init__.py` |
+| **Governed Pilot Operations Console** | Tier 1 (Production Core) | **Implemented** | Explicit 7-stage lifecycle & kill switch in `backend/app/application/services/pilot_operations_service.py`, `backend/app/presentation/routers/pilot_operations.py`, `backend/app/infrastructure/database/migrations/versions/006_pilot_operations_table.py` |
 | **SAR Dossier Generation** | Tier 1 (Production Core) | **Implemented (Prototype)** | UNODC goAML 4.0 XML & EU AMLA JSON in `fiu_regulatory_service.py` |
 | **FHE Homomorphic Averaging** | Tier 2 (Experimental) | **Prototype** | TenSEAL CKKS driver in `fhe_driver.py` (with NumPy fallback) |
 | **zk-SNARK Attestation Proofs** | Tier 2 (Experimental) | **Prototype** | Groth16/BN254 prover & verifier simulation in `zk_snark_verifier.py` |
@@ -159,7 +159,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (6,100 collected tests; 6,952 total across all suites), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (6,118 collected tests; 6,970 total across all suites), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
@@ -183,9 +183,9 @@ The [`CFI-CrossBank-01`](experiments/cross_bank/report.md) flagship benchmark em
 | **Multi-Hop Ring Detection (Scenario 3)** | $353,950.43 USD detected | **$550,552.85 USD detected** | **+$196,602.42 USD (+35.71% uplift)** |
 | **Cold-Start Transfer (Scenario 7, Zero Local Positives)** | $0.00 USD detected (0 local signal) | **$639,701.40 USD detected** | **+$639,701.40 USD (Cross-institutional transfer)** |
 | **Total Detected Laundering Volume** | $668,021.96 USD | **$1,504,325.78 USD** | **+$836,303.82 USD (+55.59% detection gain)** |
-| **Communication Efficiency (Top-k 90%)** | — | 0.0225 MB (5 rounds) | **$37,169,058.67 USD detected per MB** |
+| **Communication Efficiency (Top-k 90%)** | - | 0.0225 MB (5 rounds) | **$37,169,058.67 USD detected per MB** |
 
-> **Scientific Rationale:** Rather than treating federated learning as a generic proxy for centralized pooling, this experiment proves where collaborative intelligence yields measurable risk utility: **recovering cross-bank multi-hop cycles and zero-positive transfer learning for institutions with no historical attack examples**—all while preserving institutional data custody without transmitting raw customer PII. Full mathematical proofs, scenario breakdowns, and publication artifacts are detailed in [`experiments/cross_bank/report.md`](experiments/cross_bank/report.md).
+> **Scientific Rationale:** Rather than treating federated learning as a generic proxy for centralized pooling, this experiment proves where collaborative intelligence yields measurable risk utility: **recovering cross-bank multi-hop cycles and zero-positive transfer learning for institutions with no historical attack examples**-all while preserving institutional data custody without transmitting raw customer PII. Full mathematical proofs, scenario breakdowns, and publication artifacts are detailed in [`experiments/cross_bank/report.md`](experiments/cross_bank/report.md).
 
 ---
 
@@ -415,9 +415,9 @@ During live inference (`POST /api/v1/score-transaction`, `POST /v1/inference/sco
 
 ### 4.1 Multi-Standard Financial Message Parsing
 Financial crime intelligence requires parsing heterogeneous messaging protocols across commercial banks and core-banking platforms:
-- **ISO 20022 Financial Messaging (`financial_message_parser.py`):** Native schema parsers for `pacs.008.001.08` (Customer Credit Transfer), `pacs.002.001.10` (Payment Status Report), and `camt.053.001.08` (Bank-to-Customer Statement). Extracts debtor/creditor agents, IBAN routing codes, remittance data, and charges while isolating raw PII.
-- **Core Banking Connectors (`mambu_connector.py`, `thought_machine_connector.py`):** Cloud-native core banking connectors mapping Mambu loan/deposit streaming webhooks and Thought Machine Vault smart contract transaction events into standardized platform records.
-- **Great Expectations Data Contracts (`data_validator.py`):** Ingestion pipelines enforce schema contracts, validating value domains, currency ISO 4217 formatting, positive amounts, and timestamp monotonicity before records enter training partitions.
+- **ISO 20022 Financial Messaging (`backend/app/application/services/financial_message_parser.py`):** Native schema parsers for `pacs.008.001.08` (Customer Credit Transfer), `pacs.002.001.10` (Payment Status Report), and `camt.053.001.08` (Bank-to-Customer Statement). Extracts debtor/creditor agents, IBAN routing codes, remittance data, and charges while isolating raw PII.
+- **Core Banking Connectors (`backend/app/infrastructure/connectors/mambu_connector.py`, `backend/app/infrastructure/connectors/thought_machine_connector.py`):** Cloud-native core banking connectors mapping Mambu loan/deposit streaming webhooks and Thought Machine Vault smart contract transaction events into standardized platform records.
+- **Great Expectations Data Contracts (`backend/app/domain/data_validator.py`):** Ingestion pipelines enforce schema contracts, validating value domains, currency ISO 4217 formatting, positive amounts, and timestamp monotonicity before records enter training partitions.
 
 ### 4.2 Distributed Streaming Connector (`KafkaStreamingConnector`)
 High-throughput transaction ingestion is powered by an asynchronous Kafka connector processing CloudEvents v1.0 specifications (`payment.transaction.v1`):
@@ -463,13 +463,13 @@ $$
 
 Benchmarks are evaluated under $\alpha = 0.50$ (`CLM-FL-NONIID-ALPHA05`), capturing realistic label and feature skew across participating nodes.
 
-### 5.3 Asynchronous Coordination & Dynamic Quorum (`async_fl_engine.py`)
+### 5.3 Asynchronous Coordination & Dynamic Quorum (`backend/app/domain/async_fl_engine.py`)
 In real-world consortia, banking edge nodes experience variable compute speeds and network latency. The asynchronous engine supports:
-- **Dynamic Quorum Management (`quorum_manager.py`):** Evaluates minimum node participation thresholds ($K \ge 3$) before advancing global aggregation rounds.
+- **Dynamic Quorum Management (`backend/app/domain/quorum_manager.py`):** Evaluates minimum node participation thresholds ($K \ge 3$) before advancing global aggregation rounds.
 - **Polynomial Staleness Discounting:** Updates from slower clients arriving $\tau$ rounds late are weighted by $\beta_k = (1 + \tau)^{-\gamma}$ (default $\gamma = 0.5$), preventing stale gradients from derailing convergence while retaining historical signal.
 
 ### 5.4 Operational Federation Lifecycle & Bank Worker Isolation (`operational_federation_service.py`)
-Bridging authorized operational entry points (`app/presentation/routers/training.py`, `cfi-cli`) to the canonical distributed federated learning pipeline:
+Bridging authorized operational entry points (`backend/app/presentation/routers/training.py`, `cfi-cli`) to the canonical distributed federated learning pipeline:
 - **Server-Side Authority Resolution:** Sensitive credentials, completion authority endpoints, database URLs, and bank worker endpoints are resolved strictly server-side; client JSON payloads never transmit private credentials, file paths, or process handles.
 - **Process-Isolated Bank Workers:** In production, worker endpoints are registered by institution daemons and executed via `run_production_federation` under Windows Restricted Token or POSIX process isolation without exposing institutional private credentials or raw datasets to the coordinator.
 - **Separation of Authorities:** The coordinator holds `coordinator_token` only. The `IsolatedReceiptSigningAuthority` (Ed25519) and `IsolatedTrainingCompletionAuthority` operate in strictly segregated logical domains.
@@ -510,13 +510,13 @@ In compliance with GDPR Article 17 ("Right to be Forgotten"), institutions must 
 
 ## 7. Adversarial Robustness & Byzantine Consensus Aggregators
 
-### 7.1 Byzantine-Robust Aggregation Suite (`byzantine_defense.py`)
+### 7.1 Byzantine-Robust Aggregation Suite (`backend/app/domain/byzantine_defense.py`)
 Federated consortia may contain compromised or malicious nodes attempting to disrupt training or backdoors into the global model:
 - **Coordinate-wise Trimmed Mean:** Sorts parameter values coordinate-by-coordinate across all $n$ clients and trims the smallest and largest $\beta$-fraction (default $\beta = 0.20$), computing the arithmetic mean over central updates. Tolerates up to $\beta < 0.5$ Byzantine clients.
 - **Multi-Krum:** Selects client updates that minimize the sum of squared Euclidean distances to their $n - f - 2$ closest neighbors, filtering extreme gradient vectors.
 - **Bulyan:** Combines Krum candidate selection with recursive coordinate-wise trimmed mean averaging, providing robust consensus even under adversarial collusion ($n \ge 4f + 3$).
 
-### 7.2 Spectral SVD Backdoor Defense (`spectral_defense.py`)
+### 7.2 Spectral SVD Backdoor Defense (`backend/app/domain/spectral_defense.py`)
 To neutralize subtle backdoor triggers that evade distance-based Krum filtering, the platform computes the singular value decomposition (SVD) of the client update matrix:
 - Evaluates the top singular vector and projects updates onto the principal direction.
 - Detects anomalous clustering and cosine angle deviations characteristic of semantic backdoor poisoning, isolating malicious updates before aggregation.
@@ -535,7 +535,7 @@ Transaction fraud frequently involves multi-hop payment routing that tabular fea
 - Aggregates mean neighborhood transaction features, capturing relational smurfing cycles and fan-out laundering patterns.
 - Inductive architecture allows scoring newly observed accounts without full graph retraining.
 
-### 8.2 Fuzzy Private Set Intersection (MinHash LSH PSI, `fuzzy_psi.py`)
+### 8.2 Fuzzy Private Set Intersection (MinHash LSH PSI, `backend/app/domain/fuzzy_psi.py`)
 To discover overlapping high-risk entities across banks without exposing customer databases:
 - Converts customer demographic identifiers (phone, tax ID, device, email) into $k$-shingle sets.
 - Generates MinHash locality-sensitive hash signatures and Bloom filter commitments.
@@ -716,9 +716,9 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 6,100 backend Pytest    │ Evaluated across 8 canonical datasets│
+│ Validated by 6,118 backend Pytest    │ Evaluated across 8 canonical datasets│
 │ tests, 410 verif, 11 SDK, 400 Vitest,│ via benchmarks/runners/ & harness.   │
-│ 31 Hardhat (6,952 tests collected).  │ (6,952 total tests collected)        │
+│ 31 Hardhat (6,970 tests collected).  │ (6,970 total tests collected)        │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -752,9 +752,9 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-BYZ-CANONICAL-MULTIKRUM`** | Byzantine Defense: Multi-Krum under Scaled Sign-Inversion ($\times -3.0$, Canonical 3-Seed Benchmark) | `0.7061` | `0.7061 ± 0.0341` (Mean Retention: `98.48% ± 6.93%` relative to clean FedAvg, $N=3$) | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
 | **`CLM-BYZ-CANONICAL-ALIE-TRIMMED-MEAN`** | Byzantine Defense: Trimmed Mean under Omniscient ALIE Attack ($z=1.0$, Canonical 3-Seed Benchmark) | `0.7189` | `0.7189 ± 0.0171` (Mean Retention: `100.23% ± 5.12%` relative to clean FedAvg, $N=3$) | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
 | **`CLM-BYZ-CANONICAL-SEED-INSTABILITY`** | Byzantine Seed Instability & Failure Disclosures (Single Krum Seed 456 Collapse, ALIE collapses) | `0.0011` | Single Krum Seed 456 collapses to `0.001104`; FedAvg Seed 42 collapses to `0.165317` under sign-flip; ALIE collapses Coord Median (`0.204505`) and Bulyan (`0.222000`) on Seed 123 | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
-| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($\beta=0.20$, Historical Prototype) | `—` (Historical) | `0.7344` (Historical proxy: 99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
-| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector (Historical Prototype) | `—` (Historical) | `0.7257` (Historical proxy: 98.5% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
-| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator (Historical Prototype) | `—` (Historical) | `0.7070` (Historical proxy: 95.9% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
+| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($\beta=0.20$, Historical Prototype) | `-` (Historical) | `0.7344` (Historical proxy: 99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
+| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector (Historical Prototype) | `-` (Historical) | `0.7257` (Historical proxy: 98.5% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
+| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator (Historical Prototype) | `-` (Historical) | `0.7070` (Historical proxy: 95.9% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
 | **`CLM-LATENCY-FASTPATH`** | In-Process Fast-Path Scoring Latency | `< 15.0 ms` (Target) | `2.569 ms` (p99: 8.87 ms @ C=1, 105.02 ms @ C=100) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
 | **`CLM-LATENCY-SHAP`** | In-Process Explainability Latency (with SHAP) | `< 50.0 ms` (Target) | `2.516 ms` (linear attribution) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --with-shap` | `VERIFIED_MEASURED` |
 | **`CLM-GATEWAY-PEAK-THROUGHPUT`** | In-Process Microbenchmark Peak Throughput | `> 1,200 req/s` (Target) | `1,109.9 req/s` @ C=100 (`1,246.3` @ C=50) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
@@ -762,12 +762,12 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-HTTP-SERVICE-LATENCY-P50`** | Local HTTP Service Median Latency (Class B1) | `10.0 ms` (Target) | `7.12 ms` @ C=1 (Post-BaseHTTP=0; pooled p99: 10.85 ms; Baseline: 11.39 ms) | [`latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED` |
 | **`CLM-ABAC-THROUGHPUT`** | ABAC Authorization Engine Throughput | `> 5,000 req/s` | `132,942 req/s` (mean) | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `python scripts/run_abac_benchmark.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_p2p_secagg_driver.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
+| **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python verification/secure_aggregation/tests/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `6,952 Tests` | `6,952 Collected Tests` (6,100 Collected Backend + 410 Verification + 11 SDK, 400 Vitest across 91 files, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
-| **`CLM-AMLSIM-GRAPHSAGE-PRAUC`** | IBM AMLSim Multi-Hop GraphSAGE PR-AUC | `—` (Agent Simulation) | `0.6527` (Inductive GraphSAGE 2-Layer) | [`results.json`](experiments/amlsim/results.json) | `python experiments/amlsim/evaluate_patterns.py` | `VERIFIED_MEASURED` |
-| **`CLM-SYNTHAML-ALERTMLP-PRAUC`** | Danish Spar Nord Bank SynthAML AlertMLP PR-AUC | `—` (Project Synthetic) | `0.9924` (FedAvg) / `0.9341` (Centralized) | [`fraud_benchmark_synthaml.json`](benchmarks/results/raw/fraud_benchmark_synthaml.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml` | `VERIFIED_MEASURED` |
-| **`CLM-AMLNET-FEDAVG-PRAUC`** | AUSTRAC AMLNet Structuring Detection PR-AUC | `—` (Project Synthetic) | `1.0000` (Synthetic Structuring Separability) | [`results.json`](experiments/amlnet/results.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet` | `VERIFIED_MEASURED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `6,970 Tests` | `6,970 Collected Tests` (6,118 Collected Backend + 410 Verification + 11 SDK, 400 Vitest across 91 files, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-AMLSIM-GRAPHSAGE-PRAUC`** | IBM AMLSim Multi-Hop GraphSAGE PR-AUC | `-` (Agent Simulation) | `0.6527` (Inductive GraphSAGE 2-Layer) | [`results.json`](experiments/amlsim/results.json) | `python experiments/amlsim/evaluate_patterns.py` | `VERIFIED_MEASURED` |
+| **`CLM-SYNTHAML-ALERTMLP-PRAUC`** | Danish Spar Nord Bank SynthAML AlertMLP PR-AUC | `-` (Project Synthetic) | `0.9924` (FedAvg) / `0.9341` (Centralized) | [`fraud_benchmark_synthaml.json`](benchmarks/results/raw/fraud_benchmark_synthaml.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml` | `VERIFIED_MEASURED` |
+| **`CLM-AMLNET-FEDAVG-PRAUC`** | AUSTRAC AMLNet Structuring Detection PR-AUC | `-` (Project Synthetic) | `1.0000` (Synthetic Structuring Separability) | [`results.json`](experiments/amlnet/results.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet` | `VERIFIED_MEASURED` |
 | **`CLM-CROSSBANK-DETECTION-RATE`** | CFI-CrossBank 7-Scenario Consortium Multi-Bank Detection Rate | `100.0%` (Target) | `100.0%` (2/2 synthetic incidents in Scen 7; 100% consortium) | [`fraud_benchmark_crossbank.json`](benchmarks/results/raw/fraud_benchmark_crossbank.json) | `python experiments/cross_bank/run_consortium_benchmark.py` | `VERIFIED_MEASURED` |
 | **`CLM-FL-NONIID-ALPHA05`** | Non-IID Dirichlet $\alpha=0.5$ Optimization Comparison | `0.2331` (FedAvg) | `0.2331` (FedAvg) / `0.2285` (FedProx) / `0.2196` (SCAFFOLD) | [`fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json) | `python benchmarks/runners/run_fl_benchmark.py --alpha 0.5` | `VERIFIED_MEASURED` |
 
@@ -787,12 +787,12 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **ABAC Decision Latency** | < 0.015 ms (p99) | < 1 ms | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `Empirical In-Memory Benchmark` |
 | **SecAgg Throughput (Curve25519 P2P Driver)** | **~513,000 param/s** | > 250k param/s | `p2p_secagg_driver.py` | `Empirical Single-Thread Modular Masking Benchmark` |
 | **SecAgg Throughput (NumPy Vectorized Masking)** | **~5,630,000 param/s** | > 1M param/s | `fl_engine.py` | `Empirical NumPy Array Vectorization Benchmark` |
-| **SecAgg Latency Scaling** | **O(n x d), R^2 = 0.9703** | Linear O(n x d) | `fl_engine.py` (NumPy masking path via `secagg_benchmark_scalability.py`) | `Empirical Vectorization Benchmark (see secagg_scalability_benchmark_report.md; variance range: 0.91–0.99)` |
+| **SecAgg Latency Scaling** | **O(n x d), R^2 = 0.9703** | Linear O(n x d) | `fl_engine.py` (NumPy masking path via `verification/secure_aggregation/tests/secagg_benchmark_scalability.py`) | `Empirical Vectorization Benchmark (see secagg_scalability_benchmark_report.md; variance range: 0.91–0.99)` |
 | **FL Synthetic ROC-AUC (FedAvg)** | **0.835 mean (range 0.563–0.952)** | > 0.80 measured / 0.950 lab design goal | `simulation_service.py` (5-seed empirical benchmark, 3-bank consortium, 5 rounds) | `Empirical Simulation Benchmark (5 seeds: [42, 123, 456, 789, 2025])` |
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Unit & Integration Test Inventory** | **6,952 Collected Tests** | **6,952 Collected Tests** (6,100 Collected Backend + 410 Scientific Verification + 11 Python SDK + 400 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
+| **Unit & Integration Test Inventory** | **6,970 Collected Tests** | **6,970 Collected Tests** (6,118 Collected Backend + 410 Scientific Verification + 11 Python SDK + 400 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
 
 ---
 
@@ -965,8 +965,8 @@ To quantify collaborative value and privacy trade-offs, five distinct paradigms 
 | **Centralized Deep MLP (Neural)** | `THEORETICAL_UPPER_BOUND` | **0.8520** | **0.9780** | **64.10%** | **0.0145** | `0.260 ms` | ❌ **Illegal Data Pooling** (GDPR/KVKK Violation) |
 | **Federated Champion (FedAvg/FedProx)** | `PRODUCTION_CHAMPION` | **0.8420** | **0.9750** | **62.40%** | **0.0158** | `0.260 ms` | ✅ **100% Compliant** (Zero Raw PII, DP $\epsilon=1.0$) |
 | **Isolated Local Silos (3-Bank Mean)** | `ISOLATED_SILO` | **0.6940** | **0.8820** | **43.20%** | **0.0380** | `0.040 ms` | ⚠️ **Legally Passive** (Blind to Cross-Bank Mules) |
-| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
-| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
+| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `-` | `-` | `-` | `-` | ⚠️ **Not Evaluated on Partition** |
+| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `-` | `-` | `-` | `-` | ⚠️ **Not Evaluated on Partition** |
 
 *Core Insights:*
 - **Collaborative Uplift**: $+\Delta \text{PR-AUC} = +0.1480$ ($+21.3\%$ relative gain) and $+19.2\%$ Recall @ 0.1% FPR over isolated bank silos.
@@ -1025,30 +1025,30 @@ Pursuant to Federal Reserve SR 11-7 / OCC 2011-12, ECOA Regulation B (12 CFR Par
 
 ### 15.11 Master Empirical Comparative Benchmark Matrix (Strict Null Representation)
 
-Consolidated empirical performance matrix across all eight canonical benchmark datasets. To prevent deceptive reporting, unexecuted benchmarks or inapplicable baselines are strictly represented as `—` (`null`), never as fabricated `0.0000` values:
+Consolidated empirical performance matrix across all eight canonical benchmark datasets. To prevent deceptive reporting, unexecuted benchmarks or inapplicable baselines are strictly represented as `-` (`null`), never as fabricated `0.0000` values:
 
 | Dataset | Domain & Scale | Model / Paradigm | Clients & Rounds | PR-AUC | ROC-AUC | F1-Score | Precision | Recall | Recall @ 0.1% FPR | Status |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **PaySim Mobile Money**<br>*6.36M txns (Blekinge)*<br>([config](experiments/paysim/config.json) \| [results](experiments/paysim/results.json) \| [report](experiments/paysim/report.md)) | Centralized Pooled Oracle | Centralized Neural Classifier (Budget-Equalized) | 1 silo (Pooled) | 0.9545 | — | — | — | — | 0.9816 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg, 3 Seeds) | 3 clients / 10 rnds | **0.9545** | — | — | — | — | **0.9816** | `FEDERATED [OK]` |
-| **IEEE-CIS Card Fraud**<br>*590k txns (Vesta Corp)*<br>([canonical](experiments/ieee_cis/canonical_results.json) \| [results](experiments/ieee_cis/results.json) \| [report](experiments/ieee_cis/report.md)) | Centralized Pooled Oracle | Centralized Neural Classifier (10 Epochs) | 1 silo (Pooled) | 0.4422 | 0.8536 | — | — | — | 0.2004 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.3895** | **0.8325** | — | — | — | **0.1976** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx) | 3 clients / 5 rnds | — | — | — | — | — | — | `NOT_RUN` |
-| **European Credit Card**<br>*284k txns (ULB MLG)*<br>([config](experiments/credit_card/config.json) \| [results](experiments/credit_card/results.json) \| [report](experiments/credit_card/report.md)) | Centralized Pooled Oracle | Centralized ImbalanceMLP (Budget-Equalized 10 Epochs) | 1 silo (Pooled) | 0.8219 | 0.9850 | — | — | — | 0.8469 | `CENTRALIZED [OK]` |
+| **PaySim Mobile Money**<br>*6.36M txns (Blekinge)*<br>([config](experiments/paysim/config.json) \| [results](experiments/paysim/results.json) \| [report](experiments/paysim/report.md)) | Centralized Pooled Oracle | Centralized Neural Classifier (Budget-Equalized) | 1 silo (Pooled) | 0.9545 | - | - | - | - | 0.9816 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg, 3 Seeds) | 3 clients / 10 rnds | **0.9545** | - | - | - | - | **0.9816** | `FEDERATED [OK]` |
+| **IEEE-CIS Card Fraud**<br>*590k txns (Vesta Corp)*<br>([canonical](experiments/ieee_cis/canonical_results.json) \| [results](experiments/ieee_cis/results.json) \| [report](experiments/ieee_cis/report.md)) | Centralized Pooled Oracle | Centralized Neural Classifier (10 Epochs) | 1 silo (Pooled) | 0.4422 | 0.8536 | - | - | - | 0.2004 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.3895** | **0.8325** | - | - | - | **0.1976** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx) | 3 clients / 5 rnds | - | - | - | - | - | - | `NOT_RUN` |
+| **European Credit Card**<br>*284k txns (ULB MLG)*<br>([config](experiments/credit_card/config.json) \| [results](experiments/credit_card/results.json) \| [report](experiments/credit_card/report.md)) | Centralized Pooled Oracle | Centralized ImbalanceMLP (Budget-Equalized 10 Epochs) | 1 silo (Pooled) | 0.8219 | 0.9850 | - | - | - | 0.8469 | `CENTRALIZED [OK]` |
 | | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg, 10 Rounds) | 3 clients / 10 rnds | **0.8248** | **0.9837** | 0.7882 | 0.7619 | 0.8163 | **0.8469** | `FEDERATED [OK]` |
 | **Elliptic Bitcoin Graph**<br>*203k nodes (MIT-IBM)*<br>([config](experiments/elliptic/config.json) \| [results](experiments/elliptic/results.json) \| [report](experiments/elliptic/report.md)) | Centralized Pooled Oracle | GraphSAGE Inductive Neighborhood (Multi-Seed Mean) | 1 silo (Pooled) | 0.3761 | 0.8325 | 0.3555 | 0.2757 | 0.5583 | 0.0462 | `CENTRALIZED [OK]` |
 | | Tabular MLP Baseline | Deep Tabular MLP (0-hop) | 1 silo (Pooled) | 0.5778 | 0.8722 | 0.5162 | 0.5218 | 0.5106 | 0.2521 | `CENTRALIZED [OK]` |
-| **IBM AMLSim Graph**<br>*1.32M txns (IBM AI)*<br>([config](experiments/amlsim/config.json) \| [results](experiments/amlsim/results.json) \| [report](experiments/amlsim/report.md)) | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.6720 | — | — | — | — | — | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.6527** | **0.9509** | 0.1689 | — | — | **0.6412** | `FEDERATED [OK]` |
-| **Danish SynthAML**<br>*20k alerts (Spar Nord)*<br>([config](experiments/synthaml/config.json) \| [results](experiments/synthaml/results.json) \| [report](experiments/synthaml/report.md)) | Centralized Pooled Oracle | Centralized AlertMLP | 1 silo (Pooled) | 0.9341 | 0.9998 | — | — | — | — | `CENTRALIZED [OK]` |
+| **IBM AMLSim Graph**<br>*1.32M txns (IBM AI)*<br>([config](experiments/amlsim/config.json) \| [results](experiments/amlsim/results.json) \| [report](experiments/amlsim/report.md)) | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.6720 | - | - | - | - | - | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.6527** | **0.9509** | 0.1689 | - | - | **0.6412** | `FEDERATED [OK]` |
+| **Danish SynthAML**<br>*20k alerts (Spar Nord)*<br>([config](experiments/synthaml/config.json) \| [results](experiments/synthaml/results.json) \| [report](experiments/synthaml/report.md)) | Centralized Pooled Oracle | Centralized AlertMLP | 1 silo (Pooled) | 0.9341 | 0.9998 | - | - | - | - | `CENTRALIZED [OK]` |
 | | **Federated FedAvg (Collaborative)** | AlertMLPClassifier (FedAvg, Run B Canonical) | 3 clients / 6 rnds | **0.9924** | **0.9995** | 0.9836 | 0.9877 | 0.9796 | **0.9878** | `FEDERATED [OK]` |
-| | Isolated Silos (No Sharing) | Isolated Bank Silos (Alpha/Beta/Gamma) | Isolated Local | Mean: 0.7245 (Worst: 0.2214) | — | — | — | — | — | `ISOLATED [OK]` |
+| | Isolated Silos (No Sharing) | Isolated Bank Silos (Alpha/Beta/Gamma) | Isolated Local | Mean: 0.7245 (Worst: 0.2214) | - | - | - | - | - | `ISOLATED [OK]` |
 | **AUSTRAC AMLNet**<br>*1.09M txns (Griffith)*<br>([config](experiments/amlnet/config.json) \| [results](experiments/amlnet/results.json) \| [report](experiments/amlnet/report.md)) | Centralized Pooled Oracle | Centralized AMLNetClassifier | 1 silo (Pooled) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | `CENTRALIZED` |
 | | **Federated FedAvg (Collaborative)** | AMLNetClassifier (FedAvg) | 3 clients / 6 rnds | **1.0000** | **1.0000** | 1.0000 | 1.0000 | 1.0000 | **1.0000** | `FEDERATED [OK]` |
-| **CFI-CrossBank-02**<br>*Consortium Neural (v2.1)*<br>([config](experiments/cross_bank/config.json) \| [results](experiments/cross_bank/results.json) \| [report](experiments/cross_bank/report.md)) | Centralized Pooled Oracle | Centralized Matched View (5 Seeds) | 1 silo (Pooled) | 0.1454 | 0.9091 | — | — | — | 0.0041 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | CrossBankConsortiumMLP (FedAvg Local) | 3 clients / 5 rnds | **0.1779** | **0.9013** | — | — | — | **0.0130** | `FEDERATED [OK]` |
-| | Isolated Silos (No Sharing) | Isolated Bank Silos (Bank A/B/C) | Isolated Local | Mean: 0.1656 | 0.7116 | — | — | — | 0.0098 | `ISOLATED [OK]` |
-| | Federated Consortium Signal (Oracle) | CrossBankConsortiumMLP (Diagnostic Oracle) | 3 clients / 5 rnds | **0.8140** | **0.9227** | — | — | — | **0.7840** | `ORACLE [OK]` |
+| **CFI-CrossBank-02**<br>*Consortium Neural (v2.1)*<br>([config](experiments/cross_bank/config.json) \| [results](experiments/cross_bank/results.json) \| [report](experiments/cross_bank/report.md)) | Centralized Pooled Oracle | Centralized Matched View (5 Seeds) | 1 silo (Pooled) | 0.1454 | 0.9091 | - | - | - | 0.0041 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | CrossBankConsortiumMLP (FedAvg Local) | 3 clients / 5 rnds | **0.1779** | **0.9013** | - | - | - | **0.0130** | `FEDERATED [OK]` |
+| | Isolated Silos (No Sharing) | Isolated Bank Silos (Bank A/B/C) | Isolated Local | Mean: 0.1656 | 0.7116 | - | - | - | 0.0098 | `ISOLATED [OK]` |
+| | Federated Consortium Signal (Oracle) | CrossBankConsortiumMLP (Diagnostic Oracle) | 3 clients / 5 rnds | **0.8140** | **0.9227** | - | - | - | **0.7840** | `ORACLE [OK]` |
 
 *Artifact: [`benchmarks/results/raw/master_benchmark_matrix.json`](benchmarks/results/raw/master_benchmark_matrix.json) | Generator: [`benchmarks/generate_master_benchmark_matrix.py`](benchmarks/generate_master_benchmark_matrix.py)*
 
@@ -1159,7 +1159,7 @@ python scripts/verify_reproducibility.py --all
   3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
-  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 6,100 Collected Backend Pytest tests, 400 Frontend Vitest tests across 91 test files, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (6,952 total collected tests) and clean static analysis (0 Ruff errors).
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 6,118 Collected Backend Pytest tests, 400 Frontend Vitest tests across 91 test files, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (6,970 total collected tests) and clean static analysis (0 Ruff errors).
 - **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
 
 ---
@@ -1192,7 +1192,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **6,100 collected Pytest backend tests** (baseline: 4,370; prior milestone: 5,617), **400 Vitest frontend tests across 91 test files**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 22 verification modules (totaling **6,952 collected tests** across all suites, expanding from the 6,444 total test baseline). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **6,118 collected Pytest backend tests** (baseline: 4,370; prior milestone: 5,617), **400 Vitest frontend tests across 91 test files**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 22 verification suites (totaling **6,970 collected tests** across all suites, expanding from the 6,444 total test baseline). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -1279,7 +1279,7 @@ curl -X POST "http://localhost:8000/api/v1/score-transaction" \
   }'
 ```
 
-*Response (`HTTP 200 OK` — Latency: 14.2 ms):*
+*Response (`HTTP 200 OK` - Latency: 14.2 ms):*
 ```json
 {
   "transaction_id": "txn_88492049281",
@@ -1534,10 +1534,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (6,100 Collected Backend / 6,952 Total Collected Tests)
+### Step 5: Master Test Suites Execution (6,118 Collected Backend / 6,970 Total Collected Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (6,100 collected tests)
+# 1. Run full backend pytest suite (6,118 collected tests)
 pytest backend/tests/ -v
 
 # 2. Run Python SDK test suite (11 tests)

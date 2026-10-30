@@ -299,7 +299,7 @@ def test_property_7_classifier_exclusion_monotonicity(in_dim, hidden_dim, emb_di
     parameters than to_model_weights(include_classifier=True) for any valid architecture.
 
     Ensures the privacy policy of classifier head exclusion is invariant across
-    all model configurations — not just the default 12→128→64 architecture.
+    all model configurations - not just the default 12→128→64 architecture.
     """
     model = GraphSAGEModel(
         input_dim=in_dim,
@@ -332,7 +332,7 @@ def test_property_7_classifier_exclusion_monotonicity(in_dim, hidden_dim, emb_di
 @settings(max_examples=30, deadline=5000)
 def test_property_8_dp_noise_unit_sphere_invariant(noise_scale, dim):
     """HP12: DP-noised embeddings from get_all_embeddings(dp_noise=True, noise_scale=s)
-    are re-normalized to the unit sphere — ||noised_emb||_2 ≈ 1.0 within 1e-5 tolerance.
+    are re-normalized to the unit sphere - ||noised_emb||_2 ≈ 1.0 within 1e-5 tolerance.
 
     This validates that the L2 re-normalization step in get_all_embeddings() correctly
     preserves the unit-sphere invariant established by GraphSAGELayer.forward().

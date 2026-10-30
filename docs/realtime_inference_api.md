@@ -137,7 +137,7 @@ The scoring gateway exposes three production REST endpoints tailored for differe
 
 The platform supports dual-scale decision mappings corresponding to API interface types:
 
-### 3.1 Core Banking Gateway (`/score-transaction` & `/predict` — $[0, 1000]$ Scale)
+### 3.1 Core Banking Gateway (`/score-transaction` & `/predict` - $[0, 1000]$ Scale)
 
 | Decision | Risk Score Range | Action Executed | Escalation Overrides |
 | :--- | :--- | :--- | :--- |
@@ -145,7 +145,7 @@ The platform supports dual-scale decision mappings corresponding to API interfac
 | **`REVIEW`** | $300 \le \text{Score} \le 900$ | Transaction flagged for Four-Eyes analyst investigation. | Amounts $\ge 50{,}000\text{ USD}$ or FATF Greylist |
 | **`BLOCK`** | $900 < \text{Score} \le 1000$ | Transaction rejected immediately and alert dispatched. | FATF NCCT Blacklist ($\ge 950$) |
 
-### 3.2 Streaming JIT Gateway (`/v1/inference/score` — $[0.0, 1.0]$ Float Scale)
+### 3.2 Streaming JIT Gateway (`/v1/inference/score` - $[0.0, 1.0]$ Float Scale)
 
 | Decision | Risk Score Range | Action Executed |
 | :--- | :--- | :--- |
@@ -160,8 +160,10 @@ The platform supports dual-scale decision mappings corresponding to API interfac
 > [!IMPORTANT]
 > Real-time inference executes PyTorch models using **TorchScript JIT compilation** and **Redis In-Memory Caching (`cfi:champion_model:{simulation_id}`)** with atomic version-bound HMAC validation and a 1-hour TTL.
 
-1. **Redis JIT Caching & Atomic Pipeline**:
+1. **Redis JIT Caching, Atomic Pipeline & Dynamic Auto-Reconnect**:
    - The verified champion model is compiled to TorchScript on startup and cached in Redis with an atomic pipeline (`pipe.set(model_key, bytes); pipe.set(auth_key, envelope)`).
+   - If Redis becomes unavailable, [redis_store.py](../backend/app/infrastructure/persistence/redis_store.py) degrades gracefully to local in-memory caching while advertising `durability="ephemeral"` on the `/health` endpoint.
+   - Background auto-reconnection attempts fire continuously every 1.0s (`_attempt_auto_reconnect`). When Redis recovers, cache synchronization resumes and health transitions back to `durability="durable"` without request drops.
    - Redis cache entries are strictly verified: checks include HMAC authenticity under domain key `DOMAIN_MODEL_CACHE`, SHA-256 match, version, generation, simulation ID, and architecture parity.
    - Subsequent inference requests load directly from the verified cache, bypassing database and disk IO.
 2. **Instant PubSub Invalidation**:

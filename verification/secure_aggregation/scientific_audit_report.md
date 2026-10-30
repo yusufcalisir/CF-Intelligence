@@ -1,11 +1,11 @@
 # Publication-Quality Scientific Audit & Verification Report: Secure Aggregation Subsystem
 
-**Subsystem:** Secure Aggregation (SecAgg — P2P Curve25519 ECDH V2.0), Trusted Execution Environment (TEE), and Key Management (KMS)  
+**Subsystem:** Secure Aggregation (SecAgg - P2P Curve25519 ECDH V2.0), Trusted Execution Environment (TEE), and Key Management (KMS)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Senior Researcher & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE — 9 SUPPORTED, 1 PARTIALLY SUPPORTED, 0 UNSUPPORTED  
-**V2.0 Upgrade:** P2P Diffie-Hellman SecAgg & Shamir $(t, n)$ Threshold Secret Sharing shipped — client-side mask generation via X25519 ECDH + HKDF-SHA256, Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction.  
+**Audit Status:** COMPLETE - 9 SUPPORTED, 1 PARTIALLY SUPPORTED, 0 UNSUPPORTED  
+**V2.0 Upgrade:** P2P Diffie-Hellman SecAgg & Shamir $(t, n)$ Threshold Secret Sharing shipped - client-side mask generation via X25519 ECDH + HKDF-SHA256, Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction.  
 
 ---
 
@@ -119,8 +119,8 @@ $$
 
 ## 6. Threats to Validity & Limitations
 
-1. **✅ RESOLVED — P2P ECDH Client-Side Mask Generation:** `p2p_secagg_driver.py` (V2.0) implements full Curve25519 ECDH + HKDF-SHA256 client-side mask generation. The coordinator is a cryptographically inert relay. Zero server-side cryptographic involvement. Verified by 16/16 unit tests in `test_p2p_secagg_driver.py`.
-2. **✅ RESOLVED — Shamir $(t, n)$ Threshold Secret Sharing:** `shamir_engine.py` (V2.0) implements polynomial secret sharing and Lagrange interpolation over $\mathbb{Z}_p$ ($p = 2^{256} - 189$). Enables 100% accurate global weight reconstruction even when up to $n - t$ nodes drop out mid-round. Verified by 9 unit tests across `test_shamir_engine.py` and `test_p2p_secagg_dropout_recovery.py`.
+1. **✅ RESOLVED - P2P ECDH Client-Side Mask Generation:** `p2p_secagg_driver.py` (V2.0) implements full Curve25519 ECDH + HKDF-SHA256 client-side mask generation. The coordinator is a cryptographically inert relay. Zero server-side cryptographic involvement. Verified by 16/16 unit tests in `test_p2p_secagg_driver.py`.
+2. **✅ RESOLVED - Shamir $(t, n)$ Threshold Secret Sharing:** `shamir_engine.py` (V2.0) implements polynomial secret sharing and Lagrange interpolation over $\mathbb{Z}_p$ ($p = 2^{256} - 189$). Enables 100% accurate global weight reconstruction even when up to $n - t$ nodes drop out mid-round. Verified by 9 unit tests across `test_shamir_engine.py` and `test_p2p_secagg_dropout_recovery.py`.
 3. **Lack of Hardware SGX SDK:** `TEEDriver` operates as a software simulation mock when hardware SGX SDKs are absent.
 
 ---

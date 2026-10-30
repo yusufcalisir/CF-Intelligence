@@ -46,7 +46,7 @@ describe('MetricsComparisonBarChart Component Test Suite', () => {
 
     render(<MetricsComparisonBarChart banks={mockBanks} />);
 
-    expect(screen.getByText(/Model Performance Comparison — All Banks/i)).toBeDefined();
+    expect(screen.getByText(/Model Performance Comparison - All Banks/i)).toBeDefined();
     expect(screen.getByText(/Grouped Bar Chart/i)).toBeDefined();
   });
 });

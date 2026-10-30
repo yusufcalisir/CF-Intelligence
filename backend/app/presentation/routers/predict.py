@@ -798,7 +798,7 @@ def evaluate_transaction_risk_and_alerts(
                 severity=unassessed_alert.severity.value,
                 status=unassessed_alert.status.value,
                 reason_codes=unassessed_alert.reason_codes,
-                explanation="Risk assessment unavailable — transaction held for review",
+                explanation="Risk assessment unavailable - transaction held for review",
                 top_features=[],
                 risk_factors=unassessed_alert.risk_factors,
             )
@@ -1851,7 +1851,7 @@ async def score_transaction(
     else:
         decision = "ALLOW"
 
-    # Model version tag — resolve truth from active_ident snapshot bound to the execution
+    # Model version tag - resolve truth from active_ident snapshot bound to the execution
     ident_ver = model_ident.get("version")
     model_ver = f"v{ident_ver}.0.0" if ident_ver is not None else "unknown"
 

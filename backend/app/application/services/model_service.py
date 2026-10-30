@@ -1,7 +1,7 @@
 """PyTorch fraud detection model and training utilities.
 
 Defines a simple MLP binary classifier suitable for tabular fraud data.
-The model is intentionally straightforward — the point of this project
+The model is intentionally straightforward - the point of this project
 is the federated learning architecture, not model complexity.
 """
 
@@ -309,7 +309,7 @@ class ModelService:
 
             avg_loss = epoch_loss / max(n_batches, 1)
             loss_history.append(avg_loss)
-            logger.debug("Epoch %d/%d — loss: %.4f", epoch + 1, epochs, avg_loss)
+            logger.debug("Epoch %d/%d - loss: %.4f", epoch + 1, epochs, avg_loss)
 
             # Additional yield between epochs
             time.sleep(0.02)
@@ -319,7 +319,7 @@ class ModelService:
         gc.collect()
 
         # SCAFFOLD: update local control variates
-        # c_i+ = c_i - c + (1 / K*lr) * (w_old - w_new)  — approximated here as:
+        # c_i+ = c_i - c + (1 / K*lr) * (w_old - w_new)  - approximated here as:
         # c_i+ = c_i - c + mean_grad_correction
         updated_c_local: list[torch.Tensor] | None = None
         if c_global is not None and c_local is not None:
@@ -548,7 +548,7 @@ class ModelService:
 
                 avg_loss = epoch_loss / max(n_batches, 1)
                 loss_history.append(avg_loss)
-                logger.debug("Opacus Epoch %d/%d — loss: %.4f", epoch + 1, epochs, avg_loss)
+                logger.debug("Opacus Epoch %d/%d - loss: %.4f", epoch + 1, epochs, avg_loss)
 
                 time.sleep(0.02)
 
@@ -948,7 +948,7 @@ class ModelService:
         """Extract feature importance from the first layer weights.
 
         Uses absolute weight magnitude as a proxy for importance.
-        This is a rough heuristic — not as rigorous as SHAP or permutation
+        This is a rough heuristic - not as rigorous as SHAP or permutation
         importance, but sufficient for visualization purposes.
         """
         from app.application.services.data_generator import FEATURE_NAMES

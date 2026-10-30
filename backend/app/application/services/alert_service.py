@@ -3,7 +3,7 @@
 Generates fraud alerts from model predictions, applies sliding-window
 deduplication and intelligent multi-factor triage priority scoring, and
 manages the shared cross-bank intelligence layer. Alerts never contain
-raw transaction data — only risk scores, reason codes, triage metadata,
+raw transaction data - only risk scores, reason codes, triage metadata,
 and privacy-preserving identifiers.
 """
 
@@ -523,7 +523,7 @@ class AlertIntelligenceService:
                 involved_entity_ids=entity_ids,
                 model_confidence=0.0,
                 top_features=[],
-                risk_factors=["Risk assessment unavailable — transaction held for review"],
+                risk_factors=["Risk assessment unavailable - transaction held for review"],
                 triage_priority=TriagePriority.P3_MEDIUM,
                 triage_action=TriageAction.QUEUE_STANDARD,
                 sla_minutes=1440,
@@ -666,7 +666,7 @@ class AlertIntelligenceService:
                     }
                 )
 
-        # Velocity analysis — alerts within 60 seconds
+        # Velocity analysis - alerts within 60 seconds
         sorted_alerts = sorted(alerts, key=lambda a: a.created_at)
         for i in range(len(sorted_alerts) - 1):
             time_diff = (

@@ -1,4 +1,4 @@
-"""Core domain and AML intelligence platform tables — Phase 10.
+"""Core domain and AML intelligence platform tables.
 
 Creates the remaining 11 domain, AML, graph, and simulation tables
 to achieve 100% schema parity with SQLAlchemy Base.metadata:

@@ -121,7 +121,7 @@ async def run_realtime_benchmark(
                     return None
 
         # ── Phase 1: /api/v1/transactions/score  ────────────────────
-        print(f"[PHASE 1/3] /api/v1/transactions/score  — {n_requests} req @ {concurrency} concurrency", flush=True)
+        print(f"[STEP 1/3] /api/v1/transactions/score  - {n_requests} req @ {concurrency} concurrency", flush=True)
         t0 = time.perf_counter()
         results = await asyncio.gather(
             *[one_request(i, "/api/v1/transactions/score", _score_payload) for i in range(n_requests)]
@@ -131,7 +131,7 @@ async def run_realtime_benchmark(
         print(f"  Done in {dur1:.2f}s  ({n_requests/dur1:.0f} req/s)", flush=True)
 
         # ── Phase 2: /api/v1/predict  ────────────────────────────────
-        print(f"[PHASE 2/3] /api/v1/predict              — {n_requests} req @ {concurrency} concurrency", flush=True)
+        print(f"[STEP 2/3] /api/v1/predict              - {n_requests} req @ {concurrency} concurrency", flush=True)
         t0 = time.perf_counter()
         results2 = await asyncio.gather(
             *[one_request(i, "/api/v1/predict", _predict_payload) for i in range(n_requests)]
@@ -154,7 +154,7 @@ async def run_realtime_benchmark(
                 "velocity_1h": random.randint(1, 15),
             }
 
-        print(f"[PHASE 3/3] /v1/inference/score (JIT)    — {n_requests} req @ {concurrency} concurrency", flush=True)
+        print(f"[STEP 3/3] /v1/inference/score (JIT)    - {n_requests} req @ {concurrency} concurrency", flush=True)
         t0 = time.perf_counter()
         results3 = await asyncio.gather(
             *[one_request(i, "/v1/inference/score", _jit_payload) for i in range(n_requests)]
@@ -260,7 +260,7 @@ if __name__ == "__main__":
         )
     )
 
-    # Save JSON FIRST — before any print that might fail on encoding
+    # Save JSON FIRST - before any print that might fail on encoding
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")

@@ -286,6 +286,7 @@ class TestSharedCanaryEvidenceConsistency:
         # Ensure store has in-memory fallback (simulate Redis unavailable)
         eval_engine._store._redis_failed = True
         eval_engine._store._redis_client = None
+        monkeypatch.setattr(eval_engine._store, "has_active_shared_storage", lambda: False)
 
         # Set production environment for evaluation safety gating
         monkeypatch.setenv("APP_ENV", "production")

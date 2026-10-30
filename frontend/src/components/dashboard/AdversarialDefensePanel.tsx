@@ -73,7 +73,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
         <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
           <span className="text-xs text-slate-400 font-medium">Robustness Score</span>
           <div className="text-xl font-bold font-mono text-cyan-400 mt-1">
-            {robustnessScore !== null ? `${(robustnessScore * 100).toFixed(1)}%` : '—'}
+            {robustnessScore !== null ? `${(robustnessScore * 100).toFixed(1)}%` : '-'}
           </div>
           <p className="text-[10px] text-slate-500 mt-1">Overall Evasion Immunity</p>
         </div>
@@ -83,11 +83,11 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
           <span className="text-xs text-slate-400 font-medium">Clean vs Robust Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1 font-mono">
             <span className="text-lg font-bold text-slate-200">
-              {cleanAcc !== null ? `${(cleanAcc * 100).toFixed(1)}%` : '—'}
+              {cleanAcc !== null ? `${(cleanAcc * 100).toFixed(1)}%` : '-'}
             </span>
             <span className="text-xs text-slate-500">/</span>
             <span className={`text-lg font-bold ${isEnabled ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {robustAcc !== null ? `${(robustAcc * 100).toFixed(1)}%` : '—'}
+              {robustAcc !== null ? `${(robustAcc * 100).toFixed(1)}%` : '-'}
             </span>
           </div>
           <p className="text-[10px] text-slate-500 mt-1">Clean Acc vs Perturbed Acc</p>
@@ -97,7 +97,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
         <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
           <span className="text-xs text-slate-400 font-medium">FGSM Evasion Blocked</span>
           <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
-            {fgsmRejection !== null ? `${fgsmRejection}%` : '—'}
+            {fgsmRejection !== null ? `${fgsmRejection}%` : '-'}
           </div>
           <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
             <div
@@ -111,7 +111,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
         <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
           <span className="text-xs text-slate-400 font-medium">PGD Evasion Blocked</span>
           <div className="text-xl font-bold font-mono text-cyan-400 mt-1">
-            {pgdRejection !== null ? `${pgdRejection}%` : '—'}
+            {pgdRejection !== null ? `${pgdRejection}%` : '-'}
           </div>
           <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
             <div

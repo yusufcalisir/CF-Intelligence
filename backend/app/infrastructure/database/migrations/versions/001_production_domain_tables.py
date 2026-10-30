@@ -1,4 +1,4 @@
-"""Production domain tables — Phase 35.
+"""Production domain tables.
 
 Creates the 6 core production persistence tables that replace
 in-memory dict and Redis storage for all domain objects.

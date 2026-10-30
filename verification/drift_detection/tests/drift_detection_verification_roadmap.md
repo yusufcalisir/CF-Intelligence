@@ -134,9 +134,9 @@ This document outlines the **Scientific Verification Roadmap** for validating th
 
 ## Deliverables Summary
 
-1. `scratch/reference_drift_verification.py` — Independent mathematical reference benchmark.
-2. `scratch/test_drift_hypothesis.py` — Hypothesis property-based testing suite.
-3. `scratch/drift_monte_carlo_verification.py` — Statistical Monte Carlo simulations (p-value uniformity, power curves, FWER).
-4. `scratch/test_drift_robustness.py` — Edge-case failure injection test suite.
-5. `scratch/drift_benchmark_scalability.py` — Empirical performance benchmarking script.
-6. `drift_detection_scientific_audit_report.md` — Final scientific audit report for inclusion in `verification/`.
+1. `scratch/reference_drift_verification.py` - Independent mathematical reference benchmark.
+2. `scratch/test_drift_hypothesis.py` - Hypothesis property-based testing suite.
+3. `scratch/drift_monte_carlo_verification.py` - Statistical Monte Carlo simulations (p-value uniformity, power curves, FWER).
+4. `scratch/test_drift_robustness.py` - Edge-case failure injection test suite.
+5. `scratch/drift_benchmark_scalability.py` - Empirical performance benchmarking script.
+6. `drift_detection_scientific_audit_report.md` - Final scientific audit report for inclusion in `verification/`.

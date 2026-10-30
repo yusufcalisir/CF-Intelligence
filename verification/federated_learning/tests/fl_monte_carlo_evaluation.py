@@ -114,7 +114,7 @@ def generate_report(results: dict):
     report_path = Path(__file__).parent / "fl_monte_carlo_report.md"
 
     lines = [
-        "# Monte Carlo Statistical Validation Report — FederatedLearningEngine",
+        "# Monte Carlo Statistical Validation Report - FederatedLearningEngine",
         "",
         "## Executive Summary",
         "",

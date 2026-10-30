@@ -1,4 +1,4 @@
-﻿# Property-Based Testing Report — Risk Scoring Engine Subsystem
+﻿# Property-Based Testing Report - Risk Scoring Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine (`RiskScoringEngine`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

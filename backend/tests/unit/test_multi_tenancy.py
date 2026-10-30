@@ -225,7 +225,7 @@ class TestModelVault:
         assert os.path.exists(os.path.join(vault_a, "local_model_weights.pt"))
         assert os.path.exists(os.path.join(vault_b, "local_model_weights.pt"))
 
-        # Verify isolation — different file contents
+        # Verify isolation - different file contents
         with open(os.path.join(vault_a, "local_model_weights.pt")) as f:
             a_content = f.read()
         with open(os.path.join(vault_b, "local_model_weights.pt")) as f:

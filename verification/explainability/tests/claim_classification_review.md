@@ -1,4 +1,4 @@
-# Scientific Claim Classification Review — Explainability (XAI) Module
+# Scientific Claim Classification Review - Explainability (XAI) Suite
 
 **Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_investigation.py`)  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
@@ -149,4 +149,4 @@ To ensure publication-quality scientific integrity, the following claims must be
 
 ---
 
-*End of Scientific Claim Classification Review — Explainability (XAI) Module*
+*End of Scientific Claim Classification Review - Explainability (XAI) Suite*

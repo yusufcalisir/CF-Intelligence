@@ -18,7 +18,7 @@
 
 ## 2. Automated SLA Breach Detection & Notification Workflow
 
-If a service degradation exceeds contractual thresholds (Uptime < 99.99% or Latency p99 > 15ms):
+If a service degradation exceeds contractual thresholds (Uptime < 99.90% monthly, fast-path scoring latency p99 > 15ms, or multi-model ensemble p99 > 100ms):
 
 ```
 [Prometheus / OTel Monitor] ──(SLA Breach Detected)──> [Automated SLA Incident Logger]

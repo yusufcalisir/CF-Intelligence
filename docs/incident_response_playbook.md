@@ -192,6 +192,25 @@ record = engine.triage_and_classify(
 
 ---
 
+### 2.8. RUNBOOK-P1-03: Operational Pilot Emergency Freeze & Kill-Switch
+* **Trigger**: Participating institution anomaly, data integrity mismatch, or compliance freeze request during live pilot.
+* **Target Component**: [`pilot_operations_service.py`](../backend/app/application/services/pilot_operations_service.py)
+* **Action Checklist**:
+  1. Issue immediate operational pause via REST API or CLI:
+     `curl -X POST http://cfi-api-server:8000/api/v1/pilots/{pilot_id}/pause -H 'Authorization: Bearer <TOKEN>'`
+  2. Verify all matching grid activity halts immediately across bank workers.
+  3. Inspect sealed audit dossier (`GET /api/v1/pilots/{pilot_id}`) to audit event transition timestamps and signatures.
+
+### 2.9. RUNBOOK-P2-04: Redis Network Partition & Dynamic Reconnection Recovery
+* **Trigger**: Health check probe reports `durability="ephemeral"` and `storage_backend="memory"`.
+* **Target Component**: [`redis_store.py`](../backend/app/infrastructure/persistence/redis_store.py)
+* **Action Checklist**:
+  1. Inspect Redis container logs and network bridge: `docker logs cfi-redis`.
+  2. Verify that application continues uninterrupted in ephemeral memory mode without dropping API requests.
+  3. Once network/Redis is restored, verify that background auto-reconnect (`_attempt_auto_reconnect`, 1s cooldown) restores `durability="durable"` within 5 seconds via `GET /health`.
+
+---
+
 ## 3. Incident Lifecycle Resolution & SRE Sign-Off
 
 All open incidents must be formally closed through the `IncidentTriageEngine` lifecycle with root cause and remediation notes:

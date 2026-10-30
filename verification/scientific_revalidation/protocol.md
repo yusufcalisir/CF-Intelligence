@@ -1,4 +1,4 @@
-# CF-Intelligence — Scientific Revalidation Protocol V1.0
+# CF-Intelligence - Scientific Revalidation Protocol V1.0
 
 ## Clean Reproduction of Historically Affected Benchmark Evidence
 
@@ -7,12 +7,12 @@
 ### 1. Mission and Context
 Following the formal closure of the semantic and correctness remediation phase (culminating in commit `a0bb088febdc3fa3da16a620b281946ac8694e31`), this protocol establishes an immutable preregistered scientific methodology for regenerating valid, defensible evidence for six historical revalidation units:
 
-- **RU-CC-01**: European Credit Card (`run_creditcard_benchmark.py` — `FL-001` + `DATA-002`)
-- **RU-PS-01**: PaySim (`run_paysim_canonical_benchmark.py` — `FL-001`)
-- **RU-EL-01**: Elliptic Bitcoin GraphSAGE (`train_graphsage.py` — `GRAPH-LEAK-01` + `DATA-007`)
-- **RU-IE-01**: IEEE-CIS (`run_ieee_benchmark.py` — `FL-001`)
-- **RU-AML-01**: IBM AMLSim (`evaluate_patterns.py` — `DATA-006`)
-- **RU-MS-01**: Multi-Seed Statistical Runner (`multi_seed_runner.py` — `FL-001` + `CRYPTO-001`)
+- **RU-CC-01**: European Credit Card (`run_creditcard_benchmark.py` - `FL-001` + `DATA-002`)
+- **RU-PS-01**: PaySim (`run_paysim_canonical_benchmark.py` - `FL-001`)
+- **RU-EL-01**: Elliptic Bitcoin GraphSAGE (`train_graphsage.py` - `GRAPH-LEAK-01` + `DATA-007`)
+- **RU-IE-01**: IEEE-CIS (`run_ieee_benchmark.py` - `FL-001`)
+- **RU-AML-01**: IBM AMLSim (`evaluate_patterns.py` - `DATA-006`)
+- **RU-MS-01**: Multi-Seed Statistical Runner (`multi_seed_runner.py` - `FL-001` + `CRYPTO-001`)
 
 ---
 

@@ -1,4 +1,4 @@
-# Verification Inventory & Artifact Registry — Smart Contracts Subsystem
+# Verification Inventory & Artifact Registry - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

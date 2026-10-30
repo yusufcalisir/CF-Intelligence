@@ -2,14 +2,14 @@
 
 Provides REST endpoints for querying, validating, exporting, and signing off on
 automated regulatory AI model validation dossiers:
-- GET  /api/v1/regulatory/dossier/summary    — Executive compliance summary & metrics
-- GET  /api/v1/regulatory/dossier/eu-ai-act  — EU AI Act Articles 9–15 compliance matrix
-- GET  /api/v1/regulatory/dossier/sr11-7     — Federal Reserve SR 11-7 3-Pillars audit report
-- GET  /api/v1/regulatory/dossier/benchmarks — Baseline model comparison table
-- GET  /api/v1/regulatory/dossier/signoffs   — Supervisory sign-off audit register
-- POST /api/v1/regulatory/dossier/signoff    — Cryptographic dual-control supervisory sign-off
-- GET  /api/v1/regulatory/dossier/export     — Export dossier in Markdown or JSON
-- GET  /api/v1/regulatory/dossier/health     — Router health probe
+- GET  /api/v1/regulatory/dossier/summary    - Executive compliance summary & metrics
+- GET  /api/v1/regulatory/dossier/eu-ai-act  - EU AI Act Articles 9–15 compliance matrix
+- GET  /api/v1/regulatory/dossier/sr11-7     - Federal Reserve SR 11-7 3-Pillars audit report
+- GET  /api/v1/regulatory/dossier/benchmarks - Baseline model comparison table
+- GET  /api/v1/regulatory/dossier/signoffs   - Supervisory sign-off audit register
+- POST /api/v1/regulatory/dossier/signoff    - Cryptographic dual-control supervisory sign-off
+- GET  /api/v1/regulatory/dossier/export     - Export dossier in Markdown or JSON
+- GET  /api/v1/regulatory/dossier/health     - Router health probe
 
 Dual-routing supported under /api/v1/regulatory/dossier and /regulatory/dossier.
 """

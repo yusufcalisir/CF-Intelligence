@@ -2,7 +2,7 @@
 
 **Verification Engine:** PyTorch Opacus `PrivacyEngine(accountant='prv')`  
 **Privacy Accountant:** PRVAccountant (Privacy Random Variables, Gopi et al. 2021)  
-**Sweep Type:** Fixed-noise-multiplier (σ ∈ {3.0, 2.0, 1.0, 0.5, 0.0}) — NOT target-ε calibration  
+**Sweep Type:** Fixed-noise-multiplier (σ ∈ {3.0, 2.0, 1.0, 0.5, 0.0}) - NOT target-ε calibration  
 **Dataset:** Synthetic Banking (N=20,000, 15 features, prevalence=2.0%)  
 **Test Support:** 84 fraud transactions out of 4,000 test samples  
 **Seeds Evaluated:** [42, 123, 456]  

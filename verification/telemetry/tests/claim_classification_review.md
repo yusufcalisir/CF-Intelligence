@@ -1,4 +1,4 @@
-# Scientific Claim Classification Review — Telemetry & Observability Subsystem
+# Scientific Claim Classification Review - Telemetry & Observability Subsystem
 
 **Subsystem:** Telemetry, Metrics, Distributed Tracing, SIEM Logging & SLA Monitoring  
 **Audited Modules:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `alert_service.py`, `support_diagnostics.py`, `metrics_service.py`, `monitoring.py`, `health.py`, `dashboard.py`  
@@ -23,7 +23,7 @@ Each claim is evaluated against theoretical distributed systems standards (W3C T
 
 | Claim Category | Tested Claim | Classification | Primary Scientific Defect | Recommended Scientifically Accurate Wording |
 |:---|:---|:---:|:---|:---|
-| **System Health** | *"Guarantees real-time system health monitoring and readiness validation for Kubernetes probes."* | **SUPPORTED** | None — liveness (`/health`) and readiness (`/health/ready`) probes verify DB/Redis connectivity | *"Provides active HTTP liveness (/health) and readiness (/health/ready) probes evaluating PostgreSQL and Redis connectivity status."* |
+| **System Health** | *"Guarantees real-time system health monitoring and readiness validation for Kubernetes probes."* | **SUPPORTED** | None - liveness (`/health`) and readiness (`/health/ready`) probes verify DB/Redis connectivity | *"Provides active HTTP liveness (/health) and readiness (/health/ready) probes evaluating PostgreSQL and Redis connectivity status."* |
 | **Distributed Tracing** | *"Zero-overhead end-to-end real-time W3C distributed tracing across all daemons."* | **PARTIALLY SUPPORTED** | Custom pseudo-random ID generators (`random.getrandbits`); tracing is in-process without network OTLP exporter | *"Implements in-process W3C Trace Context header formatting (traceparent/tracestate) for transaction lifecycle profiling; full cross-network trace collection requires an external OpenTelemetry Collector."* |
 | **Latency Reporting** | *"Real-time sub-millisecond p50/p95/p99 latency SLA monitoring and quantile tracking."* | **PARTIALLY SUPPORTED** | Quantile calculation sorts full raw sample list in memory ($\mathcal{O}(N \log N)$) rather than streaming quantiles (t-digest) | *"Computes exact linear-interpolation latency percentiles (p50, p95, p99) over in-memory sample buffers; computational overhead scales with total recorded sample volume."* |
 | **Throughput & Quotas** | *"Real-time tenant resource quota enforcement and high-throughput multi-tenant billing metering."* | **PARTIALLY SUPPORTED** | Usage counters reside exclusively in volatile memory; backend process restart resets usage counters to zero | *"Tracks daily inference and monthly training round usage counters in memory to enforce tenant resource quotas during continuous process uptime."* |
@@ -167,4 +167,4 @@ To ensure publication-quality scientific integrity, the project documentation an
 
 ---
 
-*End of Scientific Claim Classification Review — Telemetry & Observability Subsystem*
+*End of Scientific Claim Classification Review - Telemetry & Observability Subsystem*

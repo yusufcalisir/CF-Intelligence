@@ -1,4 +1,4 @@
-﻿# Adversarial Robustness & Stress Testing Report — Risk Scoring Engine Subsystem
+﻿# Adversarial Robustness & Stress Testing Report - Risk Scoring Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine (`RiskScoringEngine`) & AST Policy Engine (`PolicyEngineService`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

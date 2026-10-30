@@ -1,4 +1,4 @@
-"""Scientific verification suite for RDP Moments Accountant — Phase 15.1.
+"""Scientific verification suite for RDP Moments Accountant.
 
 Mathematical invariants verified:
   1. Per-step RDP bound monotonicity: ε_RDP(α) = α·q²/(2σ²) increases with α.

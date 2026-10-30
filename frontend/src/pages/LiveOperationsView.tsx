@@ -144,7 +144,7 @@ export default function LiveOperationsView() {
 
   const isTrainingRef = useRef(isTraining);
   isTrainingRef.current = isTraining;
-  /** True while the ID-change reset effect is writing new state — blocks auto-start from firing prematurely. */
+  /** True while the ID-change reset effect is writing new state - blocks auto-start from firing prematurely. */
   const isResettingIdRef = useRef(false);
 
   const handleRetryLiveStream = () => {
@@ -248,7 +248,7 @@ export default function LiveOperationsView() {
   }, [championAuc, unifiedRoundHistory]);
 
   // Derive consortium bank results: prioritize active simulation banks, fallback to dynamically mapped nodes.
-  // All metrics are derived exclusively from real unified round telemetry — no static/hardcoded values.
+  // All metrics are derived exclusively from real unified round telemetry - no static/hardcoded values.
   const effectiveBanks: BankResult[] = useMemo(() => {
     if (simBanks.length > 0) return simBanks;
 
@@ -1034,14 +1034,14 @@ export default function LiveOperationsView() {
   // NOTE: phaseTimerRef is intentionally NOT cleared on unmount.
   // React 18 StrictMode double-mounts (mount → unmount → remount) but preserves refs/state.
   // If the timer is cleared during the "fake" unmount, the setTimeout chain that drives
-  // simulation phases dies permanently — hasAutoStartedRef blocks restart, leaving training
+  // simulation stages die permanently - hasAutoStartedRef blocks restart, leaving training
   // stuck at "generating_data". Timer cleanup is handled explicitly by:
-  //   • resetTraining() — user-initiated reset
-  //   • ID-change effect — sim switch clears old timers before starting new ones
+  //   • resetTraining() - user-initiated reset
+  //   • ID-change effect - sim switch clears old timers before starting new ones
   // In real (non-StrictMode) unmounts, stale timer callbacks become no-ops in React 18.
 
   // When the sim ID changes (user navigated to a different simulation), fully reset local state
-  // so charts and metrics always reflect the newly selected simulation — never stale data.
+  // so charts and metrics always reflect the newly selected simulation - never stale data.
   const prevIdRef = useRef(id);
   useEffect(() => {
     if (prevIdRef.current === id) return;
@@ -1145,7 +1145,7 @@ export default function LiveOperationsView() {
                   className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
                 >
                   <AlertTriangle size={12} className="text-amber-400 shrink-0" />
-                  <span>Offline Demo Mode (Connection Lost — Simulated)</span>
+                  <span>Offline Demo Mode (Connection Lost - Simulated)</span>
                 </span>
               )}
             </div>
@@ -1279,7 +1279,7 @@ export default function LiveOperationsView() {
           <div className="flex items-center gap-2.5 min-w-0">
             <AlertTriangle size={16} className="text-amber-400 shrink-0" />
             <span className="leading-relaxed">
-              <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker — this data is illustrative and not live production telemetry.
+              <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker - this data is illustrative and not live production telemetry.
             </span>
           </div>
           <button
@@ -1324,7 +1324,7 @@ export default function LiveOperationsView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">FL Training Round</p>
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
-            {effectiveCurrentRound > 0 ? `Round ${effectiveCurrentRound} / ${TOTAL_ROUNDS}` : '—'}
+            {effectiveCurrentRound > 0 ? `Round ${effectiveCurrentRound} / ${TOTAL_ROUNDS}` : '-'}
           </p>
           <p className="text-xs mt-1" style={{ color: selectedProfile.color }}>
             {gradientSubmissions > 0 ? `${gradientSubmissions} / 3 Gradients Received` : 'Awaiting start'}
@@ -1367,7 +1367,7 @@ export default function LiveOperationsView() {
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
               Per-Round Model Performance
               <span className="ml-2 text-xs font-normal" style={{ color: selectedProfile.color }}>
-                — {selectedProfile.label}
+                - {selectedProfile.label}
               </span>
             </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
@@ -1442,7 +1442,7 @@ export default function LiveOperationsView() {
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
               Federated Training Loss
               <span className="ml-2 text-xs font-normal" style={{ color: selectedProfile.color }}>
-                — {selectedProfile.label}
+                - {selectedProfile.label}
               </span>
             </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Cross-entropy loss across communication rounds</p>
@@ -1665,7 +1665,7 @@ export default function LiveOperationsView() {
         )}
       </div>
 
-      {/* Asset Recovery & Collaborative FININT Operational Hub — Live Telemetry Card */}
+      {/* Asset Recovery & Collaborative FININT Operational Hub - Live Telemetry Card */}
       {arSummary && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -1721,7 +1721,7 @@ export default function LiveOperationsView() {
         </motion.div>
       )}
 
-      {/* Deep Operational Panels — Fully Wired to Live Telemetry */}
+      {/* Deep Operational Panels - Fully Wired to Live Telemetry */}
       <ModelRegistryPanel simulationId={activeSimId || ''} />
       <ComplianceReportPanel simulationId={activeSimId || ''} banks={effectiveBanks} />
       <IncentiveRegistryPanel banks={effectiveBanks} />

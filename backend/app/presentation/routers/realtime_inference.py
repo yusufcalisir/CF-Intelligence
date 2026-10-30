@@ -1,4 +1,4 @@
-"""Low-Latency Real-Time Inference Gateway Router — Section 42.1."""
+"""Low-Latency Real-Time Inference Gateway Router - Section 42.1."""
 
 from __future__ import annotations
 

@@ -110,7 +110,7 @@ def run_reference_verification() -> dict[str, Any]:
             "index_disjointness": "PASS",
         })
 
-    report_content = f"""# Pure-Python Reference Verification Report — Real-World Fraud ETL Pipeline
+    report_content = f"""# Pure-Python Reference Verification Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

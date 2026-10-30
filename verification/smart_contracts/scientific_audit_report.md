@@ -4,7 +4,7 @@
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Senior Blockchain Security & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE (9 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED) — Gnosis Safe 2-of-3 Threshold Multi-Sig Governance (`GnosisSafeMultiSigCoordinator.sol`)  
+**Audit Status:** COMPLETE (9 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED) - Gnosis Safe 2-of-3 Threshold Multi-Sig Governance (`GnosisSafeMultiSigCoordinator.sol`)  
 
 ---
 

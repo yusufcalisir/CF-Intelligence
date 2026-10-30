@@ -285,7 +285,7 @@ def main() -> None:
     targets = list(DATASET_CONFIGS.keys()) if args.dataset == "all" else [args.dataset]
 
     print("\n" + "#" * 80)
-    print(" CFI PLATFORM — REAL-WORLD BENCHMARK DATASET PROVISIONING & PROVENANCE TOOL ")
+    print(" CFI PLATFORM - REAL-WORLD BENCHMARK DATASET PROVISIONING & PROVENANCE TOOL ")
     print("#" * 80 + "\n")
 
     for key in targets:

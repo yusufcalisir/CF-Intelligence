@@ -1,4 +1,4 @@
-# Robustness & Fault Injection Report — Connector Framework
+# Robustness & Fault Injection Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Codebase Files:** `app/application/interfaces/bank_connector.py`, `app/infrastructure/connectors/*`, `app/application/services/bank_onboarding_service.py`, `app/infrastructure/client_daemon/*`  
@@ -131,4 +131,4 @@ Zero Crash Verification:                          VERIFIED (0 Unhandled Panics)
 
 ---
 
-*End of Robustness & Fault Injection Report — Connector Framework*
+*End of Robustness & Fault Injection Report - Connector Framework*

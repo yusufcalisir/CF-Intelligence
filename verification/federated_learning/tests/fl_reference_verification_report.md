@@ -1,4 +1,4 @@
-# Independent Reference Verification Report — FederatedLearningEngine
+# Independent Reference Verification Report - FederatedLearningEngine
 
 ## Executive Summary
 

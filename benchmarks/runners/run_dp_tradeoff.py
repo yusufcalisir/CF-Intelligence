@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """Run canonical DP benchmark and write all artifacts."""
-    logger.info("Canonical Opacus DP benchmark starting — σ=%s, seeds=%s", DEFAULT_SIGMAS, DEFAULT_SEEDS)
+    logger.info("Canonical Opacus DP benchmark starting - σ=%s, seeds=%s", DEFAULT_SIGMAS, DEFAULT_SEEDS)
     suite = run_canonical_dp_benchmark(
         sigmas=DEFAULT_SIGMAS,
         seeds=DEFAULT_SEEDS,

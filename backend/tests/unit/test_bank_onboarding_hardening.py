@@ -1,4 +1,4 @@
-"""Unit tests for Phase 47 — Institutional Bank Onboarding & PKI Wizard Hardening.
+"""Unit tests for Institutional Bank Onboarding & PKI Wizard Hardening.
 
 Covers:
   1. Real X.509 CSR signing workflow with genuine RSA key generation & verification

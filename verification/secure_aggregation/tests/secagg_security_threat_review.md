@@ -1,4 +1,4 @@
-﻿# Cryptographic Security Threat Review — Secure Aggregation Subsystem
+﻿# Cryptographic Security Threat Review - Secure Aggregation Subsystem
 
 This document provides a formal security review evaluating 7 primary threat vectors against the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem.
 

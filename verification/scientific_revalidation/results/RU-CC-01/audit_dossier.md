@@ -25,7 +25,7 @@ Under extreme financial class imbalance (578:1 ratio), institutions with sparse 
 | **Bank A Silo (Large Retail)** | Isolated Silo | 0.7291 | 0.9850 | 84.85% | 85.86% | 0.0007 | ⚠️ Single-Bank Perimeter |
 | **Bank B Silo (Challenger)** | Isolated Silo | 0.6275 | 0.9736 | 82.83% | 85.86% | 0.0009 | ⚠️ Single-Bank Perimeter |
 | **Bank C Silo (Near-Zero Fraud)** | Isolated Silo | 0.6113 | 0.9443 | 78.79% | 78.79% | 0.0017 | 🚨 **Severe Data Starvation Failure** |
-| **Consortium Silo Average** | Baseline Mean | 0.6560 | 0.9676 | 82.16% | — | — | ⚠️ Baseline Silo Mean |
+| **Consortium Silo Average** | Baseline Mean | 0.6560 | 0.9676 | 82.16% | - | - | ⚠️ Baseline Silo Mean |
 
 ---
 

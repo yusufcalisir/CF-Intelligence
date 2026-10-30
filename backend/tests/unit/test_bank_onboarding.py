@@ -1,4 +1,4 @@
-"""Unit tests for Section 36.1 — Bank Onboarding Pipeline.
+"""Unit tests for Section 36.1 - Bank Onboarding Pipeline.
 
 Tests:
   1. test_register_bank_creates_db_record

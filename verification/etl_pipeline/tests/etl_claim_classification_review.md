@@ -1,4 +1,4 @@
-# Claim Classification Review — Real-World Fraud ETL Pipeline
+# Claim Classification Review - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

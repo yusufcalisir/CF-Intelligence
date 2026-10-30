@@ -297,7 +297,7 @@ class TestScreening:
         assert result.is_alerted is True
 
     def test_fuzzy_match_detected(self, svc_with_data):
-        # "Ivan Petov" — one character deleted from Petrov
+        # "Ivan Petov" - one character deleted from Petrov
         result = svc_with_data.screen_entity("Ivan Petov")
         assert any(h.score > 40.0 for h in result.hits)
 
@@ -334,7 +334,7 @@ class TestScreening:
             svc.screen_entity("John Smith", entity_type="ROBOT")
 
     def test_source_filter_applied(self, svc_with_data):
-        # Screen against only OFAC — should only find John Smith
+        # Screen against only OFAC - should only find John Smith
         result = svc_with_data.screen_entity("John Smith", sources=[WatchlistSource.OFAC_SDN])
         assert all(h.source == WatchlistSource.OFAC_SDN for h in result.hits)
 
@@ -359,13 +359,13 @@ class TestScreening:
 class TestGoodlist:
 
     def test_goodlist_suppresses_future_screens(self, svc_with_data):
-        # First screening — gets a hit
+        # First screening - gets a hit
         result = svc_with_data.screen_entity("John Smith")
         assert result.hits
         hit = result.hits[0]
         # Goodlist the hit
         svc_with_data.goodlist_entity(result.result_id, hit.hit_id, "officer-001", "Verified employee")
-        # Second screening — should be suppressed
+        # Second screening - should be suppressed
         result2 = svc_with_data.screen_entity("John Smith")
         assert result2.goodlisted is True
         assert result2.hits == []
@@ -453,7 +453,7 @@ class TestBulkRescreen:
 
     def test_bulk_rescreen_respects_threshold(self, svc_with_data):
         svc_with_data.screen_entity("John Smith")
-        # Re-screen with very high threshold — exact match still alerts
+        # Re-screen with very high threshold - exact match still alerts
         results = svc_with_data.bulk_rescreen(alert_threshold=99)
         assert any(r.is_alerted for r in results.values())
 

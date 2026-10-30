@@ -84,7 +84,7 @@ async def test_ring_buffer_respects_max_limit(manager: WebSocketConnectionManage
 
 @pytest.mark.asyncio
 async def test_ring_buffer_room_isolation(manager: WebSocketConnectionManager):
-    """Ring-buffer entries must be isolated per room — no cross-contamination."""
+    """Ring-buffer entries must be isolated per room - no cross-contamination."""
     ws_a = _mock_ws()
     ws_b = _mock_ws()
     await manager.connect(ws_a, room="simulation:room_a")

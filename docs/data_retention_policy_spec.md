@@ -54,6 +54,8 @@ The engine categorizes consortium data under the [`DataCategory`](../backend/app
 | **`GRAPH_EDGES`** | **30 Days** | `HARD_DELETE` | `RelationshipModel` (`created_at < cutoff`) | Dynamic graph links, transaction flows, and entity associations. |
 | **`EXPLAINABILITY_REPORTS`** | **60 Days** | `CRYPTOGRAPHIC_ZEROIZATION` | `SharedIntelligenceModel` (`created_at < cutoff`) | SHAP feature attributions, typologies, and indicator context. |
 | **`CUSTOMER_ENTITIES`** | **365 Days** | `CRYPTOGRAPHIC_ZEROIZATION` | `EntityModel` (`bank_id == tenant_id`) | PII privacy identifiers, KYC profile attributes, and customer entity rows. |
+| **`CROSS_BANK_PSI_BUFFER`** | **0 Days (Ephemeral)** | `IMMEDIATE_PURGE` | OpenMined PSI 2.0.6 in-memory matching state | Curve25519 Bloom filters and encrypted element buffers wiped immediately after matching. |
+| **`PILOT_AUDIT_DOSSIERS`** | **2555 Days (7 Years)**| `ARCHIVAL` | Controlled pilot lifecycle & Ed25519 scope approvals | Retained for regulatory inspection under EU AMLA and Basel standards. |
 
 
 ---
@@ -103,6 +105,7 @@ audit_trail = engine.get_erasure_audit_trail(tenant_id="bank_alpha")
 ### 3.4 Statutory Scope Limitations & Mandatory Exemptions
 - **Bank Secrecy Act (BSA) & FinCEN Mandates**: Suspicious Activity Reports (SARs) compiled under 31 CFR § 1020.320 and supervisor Four-Eyes audit records are legally required to be maintained for 5 years. Pursuant to GDPR Article 17(3)(b) (*compliance with a legal obligation*), filed SAR cases are exempt from right-to-be-forgotten deletion.
 - **Model Parameters**: Aggregated neural network weights do not contain raw training instances and are governed by Differential Privacy ($\epsilon = 3.0, \delta = 10^{-5}$) rather than SQL purging.
+- **Ephemeral PSI Elements**: Multi-counterparty OpenMined PSI 2.0.6 (Curve25519 ECDH) matching operations process client tokens strictly in volatile memory. No intermediate Bloom filters or blinded element sets are persisted to disk or Redis; once a match yields a verified `CaseEvidenceAttachment`, all ephemeral cryptographic intersection buffers are cleared immediately.
 
 ---
 

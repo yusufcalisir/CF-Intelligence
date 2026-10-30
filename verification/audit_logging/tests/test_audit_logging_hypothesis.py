@@ -185,7 +185,7 @@ def generate_report(results: list[tuple[str, bool, str]]):
     total_count = len(results)
 
     lines = [
-        "# Hypothesis Property-Based Testing Report — Audit Logging Subsystem",
+        "# Hypothesis Property-Based Testing Report - Audit Logging Subsystem",
         "",
         "## Executive Summary",
         "",

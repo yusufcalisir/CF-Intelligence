@@ -14,7 +14,7 @@ This Data Processing Agreement ("**DPA**") governs the privacy, security, and pr
 
 ### 1.1. The Zero-Raw-PII Technical & Legal Invariant
 > **Fundamental Covenant:**  
-> The Vendor covenants, warrants, and contractually guarantees that **NO RAW CUSTOMER PERSONALLY IDENTIFIABLE INFORMATION (PII)** — including but not limited to National ID numbers (TCKN/SSN), IBANs, raw Account Numbers, Primary Account Numbers (PAN / Credit Card digits), Customer Names, Physical Addresses, or Unhashed Phone Numbers — **SHALL EVER BE TRANSMITTED ACROSS THE CUSTOMER'S PERIMETER OR INGESTED BY THE VENDOR'S CENTRAL COORDINATOR.**
+> The Vendor covenants, warrants, and contractually guarantees that **NO RAW CUSTOMER PERSONALLY IDENTIFIABLE INFORMATION (PII)** - including but not limited to National ID numbers (TCKN/SSN), IBANs, raw Account Numbers, Primary Account Numbers (PAN / Credit Card digits), Customer Names, Physical Addresses, or Unhashed Phone Numbers - **SHALL EVER BE TRANSMITTED ACROSS THE CUSTOMER'S PERIMETER OR INGESTED BY THE VENDOR'S CENTRAL COORDINATOR.**
 
 ---
 

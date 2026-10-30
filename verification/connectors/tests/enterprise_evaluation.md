@@ -1,4 +1,4 @@
-# Enterprise Integration Evaluation Report — Connector Framework
+# Enterprise Integration Evaluation Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Modules:** `app.application.interfaces.bank_connector`, `app.infrastructure.connectors.*`, `app.application.services.bank_onboarding_service`, `app.infrastructure.client_daemon.*`  
@@ -27,7 +27,7 @@ This report presents a thorough evaluation of the **Connector Framework** from a
  7. Ease of Adding New Connectors       7.0 /  10.0   GOOD WITH QUALIFICATIONS
  8. Maintainability                     8.5 /  10.0   EXCELLENT
 ----------------------------------------------------------------------------------------------------
- COMPOSITE ENTERPRISE SCORE             63.0 / 80.0  (78.75% — B+ Grade)
+ COMPOSITE ENTERPRISE SCORE             63.0 / 80.0  (78.75% - B+ Grade)
 ====================================================================================================
 ```
 
@@ -136,6 +136,6 @@ This report presents a thorough evaluation of the **Connector Framework** from a
 
 ---
 
-*Enterprise Integration Evaluation Report — Connector Framework*  
+*Enterprise Integration Evaluation Report - Connector Framework*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

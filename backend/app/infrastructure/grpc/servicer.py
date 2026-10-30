@@ -436,7 +436,7 @@ class FederatedLearningServicer:
             )
             return AggregationAck(
                 received=True,
-                status_message=f"Gradient accepted for round {round_key}. Quorum reached ({current_count}/{quorum_target}) — aggregation initiated.",
+                status_message=f"Gradient accepted for round {round_key}. Quorum reached ({current_count}/{quorum_target}) - aggregation initiated.",
             )
 
         return AggregationAck(
@@ -487,7 +487,7 @@ class FederatedLearningServicer:
 
         The coordinator stores the bundle indexed by (round_id, bank_id) and
         routes it to all other participants on demand via FetchPeerPublicKeys.
-        No shared secret is ever derived server-side — the coordinator is a
+        No shared secret is ever derived server-side - the coordinator is a
         pure relay with zero cryptographic knowledge of pairwise masks.
 
         Validation:

@@ -597,7 +597,7 @@ class FederatedIEEECISTrainer:
 
             if verbose:
                 logger.info(
-                    "Round %2d/%2d [%s] — Loss: %.4f (Val: %.4f) | PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%% | Rec@1%%FPR: %.2f%% (%.2fs)",
+                    "Round %2d/%2d [%s] - Loss: %.4f (Val: %.4f) | PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%% | Rec@1%%FPR: %.2f%% (%.2fs)",
                     r,
                     rounds,
                     strat_key.upper(),

@@ -191,7 +191,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             <div className="bg-slate-900/70 p-3 rounded-lg border border-slate-800 text-[11px] space-y-1.5 text-slate-400">
               <div className="text-slate-300 font-semibold">Boundary Contract:</div>
               <div>• Queries are governed by pairwise Ed25519 bilateral operational grants.</div>
-              <div>• Independent of separately assembled M6 multi-counterparty investigation dossiers.</div>
+              <div>• Independent of separately assembled multi-counterparty investigation dossiers.</div>
               <div>• Strict SSRF protection and deterministic preflight health probes enforce container containment.</div>
             </div>
             <div className="flex justify-between text-[11px] text-slate-400 pt-1">

@@ -1,4 +1,4 @@
-"""Pilot Operations Service — Governed Two-Bank Pilot Lifecycle Management.
+"""Pilot Operations Service - Governed Two-Bank Pilot Lifecycle Management.
 
 Adheres strictly to .agents/AGENTS.md:
 - Full lifecycle: DRAFT -> PREFLIGHT -> AWAITING_APPROVAL -> AUTHORIZED -> ACTIVE -> PAUSED -> COMPLETED

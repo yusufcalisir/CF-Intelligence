@@ -1,4 +1,4 @@
-# Claim Classification Review — Smart Contracts Subsystem
+# Claim Classification Review - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

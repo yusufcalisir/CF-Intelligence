@@ -1,4 +1,4 @@
-"""Local Model Trainer & Privacy Pipeline Execution Engine — Section 41.1."""
+"""Local Model Trainer & Privacy Pipeline Execution Engine - Section 41.1."""
 
 from __future__ import annotations
 

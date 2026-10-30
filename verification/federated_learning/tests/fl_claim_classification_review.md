@@ -1,4 +1,4 @@
-# Claim Classification Review — FederatedLearningEngine Subsystem
+# Claim Classification Review - FederatedLearningEngine Subsystem
 
 This document reviews the 22 mathematical and architectural claims identified in the verification inventory for the `FederatedLearningEngine` subsystem. Each claim is classified as **SUPPORTED**, **PARTIALLY SUPPORTED**, or **UNSUPPORTED**, with scientifically precise reformulations for any over-stated claims.
 

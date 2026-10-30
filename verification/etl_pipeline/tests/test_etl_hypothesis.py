@@ -56,7 +56,7 @@ def test_property_hmac_sha256_anonymization_length(raw_id: str):
 
 
 def generate_hypothesis_report():
-    report_md = """# Hypothesis Property-Based Testing Report — Real-World Fraud ETL Pipeline
+    report_md = """# Hypothesis Property-Based Testing Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

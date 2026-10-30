@@ -1,4 +1,4 @@
-﻿# Cryptographic Engineering Assessment — Secure Aggregation & TEE Subsystem
+﻿# Cryptographic Engineering Assessment - Secure Aggregation & TEE Subsystem
 
 This document provides a formal cryptographic engineering evaluation of the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem.
 

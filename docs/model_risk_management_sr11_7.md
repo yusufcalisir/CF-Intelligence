@@ -159,7 +159,7 @@ Continuous statistical monitoring is executed by `ModelDriftService` (`backend/a
 | Drift Dimension | Statistical Test Applied | Warning Threshold | Critical Alarm & Auto-Retrain |
 | :--- | :--- | :---: | :---: |
 | **Feature Drift (Inputs)** | Kolmogorov-Smirnov ($KS$) | $p < 0.05$ | **$p < 0.01$ (Severe Input Shift)** |
-| **Concept Drift (Outputs)** | Population Stability Index ($PSI$) | $0.10 \le PSI < 0.25$ | **$PSI \ge 0.25$ (Trigger Auto-Retraining)** |
+| **Concept Drift (Outputs)** | Population Stability Index ($PSI$ drift; distinct from OpenMined PSI 2.0.6) | $0.10 \le PSI < 0.25$ | **$PSI \ge 0.25$ (Trigger Auto-Retraining)** |
 | **Covariance Drift** | Frobenius Distance $\|\Sigma_{\text{ref}} - \Sigma_{\text{curr}}\|_F$ | Drift $> 1.50$ | **Drift $> 3.00$** |
 
 ### 4.2. Automated Federated Retraining Pipeline

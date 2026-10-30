@@ -1,16 +1,16 @@
 """Regression tests for the PaySim canonical benchmark methodology.
 
 Tests protect:
-1.  Dataset mode enforcement — real mode fails hard if CSV missing.
-2.  Physical SHA-256 computation — non-empty, correct length.
-3.  Stratified split — positive counts sufficient, prevalence matched, no overlap.
-4.  Dirichlet partition — all clients non-empty, counts sum to train size.
-5.  Positive support — test set carries >50 fraud cases on canonical sample.
-6.  Sampling — systematic every-Nth is deterministic and reproducible.
-7.  Budget record — artifact records centralized and FL optimizer step counts.
-8.  Synthetic isolation — synthetic artifacts carry dataset_type='synthetic'.
+1.  Dataset mode enforcement - real mode fails hard if CSV missing.
+2.  Physical SHA-256 computation - non-empty, correct length.
+3.  Stratified split - positive counts sufficient, prevalence matched, no overlap.
+4.  Dirichlet partition - all clients non-empty, counts sum to train size.
+5.  Positive support - test set carries >50 fraud cases on canonical sample.
+6.  Sampling - systematic every-Nth is deterministic and reproducible.
+7.  Budget record - artifact records centralized and FL optimizer step counts.
+8.  Synthetic isolation - synthetic artifacts carry dataset_type='synthetic'.
 9.  Synthetic mode does NOT produce sha256 (real hash only for real files).
-10. No metric-targeted assertions — PR-AUC bounds NOT tested.
+10. No metric-targeted assertions - PR-AUC bounds NOT tested.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ class TestDatasetModeEnforcement:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """run_canonical_benchmark(dataset_mode='real') must raise FileNotFoundError
-        when real CSV is not present — never silently fall back to synthetic."""
+        when real CSV is not present - never silently fall back to synthetic."""
         import experiments.paysim.run_paysim_canonical_benchmark as mod
 
         # Override _locate_paysim_csv to simulate missing file
@@ -114,7 +114,7 @@ class TestSHA256Computation:
         assert result == hashlib.sha256(b"hello world").hexdigest()
 
     def test_sha256_not_empty_string_hash(self, tmp_path: Path) -> None:
-        """Ensure we are NOT computing sha256('') — the legacy broken hash."""
+        """Ensure we are NOT computing sha256('') - the legacy broken hash."""
         EMPTY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         f = tmp_path / "nonempty.bin"
         f.write_bytes(b"PaySim data")
@@ -134,7 +134,7 @@ class TestSHA256Computation:
         """Real PaySim CSV SHA-256 must match the independently computed value."""
         csv_path = _locate_paysim_csv()
         result = _compute_sha256(csv_path)
-        # This is NOT hardcoded as a fixed sentinel — we verify it matches itself
+        # This is NOT hardcoded as a fixed sentinel - we verify it matches itself
         # (round-trip consistency), which catches file corruption or substitution.
         result2 = _compute_sha256(csv_path)
         assert result == result2, "SHA-256 must be deterministic"
@@ -179,7 +179,7 @@ class TestStratifiedRandomSplit:
         X, y = self._make_data(1000)
         X_tr, y_tr, X_te, y_te = stratified_random_split(X, y)
         assert len(X_tr) + len(X_te) == 1000
-        # 80/20 ratio — allow ±5 rows for rounding
+        # 80/20 ratio - allow ±5 rows for rounding
         assert abs(len(X_tr) - 800) <= 10
         assert abs(len(X_te) - 200) <= 10
 

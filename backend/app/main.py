@@ -520,7 +520,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 await _r.aclose()
         except Exception as _re:
             logger.info(
-                "Redis: connection failed (%s) — WebSocket will use in-process event bus "
+                "Redis: connection failed (%s) - WebSocket will use in-process event bus "
                 "(expected degraded mode in HF Spaces / no-Redis deployments)",
                 type(_re).__name__,
             )
@@ -532,11 +532,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 pass
     else:
         logger.info(
-            "Redis: not configured — WebSocket will use in-process event bus "
+            "Redis: not configured - WebSocket will use in-process event bus "
             "(single-instance deployment mode)",
         )
 
-    # Seed mock data — strictly requires explicit opt-in via enable_demo_data_seeding=True AND non-production
+    # Seed mock data - strictly requires explicit opt-in via enable_demo_data_seeding=True AND non-production
     is_production = getattr(settings, "app_env", "development").lower() == "production"
     enable_seeding = getattr(settings, "enable_demo_data_seeding", False)
     if is_production:
@@ -549,7 +549,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.error("Failed to seed mock data: %s", exc, exc_info=True)
     else:
-        logger.info("Seed skipped — sentinel exists, another worker already seeded")
+        logger.info("Seed skipped - sentinel exists, another worker already seeded")
 
     # Start Redis Bank Client Listeners (only when Redis is reachable and authenticated)
     redis_listeners = []
@@ -580,7 +580,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 logger.error("Failed to start monolith Redis Bank Client Listeners: %s", exc)
     else:
         logger.info(
-            "Redis Bank Client Listeners skipped — Redis not available / authenticated "
+            "Redis Bank Client Listeners skipped - Redis not available / authenticated "
             "(in-process message bus active)"
         )
 
@@ -690,7 +690,7 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
     )
 
 
-# ── CORS (Strict Whitelist — No Wildcards) ────────────────────────────────────
+# ── CORS (Strict Whitelist - No Wildcards) ────────────────────────────────────
 # Wildcard origins are strictly prohibited to prevent cross-origin browser abuse.
 # Only authenticated platform frontend domains and verified preview regexes are allowed.
 _cors_origins = [
@@ -1566,7 +1566,7 @@ else:
 
 @app.get("/", tags=["root"])
 async def root() -> dict:
-    """API root — returns basic service info."""
+    """API root - returns basic service info."""
     return {
         "service": app_title,
         "version": "2.4.0",

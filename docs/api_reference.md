@@ -25,7 +25,7 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 
 ---
 
-## 📑 API Endpoint Directory (26 Endpoints)
+## 📑 API Endpoint Directory (28 Production Endpoint Groups)
 
 | # | Endpoint | Method | Category | Description |
 | :--- | :--- | :---: | :--- | :--- |
@@ -55,6 +55,8 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 | **18.24** | /v1/inference/score | POST | Real-Time Inference | High-throughput low-latency inference endpoint (fails closed HTTP 503 if unverified) |
 | **18.25** | /api/v1/training/federation/jobs | POST | Operational Federation | Launch production federated learning across isolated bank workers |
 | **18.26** | /api/v1/compliance/dossier/generate | POST | Regulatory Dossier | Compile EU AI Act Articles 9–15 and SR 11-7 compliance verification dossier |
+| **18.27** | /api/v1/pilots/* | POST/GET | Controlled Pilot Operations | Preflight readiness probes, scope digests & Ed25519 approvals |
+| **18.28** | /api/v1/cross-bank/* | POST/GET | Cross-Bank Intelligence | Isolated OpenMined PSI matching grid & case evidence attachment |
 
 ---
 
@@ -189,7 +191,19 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 }
 ```
 
-### 18.3 Enterprise Connector Diagnostics & Live Probes
+### 18.3 Enterprise System Probes & Connector Diagnostics (`/health`, `/ready`, `/live`)
+
+**Core Health & Durability Probe (`GET /health`):**
+```json
+{
+  "status": "healthy",
+  "timestamp": 1711929600.0,
+  "storage_backend": "redis",
+  "durability": "durable",
+  "auto_reconnect_active": true
+}
+```
+*(Note: When Redis connectivity is interrupted, `durability` truthfully degrades to `ephemeral` with `storage_backend: memory`; dynamic background auto-reconnect restores `durable` within 1s of Redis recovery without restarting API servers.)*
 
 **List Connector Health Status (`GET /api/v1/diagnostics/connectors`):**
 ```json
@@ -1117,7 +1131,7 @@ Content-Type: application/json
 }
 ```
 
-*Response (HTTP 200 OK — `ModelPromoteResponse`):*
+*Response (HTTP 200 OK - `ModelPromoteResponse`):*
 ```json
 {
   "version": 1,
@@ -1147,7 +1161,7 @@ Content-Type: application/json
 
 Retrieves metadata of the currently active champion model version from the registry manifest (also aliased at `GET /api/v1/models/{simulation_id}/champion`). Returns HTTP 404 if no champion is currently active.
 
-*Response (HTTP 200 OK — `ModelVersionItem`):*
+*Response (HTTP 200 OK - `ModelVersionItem`):*
 ```json
 {
   "version": 1,
@@ -1230,7 +1244,7 @@ Content-Type: application/json
 }
 ```
 
-*Response (HTTP 200 OK — `ModelVersionItem` upon successful dual sign-off):*
+*Response (HTTP 200 OK - `ModelVersionItem` upon successful dual sign-off):*
 ```json
 {
   "version": 1,
@@ -1311,7 +1325,7 @@ High-throughput, real-time transaction scoring route (aliased at `POST /api/v1/i
 }
 ```
 
-*Response (HTTP 200 OK — `RealtimeInferenceResponse`):*
+*Response (HTTP 200 OK - `RealtimeInferenceResponse`):*
 ```json
 {
   "transaction_id": "tx_2026_9948201",
@@ -1404,3 +1418,62 @@ High-throughput, real-time transaction scoring route (aliased at `POST /api/v1/i
 ```
 
 ---
+
+
+---
+
+### 18.27 Controlled Consortium Pilot Operations API (`/api/v1/pilots/*`)
+
+Manages controlled operational pilots with preflight readiness probes, deterministic scope digests, and sovereign Ed25519 multi-signature approvals.
+
+**1. Provision Pilot (`POST /api/v1/pilots`):**
+```json
+{
+  "pilot_id": "pilot_eur_aml_2026_q1",
+  "target_institutions": ["bank_a", "bank_b", "bank_c"],
+  "algorithm": "OPENMINED_PSI_206",
+  "privacy_budget": {"epsilon": 1.0, "delta": 1e-5}
+}
+```
+
+**2. Generate Scope Challenge (`POST /api/v1/pilots/{pilot_id}/challenge`):**
+Returns canonical SHA-256 digest of pilot scope parameters for institutional compliance officers to sign.
+
+**3. Submit Cryptographic Approval (`POST /api/v1/pilots/{pilot_id}/approve`):**
+```json
+{
+  "institution_id": "bank_a",
+  "approver_id": "compliance_officer_1",
+  "signature": "3045022100...",
+  "public_key_fingerprint": "SHA256:..."
+}
+```
+
+**4. Activate / Emergency Pause (`POST /api/v1/pilots/{pilot_id}/activate`, `POST /api/v1/pilots/{pilot_id}/pause`):**
+Activates upon verified multi-party quorum. Pause acts as an immediate kill-switch, halting all matching.
+
+---
+
+### 18.28 Cross-Bank Isolated Matching & Evidence Attachment API (`/api/v1/cross-bank/*`)
+
+Executes multi-counterparty OpenMined PSI 2.0.6 (Curve25519 ECDH) matching and attaches verified evidence to active case files.
+
+**1. Execute Cross-Bank Investigation (`POST /api/v1/cross-bank/investigate`):**
+```json
+{
+  "initiating_bank": "bank_a",
+  "counterparties": ["bank_b", "bank_c"],
+  "target_entity_tokens": ["hash_sha256_..."]
+}
+```
+
+**2. Attach Evidence to Case (`POST /api/v1/cases/{case_id}/evidence`):**
+```json
+{
+  "evidence_id": "ev_psi_match_99182",
+  "evidence_type": "CROSS_BANK_PSI_MATCH",
+  "counterparty_bank": "bank_b",
+  "cryptographic_digest": "sha256_verified_...",
+  "attached_by": "analyst_bank_a"
+}
+```

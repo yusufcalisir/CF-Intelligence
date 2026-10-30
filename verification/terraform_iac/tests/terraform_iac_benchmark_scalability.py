@@ -44,7 +44,7 @@ def run_scalability_benchmark() -> dict[str, Any]:
             "num_files": len(tf_files),
         })
 
-    report_md = f"""# Scalability & Rendering Benchmark Report — Multi-Cloud Terraform IaC
+    report_md = f"""# Scalability & Rendering Benchmark Report - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

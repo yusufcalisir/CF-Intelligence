@@ -2,9 +2,9 @@
 """Multi-Configuration Benchmark Visualization & Plot Generator (Section 8.2).
 
 Generates high-resolution comparative figures:
-1. docs/figures/benchmark_auc_comparison.png — ROC-AUC & PR-AUC across C1–C9
-2. docs/figures/benchmark_privacy_utility.png — Privacy-Utility trade-off curve (AUC vs. ε)
-3. docs/figures/benchmark_communication.png — Transmitted bytes vs. rounds to convergence
+1. docs/figures/benchmark_auc_comparison.png - ROC-AUC & PR-AUC across C1–C9
+2. docs/figures/benchmark_privacy_utility.png - Privacy-Utility trade-off curve (AUC vs. ε)
+3. docs/figures/benchmark_communication.png - Transmitted bytes vs. rounds to convergence
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def generate_benchmark_plots(
 
     ax.set_ylabel("Metric Score", fontsize=12, fontweight="bold")
     ax.set_title(
-        "Cross-Bank Federated Fraud Intelligence — 9 Configuration Benchmark",
+        "Cross-Bank Federated Fraud Intelligence - 9 Configuration Benchmark",
         fontsize=14,
         fontweight="bold",
         pad=15,

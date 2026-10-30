@@ -1,4 +1,4 @@
-# Production Engineering Evaluation Report — Connector Framework
+# Production Engineering Evaluation Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Codebase Files:** `app/application/interfaces/bank_connector.py`, `app/infrastructure/connectors/*`, `app/application/services/bank_onboarding_service.py`, `app/infrastructure/client_daemon/*`  
@@ -27,7 +27,7 @@ This report presents a production reliability assessment of the **Connector Fram
  7. Observability                       5.0 /  10.0   PARTIALLY SUPPORTED
  8. Resilience & Containment            7.5 /  10.0   GOOD
 ----------------------------------------------------------------------------------------------------
- COMPOSITE PRODUCTION SCORE            55.0 / 80.0  (68.75% — C+ Grade)
+ COMPOSITE PRODUCTION SCORE            55.0 / 80.0  (68.75% - C+ Grade)
 ====================================================================================================
 ```
 
@@ -119,4 +119,4 @@ This report presents a production reliability assessment of the **Connector Fram
 
 ---
 
-*End of Production Engineering Evaluation Report — Connector Framework*
+*End of Production Engineering Evaluation Report - Connector Framework*

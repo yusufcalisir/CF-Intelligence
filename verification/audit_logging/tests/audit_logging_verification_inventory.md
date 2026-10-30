@@ -1,4 +1,4 @@
-﻿# Scientific Verification Inventory — Audit Logging Subsystem
+﻿# Scientific Verification Inventory - Audit Logging Subsystem
 
 This document provides a comprehensive scientific audit inventory of the Audit Logging implementation within the Privacy-Preserving Cross-Bank Fraud Detection platform. It analyzes 12 core audit mechanisms, compliance rules, cryptographic guarantees, and event dispatchers.
 

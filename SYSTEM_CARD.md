@@ -82,7 +82,7 @@ The system enforces strict Clean Architecture separation across four decoupled l
 | **Domain Layer** | `backend/app/domain/` | Pure Python, Zero Framework Dependencies | Pure business logic, fraud entities, invariant rules, Byzantine defense algorithms (`Bulyan`, `Krum`, `SpectralDefense`), Shapley consortium value allocation. |
 | **Application Layer** | `backend/app/application/` | Python 3.12, Pydantic v2, Tenacity | Use case orchestration, federated round coordination, SAR e-filing pipelines, drift detection services, case workflow state machine. |
 | **Infrastructure Layer** | `backend/app/infrastructure/` | PyTorch, PyG, TenSEAL, Opacus, PostgreSQL, Redis, Kafka, PKCS#11 | Database persistence, multi-tenant schema isolation, mTLS 1.3 cryptographic engines, Vault transit KMS wrapper, CloudEvents 1.0 streaming. |
-| **Presentation Layer** | `backend/app/presentation/` | FastAPI 0.115, React 19, TypeScript 5.8, Tailwind CSS | 42 modular REST API endpoints, real-time WebSocket telemetry, interactive Case Management workbenches, and SIEM event broadcasters. |
+| **Presentation Layer** | `backend/app/presentation/` | FastAPI 0.115, React 19, TypeScript 5.8, Tailwind CSS | 44 modular REST routers across 50+ endpoints, real-time WebSocket telemetry, interactive Case Management workbenches, and SIEM event broadcasters. |
 
 ---
 
@@ -150,7 +150,7 @@ The platform operates under a Zero-Trust, multi-tenant isolation model informed 
 ### 5.2 Cryptographic Boundaries
 - **Rényi Differential Privacy (Opacus PRV & RDP Accounting)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; canonical empirical benchmarks evaluated at $\epsilon = 0.3497$ with $\sigma = 3.0$ and $\epsilon = 1.7744$ with $\sigma = 1.0$ using `PRVAccountant`).
 - **Homomorphic Encryption**: Model updates are encrypted via TenSEAL CKKS (8192-degree polynomial modulus) allowing the central coordinator to aggregate weights in ciphertext space without decryption.
-- **Private Set Intersection (DH-PSI)**: Participating banks cross-reference high-velocity accounts using Curve25519 Diffie-Hellman private set intersection without revealing non-overlapping client portfolios.
+- **Private Set Intersection (OpenMined PSI 2.0.6 & DH-PSI)**: Participating banks cross-reference high-velocity accounts using genuine OpenMined PSI 2.0.6 (Curve25519 ECDH) and Bloom filters. Per-bank worker nodes custody their private signing keys under `0600` POSIX permissions, producing cryptographically verified `CaseEvidenceAttachment` records without revealing non-overlapping client portfolios.
 - **Hardware Security Modules (HSM)**: Cryptographic root keys are enveloped using PKCS#11 HSM interfaces and HashiCorp Vault Transit KMS.
 - **mTLS 1.3 & ABAC**: All inter-bank and service-to-service gRPC channels enforce mutual TLS with dynamic Certificate Revocation Lists (CRL) and Attribute-Based Access Control.
 
@@ -166,6 +166,8 @@ The central aggregator incorporates robust Byzantine aggregation algorithms to n
 - **`Spectral Defense`**: Computes top singular vector projections of client weight deltas, purging coordinated low-rank sign-flip attacks.
 
 ### 6.2 System Fail-Safes & Resilience
+- **Dynamic Auto-Reconnection & Durability State**: Redis caching and message handling in [redis_store.py](backend/app/infrastructure/redis_store.py) automatically retry reconnection with a 1.0s cooldown during network dropouts, truthfully reporting `durability="ephemeral"` when degraded and returning to `durability="durable"` upon recovery without requiring process restarts.
+- **Controlled Pilot Governance**: Controlled operational pilots in [pilot_operations_service.py](backend/app/application/services/pilot_operations_service.py) enforce preflight readiness probes, deterministic scope digests, and Ed25519 multi-signature challenge verification before activation, coupled with an instant emergency pause kill-switch.
 - **Automated Circuit Breakers**: If inference latency spikes or model confidence collapses, the gateway falls back to deterministic rule-based scoring engines within 5ms.
 - **Disaster Recovery (Chaos Drills)**:
   - **Recovery Time Objective (RTO)**: **15.01 seconds** (state failover and worker reprovisioning).
@@ -186,7 +188,10 @@ Evaluated on standard host hardware distinguishing in-process compute microbench
   - **Peak Service Throughput**: **543.0 req/s** at $C = 50$ on single-worker Uvicorn over loopback TCP (452.8 req/s at $C=10$; 401.7 req/s at $C=500$; 100% 2xx success).
 - **Bandwidth Consumption**: Model gradient payloads are compressed by **74.8%** via Zstandard, Top-$k$ sparsification ($k=20\%$), and INT8 quantization.
 
-### 7.2 Multi-Cloud Infrastructure as Code (IaC)
+### 7.2 Consortium Development Sandbox Demarcation (`LOCAL_HTTP_SANDBOX`)
+The multi-bank consortium environment (`docker-compose.consortium.yml`) operates as a single-host integration sandbox across 10 Docker containers on a shared bridge network (`cfi-consortium-net`). It is classified as `LOCAL_HTTP_SANDBOX`. While it verifies isolated worker processes, OpenMined PSI 2.0.6 matching grids, and sovereign 0600 file-mounted key custody, it does NOT provide physical multi-cloud network isolation or hardware security (HSM) enclaves.
+
+### 7.3 Multi-Cloud Infrastructure as Code (IaC)
 - **Containerization**: Minimal OCI-compliant distroless Docker containers with non-root execution.
 - **Orchestration**: Production Helm charts for AWS EKS, Azure AKS, and Google Cloud GKE.
 - **Cloud Agnostic**: Terraform IaC modules implementing private VPC subnets, AWS KMS, Azure Key Vault, and GCP Cloud KMS bindings.

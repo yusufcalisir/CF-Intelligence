@@ -1,4 +1,4 @@
-# Adversarial Security & Robustness Verification Report — Audit Logging Subsystem
+# Adversarial Security & Robustness Verification Report - Audit Logging Subsystem
 
 ## Executive Summary
 

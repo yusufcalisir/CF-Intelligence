@@ -1,4 +1,4 @@
-"""ISO 20022 MX and SWIFT MT Financial Messaging Bank Connector — Section 38.2."""
+"""ISO 20022 MX and SWIFT MT Financial Messaging Bank Connector - Section 38.2."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 # Formal Limitations, Anti-Metric Shopping Protocol & Negative Result Ledger
 
 **Document Reference:** `CFI-SPEC-LIMITATIONS-2026-V1`  
-**Applicable Governance Frameworks:** Federal Reserve SR 11-7 / OCC 2011-12 (Model Risk Management — Limitations, Assumptions and Validation), EU Artificial Intelligence Act (Regulation (EU) 2024/1689) Article 13 (Transparency and Information to Deployers), ACM/IEEE Guidelines on Transparent Machine Learning Reporting, NeurIPS Paper Checklist Standards.
+**Applicable Governance Frameworks:** Federal Reserve SR 11-7 / OCC 2011-12 (Model Risk Management - Limitations, Assumptions and Validation), EU Artificial Intelligence Act (Regulation (EU) 2024/1689) Article 13 (Transparency and Information to Deployers), ACM/IEEE Guidelines on Transparent Machine Learning Reporting, NeurIPS Paper Checklist Standards.
 
 ---
 
@@ -71,7 +71,7 @@ In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](../benchmarks/res
 
 > [!NOTE]
 > **Archival Note on Legacy Prototype Data & Canonical Frontier**:  
-> The table above records the historical prototype run (10-feature algebraic centroid prototype without per-sample clipping). The canonical multi-seed Opacus DP-SGD neural benchmark ($N=20{,}000$, per-sample gradient clipping $C=1.0$, PRV accountant) achieves $\mathrm{PR\text{-}AUC} = 0.8965 \pm 0.0078$ at $\sigma=0.0$ and degrades to $0.3465 \pm 0.1580$ at $\sigma=3.0$ ($\epsilon=0.3497$, $-61.35\%$ relative loss) — confirming the identical fundamental negative result (utility collapse under strong privacy noise) under production-grade PyTorch Opacus execution. Full canonical results: [`dp_privacy_utility_tradeoff.json`](../benchmarks/results/raw/dp_privacy_utility_tradeoff.json).
+> The table above records the historical prototype run (10-feature algebraic centroid prototype without per-sample clipping). The canonical multi-seed Opacus DP-SGD neural benchmark ($N=20{,}000$, per-sample gradient clipping $C=1.0$, PRV accountant) achieves $\mathrm{PR\text{-}AUC} = 0.8965 \pm 0.0078$ at $\sigma=0.0$ and degrades to $0.3465 \pm 0.1580$ at $\sigma=3.0$ ($\epsilon=0.3497$, $-61.35\%$ relative loss) - confirming the identical fundamental negative result (utility collapse under strong privacy noise) under production-grade PyTorch Opacus execution. Full canonical results: [`dp_privacy_utility_tradeoff.json`](../benchmarks/results/raw/dp_privacy_utility_tradeoff.json).
 
 #### Mathematical & Operational Reality
 - **Why It Happens:** Differential privacy injects spherical Gaussian noise $\mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$ into clipped gradient updates. In extreme class imbalance, the gradient signal corresponding to rare fraudulent samples is minuscule relative to majority legitimate traffic. At $\sigma \ge 3.0$, the perturbation variance swamps the minority gradient coordinates, destroying decision boundary refinement.
@@ -177,6 +177,10 @@ To satisfy the transparency requirements of **Federal Reserve SR 11-7** and **EU
 ### 3.5 Explainability & Manifold Constraints
 - **Bounded SHAP Evaluation Budget:** To satisfy sub-50ms API SLAs, SHAP KernelExplainer evaluates a bounded sample budget ($N=100$) over background reference sets ($N=30$), rather than calculating exhaustive exponential Shapley permutations ($2^D$).
 - **Discrete Counterfactual Search:** Counterfactual explanations search a greedy discrete perturbation space over domain-mutable features, rather than performing continuous gradient descent along an empirical data manifold.
+
+### 3.6 Single-Host Consortium Development Sandbox (`LOCAL_HTTP_SANDBOX`)
+- **Development Sandbox Demarcation:** The integrated 10-service Docker deployment (`docker-compose.consortium.yml`) operates as a single-host development sandbox on a local bridge network (`cfi-consortium-net`). While it verifies multi-container coordination, OpenMined PSI 2.0.6 workflows, and sovereign `0600` file-mounted key custody, it does NOT provide physical multi-cloud network isolation or hardware security (HSM) enclaves. It is classified as `LOCAL_HTTP_SANDBOX`.
+- **Redis Resilience & Ephemeral Degradation:** If the Redis container experiences network severance or downtime, the caching layer degrades gracefully to bounded in-memory caching while advertising `durability="ephemeral"` via the `/health` endpoint. Dynamic background auto-reconnection (`_attempt_auto_reconnect`, 1.0s cooldown) restores `durability="durable"` once Redis connectivity resumes, eliminating the need for process restarts.
 
 ---
 

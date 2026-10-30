@@ -186,7 +186,7 @@ class SecurityComplianceEngine:
             "evidence": "SHA-256 tamper-evident cryptographic audit logging chain active; all data access events logged.",
         }
 
-        # CC8.1: Change management — all deployments go through CI/CD
+        # CC8.1: Change management - all deployments go through CI/CD
         cc8_1_status = "PASS"
         controls_results["CC8.1"] = {
             "title": "CI/CD Automated Change Management & Security Scanning",
@@ -194,7 +194,7 @@ class SecurityComplianceEngine:
             "evidence": "GitHub Actions CI pipeline enforces unit testing, ruff linting, and SAST scanner before deployment.",
         }
 
-        # CC9.1: Vendor risk — all third-party dependencies pinned in pyproject.toml
+        # CC9.1: Vendor risk - all third-party dependencies pinned in pyproject.toml
         resolved_file = Path(__file__).resolve()
         backend_root = resolved_file.parents[3] if len(resolved_file.parents) > 3 else Path.cwd()
         candidate_manifest_dirs = [

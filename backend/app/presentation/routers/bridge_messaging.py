@@ -4,20 +4,20 @@ Exposes a European Collaborative FININT bridge messaging API for compliance
 officers and fraud intelligence units to exchange encrypted cross-institution
 case tickets. Implements:
 
-- POST   /api/v1/bridge/tickets          — create encrypted FININT ticket
-- GET    /api/v1/bridge/tickets          — list tickets (filtered by bank/status/type)
-- GET    /api/v1/bridge/tickets/{id}     — retrieve single ticket
-- POST   /api/v1/bridge/tickets/{id}/transition  — state machine transition
-- POST   /api/v1/bridge/tickets/{id}/evidence    — attach evidence hash
-- POST   /api/v1/bridge/tickets/{id}/verify-evidence — verify evidence
-- GET    /api/v1/bridge/tickets/{id}/audit-chain — retrieve audit trail
-- GET    /api/v1/bridge/tickets/{id}/verify-chain — verify hash chain integrity
-- GET    /api/v1/bridge/metrics          — aggregate service metrics
-- POST   /api/v1/bridge/keypair          — generate Curve25519 keypair
+- POST   /api/v1/bridge/tickets          - create encrypted FININT ticket
+- GET    /api/v1/bridge/tickets          - list tickets (filtered by bank/status/type)
+- GET    /api/v1/bridge/tickets/{id}     - retrieve single ticket
+- POST   /api/v1/bridge/tickets/{id}/transition  - state machine transition
+- POST   /api/v1/bridge/tickets/{id}/evidence    - attach evidence hash
+- POST   /api/v1/bridge/tickets/{id}/verify-evidence - verify evidence
+- GET    /api/v1/bridge/tickets/{id}/audit-chain - retrieve audit trail
+- GET    /api/v1/bridge/tickets/{id}/verify-chain - verify hash chain integrity
+- GET    /api/v1/bridge/metrics          - aggregate service metrics
+- POST   /api/v1/bridge/keypair          - generate Curve25519 keypair
 
 Security:
 - All endpoints require the X-Bank-ID header for tenant context.
-- Bank IDs must be HMAC-SHA256 hashes — cleartext names are rejected.
+- Bank IDs must be HMAC-SHA256 hashes - cleartext names are rejected.
 - Payload encryption uses ephemeral Curve25519 ECDH + AES-256-GCM.
 """
 
@@ -115,7 +115,7 @@ def _ticket_to_summary(ticket: FinintBridgeTicket) -> TicketSummaryResponse:
     )
 
 
-# ── Routes — applied to both router and api_router via helper ─────────────────
+# ── Routes - applied to both router and api_router via helper ─────────────────
 
 def _register_routes(r: APIRouter) -> None:  # noqa: C901
 
@@ -127,7 +127,7 @@ def _register_routes(r: APIRouter) -> None:  # noqa: C901
         description=(
             "Creates an encrypted inter-bank FININT case ticket. "
             "The plaintext payload is encrypted end-to-end using ephemeral Curve25519 ECDH + AES-256-GCM. "
-            "Evidence blobs are registered only as SHA-256 hashes — raw data is never persisted."
+            "Evidence blobs are registered only as SHA-256 hashes - raw data is never persisted."
         ),
     )
     async def create_ticket(
@@ -344,7 +344,7 @@ def _register_routes(r: APIRouter) -> None:  # noqa: C901
         summary="Generate Curve25519 Keypair for Institution",
         description=(
             "Generates a fresh Curve25519 keypair. "
-            "The private key is returned once — store it immediately in your institution's HSM. "
+            "The private key is returned once - store it immediately in your institution's HSM. "
             "This endpoint never retains private key material."
         ),
     )

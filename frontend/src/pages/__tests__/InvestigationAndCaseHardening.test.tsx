@@ -15,7 +15,7 @@ const createTestQueryClient = () =>
     },
   });
 
-describe('STAGE_50 Frontend Hardening & Contract Parity', () => {
+describe('Frontend Hardening & Contract Parity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();

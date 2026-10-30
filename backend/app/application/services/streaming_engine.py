@@ -87,7 +87,7 @@ class StreamingEngine:
         }
 
         logger.info(
-            "Starting scenario %s (%s) at %.1fx speed — %d events",
+            "Starting scenario %s (%s) at %.1fx speed - %d events",
             scenario.id[:8],
             scenario.name,
             speed_multiplier,

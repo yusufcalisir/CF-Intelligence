@@ -32,7 +32,7 @@ def capture(host: str = "localhost", port: int = 7860) -> None:
         r = httpx.get(url, timeout=10)
         r.raise_for_status()
     except Exception as exc:
-        print(f"ERROR: Could not fetch schema — {exc}")
+        print(f"ERROR: Could not fetch schema - {exc}")
         sys.exit(1)
 
     schema = r.json()

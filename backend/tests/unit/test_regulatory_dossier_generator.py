@@ -203,7 +203,7 @@ class TestRegulatoryDossierExport:
         assert "## 3. Federal Reserve SR 11-7 / OCC 2011-12 Model Risk Management" in md
         assert "## 4. Empirical Model Benchmarking Comparison" in md
         assert "## 5. Dual-Control Supervisory Sign-Off Register" in md
-        assert "CONFIDENTIAL — PROPRIETARY REGULATORY VALIDATION DOSSIER" in md
+        assert "CONFIDENTIAL - PROPRIETARY REGULATORY VALIDATION DOSSIER" in md
 
         # Verify KaTeX math compatibility (Rule 4: no unescaped underscores in \text{})
         text_underscore_matches = re.findall(r"\\text\{[^}]*_[^}]*\}", md)

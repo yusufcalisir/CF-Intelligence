@@ -128,8 +128,8 @@ Evaluated across $150{,}000$ training transactions and an untouched global conso
 | **Centralized Deep MLP (Neural)** | `THEORETICAL_UPPER_BOUND` | **0.8520** | **0.9780** | **64.10%** | **0.0145** | `0.260 ms` | ❌ **Illegal Data Pooling** (GDPR/KVKK Violation) |
 | **Federated Champion (FedAvg/FedProx)** | `PRODUCTION_CHAMPION` | **0.8420** | **0.9750** | **62.40%** | **0.0158** | `0.260 ms` | ✅ **100% Compliant** (Zero Raw PII, DP $\epsilon=1.0$) |
 | **Isolated Local Silos (3-Bank Mean)** | `ISOLATED_SILO` | **0.6940** | **0.8820** | **43.20%** | **0.0380** | `0.040 ms` | ⚠️ **Legally Passive** (Blind to Cross-Bank Mules) |
-| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
-| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
+| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `-` | `-` | `-` | `-` | ⚠️ **Not Evaluated on Partition** |
+| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `-` | `-` | `-` | `-` | ⚠️ **Not Evaluated on Partition** |
 
 ### 3.3 Key Empirical Findings
 
@@ -219,7 +219,7 @@ Under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} 
 Under the 3-bank federated consortium benchmark, $227{,}845$ training transactions were partitioned across $K=3$ institutions using an extreme skew scenario:
 - **Bank A (Market Leader)**: $125{,}371$ transactions (55.0% volume), $273$ positive frauds (0.218% fraud rate).
 - **Bank B (Mid-Tier Bank)**: $68{,}353$ transactions (30.0% volume), $118$ positive frauds (0.173% fraud rate).
-- **Bank C (Challenger Bank / Starved Silo)**: $34{,}121$ transactions (15.0% volume), strictly **2 positive fraud cases** (0.0059% fraud rate — severe positive sample starvation).
+- **Bank C (Challenger Bank / Starved Silo)**: $34{,}121$ transactions (15.0% volume), strictly **2 positive fraud cases** (0.0059% fraud rate - severe positive sample starvation).
 
 Models were evaluated against an untouched consortium global holdout test set of $56{,}961$ transactions ($98$ positive frauds, 0.172% prevalence):
 
@@ -236,7 +236,7 @@ Models were evaluated against an untouched consortium global holdout test set of
 #### Key Empirical Insights (Extreme Imbalance & Collaborative Gain)
 
 1. **Near-Zero Positive Starvation Rescue**:
-   At the standard $0.50$ decision threshold, Bank C's isolated model suffers complete collapse ($\mathrm{Precision} = 0.0$, $\mathrm{Recall} = 0.0$, $\mathrm{F1} = 0.0$) due to extreme sample starvation ($2$ frauds among $34{,}121$ transactions). Even with fixed-FPR thresholding, Bank C in isolation achieves only $0.6050$ PR-AUC. Federated consensus (`FedAvg`) rescues Bank C, elevating its effective model capability to $0.7750$ PR-AUC—a massive **$+0.1700$ PR-AUC (+28.1% relative uplift)** and expanding Recall @ 0.1% FPR from 78.57% to 84.69%.
+   At the standard $0.50$ decision threshold, Bank C's isolated model suffers complete collapse ($\mathrm{Precision} = 0.0$, $\mathrm{Recall} = 0.0$, $\mathrm{F1} = 0.0$) due to extreme sample starvation ($2$ frauds among $34{,}121$ transactions). Even with fixed-FPR thresholding, Bank C in isolation achieves only $0.6050$ PR-AUC. Federated consensus (`FedAvg`) rescues Bank C, elevating its effective model capability to $0.7750$ PR-AUC-a massive **$+0.1700$ PR-AUC (+28.1% relative uplift)** and expanding Recall @ 0.1% FPR from 78.57% to 84.69%.
 2. **Federated Super-Convergence via Cross-Institutional Regularization**:
    `FedAvg` achieves $0.7750$ PR-AUC, outperforming not only the isolated silo mean ($0.6522$, $\Delta_{\mathrm{collab}} = +0.1228$), but also the monolithic centralized pooled neural network ($0.7021$). In extreme class imbalance regimes, decentralized client optimization combined with federated averaging functions as an implicit structural regularizer, mitigating the tendency of centralized stochastic gradient descent to overfit localized majority clusters.
 3. **Fixed-FPR Operational Superiority**:
@@ -1044,7 +1044,7 @@ The benchmark evaluates discrete candidate decision thresholds on a held-out tes
 ### 20.3 Analysis & Key Financial Insights
 
 1. **Convexity of Financial Loss Function**: As decision threshold $\tau$ increases from 500 to 900, false alarms decrease monotonically ($434 \to 0$), reducing analyst overhead ($c_{\mathrm{FP}} \cdot \mathrm{FP}$). However, missed fraud cases accelerate ($7 \to 90$), with each missed case costing 850 USD ($c_{\mathrm{FN}}$). The cost curve exhibits a clear convex global minimum at $\tau^{\ast} = 600$.
-2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of 47,580.00 USD—representing **nearly double the operational cost** of $\tau^{\ast} = 600$, solely due to unmitigated false negative chargebacks.
+2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of 47,580.00 USD-representing **nearly double the operational cost** of $\tau^{\ast} = 600$, solely due to unmitigated false negative chargebacks.
 3. **Interactive Control (`ThresholdTuningSlider.tsx`)**: Risk officers can dynamically adjust both decision cutoffs ($\tau \in [500, 900]$) and institution-specific unit cost parameters ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}$) via the interactive `ThresholdTuningSlider` mounted on the Declarative Policy Engine (`frontend/src/pages/PoliciesPage.tsx`). The component projects live confusion matrices, sensitivity metrics, net savings, and provides one-click snapping to the Bayesian cost-optimal threshold $\tau^{\ast}$.
 
 **Test Execution Parity**: 17/17 Pytest unit tests passed on `backend/tests/unit/test_risk_utility.py`; 5/5 Vitest tests passed on `ThresholdTuningSlider.test.tsx`.
@@ -1189,7 +1189,7 @@ Evaluated across $N = 7{,}500$ transactions ($2{,}500$ per period) with an under
 
 | Evaluation Regime | Temporal Window | PR-AUC | ROC-AUC | F1-Score | Recall @ 0.1% FPR | Brier Score | ECE | Temporal Delta vs P1 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Optimistic Randomized 5-Fold CV** | Pooled (Leakage) | 0.6958 $\pm$ 0.0262 | 0.9512 $\pm$ 0.0140 | 0.3770 | 32.67% | — | — | +0.3724 (Bias Gap) |
+| **Optimistic Randomized 5-Fold CV** | Pooled (Leakage) | 0.6958 $\pm$ 0.0262 | 0.9512 $\pm$ 0.0140 | 0.3770 | 32.67% | - | - | +0.3724 (Bias Gap) |
 | **Period 1: In-Period Test (Past)** | $t \in [0.05, 99.98]$ | **0.6245** | **0.9025** | **0.5250** | **34.62%** | **0.0458** | **0.0543** | Baseline (0.0000) |
 | **Period 2: Intermediate OOT (Present)** | $t \in [100.03, 200.0]$ | 0.6734 | 0.9442 | 0.4024 | 31.82% | 0.0547 | 0.0672 | +0.0489 (+7.8%) |
 | **Period 3: Distant OOT (Future)** | $t \in [200.02, 299.86]$ | 0.3234 | 0.8592 | 0.3261 | 6.80% | 0.0766 | 0.0863 | **-0.3011 (-48.2%)** |
@@ -1578,7 +1578,7 @@ The gateway decomposes each scoring request into six independently-timed pipelin
 | Pydantic Serialization | 0.023 ms | 1.0% |
 | **TOTAL (Full-Path)** | **2.340 ms** | **100.0%** |
 
-**Key Insight**: The 9-Signal Composite Scoring stage accounts for 91.0% of single-request fast-path latency on this host. The PyTorch neural forward pass itself contributes only 8.1% of total request duration (0.186 ms), confirming that inference engine optimization alone will not yield meaningful SLA improvements — the primary optimization target is the composite signal arithmetic pipeline. Host fast-path calibration (20 warmup runs): p50 = 2.716 ms, p95 = 3.106 ms, p99 = 3.206 ms.
+**Key Insight**: The 9-Signal Composite Scoring stage accounts for 91.0% of single-request fast-path latency on this host. The PyTorch neural forward pass itself contributes only 8.1% of total request duration (0.186 ms), confirming that inference engine optimization alone will not yield meaningful SLA improvements - the primary optimization target is the composite signal arithmetic pipeline. Host fast-path calibration (20 warmup runs): p50 = 2.716 ms, p95 = 3.106 ms, p99 = 3.206 ms.
 
 ---
 
@@ -1616,7 +1616,7 @@ Each concurrency level $C$ dispatches $10$ requests per worker thread for the Ph
 
 ```
 C =   1:   377 r/s  (serial baseline)
-C =  10: 1,452 r/s  (3.85x gain — GIL-hidden IO + signal arithmetic parallelism)
+C =  10: 1,452 r/s  (3.85x gain - GIL-hidden IO + signal arithmetic parallelism)
 C =  50: 1,791 r/s  (peak throughput; GIL saturation onset at C* ~ 50)
 C = 100: 1,395 r/s  (plateau; OS thread switching begins consuming CPU slices)
 C = 250: 1,286 r/s  (moderate degradation under heavy context switching)
@@ -1631,7 +1631,7 @@ Under the GIL-bound execution model, observed latency scales approximately linea
 
 $$p50(C) \approx p50(1) \cdot C, \quad C \le C^*$$
 
-For $C = 1$ to $C = 50$: $p50 = 2.39 \times 50 / 1 \approx 119.5\text{ ms}$ (linear prediction) vs empirical $17.94\text{ ms}$ — the sub-linear scaling ($7.5\times$ instead of $50\times$) confirms effective GIL time-sharing across threads below saturation, with short-circuit reuse of JIT-compiled paths reducing per-thread overhead.
+For $C = 1$ to $C = 50$: $p50 = 2.39 \times 50 / 1 \approx 119.5\text{ ms}$ (linear prediction) vs empirical $17.94\text{ ms}$ - the sub-linear scaling ($7.5\times$ instead of $50\times$) confirms effective GIL time-sharing across threads below saturation, with short-circuit reuse of JIT-compiled paths reducing per-thread overhead.
 
 Beyond $C^{\ast} = 50$, tail latency escalates due to thread-pool queuing:
 
@@ -1742,7 +1742,7 @@ This rigorous protocol replaces historical point estimates with statistical inte
 
 ## 27. Systematic Error Analysis, Stratification & Failure Mode Diagnostics
 
-**Audit Roadmap Reference:** Phase 34 — Sub-Plan 34.1  
+**Audit Roadmap Reference:** Item 34 - Sub-Plan 34.1  
 **Benchmark Engine:** [`experiments/error_analysis/stratify_errors.py`](../experiments/error_analysis/stratify_errors.py)  
 **Target Raw Artifact:** [`benchmarks/results/raw/error_stratification_analysis.json`](../benchmarks/results/raw/error_stratification_analysis.json)  
 **Target Automated Test Suite:** [`backend/tests/unit/test_error_stratification.py`](../backend/tests/unit/test_error_stratification.py) (**12 tests, 100% passing**)
@@ -1865,7 +1865,7 @@ $$\mathrm{Loss}_{\mathrm{stratum}} = C_{\mathrm{FN}} \cdot \mathrm{FN} + C_{\mat
 
 ## 28. Demographic Attribute Availability Assessment & Algorithmic Fairness Audit
 
-**Audit Roadmap Reference:** Phase 35 — Sub-Plan 35.1  
+**Audit Roadmap Reference:** Item 35 - Sub-Plan 35.1  
 **Benchmark Engine:** [`experiments/fairness/demographic_audit.py`](../experiments/fairness/demographic_audit.py)  
 **Target Raw Artifact:** [`benchmarks/results/raw/demographic_fairness_audit.json`](../benchmarks/results/raw/demographic_fairness_audit.json)  
 **Target Automated Test Suite:** [`backend/tests/unit/test_demographic_fairness_audit.py`](../backend/tests/unit/test_demographic_fairness_audit.py) (**10 tests, 100% passing**)
@@ -1936,7 +1936,7 @@ $$\mathrm{DIR} = \frac{P(\hat{Y}=1 \mid A=\text{unpriv})}{P(\hat{Y}=1 \mid A=\te
 
 ## 29. Master Comparative Empirical Benchmark Matrix & Strict Null Representation
 
-**Audit Roadmap Reference:** Phase 39 — Sub-Plan 39.1  
+**Audit Roadmap Reference:** Item 39 - Sub-Plan 39.1  
 **Matrix Generator Engine:** [`benchmarks/generate_master_benchmark_matrix.py`](../benchmarks/generate_master_benchmark_matrix.py)  
 **Target Raw Artifact:** [`benchmarks/results/raw/master_benchmark_matrix.json`](../benchmarks/results/raw/master_benchmark_matrix.json)  
 **Target Automated Test Suite:** [`backend/tests/unit/test_master_benchmark_matrix.py`](../backend/tests/unit/test_master_benchmark_matrix.py)  
@@ -1963,7 +1963,7 @@ In enterprise regulatory model governance, **reporting an unexecuted experiment,
 
 The CF-Intelligence Master Benchmark Matrix strictly enforces:
 1. **JSON Contract**: All unexecuted runs, unmeasured thresholds, or inapplicable architectures are stored strictly as `null` in machine-readable artifacts (`master_benchmark_matrix.json`).
-2. **Markdown Contract**: All `null` entries are explicitly rendered as `—` or `N/A (NOT RUN)`.
+2. **Markdown Contract**: All `null` entries are explicitly rendered as `-` or `N/A (NOT RUN)`.
 3. **Evaluated Zero Distinction**: When an authentic execution produces zero (e.g. PaySim FedAvg F1-Score $= 0.0000$ due to decision boundary cutoff at prevalence 0.05%), it is explicitly designated as `EVALUATED_ZERO` in the machine-readable provenance schema.
 
 ---
@@ -1972,46 +1972,46 @@ The CF-Intelligence Master Benchmark Matrix strictly enforces:
 
 | Dataset | Domain & Scale | Model / Paradigm | Clients & Rounds | PR-AUC | ROC-AUC | F1-Score | Precision | Recall | Recall @ 0.1% FPR | Status |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **PaySim Mobile Money Fraud**<br>*6.36M transactions (Blekinge Institute)* | Centralized Pooled Oracle | Centralized Neural Classifier (30 ep) | 1 silo (Pooled) | 0.9545 | 0.9994 | — | — | — | 0.9877 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg) | 3 clients / 10 rnds | **0.9545** | **0.9994** | — | — | — | **0.9816** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **IEEE-CIS Fraud Detection**<br>*590,540 transactions (Vesta Corp)* | Centralized Pooled Oracle | Centralized Neural Classifier (10 ep) | 1 silo (Pooled) | 0.4422 | 0.8536 | — | — | — | 0.2004 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.3895** | **0.8325** | — | — | — | **0.1976** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx mu=0.01) | 3 clients / 5 rnds | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **European Credit Card Fraud**<br>*284,807 transactions (ULB Machine Learning Group)* | Centralized Pooled Oracle | Centralized Equalized MLP (10 ep) | 1 silo (Pooled) | 0.8219 | 0.9803 | — | — | — | 0.8653 | `CENTRALIZED [OK]` |
-| | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg) | 3 clients / 5 rnds | **0.8248** | **0.9841** | — | — | — | **0.8653** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
+| **PaySim Mobile Money Fraud**<br>*6.36M transactions (Blekinge Institute)* | Centralized Pooled Oracle | Centralized Neural Classifier (30 ep) | 1 silo (Pooled) | 0.9545 | 0.9994 | - | - | - | 0.9877 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg) | 3 clients / 10 rnds | **0.9545** | **0.9994** | - | - | - | **0.9816** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| **IEEE-CIS Fraud Detection**<br>*590,540 transactions (Vesta Corp)* | Centralized Pooled Oracle | Centralized Neural Classifier (10 ep) | 1 silo (Pooled) | 0.4422 | 0.8536 | - | - | - | 0.2004 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.3895** | **0.8325** | - | - | - | **0.1976** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx mu=0.01) | 3 clients / 5 rnds | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| **European Credit Card Fraud**<br>*284,807 transactions (ULB Machine Learning Group)* | Centralized Pooled Oracle | Centralized Equalized MLP (10 ep) | 1 silo (Pooled) | 0.8219 | 0.9803 | - | - | - | 0.8653 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg) | 3 clients / 5 rnds | **0.8248** | **0.9841** | - | - | - | **0.8653** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
 | **Elliptic Bitcoin AML Graph**<br>*203k nodes, 234k edges (MIT-IBM Watson / Elliptic)* | Centralized Pooled Oracle | GraphSAGE Inductive Neighborhood (Multi-Seed Temporal Mean) | 1 silo (Pooled) | 0.3761 | 0.8325 | 0.3555 | 0.2757 | 0.5583 | 0.0462 | `CENTRALIZED [OK]` |
 | | Tabular MLP Baseline | Deep Tabular MLP (0-hop) | 1 silo (Pooled) | 0.5778 | 0.8722 | 0.5162 | 0.5218 | 0.5106 | 0.2521 | `CENTRALIZED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **IBM AMLSim Multi-Hop Banking**<br>*1.32M transactions, 10k accounts (IBM Research AI)* | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.6720 | — | — | — | — | — | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.6527** | **0.9509** | 0.1689 | — | — | **0.6412** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **Danish Spar Nord Bank SynthAML**<br>*20k alerts / 16M txns (Aarhus Univ / Spar Nord)* | Centralized Pooled Oracle | Centralized AlertMLP | 1 silo (Pooled) | 0.9995 | 0.9998 | — | — | — | — | `CENTRALIZED` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| **IBM AMLSim Multi-Hop Banking**<br>*1.32M transactions, 10k accounts (IBM Research AI)* | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.6720 | - | - | - | - | - | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.6527** | **0.9509** | 0.1689 | - | - | **0.6412** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| **Danish Spar Nord Bank SynthAML**<br>*20k alerts / 16M txns (Aarhus Univ / Spar Nord)* | Centralized Pooled Oracle | Centralized AlertMLP | 1 silo (Pooled) | 0.9995 | 0.9998 | - | - | - | - | `CENTRALIZED` |
 | | **Federated FedAvg (Collaborative)** | AlertMLPClassifier (FedAvg) | 3 clients / 6 rnds | **0.9985** | **0.9995** | 0.9836 | 0.9877 | 0.9796 | **0.9878** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Isolated Bank Silos (Bank Alpha / Beta / Gamma) | Isolated Local | Mean: 0.7245 (Worst: 0.2214) | — | — | — | — | — | `ISOLATED [OK]` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Isolated Bank Silos (Bank Alpha / Beta / Gamma) | Isolated Local | Mean: 0.7245 (Worst: 0.2214) | - | - | - | - | - | `ISOLATED [OK]` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
 | **Australian AUSTRAC AMLNet**<br>*1.09M wire transactions (Griffith Univ / Zenodo)* | Centralized Pooled Oracle | Centralized AMLNetClassifier | 1 silo (Pooled) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | `CENTRALIZED` |
 | | **Federated FedAvg (Collaborative)** | AMLNetClassifier (FedAvg) | 3 clients / 6 rnds | **1.0000** | **1.0000** | 1.0000 | 1.0000 | 1.0000 | **1.0000** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **CFI-CrossBank Multi-Bank Consortium**<br>*100k txns, 1k accounts, 7 Attack Scenarios (CFI-CrossBank-01)* | Centralized Pooled Oracle | Pooled Consortium Oracle Upper Bound | 1 silo (Pooled) | 0.9850 | 0.9990 | — | — | — | 0.9900 | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | Collaborative Federated Intelligence (FedAvg) | 3 clients / 2 rnds | **0.9729** | **0.9985** | — | — | — | **0.9881** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| | Isolated Silos (No Sharing) | Isolated Bank Nodes (No Cross-Bank Sharing) | Isolated Local | Mean: 0.8832 | — | — | — | — | — | `ISOLATED [OK]` |
-| | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Local Independent Models | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| **CFI-CrossBank Multi-Bank Consortium**<br>*100k txns, 1k accounts, 7 Attack Scenarios (CFI-CrossBank-01)* | Centralized Pooled Oracle | Pooled Consortium Oracle Upper Bound | 1 silo (Pooled) | 0.9850 | 0.9990 | - | - | - | 0.9900 | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | Collaborative Federated Intelligence (FedAvg) | 3 clients / 2 rnds | **0.9729** | **0.9985** | - | - | - | **0.9881** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | - | - | - | - | - | - | `N/A (NOT RUN)` |
+| | Isolated Silos (No Sharing) | Isolated Bank Nodes (No Cross-Bank Sharing) | Isolated Local | Mean: 0.8832 | - | - | - | - | - | `ISOLATED [OK]` |
+| | Classical Baselines | Random Forest / LogReg | Non-Neural | - | - | - | - | - | - | `N/A (NOT RUN)` |
 
 ---
 

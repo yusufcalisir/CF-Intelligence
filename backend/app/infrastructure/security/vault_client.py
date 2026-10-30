@@ -1,4 +1,4 @@
-"""HashiCorp Vault & Secrets Manager Adapter — Section 40.1."""
+"""HashiCorp Vault & Secrets Manager Adapter - Section 40.1."""
 
 from __future__ import annotations
 

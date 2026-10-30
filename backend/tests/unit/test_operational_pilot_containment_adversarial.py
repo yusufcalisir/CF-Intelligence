@@ -1,21 +1,21 @@
 """Comprehensive Operational Pilot Containment & Adversarial Acceptance Test Suite.
 
 Milestone 5 Operational Acceptance Verification:
-1. P0 — Paused-Pilot Omission Bypass Elimination:
+1. P0 - Paused-Pilot Omission Bypass Elimination:
    - Durable execution-scope binding ensures non-active pilots remain discoverable.
    - Omitting pilot_id rejects operations when governing pilot is PAUSED, ABORTED, COMPLETED, expired, or quota-exhausted.
    - Non-pilot M4 operations for uncontained scopes remain authorized under their own rules.
-2. P0 — Signal-Persistence / Reservation-Commit Race Elimination:
+2. P0 - Signal-Persistence / Reservation-Commit Race Elimination:
    - Reliable result admission state transition (PENDING_COMMIT -> COMMITTED / REJECTED).
    - Signal cannot become authoritative or attachable before execution reservation commit.
    - Mid-flight pause or database failure terminates reservation as ABORTED and marks signal REJECTED.
    - Evidence attachment verifies reservation is COMMITTED with matching signal_id and active governing pilot.
    - Resuming pilot does not revive earlier rejected signals.
-3. P1 — Real, Authenticated Infrastructure Preflight:
+3. P1 - Real, Authenticated Infrastructure Preflight:
    - Mandatory worker and coordinator topology for real execution.
    - Missing topology, wrong bank ID, non-coordinator role, SSRF metadata targets, and stopped workers fail closed.
    - Preflight revalidation enforced before RESUME.
-4. P1 — Exact Approved Grant Revision Binding:
+4. P1 - Exact Approved Grant Revision Binding:
    - Rejection when grant revision, scope digest, allowed institutions, purpose, or jurisdiction changes without fresh approval.
    - Rejection when grant is revoked during execution.
 """
@@ -302,7 +302,7 @@ def _create_and_activate_pilot(
     return svc.activate_pilot(pilot_id=pilot_id)
 
 
-# ── Defect 1: P0 — Paused-Pilot Omission Bypass ────────────────────────────────
+# ── Defect 1: P0 - Paused-Pilot Omission Bypass ────────────────────────────────
 
 
 def test_omission_bypass_rejected_when_pilot_paused(containment_env: dict[str, Any]) -> None:
@@ -433,7 +433,7 @@ def test_separate_authorized_non_pilot_operations_preserved(containment_env: dic
     assert uncontained is None
 
 
-# ── Defect 2: P0 — Signal-Persistence / Reservation-Commit Race ───────────────
+# ── Defect 2: P0 - Signal-Persistence / Reservation-Commit Race ───────────────
 
 
 def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, Any]) -> None:
@@ -604,7 +604,7 @@ def test_attachment_verifies_durable_reservation_and_signal_binding(containment_
     assert "does not match" in str(exc.value).lower()
 
 
-# ── Defect 3: P1 — Real Authenticated Infrastructure Preflight ────────────────
+# ── Defect 3: P1 - Real Authenticated Infrastructure Preflight ────────────────
 
 
 def test_preflight_requires_mandatory_topology(containment_env: dict[str, Any]) -> None:
@@ -675,7 +675,7 @@ def test_preflight_revalidated_before_resume(containment_env: dict[str, Any]) ->
     assert "preflight" in str(exc.value).lower() or "ssrf" in str(exc.value).lower()
 
 
-# ── Defect 5: P1 — Exact Approved Grant Revision Binding ──────────────────────
+# ── Defect 5: P1 - Exact Approved Grant Revision Binding ──────────────────────
 
 
 def test_grant_revision_change_invalidates_active_pilot(containment_env: dict[str, Any]) -> None:
@@ -1119,7 +1119,7 @@ def test_coordinator_authentication_mandatory_negative_controls(
 
 
 # ==============================================================================
-# P0 — Final Durable Publication Linearization & Crash Consistency Closure
+# P0 - Final Durable Publication Linearization & Crash Consistency Closure
 # ==============================================================================
 
 

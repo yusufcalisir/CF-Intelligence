@@ -3,7 +3,7 @@
 Lightweight investigation workflow for fraud cases. Investigators
 can open cases, link alerts, add notes, and track the investigation
 timeline. This is intentionally simpler than a full case management
-system — it demonstrates the workflow pattern without enterprise
+system - it demonstrates the workflow pattern without enterprise
 complexity.
 """
 
@@ -990,7 +990,7 @@ class CaseManagementService:
                 lines.extend(["", "## Investigation Notes", ""])
                 for note in case.notes:
                     lines.append(
-                        f"### {note.author} — {note.created_at.strftime('%Y-%m-%d %H:%M')}"
+                        f"### {note.author} - {note.created_at.strftime('%Y-%m-%d %H:%M')}"
                     )
                     lines.append(f"{note.content}")
                     lines.append("")
@@ -1033,7 +1033,7 @@ class CaseManagementService:
             titles = [
                 "High-Risk Activity: Device Sharing & Crypto Outflow",
                 "Cross-Border Transaction Velocity Anomaly",
-                "Suspected Account Takeover — Multi-Bank Device Match",
+                "Suspected Account Takeover - Multi-Bank Device Match",
                 "Structuring Pattern Detected: Smurfing Indicators",
             ]
             analysts = ["senior_analyst_1", "analyst_2", "compliance_officer_1", "analyst_3"]

@@ -59,7 +59,7 @@ def _api_request(
     headers: dict | None = None,
     timeout: int = 30,
 ) -> dict:
-    """Minimal HTTP client using stdlib urllib — no external deps."""
+    """Minimal HTTP client using stdlib urllib - no external deps."""
     data = json.dumps(payload).encode() if payload else None
     req_headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if headers:
@@ -143,7 +143,7 @@ def command_status() -> dict:
             "active_bank_nodes": ["bank_alpha", "bank_beta", "bank_gamma"],
             "federated_round": 25,
             "global_model_auc": 0.885,
-            "note": "No active_bank config found — showing local stub. Run cfi-cli join first.",
+            "note": "No active_bank config found - showing local stub. Run cfi-cli join first.",
         }
         print(json.dumps(status_data, indent=2))
         return status_data
@@ -155,12 +155,12 @@ def command_status() -> dict:
 
     # Pretty table
     print(f"┌─ Bank Status {'─' * 40}")
-    print(f"│  bank_id        : {data.get('bank_id', '—')}")
-    print(f"│  legal_name     : {data.get('legal_name', '—')}")
-    print(f"│  jurisdiction   : {data.get('jurisdiction', '—')}")
-    print(f"│  status         : {data.get('status', '—')}")
-    print(f"│  cert_fingerprint: {(data.get('cert_fingerprint') or '—')[:20]}...")
-    print(f"│  activated_at   : {data.get('activated_at', '—')}")
+    print(f"│  bank_id        : {data.get('bank_id', '-')}")
+    print(f"│  legal_name     : {data.get('legal_name', '-')}")
+    print(f"│  jurisdiction   : {data.get('jurisdiction', '-')}")
+    print(f"│  status         : {data.get('status', '-')}")
+    print(f"│  cert_fingerprint: {(data.get('cert_fingerprint') or '-')[:20]}...")
+    print(f"│  activated_at   : {data.get('activated_at', '-')}")
     print(f"└{'─' * 54}")
     return data
 
@@ -181,7 +181,7 @@ def command_rotate_certs(bank_id: str) -> dict:
     cert_file.write_text(result["mtls_cert_pem"], encoding="utf-8")
     key_file.write_text(result["mtls_key_pem"], encoding="utf-8")
 
-    fingerprint = result.get("cert_fingerprint", "—")
+    fingerprint = result.get("cert_fingerprint", "-")
     print(
         f"✅ Certificate rotated for '{bank_id}'.\n"
         f"   Fingerprint: {fingerprint}\n"
@@ -279,7 +279,7 @@ def command_federate(
     print(f"│  Status           : {res.get('status')}")
     print(f"│  Receipt Verified : {res.get('is_verified')}")
     print(f"│  Model Version    : {res.get('model_version')}")
-    print(f"│  Artifact SHA-256 : {(res.get('artifact_sha256') or '—')[:24]}...")
+    print(f"│  Artifact SHA-256 : {(res.get('artifact_sha256') or '-')[:24]}...")
     print(f"│  Champion Promoted: {res.get('is_promoted_champion')}")
     print(f"│  Metrics          : {res.get('metrics')}")
     print(f"└{'─' * 60}")
@@ -293,7 +293,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Builds argument parser for cfi-cli."""
     parser = argparse.ArgumentParser(
         prog="cfi-cli",
-        description="Collaborative Fraud Intelligence — Operator CLI",
+        description="Collaborative Fraud Intelligence - Operator CLI",
     )
     parser.add_argument("--version", action="version", version=f"cfi-cli {CLI_VERSION}")
 

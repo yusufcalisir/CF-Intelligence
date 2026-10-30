@@ -208,6 +208,8 @@ assert artifact.status == BackupStatus.CORRUPTED
 | **SQLite Edge Node DB** | Binary File Snapshot (`.db`) | Checksum + SQLite Header Validation | $0\text{ txns}$ | $\le 60\text{s}$ | $< 2.0\text{ms}$ |
 | **Federated Global Model** | PyTorch Checkpoint (`.pt`) | Checksum + Safe Weights Load | $0\text{ rounds}$ | $\le 30\text{s}$ | $< 3.5\text{ms}$ |
 | **KMS Keyring & Envelopes** | Vault Transit Export / JSON | Checksum + Keyring Deserialization | $0\text{ keys}$ | $\le 10\text{s}$ | $< 1.5\text{ms}$ |
+| **Institutional Worker Keys** | Ed25519 PEM (`WORKER_SIGNING_KEY_FILE`) | Checksum + POSIX `0600` Permissions | $0\text{ keys}$ | $\le 10\text{s}$ | $< 1.0\text{ms}$ |
+| **Pilot Audit Dossiers** | Canonical JSON (`pilot_operations_service`) | Checksum + Schema / Digest Validation | $0\text{ dossiers}$ | $\le 15\text{s}$ | $< 2.0\text{ms}$ |
 
 ---
 

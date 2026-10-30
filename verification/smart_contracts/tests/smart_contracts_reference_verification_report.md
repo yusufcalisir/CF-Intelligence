@@ -1,4 +1,4 @@
-# Pure-Python Reference Verification Report — Smart Contracts Subsystem
+# Pure-Python Reference Verification Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

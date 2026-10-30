@@ -81,8 +81,8 @@ class AdversarialAttackType(StrEnum):
 class DPMode(StrEnum):
     """Differential privacy implementation mode.
 
-    POST_HOC: Simplified approach — clip weight delta and add noise after training.
-    OPACUS: Industry-standard — per-sample gradient clipping and noise during training
+    POST_HOC: Simplified approach - clip weight delta and add noise after training.
+    OPACUS: Industry-standard - per-sample gradient clipping and noise during training
             using Meta AI's Opacus library.
     """
 
@@ -282,11 +282,11 @@ class RecallReasonCode(StrEnum):
     and the ISO 20022 External Code Sets (ExternalCancellationReason1Code).
     """
 
-    FRAD = "FRAD"   # Fraudulent Origination — highest priority, 4h SLA
+    FRAD = "FRAD"   # Fraudulent Origination - highest priority, 4h SLA
     TECH = "TECH"   # Technical Problem (duplicate, encoding error)
-    DUPL = "DUPL"   # Duplicate Transfer — accidental re-submission
+    DUPL = "DUPL"   # Duplicate Transfer - accidental re-submission
     CUST = "CUST"   # Requested by Originating Customer
-    UPAY = "UPAY"   # Undue Payment — erroneous beneficiary / amount
+    UPAY = "UPAY"   # Undue Payment - erroneous beneficiary / amount
     COVR = "COVR"   # Cover Payment recall
 
 
@@ -326,7 +326,7 @@ class ResolutionCode(StrEnum):
 
     NOAS = "NOAS"   # No Answer from beneficiary / account frozen
     NOOR = "NOOR"   # No Original Transaction Received (unrecognised)
-    LEGL = "LEGL"   # Legal proceedings initiated — funds frozen by court
+    LEGL = "LEGL"   # Legal proceedings initiated - funds frozen by court
     CUST = "CUST"   # Beneficiary customer disputed the recall
     AGNT = "AGNT"   # Agent-level technical reason (routing error)
 
@@ -345,7 +345,7 @@ class WatchlistSource(StrEnum):
     UN_SECURITY_COUNCIL = "UN_SECURITY_COUNCIL"  # UN SC Consolidated List (1267/1989)
     OFAC_SDN = "OFAC_SDN"                 # US OFAC Specially Designated Nationals
     HM_TREASURY = "HM_TREASURY"           # UK HMT Financial Sanctions
-    PEP_GLOBAL = "PEP_GLOBAL"             # Politically Exposed Persons — global aggregated
+    PEP_GLOBAL = "PEP_GLOBAL"             # Politically Exposed Persons - global aggregated
     INTERNAL_GOODLIST = "INTERNAL_GOODLIST"  # Institution-level false-positive suppression list
 
 
@@ -353,9 +353,9 @@ class MatchAlgorithm(StrEnum):
     """Algorithms used for name matching during sanctions/PEP screening."""
 
     EXACT = "EXACT"                    # Exact string equality (after normalisation)
-    LEVENSHTEIN = "LEVENSHTEIN"        # Edit distance — catches typos, transpositions
+    LEVENSHTEIN = "LEVENSHTEIN"        # Edit distance - catches typos, transpositions
     JARO_WINKLER = "JARO_WINKLER"      # Similarity weighted for common prefixes
-    DOUBLE_METAPHONE = "DOUBLE_METAPHONE"  # Phonetic — cross-language sound equivalence
+    DOUBLE_METAPHONE = "DOUBLE_METAPHONE"  # Phonetic - cross-language sound equivalence
     TRANSLITERATION = "TRANSLITERATION"   # Cyrillic / Arabic / Chinese → Latin script
 
 
@@ -386,8 +386,8 @@ class MatchDisposition(StrEnum):
     """
 
     PENDING_REVIEW = "PENDING_REVIEW"
-    CONFIRMED_MATCH = "CONFIRMED_MATCH"    # True positive — transaction blocked
-    FALSE_POSITIVE = "FALSE_POSITIVE"      # Goodlisted — suppressed in future screens
+    CONFIRMED_MATCH = "CONFIRMED_MATCH"    # True positive - transaction blocked
+    FALSE_POSITIVE = "FALSE_POSITIVE"      # Goodlisted - suppressed in future screens
     ESCALATED = "ESCALATED"               # Referred to senior compliance / FIU
 
 

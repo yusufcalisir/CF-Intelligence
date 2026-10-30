@@ -1,4 +1,4 @@
-# Scientific Verification Inventory — Federation Coordinator Subsystem
+# Scientific Verification Inventory - Federation Coordinator Subsystem
 
 **Subsystem:** Federation Coordinator & Distributed Orchestration Engine  
 **Module Paths:**  
@@ -370,4 +370,4 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
 
 ---
 
-*End of Scientific Verification Inventory — Federation Coordinator Subsystem*
+*End of Scientific Verification Inventory - Federation Coordinator Subsystem*

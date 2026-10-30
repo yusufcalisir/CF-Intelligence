@@ -1,4 +1,4 @@
-# Hypothesis Property-Based Testing Report — Audit Logging Subsystem
+# Hypothesis Property-Based Testing Report - Audit Logging Subsystem
 
 ## Executive Summary
 

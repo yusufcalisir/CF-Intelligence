@@ -1,4 +1,4 @@
-# Scientific Verification Inventory — Explainability (XAI) Module
+# Scientific Verification Inventory - Explainability (XAI) Suite
 
 **Module Path:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_investigation`  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
@@ -209,4 +209,4 @@ The Explainability module provides multi-layered explanations for fraud alerts, 
 
 ---
 
-*End of Scientific Verification Inventory — Explainability (XAI) Module*
+*End of Scientific Verification Inventory - Explainability (XAI) Suite*

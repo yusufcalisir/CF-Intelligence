@@ -573,7 +573,7 @@ class FederatedCreditCardTrainer:
 
             if verbose:
                 logger.info(
-                    "Round %2d/%2d [%s] — Val Loss: %.4f | PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%% (%.2fs)",
+                    "Round %2d/%2d [%s] - Val Loss: %.4f | PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%% (%.2fs)",
                     r,
                     rounds,
                     strat_key.upper(),
@@ -998,7 +998,7 @@ Under extreme financial class imbalance (578:1 ratio), institutions with sparse 
 | **Bank A Silo (Large Retail)** | Isolated Silo | {_format_metric(m_a.get('pr_auc'))} | {_format_metric(m_a.get('roc_auc'))} | {_format_metric(m_a.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_a.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_a.get('brier_score'))} | ⚠️ Single-Bank Perimeter |
 | **Bank B Silo (Challenger)** | Isolated Silo | {_format_metric(m_b.get('pr_auc'))} | {_format_metric(m_b.get('roc_auc'))} | {_format_metric(m_b.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_b.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_b.get('brier_score'))} | ⚠️ Single-Bank Perimeter |
 | **Bank C Silo (Near-Zero Fraud)** | Isolated Silo | {_format_metric(silo_c_prauc)} | {_format_metric(m_c.get('roc_auc'))} | {_format_metric(m_c.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_c.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_c.get('brier_score'))} | 🚨 **Severe Data Starvation Failure** |
-| **Consortium Silo Average** | Baseline Mean | {_format_metric(silo_mean_prauc)} | {_format_metric(consortium_mean.get('roc_auc'))} | {_format_metric(consortium_mean.get('recall_at_01_fpr'), 2, True)} | — | — | ⚠️ Baseline Silo Mean |
+| **Consortium Silo Average** | Baseline Mean | {_format_metric(silo_mean_prauc)} | {_format_metric(consortium_mean.get('roc_auc'))} | {_format_metric(consortium_mean.get('recall_at_01_fpr'), 2, True)} | - | - | ⚠️ Baseline Silo Mean |
 
 ---
 

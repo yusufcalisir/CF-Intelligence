@@ -1,4 +1,4 @@
-# Robustness Testing Report — Model Drift & Calibration Subsystem
+# Robustness Testing Report - Model Drift & Calibration Subsystem
 
 **Module:** `drift_service.py`, `retraining_trigger_engine.py`  
 **Test Suite:** `test_drift_robustness.py`  
@@ -28,7 +28,7 @@ Thirty-five boundary-injection robustness tests were executed against the `Model
 
 ## 2. Test Categories and Results
 
-### GDR1 — NaN Feature Values (3 tests, 2 passed, 1 failed)
+### GDR1 - NaN Feature Values (3 tests, 2 passed, 1 failed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -36,7 +36,7 @@ Thirty-five boundary-injection robustness tests were executed against the `Model
 | GDR1b | NaN values in feature drift analysis | **PASS** | scipy KS test propagates NaN to `ks_p_value = nan`; but service does not crash |
 | GDR1c | NaN values in `y_prob` for Brier Score | **FAIL** | `brier_score = nan`; no sanitisation performed |
 
-**BUG-DR-01 — Brier Score NaN Propagation**
+**BUG-DR-01 - Brier Score NaN Propagation**
 
 ```
 Input:  y_true = [0, 1, 0, 1, 0]
@@ -59,7 +59,7 @@ if not np.all(np.isfinite(y_prob_arr)):
 
 ---
 
-### GDR2 — Infinite Feature Values (3 tests, 2 passed, 1 failed)
+### GDR2 - Infinite Feature Values (3 tests, 2 passed, 1 failed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -67,7 +67,7 @@ if not np.all(np.isfinite(y_prob_arr)):
 | GDR2b | -Inf in expected PSI array | **PASS** | NumPy raises RuntimeWarning (invalid subtract); PSI returns 0.0 |
 | GDR2c | Both +Inf and -Inf in feature drift | **FAIL** | `wasserstein_distance = inf` |
 
-**BUG-DR-02 — Wasserstein Distance Returns +Inf**
+**BUG-DR-02 - Wasserstein Distance Returns +Inf**
 
 ```
 Input:  curr = [inf, -inf] + Normal(0,1,98)
@@ -92,7 +92,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR3 — Empty Arrays (5 tests, 5 passed)
+### GDR3 - Empty Arrays (5 tests, 5 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -106,7 +106,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR4 — Single-Element Arrays (3 tests, 3 passed)
+### GDR4 - Single-Element Arrays (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -118,7 +118,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR5 — Constant Distributions / Zero Variance (3 tests, 3 passed)
+### GDR5 - Constant Distributions / Zero Variance (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -130,7 +130,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR6 — Extreme Class Imbalance (3 tests, 3 passed)
+### GDR6 - Extreme Class Imbalance (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -142,7 +142,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR7 — Severely Unequal Sample Sizes (3 tests, 3 passed)
+### GDR7 - Severely Unequal Sample Sizes (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -154,7 +154,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR8 — Entirely Duplicated Values (3 tests, 3 passed)
+### GDR8 - Entirely Duplicated Values (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -166,7 +166,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR9 — Very Small Probabilities (3 tests, 3 passed)
+### GDR9 - Very Small Probabilities (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -178,7 +178,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR10 — Floating-Point Boundary Probabilities (2 tests, 2 passed)
+### GDR10 - Floating-Point Boundary Probabilities (2 tests, 2 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -189,7 +189,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR11 — Mismatched y_true / y_prob Lengths (1 test, 1 passed)
+### GDR11 - Mismatched y_true / y_prob Lengths (1 test, 1 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -199,7 +199,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 
 ---
 
-### GDR12 — Extreme PSI Triggering Retraining Logic (3 tests, 3 passed)
+### GDR12 - Extreme PSI Triggering Retraining Logic (3 tests, 3 passed)
 
 | Test | Scenario | Result | Observation |
 |------|----------|--------|-------------|
@@ -207,7 +207,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 | GDR12b | Two completely different distributions | **PASS** | Status = CRITICAL, auto_retrain_triggered = True |
 | GDR12c | NaN PSI in RetrainingTriggerEngine | **PASS** | Returns bool (NaN > 0.20 evaluates to False in Python/NumPy) |
 
-**Assessment for GDR12c:** Python evaluates `float('nan') > 0.20` as `False`, so `check_drift_threshold(nan, 1.0)` silently returns `False` (no trigger). This is semantically incorrect — NaN should not imply "no drift" — but no crash occurs. A `math.isfinite` guard should be added.
+**Assessment for GDR12c:** Python evaluates `float('nan') > 0.20` as `False`, so `check_drift_threshold(nan, 1.0)` silently returns `False` (no trigger). This is semantically incorrect - NaN should not imply "no drift" - but no crash occurs. A `math.isfinite` guard should be added.
 
 ---
 
@@ -231,7 +231,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 - **Impact:** `inf` propagates to any downstream comparisons involving Wasserstein; dashboard display shows `inf`; JSON serialisation may fail or produce `null`
 - **Fix location:** [drift_service.py L120–L132](../../../backend/app/application/services/drift_service.py#L120-L132)
 
-### Advisory — NaN PSI Silently Evaluates to False in RetrainingTriggerEngine
+### Advisory - NaN PSI Silently Evaluates to False in RetrainingTriggerEngine
 
 - **Severity:** LOW (no crash, but semantically misleading)
 - **Location:** [retraining_trigger_engine.py L48](../../../backend/app/application/services/retraining_trigger_engine.py#L48)
@@ -285,9 +285,9 @@ When the empirical distribution includes $+\infty$, the CDF does not converge an
 |-------|--------------------|---------------------|---------------|
 | "Brier Score is numerically stable under hostile inputs" | Assumed Supported | **Partially Supported** | NaN propagation confirmed (BUG-DR-01) |
 | "Wasserstein distance handles all real-valued inputs" | Assumed Supported | **Partially Supported** | Inf propagation confirmed (BUG-DR-02) |
-| "Empty array guard prevents crashes" | — | **Supported** | All 5 empty-array tests passed |
+| "Empty array guard prevents crashes" | - | **Supported** | All 5 empty-array tests passed |
 | "Constant distribution handled via fallback binning" | Partially Supported | **Supported** | All 3 constant-distribution tests passed |
-| "RetrainingTriggerEngine handles NaN PSI gracefully" | — | **Partially Supported** | No crash; semantically incorrect (NaN → no trigger) |
+| "RetrainingTriggerEngine handles NaN PSI gracefully" | - | **Partially Supported** | No crash; semantically incorrect (NaN → no trigger) |
 
 ---
 
@@ -301,7 +301,7 @@ When the empirical distribution includes $+\infty$, the CDF does not converge an
 
 **Priority 2 (Improve robustness):**
 
-3. **Advisory — NaN PSI:** Add `math.isfinite(psi_score)` guard in `check_drift_threshold`.
+3. **Advisory - NaN PSI:** Add `math.isfinite(psi_score)` guard in `check_drift_threshold`.
 
 4. **Sample-size warnings:** Log a `WARNING` when N_curr < 30 for any feature drift computation (below minimum sample size for reliable KS inference).
 
@@ -311,6 +311,6 @@ When the empirical distribution includes $+\infty$, the CDF does not converge an
 
 ## 8. Conclusion
 
-The drift detection subsystem demonstrates robust handling of the majority of boundary conditions tested (33/35 passing). The two confirmed defects — NaN propagation in calibration and Inf propagation in Wasserstein distance — are both fixable with minimal code changes (input sanitisation). The remaining 33 scenarios, including all empty-array guards, constant distributions, unequal sample sizes, duplicated values, and probability boundaries, behave correctly.
+The drift detection subsystem demonstrates robust handling of the majority of boundary conditions tested (33/35 passing). The two confirmed defects - NaN propagation in calibration and Inf propagation in Wasserstein distance - are both fixable with minimal code changes (input sanitisation). The remaining 33 scenarios, including all empty-array guards, constant distributions, unequal sample sizes, duplicated values, and probability boundaries, behave correctly.
 
 The scientific credibility of the module is assessed as **HIGH** for production deployment contingent on resolution of BUG-DR-01 and BUG-DR-02 prior to release.

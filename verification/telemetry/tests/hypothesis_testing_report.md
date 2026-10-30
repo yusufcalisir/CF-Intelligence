@@ -1,4 +1,4 @@
-# Property-Based Testing Report — Telemetry & Observability Subsystem
+# Property-Based Testing Report - Telemetry & Observability Subsystem
 
 **Module:** Telemetry Registry, OpenTelemetry Tracer, SLA Monitor, Tenant Metering, Diagnostic Compiler  
 **Audited Code Files:** `telemetry/__init__.py`, `otel_tracer.py`, `sla_monitor.py`, `tenant_metering.py`, `support_diagnostics.py`  
@@ -106,6 +106,6 @@ The Hypothesis property-based test suite confirms that the Telemetry & Observabi
 
 ---
 
-*Property-Based Testing Report — Telemetry & Observability Subsystem*  
+*Property-Based Testing Report - Telemetry & Observability Subsystem*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

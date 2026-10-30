@@ -82,6 +82,8 @@ desktop.ini
 *.pfx
 *.cer
 *.der
+.secrets/
+secrets/
 
 # --- Database & Local Storage ---
 *.db
@@ -90,6 +92,7 @@ desktop.ini
 /data/
 storage/*
 !storage/README.md
+evidence/
 backend/storage/
 backend/app/storage/
 !backend/app/infrastructure/storage/

@@ -1,5 +1,5 @@
 /**
- * DriftMetricsCard — Empirical Concept & Feature Drift Profiling Telemetry Card
+ * DriftMetricsCard - Empirical Concept & Feature Drift Profiling Telemetry Card
  *
  * Visualizes multi-period statistical drift metrics:
  *   - Population Stability Index (PSI) across features and concept predictions

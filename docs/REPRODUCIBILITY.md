@@ -95,7 +95,13 @@ The repository includes a comprehensive `Makefile` automating end-to-end executi
 # 1. Complete Environment Verification & Smoke Test
 make test
 
-# 2. Master One-Line Verification of All Automated Test Suites (5,617 Pytest + 410 Verification + 11 SDK + 375 Vitest + 31 Hardhat = 6,444 Total)
+# 2. Multi-Bank Consortium Sandbox Deployment & Verification (10 Containers)
+python scripts/generate_consortium_deployment_secrets.py --force
+python scripts/bootstrap_consortium_deployment.py --allow-credential-rotation
+docker compose -f docker-compose.consortium.yml up -d
+pytest backend/tests/integration/test_consortium_multi_bank_deployment.py -v
+
+# 3. Master One-Line Verification of All Automated Test Suites (5,617 Pytest + 410 Verification + 11 SDK + 375 Vitest + 31 Hardhat = 6,444 Total)
 make test-all
 
 # 3. Run All Empirical Benchmark Runners & Compile Master Matrix
@@ -319,3 +325,5 @@ The reproducibility pipeline is continuously verified by targeted unit and integ
 | **Authoritative Dataset Cards** | [`backend/tests/unit/test_dataset_cards.py`](../backend/tests/unit/test_dataset_cards.py) | Verifies `DATASETS.md` provenance, licensing, and 0/10 protected demographic PII scan |
 | **Model & System Cards** | [`backend/tests/unit/test_system_and_model_cards.py`](../backend/tests/unit/test_system_and_model_cards.py) | Verifies `MODEL_CARD.md` and `SYSTEM_CARD.md` regulatory conformity |
 | **Master Test Runner** | [`scripts/run_all_tests.py`](../scripts/run_all_tests.py) | Orchestrates all backend (5,617), verification (410), SDK (11), frontend (375), and contracts (31) tests = 6,444 total |
+| **Consortium Deployment Integration** | [`backend/tests/integration/test_consortium_multi_bank_deployment.py`](../backend/tests/integration/test_consortium_multi_bank_deployment.py) | Verifies 10-container sandbox topology, multi-bank OpenMined PSI matching, and authentic evidence attachment |
+| **Consortium Security Hardening** | [`backend/tests/unit/test_consortium_security_and_transport_hardening.py`](../backend/tests/unit/test_consortium_security_and_transport_hardening.py) | Verifies Redis auto-reconnect backoff (1s cooldown), 0600 key custody, and browser session epoch invalidation |

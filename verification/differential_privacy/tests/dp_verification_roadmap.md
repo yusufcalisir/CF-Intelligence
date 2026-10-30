@@ -1,4 +1,4 @@
-﻿# Master Scientific Verification Roadmap — Differential Privacy Subsystem
+﻿# Master Scientific Verification Roadmap - Differential Privacy Subsystem
 
 This document defines the 5-phase scientific verification roadmap for the Differential Privacy (DP), PETs, and Privacy Audit subsystem, mapping every audited algorithm and privacy claim to specific, rigorous validation methodologies.
 

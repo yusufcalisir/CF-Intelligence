@@ -35,10 +35,10 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Real-World Origin**: Derived from an aggregated sample of 1 month of financial transaction logs from the **M-Pesa** mobile money service in Kenya.
 * **Scale**: 6,362,620 transaction records containing 8,213 confirmed fraud events ($\mathrm{FraudRate} = 0.129\%$).
 * **Transaction Modalities**:
-  * `CASH_OUT` ($35.1\%$ volume — target fraud sink)
+  * `CASH_OUT` ($35.1\%$ volume - target fraud sink)
   * `PAYMENT` ($33.8\%$ volume)
   * `CASH_IN` ($22.0\%$ volume)
-  * `TRANSFER` ($8.4\%$ volume — target fraud initiation)
+  * `TRANSFER` ($8.4\%$ volume - target fraud initiation)
   * `DEBIT` ($0.7\%$ volume)
 * **Key Fraud Mechanics**:
   Fraudsters execute unauthorized `TRANSFER` actions followed immediately by `CASH_OUT` to liquidate illicit funds. The source account balance is systematically depleted to zero.

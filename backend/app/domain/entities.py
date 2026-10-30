@@ -26,7 +26,7 @@ class Bank:
     """A participating financial institution in the federated learning simulation.
 
     Each bank owns independent transaction data with distinct statistical
-    properties (Non-IID). Banks never share raw data — only model parameters.
+    properties (Non-IID). Banks never share raw data - only model parameters.
     """
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

@@ -1,4 +1,4 @@
-# Robustness Testing Report — Federation Coordinator Subsystem
+# Robustness Testing Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`, `client.py`, `region_failover.py`  
 **Test Suite:** `scratch/test_federation_coordinator_robustness.py`  
@@ -93,4 +93,4 @@ All **twelve robustness tests passed with 100% success**, confirming graceful fa
 
 ---
 
-*End of Robustness Testing Report — Federation Coordinator Subsystem*
+*End of Robustness Testing Report - Federation Coordinator Subsystem*

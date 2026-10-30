@@ -344,7 +344,7 @@ sequenceDiagram
 
 Deterministic exact-string matching fails when bank records differ slightly in spelling, accents, or formatting (e.g., "Yusuf Çalışır" vs "Yusuf Calisir"). Phase 2 implements a four-stage privacy-preserving fuzzy entity matching pipeline:
 
-#### Stage 1 — Standardization Pipeline (`standardize_input()`)
+#### Stage 1 - Standardization Pipeline (`standardize_input()`)
 
 [value_objects_investigation.py](../backend/app/domain/value_objects_investigation.py) :: `standardize_input(raw_value, entity_type)` applies a pre-hashing normalization pipeline to all entity identifiers before any matching is attempted:
 
@@ -357,7 +357,7 @@ Deterministic exact-string matching fails when bank records differ slightly in s
 
 This ensures that `"Yusuf Çalışır"` and `"Yusuf Calisir"` both standardize to `"yusuf calisir"` before any hash is computed.
 
-#### Stage 2 — Locality-Sensitive Hashing (LSH) on Character n-grams (`compute_minhash_signature()`)
+#### Stage 2 - Locality-Sensitive Hashing (LSH) on Character n-grams (`compute_minhash_signature()`)
 
 [value_objects_investigation.py](../backend/app/domain/value_objects_investigation.py) :: `compute_minhash_signature(text, num_hashes=16)` generates a compact probabilistic fingerprint:
 
@@ -377,7 +377,7 @@ $$\widehat{J}(S_1, S_2) = \frac{|\{ i \mid \mathrm{sig}_1[i] = \mathrm{sig}_2[i]
 
 The 16-dimensional MinHash vector is stored directly in the entity's `attributes["minhash_signature"]` field, eliminating the need for a separate LSH index store.
 
-#### Stage 3 — Multi-Attribute Fuzzy PSI (`PSIService.run_psi(enable_fuzzy=True)`)
+#### Stage 3 - Multi-Attribute Fuzzy PSI (`PSIService.run_psi(enable_fuzzy=True)`)
 
 [psi_service.py](../backend/app/application/services/psi_service.py) :: `run_psi(bank_a_id, bank_b_id, entity_type, enable_fuzzy=True, fuzzy_threshold=3)` executes a threshold-based multi-attribute matching protocol:
 
@@ -392,7 +392,7 @@ $$\left| \mathrm{matched\_attrs} \right| \ge k \quad (\text{default: } k = 3 \te
 
 4. **Similarity Score**: The output match record includes a continuous overlap score $= |\mathrm{matched\_attrs}| / n$.
 
-#### Stage 4 — Central LSH Registry (`EntityResolutionService.resolve_fuzzy_entities()`)
+#### Stage 4 - Central LSH Registry (`EntityResolutionService.resolve_fuzzy_entities()`)
 
 [entity_resolution.py](../backend/app/application/services/entity_resolution.py) :: `resolve_fuzzy_entities(query_name, entity_type, threshold=0.70)` provides a direct name-to-entity fuzzy lookup:
 - Standardizes and computes the MinHash signature of the query string.
@@ -691,7 +691,7 @@ sequenceDiagram
     participant Coord as CoordinatorService
     participant Prom as Prometheus Gauge
 
-    Note over Bank, Coord: Phase 1 — Handshake & Version Validation
+    Note over Bank, Coord: Step 1 - Handshake & Version Validation
     Bank->>Coord: POST /api/v1/coordinator/handshake<br/>{bank_id, pytorch_version, python_version, hardware_type, ram_gb}
     Coord->>Coord: Validate PyTorch ≥ 2.x AND Python ≥ 3.10
     alt Compatible
@@ -701,7 +701,7 @@ sequenceDiagram
         Coord-->>Bank: {registered: false, status: "INCOMPATIBLE", reason: "..."}
     end
 
-    Note over Bank, Coord: Phase 2 — Live Heartbeat Loop (every ~10s)
+    Note over Bank, Coord: Step 2 - Live Heartbeat Loop (every ~10s)
     loop Every 10 seconds while ONLINE
         Bank->>Coord: POST /api/v1/coordinator/heartbeat<br/>{bank_id}
         Coord->>Coord: Update last_heartbeat = time.time()
@@ -712,7 +712,7 @@ sequenceDiagram
     Coord->>Coord: For each client: if now - last_heartbeat > timeout → mark OFFLINE
     Coord->>Prom: cfi_active_clients_count.record(len(active_clients))
 
-    Note over Bank, Coord: Phase 3 — Parameter Negotiation
+    Note over Bank, Coord: Step 3 - Parameter Negotiation
     Bank->>Coord: GET /api/v1/coordinator/negotiate?bank_id=X&base_batch_size=64&base_epochs=5
     Coord->>Coord: Lookup hardware_type and ram_gb from registry
     alt CUDA and RAM ≥ 16 GB
@@ -819,8 +819,8 @@ Defends against colluding attackers that Krum or Median alone cannot mitigate:
 | Dataset | Source | Feature Dim | Fraud Ratio | Graph Structure? |
 |:---|:---|---:|---:|:---:|
 | **Elliptic Bitcoin** | Kaggle / EllipticDataset | 166 | ~2 % | ✅ node-edge CSV |
-| **AMLSim** | IBM Research | 6 (tabular) | ~1.5 % | — |
-| **PaySim / Kaggle CC** | Kaggle Credit Card Fraud | 29 (V1-V28 + Amount) | ~0.17 % | — |
+| **AMLSim** | IBM Research | 6 (tabular) | ~1.5 % | - |
+| **PaySim / Kaggle CC** | Kaggle Credit Card Fraud | 29 (V1-V28 + Amount) | ~0.17 % | - |
 
 Each loader conforms to the contract:
 ```python
@@ -830,7 +830,7 @@ data = load_dataset("elliptic", n_mock_nodes=2000)
 
 Real CSV files are looked up under `storage/datasets/<name>/`. When absent, synthetic mocks matching exact feature dimensions and label distributions are generated automatically.
 
-### FedYogi — Adaptive Server Optimizer
+### FedYogi - Adaptive Server Optimizer
 
 **Reference**: Reddi et al., *"Adaptive Federated Optimization"* (ICLR 2021)
 
@@ -844,7 +844,7 @@ w_{t+1} &= w_t + \eta \cdot \frac{m_{t+1}}{\sqrt{v_{t+1}} + \tau}
 
 Compared to FedAdam, FedYogi slows variance growth and maintains larger effective updates on parameters where $v$ already exceeds $\Delta^2$, which is critical for highly skewed fraud distributions.
 
-### SCAFFOLD — Control-Variate Client-Drift Correction
+### SCAFFOLD - Control-Variate Client-Drift Correction
 
 **Reference**: Karimireddy et al., *"SCAFFOLD: Stochastic Controlled Averaging for Federated Learning"* (ICML 2020)
 
@@ -923,6 +923,8 @@ sequenceDiagram
    In compliance with `AGENTS.md` truthfulness rules, the system explicitly marks software-emulated Private Set Intersection and entity resolution as `SIMULATED_SOFTWARE_ONLY` (`emulation_mode: True`, `is_authoritative: False`, `is_synthetic: True`). Software simulation is strictly disabled in production (`enable_cross_bank_simulation = False`), failing closed with invariant validation. Querying operational entities via simulation is prohibited. When institutional policy mandates physical hardware enclave execution (`require_hardware_attestation: True`), the platform refuses to fabricate measurement quotes and fails closed with `AttestationError` (`HTTP 412 Precondition Failed`).
 3. **Immutable Evidence Anchoring & Collision-Resistant Durability:**
    Signals evaluated by an analyst are verified via server-side SHA-256 integrity validation (`content_hash`) and anchored to the institution's case evidence ledger via `EvidenceRegistryService`. Evidence files are persisted atomically with collision-resistant paths (`case_{case_id}_signal_{resolved_signal_id}_{payload_digest[:16]}.json`). If file writes fail, execution fails closed with `EvidencePersistenceError` without claiming durability. If optimistic concurrency (CAS) updates fail, newly written files and registry entries are rolled back. Simulated or synthetic signals cannot be attached to authoritative fraud cases, SAR preparations, or escalated cases. Terminal cases (`CONFIRMED_FRAUD`, `FALSE_POSITIVE`, `CLOSED_NO_ACTION`) reject further mutations (`HTTP 409 Conflict`), preserving regulatory audit integrity under Four-Eyes dual control.
+4. **Genuine OpenMined PSI 2.0.6 (Curve25519 ECDH) Operational Pipeline:**
+   In operational deployments, cross-bank matching executes via [`IsolatedMatchingService`](../backend/app/application/services/isolated_matching_service.py) across genuine process-isolated containers (`cfi-worker-bank-a`, `cfi-worker-bank-b`, `cfi-worker-bank-c`) and coordinator (`cfi-psi-coordinator`) using OpenMined PSI 2.0.6. Counterparty private entity vaults are strictly isolated (`storage/{bank_id}/private_entities/`), worker signing keys are file-mounted with `0600` permissions (`WORKER_SIGNING_KEY_FILE`), and match receipts are cryptographically signed using Ed25519 before being anchored as [`CaseEvidenceAttachment`](../backend/app/domain/case_management.py) to active fraud cases. Transient counterparty downtime is truthfully reported as `PARTIAL_FAILURE` without synthesizing fake match results.
 
 ---
 
@@ -932,6 +934,8 @@ All platform components are continuously verified through unit and integration s
 
 | Test Suite | Targeted Module / Service | Verified Features | Test Count | Status |
 |:---|:---|:---|:---:|:---:|
+| [test_consortium_multi_bank_deployment.py](../backend/tests/integration/test_consortium_multi_bank_deployment.py) | `isolated_matching_service`, `docker-compose.consortium.yml` | Full 10-service health probes, OpenMined PSI matching, evidence attachment, recovery | 9 | ✅ 100% Pass |
+| [test_consortium_security_and_transport_hardening.py](../backend/tests/unit/test_consortium_security_and_transport_hardening.py) | `isolated_matching_service`, `redis_store` | Isolated key custody (0600), mTLS CN/SAN validation, Redis auto-reconnect | 9 | ✅ 100% Pass |
 | [test_fuzzy_psi.py](../backend/tests/unit/test_fuzzy_psi.py) | `value_objects_investigation`, `psi_service` | Turkish transliteration, MinHash LSH, 3-of-5 attribute threshold gate | 3 | ✅ 100% Pass |
 | [test_psi_service.py](../backend/tests/unit/test_psi_service.py) | `psi_service` | Commutative DH-PSI exponentiation, match identification, cross-encryption | 3 | ✅ 100% Pass |
 | [test_psi_fuzzy_domain.py](../backend/tests/unit/test_psi_fuzzy_domain.py) | `value_objects_investigation` | Normalization edge cases, punctuation stripping, phone E.164 standardization | 4 | ✅ 100% Pass |

@@ -102,9 +102,9 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
         )}
         <div className="space-y-1 text-xs">
           <div className="font-bold text-sm tracking-wide">
-            {isActive && 'Operational Queries ENABLED — Active Enclave'}
-            {isPaused && 'Operational Queries BLOCKED — Emergency Pause Active'}
-            {isAuthorized && 'Pilot Fully Authorized — Awaiting Operator Activation'}
+            {isActive && 'Operational Queries ENABLED - Active Enclave'}
+            {isPaused && 'Operational Queries BLOCKED - Emergency Pause Active'}
+            {isAuthorized && 'Pilot Fully Authorized - Awaiting Operator Activation'}
             {isTerminal && `Pilot Execution Concluded (${pilot.status})`}
             {!isActive && !isPaused && !isAuthorized && !isTerminal && 'Pilot Provisioning & Verification In-Progress'}
           </div>

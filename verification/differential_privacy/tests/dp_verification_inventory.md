@@ -1,4 +1,4 @@
-# Scientific Verification Inventory — Differential Privacy Subsystem
+# Scientific Verification Inventory - Differential Privacy Subsystem
 
 This document presents a complete scientific audit and verification inventory of the Differential Privacy (DP), Private Set Intersection (PETs), and Privacy Audit subsystem within the privacy-preserving cross-bank fraud detection platform.
 

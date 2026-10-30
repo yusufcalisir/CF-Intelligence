@@ -20,7 +20,7 @@ from app.domain.value_objects_investigation import RiskScore, RiskSignal, RiskWe
 
 logger = logging.getLogger(__name__)
 
-# Country risk scores — simplified lookup table (FATF-aligned)
+# Country risk scores - simplified lookup table (FATF-aligned)
 COUNTRY_RISK: dict[str, float] = {
     # FATF black-listed / fully sanctioned jurisdictions
     "KP": 1.00,  # North Korea (DPRK)

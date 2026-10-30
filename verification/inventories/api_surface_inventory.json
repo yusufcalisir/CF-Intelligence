@@ -1,7 +1,7 @@
 {
-  "total_routers": 45,
+  "total_routers": 47,
   "total_schemas": 39,
-  "total_items": 84,
+  "total_items": 86,
   "items": [
     {
       "type": "ROUTER",
@@ -674,6 +674,22 @@
       "inspected": true,
       "truth_sensitive": true,
       "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/cross_bank_intelligence.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified cross-bank entity matching, zero raw PII signal exchange, and fail-closed consortium gating"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/pilot_operations.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified 7-stage bilateral pilot lifecycle, bilateral supervisor approval, and server-authoritative kill switch"
     }
   ]
 }

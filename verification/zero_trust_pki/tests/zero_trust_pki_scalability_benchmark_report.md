@@ -1,4 +1,4 @@
-# Scalability & Latency Benchmark Report — Zero Trust PKI & ABAC
+# Scalability & Latency Benchmark Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

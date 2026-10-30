@@ -49,7 +49,7 @@ def run_reference_verification() -> dict[str, Any]:
         assert valid == expected
         passed += 1
 
-    report_md = f"""# Pure-Python Reference Verification Report — Multi-Cloud Terraform IaC
+    report_md = f"""# Pure-Python Reference Verification Report - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

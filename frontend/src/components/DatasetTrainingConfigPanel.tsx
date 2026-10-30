@@ -7,7 +7,7 @@
  *   2. Toggle between "Mock Simulation" and "Real Backend" training modes
  *
  * On "Launch Training" the parent receives (profile, mode) and starts the
- * appropriate training path.  This component carries NO training state — it is
+ * appropriate training path.  This component carries NO training state - it is
  * purely presentational configuration UI.
  */
 

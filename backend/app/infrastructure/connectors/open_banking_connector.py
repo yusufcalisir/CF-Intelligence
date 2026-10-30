@@ -1,4 +1,4 @@
-"""Berlin Group NextGenPSD2 and Open Banking REST Bank Connector — Section 38.2."""
+"""Berlin Group NextGenPSD2 and Open Banking REST Bank Connector - Section 38.2."""
 
 from __future__ import annotations
 

@@ -353,6 +353,7 @@ $$\mathbb{I}_{\mathrm{structuring}} = \mathbb{I}(8{,}500 \le \mathrm{amount} < 1
 #### 3.8.3 Typologies & Collaborative Detection Advantage
 - **Cross-Bank Fraud Typologies**: Circular layering across institutions (smurfing/fan-out $\to$ intermediate mules $\to$ rapid exit gather), split-deposit velocity bursts, and cross-border settlement loops.
 - **Collaborative GNN Gain**: Local silo PR-AUC average of $0.4448$ increases to $\mathbf{0.8267}$ under Federated Relational GNN, delivering an empirical gain of $+0.3819$ ($+85.8\%$ relative lift).
+- **Private Entity Resolution**: Multi-counterparty cross-bank matching executes via genuine OpenMined PSI 2.0.6 (Curve25519 ECDH) and Bloom filters, generating cryptographically verified `CaseEvidenceAttachment` records without exposing unflagged account sets.
 
 #### 3.8.4 Data Hygiene, Biases & Limitations
 - **Strict Privacy Invariant**: 0/10 protected demographic attributes. Zero raw PII across institutions. Entity identifiers pseudonymized with type-salted HMAC-SHA256.
@@ -428,8 +429,9 @@ kaggle datasets download -d anshankul/ibm-amlsim-example-dataset -p backend/stor
 
 ## 7. Verification Test Suites
 
-Dataset integrity, zero lookahead leakage, schema conformance, and zero-mock error guards are verified across **86 dedicated data tests**:
+Dataset integrity, zero lookahead leakage, schema conformance, and zero-mock error guards are verified across **95 dedicated data tests**:
 - [`backend/tests/unit/test_dataset_cards.py`](backend/tests/unit/test_dataset_cards.py): Authoritative dataset card formalization, licensing conformance, class balance validation, and cross-reference integrity (**8 tests, 100% passing**).
+- [`backend/tests/integration/test_consortium_multi_bank_deployment.py`](backend/tests/integration/test_consortium_multi_bank_deployment.py): Multi-bank consortium deployment, authentic OpenMined PSI matching across Bank A, Bank B, and Bank C, and case evidence attachment (**9 tests, 100% passing**).
 - [`backend/tests/unit/test_real_dataloaders.py`](backend/tests/unit/test_real_dataloaders.py): Ingestion integrity for all 7 benchmark datasets, PyG/NetworkX graph exports, and zero-mock error guards (**13 tests, 100% passing**).
 - [`backend/tests/unit/test_flagship_cross_bank_experiment.py`](backend/tests/unit/test_flagship_cross_bank_experiment.py): CFI-CrossBank-01 3-tier topology generation, circular multi-hop validation, and collaborative GNN baseline (**10 tests, 100% passing**).
 - [`backend/tests/unit/test_paysim_loader.py`](backend/tests/unit/test_paysim_loader.py): PaySim loading, 13-feature engineering, accounting balance deltas, and zero temporal leakage (**8 tests, 100% passing**).

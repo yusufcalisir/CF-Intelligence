@@ -1,7 +1,7 @@
 """RBAC-01 through RBAC-10: Live RBAC Authority & Current Permission Verification Test Suite.
 
-Workstream: 01-C.2 — Live RBAC Authority & Current Permission Verification
-Parent Module: 01-C — Approval Identity & RBAC
+Workstream: 01-C.2 - Live RBAC Authority & Current Permission Verification
+Parent Suite: 01-C - Approval Identity & RBAC
 
 Verifies:
 - RBAC-01: Compliance role removed after JWT issuance -> new Compliance sign-off rejected.

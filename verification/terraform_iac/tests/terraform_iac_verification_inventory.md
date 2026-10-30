@@ -1,4 +1,4 @@
-# Verification Inventory & Artifact Registry — Multi-Cloud Terraform IaC
+# Verification Inventory & Artifact Registry - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

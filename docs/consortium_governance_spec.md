@@ -169,7 +169,7 @@ If any invariant fails, the engine raises `ConsortiumPolicyViolation` and aborts
 
 ### 5.1 Programmatic Workflow with Authentic Institutional Context
 
-Direct service operations require an authentic cryptographic authorization context—either an authenticated Bearer token (`auth_token`) belonging to an active institutional principal with governance authority (`admin`, `ml_lead`, or `compliance`), or a signed [`TrustedInternalContext`](../backend/app/application/services/model_registry.py) from the automated consortium coordinator:
+Direct service operations require an authentic cryptographic authorization context-either an authenticated Bearer token (`auth_token`) belonging to an active institutional principal with governance authority (`admin`, `ml_lead`, or `compliance`), or a signed [`TrustedInternalContext`](../backend/app/application/services/model_registry.py) from the automated consortium coordinator:
 
 ```python
 from app.infrastructure.security.auth_service import AuthenticationService
@@ -319,16 +319,16 @@ In strict compliance with `AGENTS.md` Anti-Fabrication rules:
 - **Software Simulation:** The standard simulation mode runs in-process commutative Diffie-Hellman PSI and MinHash LSH fuzzy matching over explicitly isolated synthetic datasets. Simulation requires explicit opt-in (`CFI_ENABLE_CROSS_BANK_SIMULATION=true`). Signals generated in this mode are labeled with `execution_mode: "SIMULATED_RESEARCH"` and `is_synthetic: True`. Research signals are preserved strictly in the non-operational `research_case_evidence_store` and can **never** be registered in the authoritative case evidence ledger or consumed by SAR/regulatory pipelines.
 - **Fail-Closed Hardware Boundary:** If an institutional caller sets `require_hardware_attestation: True`, the service refuses to fabricate hardware measurements and immediately raises `RuntimeError` (`HTTP 412 Precondition Failed`), preventing unverified execution from masquerading as a physical hardware enclave.
 
-### 6.3 Authentic Two-Bank Isolated Worker Architecture (DH-PSI)
+### 6.3 Authentic Multi-Bank Isolated Worker Architecture (OpenMined PSI 2.0.6)
 
-Milestone 4 introduces genuine multi-process institutional separation through [`IsolatedBankWorkerNode`](../backend/app/application/services/isolated_matching_service.py) and [`CrossBankMatchingCoordinator`](../backend/app/application/services/isolated_matching_service.py):
+The platform provides genuine multi-process and multi-container institutional separation through [`IsolatedBankWorkerNode`](../backend/app/application/services/isolated_matching_service.py) and [`CrossBankMatchingCoordinator`](../backend/app/application/services/isolated_matching_service.py):
 
 1. **Storage Vault Separation:** Each participating bank worker operates strictly within its own isolated storage vault (`storage/{bank_id}/private_entities/`), with cross-tenant file loads failing closed (`PermissionError`).
 2. **KMS Tenant Session Isolation:** Each bank node accesses cryptographic keys strictly through a permanently bound [`TenantKMSSession`](../backend/app/application/services/kms_service.py). Cross-tenant key probes fail closed with access control violations.
-3. **2048-bit MODP Diffie-Hellman PSI:** Private Set Intersection executes in 3 stages:
-   - *Stage 1:* Bank A hashes local entity to group and blinds with private exponent $a$: $c = H(x)^a \pmod p$.
-   - *Stage 2:* Bank B verifies Bank A's HMAC signature and fresh nonce, applies exponent $b$ to get double-blinded query $D = c^b = H(x)^{ab} \pmod p$, blinds its own vault entities $B_j = H(y_j)^b \pmod p$, and permutes them cryptographically.
-   - *Stage 3:* Bank A verifies Bank B's signature, blinds counterpart elements with exponent $a$ ($E_j = B_j^a \pmod p$), and computes exact set intersection $D \in \{E_j\}$.
+3. **Genuine OpenMined PSI 2.0.6 Protocol (Curve25519 ECDH):** Private Set Intersection executes via the authoritative OpenMined PSI 2.0.6 library over Curve25519:
+   - *Stage 1:* Bank A hashes local entities to Curve25519 points and blinds with secret scalar $a$: $c = H(x)^a$.
+   - *Stage 2:* Counterparty workers verify Bank A's authenticated request and fresh nonce, apply private scalar $b$ to compute double-blinded query points $D = c^b = H(x)^{ab}$, blind their own private vault entities $B_j = H(y_j)^b$, and build compressed Bloom filter match packages.
+   - *Stage 3:* Bank A verifies counterparty signatures, blinds counterpart elements with scalar $a$ ($E_j = B_j^a$), and executes set intersection over $D \in \{E_j\}$ without exposing non-matching records.
 4. **Attestation & Evidence Anchoring:** Generates a [`VerifiedMatchReceipt`](../backend/app/application/services/isolated_matching_service.py) with dual worker signatures and coordinator attestation. Only verified operational signals (`VERIFIED_OPERATIONAL`) are eligible for attachment to the authoritative case evidence ledger.
 
 ### 6.4 Explicit Operational Data-Sharing Grant Governance
@@ -338,6 +338,18 @@ To eliminate permissive global fallbacks:
 - The grant must possess valid governing authority (e.g. FFIEC, BaFin, FCA) and monotonic revision history ($\ge 1$).
 - In the absence of an active operational grant, operational queries fail closed (`ConsortiumSecurityError`).
 - Authoritative institutional jurisdiction context is strictly mandatory; absence of verified jurisdiction terminates execution immediately to prevent unlawful cross-border data transfer.
+
+### 6.5 Controlled Pilot Operations & Multi-Party Cryptographic Approvals
+
+Controlled bilateral and multi-bank pilots are governed by [`PilotOperationsService`](../backend/app/application/services/pilot_operations_service.py):
+1. **Preflight Readiness Verification**: Prior to activation, the coordinator verifies that the consortium is active (`CONSORTIUM_ACTIVE`), operational data-sharing grants cover all participating institutions (`OPERATIONAL_GRANT_VALID`), and sovereign Ed25519 verification keys are enrolled in [`InstitutionalVerificationRegistry`](../backend/app/domain/institutional_identity.py) (`INSTITUTIONAL_KEYS_ENROLLED`).
+2. **Canonical Scope Digest**: Immutable pilot parameters (institutions, coordinator endpoints, worker topologies, quotas) are bound to a deterministic SHA-256 digest:
+   $$\text{scope\_digest} = \mathrm{SHA256}(\text{pilot\_id} \mathbin{\Vert} \text{revision} \mathbin{\Vert} \text{consortium\_id} \mathbin{\Vert} \text{institutions} \mathbin{\Vert} \dots)$$
+3. **Multi-Party Cryptographic Approvals**: The pilot requires independent, cryptographically signed approvals from each participating bank and the consortium operator:
+   $$\text{challenge} = \text{PILOT\_APPROVAL}:\text{pilot\_id}:\text{revision}:\text{scope\_digest}:\text{institution}:\text{approver\_id}$$
+   Signed with the institution's enrolled sovereign Ed25519 private key.
+4. **Emergency Kill-Switch & Quota Enforcement**: Immediate pause/resume controls halt queries within milliseconds. Cumulative query quotas prevent unauthorized data exposure.
+5. **Tamper-Evident Audit Dossier**: Complete pilot lifecycles (preflight, approvals, queries, pause events, completion) are compiled into a cryptographic JSON dossier backed by an append-only audit chain.
 
 ---
 
@@ -397,4 +409,17 @@ python -m pytest \
 | `test_cross_bank_intelligence_integration.py` | `test_attach_cross_bank_evidence_endpoint_flow` | REST API evidence attachment flow updating case ledger with SHA-256 evidence record. |
 | `test_cross_bank_intelligence_integration.py` | `test_attach_evidence_to_terminal_case_via_api_returns_409` | REST API terminal case immutability check returning 409 Conflict. |
 | `test_cross_bank_intelligence_integration.py` | `test_consortium_policy_endpoint` | REST API retrieval of active consortium data-sharing policy rules. |
+| `test_consortium_security_and_transport_hardening.py` | `test_secret_generation_refuses_to_overwrite_existing_env_without_force` | Secret generation safeguard requiring `--force` to rewrite active `.env.consortium`. |
+| `test_consortium_security_and_transport_hardening.py` | `test_isolated_key_custody_file_provisioning_and_worker_file_mount_loading` | Sovereign Ed25519 key custody provisioning with `0600` permissions and file-mounted loading. |
+| `test_consortium_security_and_transport_hardening.py` | `test_bootstrap_preserves_existing_principal_and_rejects_unauthorized_credential_rotation` | Bootstrap user persistence preserving active user IDs without session invalidation. |
+| `test_consortium_security_and_transport_hardening.py` | `test_verification_registry_prevents_implicit_public_key_overwrite_without_rotation` | Registry non-overwrite invariant and signed cryptographic key rotation enforcement. |
+| `test_consortium_security_and_transport_hardening.py` | `test_hardened_mtls_worker_and_coordinator_positive_handshake_and_matching` | Mutual TLS worker and coordinator handshake with X.509 CN and SAN verification. |
+| `test_consortium_security_and_transport_hardening.py` | `test_hardened_mtls_rejects_plaintext_http_downgrade_and_incomplete_config` | Transport security downgrade rejection and incomplete certificate config rejection. |
+| `test_consortium_security_and_transport_hardening.py` | `test_hardened_mtls_rejects_unauthenticated_untrusted_and_mismatched_identities` | Reject unauthenticated and untrusted client certificates against institutional allowlists. |
+| `test_consortium_security_and_transport_hardening.py` | `test_explicit_grant_id_never_falls_back_to_pair_or_default_grant` | Strict operational grant identity binding preventing fallback to default or pairwise grants. |
+| `test_consortium_security_and_transport_hardening.py` | `test_redis_store_auto_reconnects_after_transient_outage_cooldown` | Transparent auto-reconnect in `RedisStore` and `CacheService` after transient outages. |
+| `test_consortium_multi_bank_deployment.py` | `test_consortium_deployment_service_health_probes` | Full 10-service health probe verification across Docker consortium environment. |
+| `test_consortium_multi_bank_deployment.py` | `test_consortium_deployment_operational_multi_counterparty_query` | Live multi-counterparty OpenMined PSI 2.0.6 query across Bank B and Bank C. |
+| `test_consortium_multi_bank_deployment.py` | `test_consortium_deployment_investigation_case_evidence_attachment` | Attaching verified multi-party matching evidence to live Bank A investigation case. |
+| `test_consortium_multi_bank_deployment.py` | `test_consortium_deployment_operational_recovery` | Transient Redis outage fallback to memory and auto-reconnection without container restart. |
 

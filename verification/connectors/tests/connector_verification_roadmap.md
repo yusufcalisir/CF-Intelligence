@@ -1,4 +1,4 @@
-# Scientific Verification Roadmap — Connector Framework
+# Scientific Verification Roadmap - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Modules:** `app.application.interfaces.bank_connector`, `app.infrastructure.connectors.*`, `app.application.services.bank_onboarding_service`, `app.infrastructure.client_daemon.*`  
@@ -88,12 +88,12 @@ Phase 7: End-to-End Daemon Integration Testing                   (3 Lifecycle Wo
 - **Target Components:** `NormalizedTransaction` (C-03), `ISO20022MessagingConnector` (C-05), `OpenBankingConnector` (C-06), `RESTBankConnector` (C-07), `ExponentialBackoffReconnector` (C-18), `BankConnectorFactory` (C-04).
 - **Verification Method:** Randomized Property-Based Testing (Hypothesis, 100 trials/property).
 - **Properties to Verify:**
-  - **Property 1:** `NormalizedTransaction` Schema Validation Invariant — valid inputs always yield `amount > 0` and UTC datetime objects.
-  - **Property 2:** ISO 20022 XML & SWIFT MT103 Parsing Non-Crash Invariant — arbitrary string inputs either parse to valid transactions or raise `ValueError` without unhandled panics.
-  - **Property 3:** Open Banking OAuth2 Token Refresh Boundary Invariant — token is refreshed if and only if $\text{TTL} < 300\text{s}$.
-  - **Property 4:** HMAC-SHA256 Payload Signature Determinism & Tamper Sensitivity — identical payloads yield identical signatures; single-byte payload alterations invalidate signatures.
-  - **Property 5:** Full-Jitter Exponential Backoff Boundedness — delay $d$ is strictly bounded in $[0.5 \times c, 1.0 \times c]$ where $c = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot 2^{\text{attempt}})$.
-  - **Property 6:** `BankConnectorFactory` Production Guard Invariant — requesting unapproved or mock connectors when `APP_ENV=production` unconditionally raises `ValueError` or `ImportError`.
+  - **Property 1:** `NormalizedTransaction` Schema Validation Invariant - valid inputs always yield `amount > 0` and UTC datetime objects.
+  - **Property 2:** ISO 20022 XML & SWIFT MT103 Parsing Non-Crash Invariant - arbitrary string inputs either parse to valid transactions or raise `ValueError` without unhandled panics.
+  - **Property 3:** Open Banking OAuth2 Token Refresh Boundary Invariant - token is refreshed if and only if $\text{TTL} < 300\text{s}$.
+  - **Property 4:** HMAC-SHA256 Payload Signature Determinism & Tamper Sensitivity - identical payloads yield identical signatures; single-byte payload alterations invalidate signatures.
+  - **Property 5:** Full-Jitter Exponential Backoff Boundedness - delay $d$ is strictly bounded in $[0.5 \times c, 1.0 \times c]$ where $c = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot 2^{\text{attempt}})$.
+  - **Property 6:** `BankConnectorFactory` Production Guard Invariant - requesting unapproved or mock connectors when `APP_ENV=production` unconditionally raises `ValueError` or `ImportError`.
 - **Justification:** Property-based testing generates hundreds of randomized input combinations, uncovering edge cases and unexpected state transitions that fixed example tests miss.
 
 ---
@@ -152,6 +152,6 @@ Phase 7: End-to-End Daemon Integration Testing                   (3 Lifecycle Wo
 
 ---
 
-*Scientific Verification Roadmap — Connector Framework*  
+*Scientific Verification Roadmap - Connector Framework*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

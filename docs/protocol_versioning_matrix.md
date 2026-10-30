@@ -53,7 +53,14 @@ The server evaluates `(client_version, client_schema_hash)` against the active m
 
 ---
 
-## 🌐 4. HTTP REST & WebSocket Versioning Invariants
+## 🔒 4. Isolated Matching & Pilot Governance Protocol Standards
+
+- **OpenMined PSI Protocol Version (2.0.6)**: The cross-bank matching grid operates strictly on OpenMined PSI 2.0.6 over Curve25519 ECDH. Worker daemons and coordinator validate library protocol version compatibility during handshake.
+- **Canonical Pilot Scope Digest (SHA-256)**: Pilot authorization challenges format scope metadata (institutions, algorithm version, privacy budget, validity interval) using RFC 8785 canonical JSON sorting before hashing, ensuring Ed25519 signature verification across heterogeneous platforms.
+
+---
+
+## 🌐 5. HTTP REST & WebSocket Versioning Invariants
 
 1. **Path-Based Prefix Routing**:
    - Production REST endpoints are namespaced under `/api/v1` or `/v1` (e.g. `/api/v1/score-transaction`, `/api/v1/predict`, `/v1/webhooks/subscriptions`, `/v1/inference/score`).
@@ -75,7 +82,7 @@ The server evaluates `(client_version, client_schema_hash)` against the active m
 
 ---
 
-## 🧪 5. Automated Test Verification Matrix
+## 🧪 6. Automated Test Verification Matrix
 
 Protocol negotiation, SemVer comparison, and lifecycle header adherence are continuously verified:
 

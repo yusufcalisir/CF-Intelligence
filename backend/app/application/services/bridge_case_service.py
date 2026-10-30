@@ -44,7 +44,7 @@ try:
 except ImportError:  # pragma: no cover
     _CRYPTO_AVAILABLE = False
     logger.warning(
-        "cryptography package not available — FININT bridge will use "
+        "cryptography package not available - FININT bridge will use "
         "deterministic software-mode key agreement (non-production fallback)."
     )
 
@@ -71,7 +71,7 @@ def encrypt_payload(plaintext: bytes, recipient_public_key_b64: str) -> tuple[st
         recipient_public_key_b64: Base64-encoded Curve25519 public key of recipient.
 
     Returns:
-        Tuple of (ciphertext_b64, nonce_b64, ephemeral_pubkey_b64) — all base64url-safe.
+        Tuple of (ciphertext_b64, nonce_b64, ephemeral_pubkey_b64) - all base64url-safe.
     """
     if not _CRYPTO_AVAILABLE:
         raise RuntimeError("Curve25519 ECDH and AES-256-GCM authenticated encryption require the cryptography library.")

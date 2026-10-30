@@ -128,7 +128,7 @@ export default function App() {
                 }
               />
 
-              {/* Phase 2: AML Intelligence Platform */}
+              {/* Collaborative AML Intelligence Platform */}
               <Route
                 path="/investigation"
                 element={

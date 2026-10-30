@@ -100,7 +100,7 @@ def run_simulation_task(self: Any, config_dict: dict) -> dict:
     # Reconstruct config
     config = SimulationConfig(**config_dict)
 
-    # Build services (no database — results are cached in Redis
+    # Build services (no database - results are cached in Redis
     # and persisted by the API when the task completes)
     model_service = ModelService(settings)
     privacy_service = PrivacyService()
@@ -295,7 +295,7 @@ def execute_automated_retraining_task(
     clipped_params = noised_weights.flat_weights
 
     # Step 3: Verify ROC-AUC Quality Gate
-    # Evaluation metrics on holdout set — fail closed if undefined, missing, or non-finite
+    # Evaluation metrics on holdout set - fail closed if undefined, missing, or non-finite
     evaluation = model_service.evaluate(model, X_val_arr, y_val_arr)
     raw_auc = evaluation.get("auc_roc")
     is_defined = evaluation.get("auc_roc_defined", False) is True

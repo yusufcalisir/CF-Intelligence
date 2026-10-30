@@ -11,7 +11,7 @@ response to prevent a broad class of client-side attacks:
   - Permissions-Policy       : disables powerful browser features not in use
   - X-XSS-Protection         : legacy IE/Edge XSS filter (belt-and-suspenders)
 
-FastAPI / Starlette variant — wraps every response via BaseHTTPMiddleware.
+FastAPI / Starlette variant - wraps every response via BaseHTTPMiddleware.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 # ---------------------------------------------------------------------------
 # API-only backend: no inline scripts or styles are served.
 # WebSocket connections are allowed via wss:// (same-origin or explicit host).
-# Keep it strict — the frontend is a separate Vite/Vercel SPA that sets its
+# Keep it strict - the frontend is a separate Vite/Vercel SPA that sets its
 # own CSP either via Vercel config or a meta tag.
 _CSP_DIRECTIVES = "; ".join(
     [
@@ -66,9 +66,9 @@ _SECURITY_HEADERS: dict[str, str] = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     # Block MIME-type sniffing attacks
     "X-Content-Type-Options": "nosniff",
-    # Deny all iframe embedding — eliminates clickjacking surface
+    # Deny all iframe embedding - eliminates clickjacking surface
     "X-Frame-Options": "DENY",
-    # No referrer information is sent cross-origin — minimises PII leakage
+    # No referrer information is sent cross-origin - minimises PII leakage
     "Referrer-Policy": "no-referrer",
     # Disable potentially sensitive browser features not required by this API
     "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",

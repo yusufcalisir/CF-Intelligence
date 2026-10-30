@@ -10,10 +10,10 @@ Multi-Tenancy (SOC2/PCI-DSS Compliance):
     tenant is set, the system-level "central" database is used.
 
     SQLite mode:
-        storage/cfi_central.db   — coordinator / system tables
-        storage/cfi_bank_a.db    — Bank A's isolated tables
-        storage/cfi_bank_b.db    — Bank B's isolated tables
-        storage/cfi_bank_c.db    — Bank C's isolated tables
+        storage/cfi_central.db   - coordinator / system tables
+        storage/cfi_bank_a.db    - Bank A's isolated tables
+        storage/cfi_bank_b.db    - Bank B's isolated tables
+        storage/cfi_bank_c.db    - Bank C's isolated tables
 
     PostgreSQL/CockroachDB mode:
         Separate database names suffixed per tenant (e.g. fraud_intelligence_bank_a).
@@ -68,7 +68,7 @@ active_tenant: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "active_tenant", default=None
 )
 
-# Valid tenant identifiers — extend as new banks are onboarded.
+# Valid tenant identifiers - extend as new banks are onboarded.
 VALID_TENANTS = {"bank_a", "bank_b", "bank_c"}
 
 settings = get_settings()

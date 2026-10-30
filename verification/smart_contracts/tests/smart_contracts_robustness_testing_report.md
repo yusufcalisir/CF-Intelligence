@@ -1,4 +1,4 @@
-# Adversarial Robustness & Vulnerability Report — Smart Contracts Subsystem
+# Adversarial Robustness & Vulnerability Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

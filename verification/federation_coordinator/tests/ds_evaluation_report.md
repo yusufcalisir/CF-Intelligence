@@ -1,4 +1,4 @@
-# Distributed Systems Evaluation Report — Federation Coordinator Subsystem
+# Distributed Systems Evaluation Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`, `client.py`, `flower_engine.py`, `region_failover.py`  
 **Evaluation Date:** 2026-08-01  
@@ -97,4 +97,4 @@ To ensure academic and technical transparency, the implemented guarantees are ex
 
 ---
 
-*End of Distributed Systems Evaluation Report — Federation Coordinator Subsystem*
+*End of Distributed Systems Evaluation Report - Federation Coordinator Subsystem*

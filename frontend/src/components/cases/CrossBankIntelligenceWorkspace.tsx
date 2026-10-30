@@ -282,7 +282,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 Cross-Bank Consortium Intelligence Workspace
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                M6.6 VERIFIED
+                CROSS-BANK VERIFIED
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -701,7 +701,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                         {/* Truthful Sanitized Failure Details */}
                         {failure && (
                           <div className="mt-2 pt-2 border-t border-rose-500/20 text-[11px] text-rose-300/90 leading-relaxed font-mono">
-                            {isAnonymized && failure.error_message ? failure.error_message.replace(/\bbank_[a-zA-Z0-9_\-]+\b/gi, '[redacted-counterparty]') : failure.error_message}
+                            {isAnonymized && failure.error_message ? failure.error_message.replace(/\bbank_[a-zA-Z0-9_-]+\b/gi, '[redacted-counterparty]') : failure.error_message}
                           </div>
                         )}
                       </div>

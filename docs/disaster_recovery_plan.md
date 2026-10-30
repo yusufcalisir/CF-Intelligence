@@ -33,7 +33,8 @@ The Collaborative Fraud Intelligence (CFI) Disaster Recovery (DR) architecture e
 │                       │                                           │                    │
 │                       ▼                                           ▼                    │
 │        [ Synchronous Aurora / PostgreSQL 16 Multi-AZ Multi-Region Streaming ]          │
-│        [ Synchronous Redis 7.2 Sentinel Global Key-Value State Sync ]                  │
+│        [ Synchronous Redis 7.2 Sentinel Global Key-Value State Sync ]
+│        [ Dynamic Redis Reconnection Engine (_attempt_auto_reconnect, cooldown=1.0s) ]                  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -133,6 +134,8 @@ python -m pytest \
    - `test_backup_artifact_creation_and_checksum_verification`: Validates SHA-256 backup digest generation.
    - `test_corrupted_backup_detection`: Validates detection and isolation of corrupted or tampered backup files.
    - `test_sandbox_restore_probe_execution`: Validates automated restore probe in ephemeral sandbox environment.
+4. **`test_consortium_security_and_transport_hardening.py`** (9 Tests):
+   - `test_redis_store_reconnect_backoff_and_recovery`: Verifies dynamic auto-reconnect backoff (1.0s cooldown) and ephemeral durability degradation during simulated Redis severance.
 
-**Test Execution Parity**: 7 passed in 1.13s (100% pass rate).
+**Test Execution Parity**: 16 passed (100% pass rate).
 

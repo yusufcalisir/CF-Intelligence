@@ -197,7 +197,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         <div className="font-semibold text-slate-300">Architectural Boundary:</div>
         <p>
           Telemetry displayed here reflects the governed two-bank pilot enclave.
-          Multi-counterparty investigation batches and case evidence dossiers are handled under separate M6.5/M6.6 batch pipelines and are intentionally isolated from two-bank pilot metrics.
+          Multi-counterparty investigation batches and case evidence dossiers are handled under separate batch pipelines and are intentionally isolated from two-bank pilot metrics.
         </p>
       </div>
     </div>

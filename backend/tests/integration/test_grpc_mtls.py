@@ -1,4 +1,4 @@
-"""Unit tests for Phase 37.1 — Mandatory mTLS gRPC Server Hardening.
+"""Unit tests for Mandatory mTLS gRPC Server Hardening.
 
 All tests are pure unit tests (no live gRPC socket, no real DB).
 BankCertificateInterceptor internals are tested by mocking _lookup_bank_active_sync
@@ -53,7 +53,7 @@ def _run_interceptor(interceptor, metadata: dict[str, str]) -> tuple[bool, grpc.
     if continuation_called:
         return True, None
 
-    # The interceptor returned an abort handler — extract the status code by calling it
+    # The interceptor returned an abort handler - extract the status code by calling it
     ctx = _make_context()
     if callable(result):
         result(None, ctx)
@@ -98,7 +98,7 @@ def test_expired_cert_rejected(mock_lookup) -> None:
     """A bank whose DB record is SUSPENDED/OFFBOARDED must be rejected with PERMISSION_DENIED.
 
     This simulates the case where the cert CN is parseable but the DB says the bank
-    is no longer ACTIVE (e.g. expired/offboarded — _lookup_bank_active_sync returns False).
+    is no longer ACTIVE (e.g. expired/offboarded - _lookup_bank_active_sync returns False).
     """
     interceptor = BankCertificateInterceptor()
     allowed, code = _run_interceptor(
@@ -141,7 +141,7 @@ def test_version_too_old_rejected() -> None:
 
     assert not continuation_called, "Continuation must NOT be called for version 0.1.0"
 
-    # The interceptor returns a grpc.RpcMethodHandler — extract the unary_unary callable
+    # The interceptor returns a grpc.RpcMethodHandler - extract the unary_unary callable
     ctx = _make_context()
     if hasattr(handler, "unary_unary") and handler.unary_unary is not None:
         handler.unary_unary(None, ctx)

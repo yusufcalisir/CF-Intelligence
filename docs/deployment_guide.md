@@ -1,10 +1,11 @@
 # 🌐 Enterprise Deployment Guide: From Single-Node On-Premises to Multi-Node Mesh
 
 This comprehensive guide details the production deployment models for the **Collaborative Fraud Intelligence (CFI)** platform:
-1. **Part 1: One-Click Enterprise On-Premises Production Stack (`docker-compose.yml`)** — The unified production stack hosting the security gateway, frontend SPA, backend API, PostgreSQL 16, and Redis 7.2 with optional OpenTelemetry, Prometheus, and Grafana monitoring profiles.
-2. **Part 2: Multi-Node Network-Isolated Distributed Cluster (`docker-compose.multinode.yml`)** — The multi-container distributed topology enforcing strict subnet isolation across distinct bank institutions.
-3. **Part 3: Enterprise Kubernetes & GitOps Helm Mesh (`deployments/helm/cfi-platform`)** — Production Kubernetes microservices deployment with automated NetworkPolicies, HPAs, PodDisruptionBudgets, and ArgoCD synchronization.
-4. **Part 4: Post-Deployment Smoke Testing & Automated Verification** — CLI tools and test suites ensuring 100% deployment integrity.
+1. **Part 1: One-Click Enterprise On-Premises Production Stack (`docker-compose.yml`)** - The unified production stack hosting the security gateway, frontend SPA, backend API, PostgreSQL 16, and Redis 7.2 with optional OpenTelemetry, Prometheus, and Grafana monitoring profiles.
+2. **Part 2: Multi-Node Network-Isolated Distributed Cluster (`docker-compose.multinode.yml`)** - The multi-container distributed topology enforcing strict subnet isolation across distinct bank institutions.
+3. **Part 2.5: Integrated 10-Service Multi-Bank Consortium Sandbox (`docker-compose.consortium.yml`)** - The 10-service consortium environment linking the FastAPI backend, React 19 frontend, PostgreSQL/Redis, genuine OpenMined PSI 2.0.6 coordinator, and three process-isolated bank worker nodes.
+4. **Part 3: Enterprise Kubernetes & GitOps Helm Mesh (`deployments/helm/cfi-platform`)** - Production Kubernetes microservices deployment with automated NetworkPolicies, HPAs, PodDisruptionBudgets, and ArgoCD synchronization.
+5. **Part 4: Post-Deployment Smoke Testing & Automated Verification** - CLI tools and test suites ensuring 100% deployment integrity.
 
 > [!NOTE]
 > For cloud infrastructure topologies, Terraform manifests, and disaster recovery failover architectures, refer to [`docs/production_infrastructure.md`](production_infrastructure.md) and [`docs/disaster_recovery_plan.md`](disaster_recovery_plan.md). For interactive API exploration, see [`docs/developer_and_api_portal.md`](developer_and_api_portal.md).
@@ -198,6 +199,109 @@ Verify that Bank A **can** reach the central coordinator over gRPC port 50051:
 ```bash
 docker exec cfi-bank-client-a nc -zv coordinator 50051
 ```
+
+---
+
+# Part 2.5: Integrated 10-Service Multi-Bank Consortium Sandbox (`docker-compose.consortium.yml`)
+
+The 10-service consortium stack provides an integrated, reproducible single-host demonstration and verification sandbox (`LOCAL_HTTP_SANDBOX`) that links the FastAPI backend, React 19 frontend, durable PostgreSQL/Redis, genuine OpenMined PSI 2.0.6 coordinator, and three process-isolated bank worker nodes.
+
+## 2.5.1 Consortium Sandbox Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                      10-SERVICE INTEGRATED CONSORTIUM SANDBOX (LOCAL_HTTP_SANDBOX)               │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                                  │
+│   Client Browser / Reverse Proxy Gateway                                                         │
+│   ┌────────────────────────────────────────────────────────────────────────────────────────┐     │
+│   │ 1. Nginx Gateway (`cfi-gateway`) - Ports 80 / 443                                      │     │
+│   │    • / ──► `cfi-frontend` (React 19 SPA, Port 3000)                                    │     │
+│   │    • /api/*, /docs, /scalar ──► `cfi-api-server` (FastAPI, Port 8000)                  │     │
+│   │    • /ws/* ──► `cfi-api-server` (WebSocket Telemetry Streaming)                        │     │
+│   │    • /gateway-health ──► Nginx status probe                                            │     │
+│   └────────────────────────────────────────────────────────────────────────────────────────┘     │
+│                                              │                                                   │
+│                        ┌─────────────────────┴──────────────────────┐                            │
+│                        ▼                                            ▼                            │
+│   ┌──────────────────────────────────────────┐ ┌──────────────────────────────────────────┐      │
+│   │ 2. Frontend SPA (`cfi-frontend`)         │ │ 3. Backend API (`cfi-api-server`)        │      │
+│   │    • Session Epoching & In-Flight Abort  │ │    • 44 Modular REST Routers             │      │
+│   │    • Zero Token Caching in Storage       │ │    • Fail-Closed 401/403 Tenant Guards   │      │
+│   └──────────────────────────────────────────┘ └────────────────────┬─────────────────────┘      │
+│                                                                     │                            │
+│              ┌───────────────────────────────┬──────────────────────┴───────┐                    │
+│              ▼ (Durable Relational)          ▼ (Cache & Auth Sessions)      ▼ (Alembic SQL)      │
+│   ┌───────────────────────────┐ ┌───────────────────────────┐ ┌───────────────────────────┐     │
+│   │ 4. PostgreSQL 16          │ │ 5. Redis 7.2              │ │ 6. Migration Container    │     │
+│   │    (`cfi-postgres`)       │ │    (`cfi-redis`)          │ │    (`cfi-consortium-      │     │
+│   │    • Case & Audit Storage │ │    • Auto-Reconnect Engine│ │     migrations`)           │     │
+│   └───────────────────────────┘ └───────────────────────────┘ └───────────────────────────┘     │
+│                                                                                                  │
+│   Private Set Intersection (PSI) Matching Grid                                                   │
+│   ┌────────────────────────────────────────────────────────────────────────────────────────┐     │
+│   │ 7. PSI Coordinator (`cfi-psi-coordinator`) - Port 8200                                 │     │
+│   │    • Curve25519 ECDH Protocol Driver (OpenMined PSI 2.0.6)                             │     │
+│   │    • Multi-Counterparty Bloom Filter Intersection Dispatch                             │     │
+│   └───────────────▲──────────────────────────▲───────────────────────────▲─────────────────┘     │
+│                   │                          │                           │                       │
+│     Internal RPC  │            Internal RPC  │             Internal RPC  │                       │
+│     Port 8100     │            Port 8101     │             Port 8102     │                       │
+│   ┌───────────────┴───────────┐┌─────────────┴─────────────┐┌────────────┴──────────────┐        │
+│   │ 8. Worker Bank A          ││ 9. Worker Bank B          ││ 10. Worker Bank C          │        │
+│   │    (`cfi-worker-bank-a`)  ││    (`cfi-worker-bank-b`)  ││     (`cfi-worker-bank-c`)  │        │
+│   │    • Ed25519 Key (0600)   ││    • Ed25519 Key (0600)   ││     • Ed25519 Key (0600)   │        │
+│   │    • Local Entity Store   ││    • Local Entity Store   ││     • Local Entity Store   │        │
+│   └───────────────────────────┘└───────────────────────────┘└────────────────────────────┘        │
+│                                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 2.5.2 Operator Setup & Execution Steps
+
+### Step 1: Generate Cryptographically Secure Consortium Secrets
+Generate deployment secrets and sovereign Ed25519 key custody files:
+```bash
+python scripts/generate_consortium_deployment_secrets.py --env-file .env.consortium
+```
+- Creates `.env.consortium` with distinct high-entropy passwords for `analyst_bank_a`, `analyst_bank_b`, `analyst_bank_c`, and `operator_consortium`.
+- Generates isolated `0600`-permission Ed25519 key files for Bank A, Bank B, and Bank C under `deploy/consortium/keys/`.
+- Safeguards existing production secrets: refuses to overwrite an existing `.env.consortium` without the explicit `--force` flag.
+
+### Step 2: Launch the 10-Service Consortium Topology
+```bash
+docker compose -f docker-compose.consortium.yml --env-file .env.consortium up -d --build
+```
+Wait for all 10 containers to report `healthy`:
+```bash
+docker compose -f docker-compose.consortium.yml --env-file .env.consortium ps
+```
+
+### Step 3: Idempotent Institutional Bootstrap
+Provision consortium users, enroll sovereign public keys, and bind operational data-sharing grants:
+```bash
+python scripts/bootstrap_consortium_deployment.py --env-file .env.consortium
+```
+- Preserves active user database records and `user_id` values across re-runs.
+- Requires `--allow-credential-rotation` if passwords or credentials are intentionally rotated.
+- Sets up initial bilateral grants (`grant_consortium_deployment_ab`) and links alert entities.
+
+### Step 4: Run Automated Verification Suites
+Execute the full backend consortium integration suite (9 tests):
+```bash
+python -m pytest backend/tests/integration/test_consortium_multi_bank_deployment.py -v
+```
+
+Execute the Playwright end-to-end browser acceptance suite (5 specs):
+```bash
+cd frontend
+npx playwright test -c playwright.consortium.config.ts
+```
+
+### Step 5: Verify Transient Operational Recovery
+The deployment features self-healing Redis coordination:
+- Stopping the Redis container dynamically triggers an ephemeral in-memory fallback (`storage_backend="in_memory"`, `durability="ephemeral"`).
+- Restarting Redis causes `RedisStore` and `CacheService` to auto-reconnect (`storage_backend="redis"`, `durability="durable"`) after a 1.0s cooldown without server restart.
 
 ---
 

@@ -188,17 +188,17 @@ class DataGenerator:
 
     The three banks have deliberately different distributions:
 
-    Bank A (Meridian National) — Large retail bank
+    Bank A (Meridian National) - Large retail bank
       - High volume (50k default), low fraud rate (0.8%)
       - Fraud pattern: velocity spikes + unusual merchant at night
       - Broad geographic distribution, most transactions domestic
 
-    Bank B (Nexus Digital) — Digital-only bank
+    Bank B (Nexus Digital) - Digital-only bank
       - Medium volume (30k default), higher fraud rate (2.5%)
       - Fraud pattern: new accounts + high-risk countries + crypto/wire
       - Heavy mobile usage, international transactions
 
-    Bank C (Heritage Regional) — Traditional regional bank
+    Bank C (Heritage Regional) - Traditional regional bank
       - Lower volume (20k default), moderate fraud rate (1.2%)
       - Fraud pattern: repeated small amounts before large charge (testing)
       - Concentrated geography, POS-heavy
@@ -346,7 +346,7 @@ class DataGenerator:
         n: int,
         rng: np.random.Generator,
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Meridian National — Large retail bank, 0.8% fraud.
+        """Meridian National - Large retail bank, 0.8% fraud.
 
         Fraud pattern: velocity spikes during late-night hours
         with unusual merchant categories.
@@ -358,7 +358,7 @@ class DataGenerator:
         # Legitimate transactions
         legit = self._generate_base_transactions(n_legit, rng, profile="retail_domestic")
 
-        # Fraudulent transactions — velocity spikes at night
+        # Fraudulent transactions - velocity spikes at night
         fraud = self._generate_base_transactions(n_fraud, rng, profile="retail_domestic")
         fraud["velocity"] = pd.Series(rng.uniform(8, 25, n_fraud).tolist(), index=fraud.index)
         fraud["hour_of_day"] = pd.Series(
@@ -393,7 +393,7 @@ class DataGenerator:
         n: int,
         rng: np.random.Generator,
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Nexus Digital — Digital bank, 2.5% fraud.
+        """Nexus Digital - Digital bank, 2.5% fraud.
 
         Fraud pattern: new accounts + high-risk countries + crypto/wire transfers.
         """

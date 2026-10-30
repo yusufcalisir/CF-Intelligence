@@ -1,4 +1,4 @@
-# Adversarial Robustness Report — Zero Trust PKI & ABAC
+# Adversarial Robustness Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

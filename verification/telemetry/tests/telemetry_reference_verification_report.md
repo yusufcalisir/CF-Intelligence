@@ -1,4 +1,4 @@
-# Independent Reference Verification Report — Telemetry & Observability Subsystem
+# Independent Reference Verification Report - Telemetry & Observability Subsystem
 
 **Module:** Telemetry, Metrics, SLA Monitor, Tenant Metering, Alert Intelligence, Model Drift & Calibration  
 **Audited Code Files:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `alert_service.py`, `metrics_service.py`, `drift_service.py`  
@@ -114,6 +114,6 @@ The independent mathematical reference verification confirms **100% numerical co
 
 ---
 
-*Independent Reference Verification Report — Telemetry & Observability Subsystem*  
+*Independent Reference Verification Report - Telemetry & Observability Subsystem*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

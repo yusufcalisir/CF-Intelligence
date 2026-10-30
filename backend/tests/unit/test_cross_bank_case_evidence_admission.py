@@ -157,6 +157,22 @@ def admission_env() -> dict[str, Any]:
         auth_token=tokens["admin"],
     )
 
+    def _setup_admission_operational_grant(consortia: Any, proposals: Any) -> None:
+        c = consortia["c_admission_test"]
+        if not hasattr(c, "metadata") or c.metadata is None:
+            c.metadata = {}
+        c.metadata["operational_data_sharing_grant"] = {
+            "grant_id": "grant_test",
+            "is_active": True,
+            "status": "ACTIVE",
+            "revision": 1,
+            "approvals": {"bank_a": True, "bank_b": True},
+            "revoked_by_institutions": [],
+            "participating_banks": ["bank_a", "bank_b"],
+        }
+
+    gov_svc._store.atomic_mutate(_setup_admission_operational_grant)
+
     cbi_svc = CrossBankIntelligenceService(
         consortium_service=gov_svc,
         case_service=case_svc,

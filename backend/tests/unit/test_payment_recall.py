@@ -289,7 +289,7 @@ class TestProvisionalHold:
         assert "PROVISIONAL_HOLD_TRIGGERED" in actions
 
     def test_hold_without_webhook_url_does_not_crash(self, svc, initiated_case):
-        # No webhook URL registered — should succeed silently
+        # No webhook URL registered - should succeed silently
         case = svc.trigger_provisional_hold(initiated_case.id)
         assert case.provisional_hold_triggered is True
 

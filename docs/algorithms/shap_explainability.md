@@ -55,7 +55,7 @@ SHAP (SHapley Additive exPlanations; Lundberg & Lee, 2017) resolves this by comp
 ### 6.1 Problem Solved & Operational Objective
 While SHAP provides local feature attribution for what caused an elevated risk score, compliance officers and fraud investigators require actionable recourse guidance: **"What minimal, feasible transaction modifications would clear this transaction or lower its risk below the decision threshold $\tau^*$?"**
 
-In financial domains, naive counterfactual algorithms (such as unconstrained gradient descent or nearest-neighbor perturbation) produce invalid or non-actionable suggestions—e.g., suggesting an account change its opening date, altering historical SAR filings, or setting transaction amounts to negative values. The CF-Intelligence Counterfactual Engine resolves this by enforcing strict domain boundary guardrails, immutable attribute locks, and live model re-inference verification.
+In financial domains, naive counterfactual algorithms (such as unconstrained gradient descent or nearest-neighbor perturbation) produce invalid or non-actionable suggestions-e.g., suggesting an account change its opening date, altering historical SAR filings, or setting transaction amounts to negative values. The CF-Intelligence Counterfactual Engine resolves this by enforcing strict domain boundary guardrails, immutable attribute locks, and live model re-inference verification.
 
 - **Location**: [`backend/app/application/services/counterfactual_service.py`](../../backend/app/application/services/counterfactual_service.py)
 - **Integration**: [`backend/app/application/services/explainability_service.py`](../../backend/app/application/services/explainability_service.py)

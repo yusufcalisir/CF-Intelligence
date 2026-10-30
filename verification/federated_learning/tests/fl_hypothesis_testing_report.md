@@ -1,4 +1,4 @@
-# Property-Based Testing Report — FederatedLearningEngine Subsystem
+# Property-Based Testing Report - FederatedLearningEngine Subsystem
 
 This document presents the empirical results of property-based testing on the `FederatedLearningEngine` module using the `Hypothesis` framework. Rather than testing fixed example values, property-based testing proves core mathematical invariants across hundreds of randomized client configurations, high-dimensional tensors ($d \le 2,000$), extreme floating point values, non-IID sample imbalances, and Byzantine noise vectors.
 

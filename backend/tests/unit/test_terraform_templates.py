@@ -4,7 +4,7 @@ These tests validate that all three cloud provider modules (AWS, Azure, GCP)
 have the required HCL file structure, declare necessary resource types,
 enforce encryption key vault resources, and define expected output values.
 
-No Terraform binary or cloud credentials are required — all checks are
+No Terraform binary or cloud credentials are required - all checks are
 pure offline text / regex analysis of the .tf source files.
 """
 
@@ -314,7 +314,7 @@ class TestNetworkIsolationAndSecurity:
         content = read(GCP_DIR / "main.tf")
         resources = hcl_blocks(content, "resource")
         assert "google_compute_router_nat" in resources, (
-            "Cloud NAT (google_compute_router_nat) missing — private nodes cannot pull images"
+            "Cloud NAT (google_compute_router_nat) missing - private nodes cannot pull images"
         )
 
 

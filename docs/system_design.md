@@ -19,10 +19,11 @@
 
 ## 2. High-Level Architecture & Deployment Topologies
 
-The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployment topologies:
+The Collaborative Fraud Intelligence (CFI) platform supports 4 flexible deployment topologies:
 1. **Production Unified Stack (`docker-compose.yml`):** Enterprise production deployment coupling Nginx Gateway (ports 80/443), React 19 SPA, FastAPI Clean Architecture application server (port 8000), PostgreSQL 16 (port 5432), and Redis 7.2 (port 6379).
 2. **Decoupled Microservices / Dev Grid (`docker-compose.dev.yml` & Helm):** Decomposes functional planes across dedicated containers orchestrated via `gateway.py` path prefix routing.
 3. **Distributed Multi-Node Consortium (`docker-compose.multinode.yml`):** Multi-bank cluster deploying the central coordinator (port 50051 / 8000) alongside isolated bank client daemons (`bank-a`, `bank-b`, `bank-c`) communicating strictly over outbound-only gRPC mTLS.
+4. **Integrated 10-Service Multi-Bank Consortium Sandbox (`docker-compose.consortium.yml`):** Full 10-container demonstration and testing environment (`LOCAL_HTTP_SANDBOX`) coupling the Nginx gateway, React 19 frontend, PostgreSQL, auto-reconnecting Redis, FastAPI backend API, OpenMined PSI 2.0.6 coordinator, and three process-isolated bank worker nodes with sovereign Ed25519 key custody.
 
 ### 2.1 Microservices Topology & Service Matrix
 
@@ -96,7 +97,10 @@ The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployme
 ```
 
 ### 3.2 State Management & Cache Resilience
-Services write states to `RedisStore`. In development environments, `RedisStore`, `CacheService`, `RedisBankClientListener`, and the core lifespan startup probes implement dual-layer credential auto-healing and container host re-routing (mapping Docker container hostname `redis` to `127.0.0.1` and reconciling development credential variations between `.env` and local scripts). If Redis is completely offline or unconfigured, `RedisStore` catches the exception and routes reads/writes to a thread-safe, in-memory Python dictionary backend. This ensures the demo interface and local test suites remain stable under transient failures.
+Services write states to `RedisStore` and `CacheService`. The storage architecture features dynamic self-healing automatic reconnection (`_attempt_auto_reconnect`, `_RECONNECT_COOLDOWN_SECONDS = 1.0`):
+- During transient outages or container restarts, operations gracefully fall back to a thread-safe, in-memory dictionary backend. The runtime health probes truthfully report `storage_backend="in_memory"` and `durability="ephemeral"`.
+- As soon as the Redis container recovers, subsequent requests seamlessly reconnect without server restarts, automatically transitioning health status back to `storage_backend="redis"` and `durability="durable"`.
+- In development environments, dual-layer credential auto-healing and container host re-routing reconcile development credential variations between `.env` and local scripts. In production, strict invariant checking fails closed against unauthenticated or wildcard endpoints.
 
 ### 3.3 Enterprise Model Registry & Governance (SR 11-7 Compliance)
 *   **Production Admission Gating (`validate_production_admission`):** Before any candidate model checkpoint can be admitted for production serving, it must pass combined cryptographic and institutional quality gates:

@@ -2,7 +2,7 @@
   "metadata": {
     "artifact_type": "DERIVED RECONCILIATION ARTIFACT",
     "description": "Scientific record and causal claim reconciliation for Post-BaseHTTP high-concurrency diagnosis",
-    "benchmark_execution": "NO NEW BENCHMARK EXECUTION — REASONING EXCLUSIVELY FROM VERIFIED HISTORICAL EVIDENCE",
+    "benchmark_execution": "NO NEW BENCHMARK EXECUTION - REASONING EXCLUSIVELY FROM VERIFIED HISTORICAL EVIDENCE",
     "timestamp_iso": "2026-10-02T13:25:00Z"
   },
   "source_artifacts": {
@@ -109,7 +109,7 @@
     "classification": "Process CPU usage plateaus at approximately 1.1-1.2 logical-core equivalents across all process threads. Per-thread CPU was not directly measured."
   },
   "gil_claim_audit": {
-    "classification": "GIL CONTENTION — PLAUSIBLE, NOT ESTABLISHED"
+    "classification": "GIL CONTENTION - PLAUSIBLE, NOT ESTABLISHED"
   },
   "risk_p99_statistical_reconciliation": {
     "global_stage_p99_ms": 303.44,
@@ -259,8 +259,8 @@
     }
   ],
   "research_backlog_closure": {
-    "item": "E — High-Concurrency Latency",
-    "decision": "E — CLOSED",
+    "item": "E - High-Concurrency Latency",
+    "decision": "E - CLOSED",
     "rationale": "High-concurrency latency has been reproducibly demonstrated and localized to concurrency-sensitive request-lifecycle/scheduling intervals rather than algorithmic model compute. The dominant measured region is pre-route server time, with additional coroutine-resume and pre-ASGI client/transport delay. Exact causal subdivision of those broad intervals is not fully isolated, but this residual uncertainty does not prevent closure of the original research question."
   },
   "intervention_readiness": {

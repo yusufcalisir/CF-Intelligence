@@ -65,8 +65,12 @@ When a bank's local model flags a transaction, it generates a local alert via [a
 * **Risk Indicator**: A continuous normalized value representing the bank's assessment confidence.
 * **Standard Reason Codes**: Standardized anomaly descriptors (e.g., `VEL-001` for velocity spikes, `GEO-RISK` for high-risk jurisdictions, `STRUCT-002` for potential smurfing) that enable peer institutions to evaluate relevance.
 
-### 3. Privacy-Preserving Entity Resolution (DH-PSI & Fuzzy MinHash LSH)
-To correlate entities across institutions without disclosing non-overlapping identities, the platform implements two complementary cryptographic protocols in [psi_service.py](../backend/app/application/services/psi_service.py) and [entity_resolution.py](../backend/app/application/services/entity_resolution.py):
+### 3. Privacy-Preserving Entity Resolution (OpenMined PSI 2.0.6, DH-PSI & Fuzzy MinHash LSH)
+To correlate entities across institutions without disclosing non-overlapping identities, the platform implements three complementary cryptographic protocols in [isolated_matching_service.py](../backend/app/application/services/isolated_matching_service.py), [psi_service.py](../backend/app/application/services/psi_service.py), and [entity_resolution.py](../backend/app/application/services/entity_resolution.py):
+* **Production Consortium Isolated Matching (OpenMined PSI 2.0.6)**:
+  - Deployed in the isolated matching coordinator and per-bank worker daemons over Curve25519 ECDH and Bloom filter intersection.
+  - Institutional worker nodes custody their private signing and matching keys locally with strict `0600` POSIX permissions; keys are never transmitted to coordinator or peer nodes.
+  - Matches generate cryptographically signed `CaseEvidenceAttachment` records that attach directly to active investigative cases without raw counterparty PII exposure.
 * **Diffie-Hellman Commutative Private Set Intersection (DH-PSI)**:
   - Banks encrypt hash sets with local private keys ($a$ and $b$) over a shared 512-bit prime $p$.
   - After cross-encryption, elements matching $x^{ab} \equiv x^{ba} \pmod p$ confirm identical cross-bank entities in zero knowledge.
@@ -125,9 +129,10 @@ The platform provides a real-time scenario simulator in [scenario_service.py](..
 
 To serve low-latency features and prevent data leakage, the platform implements a dual online/offline Feature Store in [feature_store_service.py](../backend/app/application/services/feature_store_service.py):
 
-### 1. Online Feature Store (Redis-backed)
+### 1. Online Feature Store (Redis-backed with Self-Healing Auto-Reconnect)
 - Serves pre-computed customer and merchant feature vectors directly to the `RiskScoringEngine` under strict latency bounds (<5ms execution).
 - Employs asynchronous background writes (fire-and-forget) to ensure scoring reads the last committed feature snapshot without request blocking.
+- **Dynamic Auto-Reconnection & Truthful Durability**: If Redis experiences network severance, [redis_store.py](../backend/app/infrastructure/persistence/redis_store.py) and [cache.py](../backend/app/infrastructure/cache.py) degrade gracefully to bounded in-memory caching while advertising `durability="ephemeral"` via the `/health` endpoint. Once Redis becomes available again, connection recovery initiates automatically every second (`_RECONNECT_COOLDOWN_SECONDS = 1.0`), restoring `durability="durable"` without requiring service restarts.
 
 ### 2. Offline Feature Store (Snowflake / BigQuery Parity)
 - Provides point-in-time joins (`get_historical_features`) over historical training datasets.
@@ -281,6 +286,17 @@ To satisfy Federal Reserve SR 11-7 Model Risk Management guidelines:
 
 ---
 
+## Consortium Pilot Governance & Multi-Party Cryptographic Approvals
+
+To transition from analytical experimentation to production operational pilots without bypassing institutional sovereignty, the platform implements controlled pilot governance in [pilot_operations_service.py](../backend/app/application/services/pilot_operations_service.py):
+1. **Preflight Readiness Verification**: Probes database migrations, Redis durability state, model registry champion checkpoints, worker mTLS heartbeats, and institutional certificate validity before provisioning a pilot.
+2. **Canonical Scope Digest & Challenge**: Computes a deterministic SHA-256 digest over the canonical JSON representation of pilot scope (target institutions, matching algorithms, privacy budgets, and validity intervals).
+3. **Multi-Party Sovereign Ed25519 Approvals**: Requires authorized institutional principals to submit Ed25519 cryptographic signatures validating the scope challenge before pilot activation. Activations enforce multi-party quorum; unilateral activation attempts are strictly rejected.
+4. **Emergency Operational Kill-Switch**: The platform governance council or participating risk officers can invoke `pause` or `resume` operations instantly, freezing matching and evidence generation if an anomaly is detected.
+5. **Tamper-Evident Audit Dossier**: All pilot lifecycle transitions (provisioning, challenges, approvals, activation, pause, completion) produce cryptographically sealed audit dossiers for regulatory compliance.
+
+---
+
 ## Empirical Benchmarks & Experimental Validation
 
 Under extreme financial class imbalance ($< 0.1\%$ fraud incidence), automated benchmarks evaluated in [metrics_service.py](../backend/app/application/services/metrics_service.py) demonstrate:
@@ -331,7 +347,9 @@ All collaborative AML intelligence components are validated through targeted uni
 | [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service.py` | 12-dim node features, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
 | [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine.py` | Neo4j Bolt driver initialization, Cypher merges, Redis fallback | 8 | ✅ 100% Pass |
 | [test_regional_governance_ai_act.py](../backend/tests/unit/test_regional_governance_ai_act.py) | `regional_governance.py`, `ai_act_compliance.py` | Regional rings, cross-border DP filters, Articles 10–15 certificate | 4 | ✅ 100% Pass |
-| **Total Verified (Core AML Intelligence)** | **11 Dedicated Suites** | **Collaborative AML Intelligence Platform** | **61 Tests** | **100% Pass** |
+| [test_consortium_security_and_transport_hardening.py](../backend/tests/unit/test_consortium_security_and_transport_hardening.py) | `redis_store.py`, `institutional_identity.py` | Redis auto-reconnect, 0600 key custody, session epoch invalidation | 9 | ✅ 100% Pass |
+| [test_consortium_multi_bank_deployment.py](../backend/tests/integration/test_consortium_multi_bank_deployment.py) | Consortium Containers | 10-service sandbox topology, multi-bank PSI, evidence attachment | 9 | ✅ 100% Pass |
+| **Total Verified (Core AML Intelligence)** | **13 Dedicated Suites** | **Collaborative AML Intelligence Platform** | **79 Tests** | **100% Pass** |
 
 ---
 

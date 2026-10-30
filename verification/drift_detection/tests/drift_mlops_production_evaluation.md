@@ -1,4 +1,4 @@
-# MLOps & Production Monitoring Audit — Model Drift Detection Subsystem
+# MLOps & Production Monitoring Audit - Model Drift Detection Subsystem
 
 **Subsystem:** Model Drift & Calibration Analytics (`drift_service.py`, `retraining_trigger_engine.py`, `automated_retraining.py`, `auto_rollback.py`)  
 **Audit Standard:** MLOps & Production Engineering Review  

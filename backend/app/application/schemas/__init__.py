@@ -1,4 +1,4 @@
-"""Application schemas — Pydantic models for API request/response validation."""
+"""Application schemas - Pydantic models for API request/response validation."""
 
 from app.application.schemas import (
     admin_console,

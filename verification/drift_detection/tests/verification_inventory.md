@@ -152,7 +152,7 @@ This document provides an exhaustive, element-by-element scientific audit and ve
 
 ---
 
-### Component 4: Model Calibration — Brier Score Evaluator
+### Component 4: Model Calibration - Brier Score Evaluator
 
 - **Component:** `ModelDriftService.compute_calibration` (Brier Score Section)
 - **Target File & Lines:** `app/application/services/drift_service.py`, Lines 177–178, 216

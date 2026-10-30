@@ -1,4 +1,4 @@
-.PHONY: help dev test test-smoke lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all reproduce-verify benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
+.PHONY: help dev test test-smoke lint docker-up docker-down consortium-up consortium-down consortium-test migrate clean benchmark benchmark-all reproduce-all reproduce-verify benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
 
 SHELL := /bin/bash
 
@@ -33,6 +33,15 @@ docker-logs: ## Tail logs from all services
 
 docker-clean: ## Remove all containers, volumes, and images
 	docker compose down -v --rmi all
+
+consortium-up: ## Start 10-service multi-bank consortium deployment
+	docker compose -f docker-compose.consortium.yml up -d
+
+consortium-down: ## Stop 10-service multi-bank consortium deployment
+	docker compose -f docker-compose.consortium.yml down
+
+consortium-test: ## Run multi-bank consortium deployment integration tests
+	pytest backend/tests/integration/test_consortium_multi_bank_deployment.py -v
 
 kafka-up: ## Start Kafka and Redis streaming services
 	docker compose up -d kafka redis

@@ -1,4 +1,4 @@
-"""End-to-End Fault Tolerance Integration Test Suite — Section 43.1.
+"""End-to-End Fault Tolerance Integration Test Suite - Section 43.1.
 
 Validates coordinator fault recovery, mid-round bank disconnections, and Byzantine spectral anomaly defense.
 """

@@ -88,8 +88,8 @@ CF-Intelligence deploys a production-grade, two-tier collaborative machine learn
 ### 1.2 Computational Frameworks & Libraries
 - **Deep Learning**: PyTorch `2.4.0+cpu` / CUDA, PyTorch Geometric (PyG) `2.5.0`
 - **Federated Consensus**: Federated Averaging (`FedAvg`), Federated Proximal (`FedProx`, $\mu=0.01$), and Stochastic Controlled Averaging (`SCAFFOLD`)
-- **Privacy & Cryptography**: Opacus `1.4.1` (PRVAccountant / Privacy Random Variables & Rényi DP), TenSEAL `0.3.14` (CKKS Homomorphic Encryption with 8192-degree polynomial modulus), Curve25519 Diffie-Hellman Private Set Intersection (DH-PSI), Shamir-masked pairwise Secure Aggregation (`p2p_secagg`)
-- **Serving & Transport**: FastAPI `0.115.0`, gRPC `1.62.0`, WebSockets, Apache Kafka CloudEvents 1.0
+- **Privacy & Cryptography**: Opacus `1.4.1` (PRVAccountant / Privacy Random Variables & Rényi DP), TenSEAL `0.3.14` (CKKS Homomorphic Encryption with 8192-degree polynomial modulus), OpenMined PSI `2.0.6` (Curve25519 ECDH Bloom filter intersection) and Diffie-Hellman Private Set Intersection (DH-PSI), Shamir-masked pairwise Secure Aggregation (`p2p_secagg`)
+- **Serving, State & Transport**: FastAPI `0.115.0` (44 modular REST routers across 50+ endpoints), Redis 7.2 (with dynamic auto-reconnect backoff and ephemeral degradation), gRPC `1.62.0`, WebSockets, Apache Kafka CloudEvents 1.0
 
 ---
 
@@ -235,3 +235,5 @@ The model artifacts and governance contracts are certified by automated test sui
 - **Multi-Seed Statistical Robustness**: [`backend/tests/unit/test_multi_seed_runner.py`](backend/tests/unit/test_multi_seed_runner.py) (**13 tests, 100% passing**)
 - **Federal Reserve SR 11-7 Model Governance**: [`backend/tests/unit/test_model_governance_hardening.py`](backend/tests/unit/test_model_governance_hardening.py) (**89 total SR 11-7 tests, 100% passing**)
 - **Claim Registry Reconciliation**: [`backend/tests/unit/test_claims_registry.py`](backend/tests/unit/test_claims_registry.py) (**4 tests, 100% passing**)
+- **Consortium Transport & Security Hardening**: [`backend/tests/unit/test_consortium_security_and_transport_hardening.py`](backend/tests/unit/test_consortium_security_and_transport_hardening.py) (**9 tests, 100% passing**)
+- **Consortium Multi-Bank Deployment**: [`backend/tests/integration/test_consortium_multi_bank_deployment.py`](backend/tests/integration/test_consortium_multi_bank_deployment.py) (**9 tests, 100% passing**)

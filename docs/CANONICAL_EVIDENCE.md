@@ -70,6 +70,7 @@ Every dataset used within the platform is classified under one of five mutually 
 | **Differential Privacy** | Synthetic Banking Records<br>(Opacus DP-SGD PRV) | `CONTROLLED_TESTBED` | DP-SGD with PRV Accountant | **$\sigma=3.0 \to \epsilon=0.35$, AP: 0.3465**<br>**$\sigma=0.0$ (non-private) $\to$ AP: 0.8965** | `CANONICAL` |
 | **Non-IID Federation** | Dirichlet $\alpha=0.5$ Partition | `CONTROLLED_TESTBED` | FedAvg vs FedProx vs SCAFFOLD | **FedAvg AP: 0.2331**<br>FedProx AP: 0.2285, SCAFFOLD: 0.2196 | `CANONICAL` |
 | **Latency Gateway** | AMD Ryzen / Windows 11 Host | `CONTROLLED_TESTBED` | PyTorch In-Process & FastAPI | **In-Process p50: 2.70 ms (NN: 0.38 ms)**<br>**Peak HTTP: 543.0 req/s at C=50 (pooled p50: 89.02 ms)**<br>*(Local host benchmark, network omitted)* | `CANONICAL` |
+| **Cross-Bank Matching** | Isolated 3-Bank Grid | `CONTROLLED_TESTBED` | OpenMined PSI 2.0.6 (Curve25519 ECDH) | **Zero raw PII exposure; cryptographically verified CaseEvidenceAttachment** | `CANONICAL` |
 
 ---
 

@@ -1,4 +1,4 @@
-"""Alert repository — production AsyncSession CRUD for AlertModel.
+"""Alert repository - production AsyncSession CRUD for AlertModel.
 
 Replaces in-memory dict storage. PostgreSQL is the single source of truth;
 Redis is populated by the write-through cache decorator in cache.py.

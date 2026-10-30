@@ -1,4 +1,4 @@
-# Monte Carlo Statistical Validation Report — FederatedLearningEngine
+# Monte Carlo Statistical Validation Report - FederatedLearningEngine
 
 ## Executive Summary
 

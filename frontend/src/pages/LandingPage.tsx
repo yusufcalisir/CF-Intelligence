@@ -19,7 +19,7 @@ const BANK_NODES: Record<string, BankInfoDetail> = {
   jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=1.0, δ=1e-5. HSM-signed: 0x99F1.'] },
   hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
   deutsche: { id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK', location: 'Frankfurt, DE (Node #03)', hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM', pytorch: '2.4.0+cpu', latency: '2.9 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr></FIToFICstmrCdtTrf></Document>', 'Heterogeneous negotiator: batch_size=32, grad_accum_steps=2.', 'CPU straggler quenched. Round latency 342ms.'] },
-  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=1.0, δ=1e-5). [[W_global]] published to consortium.'] },
+  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation / Emulated)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=1.0, δ=1e-5). [[W_global]] published to consortium.'] },
 };
 
 const PLATFORM_MODULES: Module[] = [
@@ -28,9 +28,9 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Production Engine', purpose: 'Coordinates distributed GNN model optimization across banking institutions using FedAvg and FedProx with straggler mitigation.', algorithm: 'FedAvg, FedProx, Asynchronous SGD', inputs: 'Local gradient tensors from node agents', outputs: 'Aggregated global GNN model weights', tech: 'PyTorch 2.4, gRPC, Protocol Buffers' },
   { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'Core Production Engine', purpose: 'Constructs dynamic multi-hop transaction graphs from ISO 20022 message streams and computes 512-dim structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 & camt.053 feeds', outputs: '512-dimensional node embeddings', tech: 'PyTorch Geometric 2.6, DGL' },
   { id: 'aml-copilot', name: 'Autonomous Agentic AML Copilot', category: 'Core Production Engine', purpose: 'Synthesizes 5-paragraph FinCEN SAR narratives, 4-Eyes supervisor briefings, and Neo4j visual graph maps from suspicious transactions.', algorithm: 'Local LLM RAG + SHAP Feature Attribution', inputs: 'Neo4j subgraph, ISO 20022 XML, SHAP vectors', outputs: 'SAR Narrative & 4-Eyes Supervisor Briefing', tech: 'LangChain, Ollama / vLLM, Neo4j' },
-  { id: 'adaptive-dp', name: 'Adaptive DP Budget Auto-Scaler', category: 'Core Production Engine', purpose: 'Dynamically optimizes per-round Gaussian noise multipliers (σ_t) and clipping bounds using Rényi DP and loss velocity accounting.', algorithm: 'Rényi Differential Privacy (RDP) & PRV Dual Minimizer', inputs: 'Gradient velocity ΔL_t, batch ratio q_t, target ε', outputs: 'Calibrated σ_t preserving fraud detection AUC-ROC (>0.94)', tech: 'Rényi DP Accountant, Opacus, Numerical Dual' },
+  { id: 'adaptive-dp', name: 'Adaptive DP Budget Auto-Scaler', category: 'Core Production Engine', purpose: 'Dynamically optimizes per-round Gaussian noise multipliers (σ_t) and clipping bounds using Rényi DP and loss velocity accounting.', algorithm: 'Rényi Differential Privacy (RDP) & PRV Dual Minimizer', inputs: 'Gradient velocity ΔL_t, batch ratio q_t, target ε', outputs: 'Calibrated σ_t with bounded privacy expenditure (quantified privacy-utility tradeoff)', tech: 'Rényi DP Accountant, Opacus, Numerical Dual' },
   { id: 'bft-agg', name: 'Byzantine-Robust Defense Filter', category: 'Core Production Engine', purpose: 'Detects and neutralises gradient poisoning, model replacement, and backdoor attacks from compromised bank nodes.', algorithm: 'Krum, Trimmed Mean, Flame, Cosine Dist', inputs: 'Gradient updates from all consortium nodes', outputs: 'Filtered, verified aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
-  { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
+  { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves (or software-emulated enclaves in development environments).', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
   { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time defense filter simulation (Krum quarantine demonstration via live interactive scenario proxy).', algorithm: 'Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
@@ -48,13 +48,13 @@ const PLATFORM_MODULES: Module[] = [
 
   // ── EUROPEAN REGTECH & COLLABORATIVE FININT ─────────────────────────────────
   { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
-  { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation — with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
-  { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms — Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration — with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
+  { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation - with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
+  { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms - Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration - with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
   { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
   { id: 'asset-recovery-hub', name: 'Asset Recovery & Collaborative FININT Operational Hub', category: 'European RegTech & Collaborative FININT', purpose: 'Aggregates real-time EUR asset frozen/recovered KPIs across ISO 20022 camt.056 payment recalls and cross-bank FININT provisional holds. Tracks Mean Time to Response (MTTR) reduction vs. the legacy 48-hour bilateral baseline, cross-bank contagion containment rate, and per-typology ROI breakdown across smurfing, APP fraud mule chains, dormant-burst velocity, and crypto gateway cashout scenarios.', algorithm: 'SHA-256 hash-chained audit trail + MTTR P50/P90/P99 percentile aggregation + contagion containment rate + typology ROI breakdown', inputs: 'camt.056 recall confirmations + cross-bank FININT case ticket closures + provisional hold webhook callbacks', outputs: 'EUR frozen/recovered KPIs + MTTR reduction % vs. 48h baseline + mule chain disruption count + typology risk classification', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, ISO 20022 camt.056 / EPC SCT Inst Rulebook' },
   { id: 'kafka-streaming', name: 'Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus', category: 'European RegTech & Collaborative FININT', purpose: 'Standardises asynchronous transaction and FININT alert streaming using CNCF CloudEvents 1.0 specifications with at-least-once delivery, distributed idempotency deduplication, and automated Dead Letter Queue (DLQ) quarantine for sub-millisecond fraud propagation across European bank nodes.', algorithm: 'CNCF CloudEvents 1.0 + SHA-256 Idempotency Hashing + Monotonic Kafka Offset Commit + DLQ Error Quarantine', inputs: 'Normalized transaction events + cross-bank FININT alerts + camt.056 recalls + bank idempotency tokens', outputs: 'Validated CloudEvent envelopes (specversion 1.0) + partition offset receipts + DLQ isolation records', tech: 'aiokafka, pure asyncio fallback, CloudEvents 1.0, FastAPI, Python 3.12, Apache Kafka 3.7.0' },
   { id: 'core-banking-gateway', name: 'Cloud Core Banking Gateway (Mambu & Thought Machine)', category: 'European RegTech & Collaborative FININT', purpose: 'Native bidirectional connector gateway bridging cloud core banking engines (Mambu v2 & Thought Machine Vault Core) into the CFI fraud detection fabric with HMAC-authenticated webhooks, Zero-Raw-PII customer pseudonymization, and sub-second outbound provisional account hold dispatching.', algorithm: 'HMAC-SHA256 Webhook Verification + Type-Salted PII Hashing + ISO 20022 PIB Normalization + Idempotency Engine', inputs: 'Mambu deposit-transaction/client webhooks + Thought Machine posting instruction batches (PIBs) + provisional hold triggers', outputs: 'Normalized ISO 20022 transactions + Zero-Raw-PII profiles + cryptographic hold/restriction receipts', tech: 'Pure Python stdlib, httpx, FastAPI, Pydantic v2, Python 3.12, Mambu v2, Thought Machine Vault Core' },
-  { id: 'hsm-key-wrapper', name: 'Hardware Security Module (HSM) & Vault Transit Key Service', category: 'European RegTech & Collaborative FININT', purpose: 'Enforces hardware-anchored zero-trust cryptographic key isolation with non-exportable private key handles (Zero-Disk Key guarantee). Executes Curve25519/X25519 ECDH shared secret derivation and digital signatures inside FIPS 140-2 Level 3 PKCS#11 HSM or Vault Transit boundaries with automated mTLS 1.3 certificate rotation monitoring.', algorithm: 'PKCS#11 + AWS CloudHSM + Vault Transit API + Curve25519 ECDH + X.509 SHA-256 Thumbprint Attestation', inputs: 'Inter-bank FININT digests + ephemeral peer public keys + consortium X.509 certificate PEMs', outputs: 'Hardware digital signatures + derived 256-bit symmetric secrets + mTLS rotation alerts + peer attestation verdicts', tech: 'cryptography, PKCS#11, SoftHSM2, HashiCorp Vault Transit, Python 3.12, FIPS 140-2 Level 3' },
+  { id: 'hsm-key-wrapper', name: 'Hardware Security (HSM) & Vault Transit Key Service', category: 'European RegTech & Collaborative FININT', purpose: 'Enforces hardware-anchored zero-trust cryptographic key isolation with non-exportable private key handles (Zero-Disk Key guarantee). Executes Curve25519/X25519 ECDH shared secret derivation and digital signatures inside FIPS 140-2 Level 3 PKCS#11 HSM (or SoftHSM2/Vault Transit emulation in dev) with automated mTLS 1.3 certificate rotation monitoring.', algorithm: 'PKCS#11 + AWS CloudHSM + Vault Transit API + Curve25519 ECDH + X.509 SHA-256 Thumbprint Attestation', inputs: 'Inter-bank FININT digests + ephemeral peer public keys + consortium X.509 certificate PEMs', outputs: 'Hardware digital signatures + derived 256-bit symmetric secrets + mTLS rotation alerts + peer attestation verdicts', tech: 'cryptography, PKCS#11, SoftHSM2, HashiCorp Vault Transit, Python 3.12, FIPS 140-2 Level 3' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -122,7 +122,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'secure-agg': {
     sla: '< 25 ms hardware-isolated aggregation',
-    security: 'Intel SGX Enclave v2 Hardware TEE',
+    security: 'Intel SGX Enclave v2 (Hardware TEE / Software Emulation)',
     compliance: 'Paillier Additive Homomorphic Scheme',
     actionRoute: '/security',
     actionLabel: 'Inspect SGX Enclave Vault',
@@ -257,7 +257,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'sanctions-screening': {
     sla: '< 50 ms per entity screen (p99, 5-source, 10k entries) | Portfolio bulk rescreen: async',
-    security: 'Zero raw PII — SHA-256 entity key hashing | Goodlist false-positive suppression | No watchlist data persisted externally',
+    security: 'Zero raw PII - SHA-256 entity key hashing | Goodlist false-positive suppression | No watchlist data persisted externally',
     compliance: 'EU Council Consolidated Sanctions | UN SC 1267/1989 | OFAC SDN | HM Treasury | EU AMLA Art. 15 | FATF Rec. 10',
     actionRoute: '/cases',
     actionLabel: 'Open Screening Workbench',
@@ -302,7 +302,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'hsm-key-wrapper': {
     sla: '< 1.8 ms hardware sign (p99) | 0.0 ms key exposure (Zero-Disk)',
-    security: 'FIPS 140-2 Level 3 | Non-Exportable Private Keys | Hardware Curve25519 ECDH | mTLS 1.3',
+    security: 'FIPS 140-2 Level 3 | Non-Exportable Private Keys | Hardware Curve25519 ECDH | mTLS 1.3 (SoftHSM2 in Dev)',
     compliance: 'eIDAS QES | BSI TR-03109 | NIST SP 800-57 | GDPR Art. 32 Technical Measures',
     actionRoute: '/security',
     actionLabel: 'Open HSM Key Console',
@@ -453,15 +453,15 @@ export type BenchmarkDatasetKey = 'master' | 'creditcard' | 'paysim' | 'ieee_cis
 export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDatasetInfo> = {
   master: {
     id: 'master',
-    name: 'Consortium Master Benchmark (CFI-CrossBank-01)',
-    datasetTag: 'Flagship Multi-Bank Trial',
+    name: 'Consortium Master Benchmark (CFI-CrossBank-01 Prototype)',
+    datasetTag: 'Project-Synthetic Consortium Trial',
     scope: '150,000 Train · 45,000 Global Holdout Test',
     prevalence: '0.129% Fraud Prevalence',
     uplift: '+0.1480 PR-AUC (+21.3%)',
     fpReduction: '-64.7% False Alarms',
     latency: '0.260 ms',
-    roi: '+$836,304 USD (+55.59% volume gain)',
-    description: 'Empirical multi-institution evaluation (CFI-CrossBank-01) comparing illegal centralized pooling, federated consensus, and isolated bank silos across 3 concurrent banking institutions with 100% union horizon visibility.',
+    roi: '+$836,304 USD (+55.59% volume gain in synthetic trial)',
+    description: 'Empirical multi-institution evaluation (CFI-CrossBank-01 architectural prototype) comparing illegal centralized pooling, federated consensus, and isolated bank silos across 3 concurrent banking institutions with 100% union horizon visibility. (Canonical Protocol 2.1.0 neural benchmark is CFI-CrossBank-02).',
     cm: { tp: 281, fp: 45, fn: 99, tn: 44575, precision: '86.2%', recall: '73.9%', f1: '79.6%', specificity: '99.9%' },
     routeDataset: 'paysim',
     rows: [
@@ -469,7 +469,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
       { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
       { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
       { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
-      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '— (NOT_EVALUATED)', rocauc: '—', recall01: '—', brier: '—', latency: '—', compliance: 'Not Evaluated on Partition', compliant: false },
+      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
     ],
   },
   creditcard: {
@@ -548,7 +548,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
       { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
-      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '— (NOT_EVALUATED)', rocauc: '—', recall01: '—', brier: '—', latency: '—', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
       { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
@@ -574,14 +574,14 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
   synthaml: {
     id: 'synthaml',
     name: 'Spar Nord Bank SynthAML AlertMLP',
-    datasetTag: 'Extreme Silo Starvation',
+    datasetTag: 'Extreme Silo Starvation (Internal Synthetic)',
     scope: '5,000 Multi-Bank Alerts (Synthetic Copula)',
     prevalence: 'Bank Beta: 0.2214 Silo Collapse',
     uplift: '+0.7710 PR-AUC (Bank Beta Rescue: 0.9924 vs 0.2214)',
     fpReduction: '99.2% Precision @ High Precision',
     latency: '0.042 ms',
     roi: 'Collaborative Federation Rescue',
-    description: 'Project-generated synthetic benchmark modeled on Danish Spar Nord Bank SAR profiles across 3 banks under extreme partition imbalance. Bank Beta silo collapses to 0.2214 PR-AUC due to sparse local fraud; FedAvg achieves 0.9924 collaborative rescue (Centralized baseline: 0.9341).',
+    description: 'Project-generated synthetic benchmark modeled on Danish Spar Nord Bank SAR profiles across 3 banks under extreme partition imbalance (Classified as INTERNAL_ONLY). Bank Beta silo collapses to 0.2214 PR-AUC due to sparse local fraud; FedAvg achieves 0.9924 collaborative rescue (Centralized baseline: 0.9341).',
     cm: { tp: 248, fp: 2, fn: 2, tn: 4748, precision: '99.2%', recall: '99.2%', f1: '99.2%', specificity: '99.96%' },
     routeDataset: 'creditcard',
     rows: [
@@ -593,14 +593,14 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
   amlnet: {
     id: 'amlnet',
     name: 'AUSTRAC AMLNet Structuring Detection',
-    datasetTag: 'Cash Structuring Detection',
+    datasetTag: 'Cash Structuring Detection (Internal Synthetic)',
     scope: '25,000 Transactions (AUSTRAC Wire Profiles)',
     prevalence: 'Synthetic Threshold Structuring',
     uplift: '1.0000 PR-AUC (Rule Separability)',
     fpReduction: '100% Specificity @ 10k Threshold',
     latency: '0.038 ms',
     roi: 'Instant Structuring Pattern Isolation',
-    description: 'AUSTRAC wire structuring benchmark across 3 banks evaluating near-threshold transactions ($8,500-$9,950 AUD). 1.0000 PR-AUC reflects synthetic structuring rule separability where near_thresh feature trivially isolates laundering transactions across institutions.',
+    description: 'AUSTRAC wire structuring benchmark across 3 banks evaluating near-threshold transactions ($8,500-$9,950 AUD) (Classified as INTERNAL_ONLY). 1.0000 PR-AUC reflects synthetic structuring rule separability where near_thresh feature trivially isolates laundering transactions across institutions.',
     cm: { tp: 500, fp: 0, fn: 0, tn: 24500, precision: '100.0%', recall: '100.0%', f1: '100.0%', specificity: '100.0%' },
     routeDataset: 'paysim',
     rows: [
@@ -1012,14 +1012,14 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                       <span>CASE-2026-004</span>
                       <span className="text-rose-400">P1 Critical</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring — In Review</div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6 space-y-0.5">
                     <div className="flex items-center justify-between text-slate-200 font-bold">
                       <span>CASE-2026-001</span>
                       <span className="text-emerald-400">SAR Filed</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion — FinCEN SAR XML Exported</div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
                   </div>
                 </div>
               </motion.div>
@@ -1730,7 +1730,7 @@ export default function LandingPage() {
         </AnimatePresence>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 1 — HERO / OVERVIEW (#hero)
+            SECTION 1 - HERO / OVERVIEW (#hero)
         ══════════════════════════════════════════════════════════ */}
         <section id="hero" className="relative py-10 sm:py-20 px-3.5 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center min-w-0">
@@ -1761,7 +1761,7 @@ export default function LandingPage() {
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">+55.59%</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε ≤ 1.0</div>
@@ -1769,9 +1769,9 @@ export default function LandingPage() {
                   <div className="text-[9px] font-mono text-slate-400 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.57 ms</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring SLA</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 8.87ms · 1,246 req/s</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.70 ms</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
                 </div>
               </div>
 
@@ -1802,7 +1802,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 2 — PROBLEM STATEMENT (#problem-solution)
+            SECTION 2 - PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
         <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -1815,7 +1815,7 @@ export default function LandingPage() {
                 The Cross-Bank Blindspot in Money Laundering
               </h2>
               <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation—missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
+                Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation-missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
               </p>
             </div>
 
@@ -1857,7 +1857,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 3 — WORKFLOW / EXECUTION PIPELINE (#how-it-works)
+            SECTION 3 - WORKFLOW / EXECUTION PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
         <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -1935,7 +1935,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 4 — ENGINE CAPABILITIES (#product)
+            SECTION 4 - ENGINE CAPABILITIES (#product)
         ══════════════════════════════════════════════════════════ */}
         <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2061,7 +2061,7 @@ export default function LandingPage() {
 
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 5 — PLATFORM / NODE INSPECTOR (#platform)
+            SECTION 5 - PLATFORM / NODE INSPECTOR (#platform)
         ══════════════════════════════════════════════════════════ */}
         <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2070,9 +2070,9 @@ export default function LandingPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Architecture
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Active Bank Node Inspector</h2>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Simulated Consortium Node Inspector</h2>
               <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                Click any institution node to inspect hardware specs, PyTorch execution runtime, and ISO 20022 message streams.
+                Inspect simulated node hardware configurations, PyTorch execution runtimes, and synthetic ISO 20022 message streams across reference bank profiles.
               </p>
             </div>
 
@@ -2103,7 +2103,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 6 — ARCHITECTURE (#architecture)
+            SECTION 6 - ARCHITECTURE (#architecture)
         ══════════════════════════════════════════════════════════ */}
         <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2184,7 +2184,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7 — SECURITY & PRIVACY (#security)
+            SECTION 7 - SECURITY & PRIVACY (#security)
         ══════════════════════════════════════════════════════════ */}
         <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2284,7 +2284,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7.5 — EMPIRICAL BENCHMARKS & PRODUCTION VALIDATION (#benchmarks)
+            SECTION 7.5 - EMPIRICAL BENCHMARKS & PRODUCTION VALIDATION (#benchmarks)
         ══════════════════════════════════════════════════════════ */}
         <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2619,7 +2619,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7.6 — TARGET CUSTOMER PROFILES (#solutions)
+            SECTION 7.6 - TARGET CUSTOMER PROFILES (#solutions)
         ══════════════════════════════════════════════════════════ */}
         <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2706,7 +2706,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7.7 — INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
+            SECTION 7.7 - INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
         ══════════════════════════════════════════════════════════ */}
         <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2775,7 +2775,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 8 — EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
+            SECTION 8 - EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
         <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <div id="docs" className="w-full min-w-0">
@@ -2914,13 +2914,13 @@ telemetry.on('round.stage', (evt) => {
                     { method: 'POST', path: '/api/v1/copilot/generate-sar', desc: 'Autonomous Agentic AML Copilot: synthesize 5-paragraph FinCEN SAR narratives & 4-Eyes briefings', req: 'case_id, shap_attributions, graph_nodes', res: 'sar_narrative, supervisor_briefing' },
                     { method: 'POST', path: '/api/v1/onboarding/register', desc: 'Issue bank node onboarding and certificate provisioning request', req: 'bank_id, legal_name, jurisdiction, contact_email', res: 'bank_id, cert_fingerprint, mtls_cert_pem' },
                     { method: 'GET',  path: '/api/v1/onboarding/bundle/{bank_id}', desc: 'Download mTLS X.509 client certificate and pre-rendered daemon config', req: 'bank_id (path parameter)', res: 'cert_fingerprint, config_yaml' },
-                    { method: 'POST', path: '/api/v1/compliance/dossier/generate', desc: 'Regulatory Dossier Generator: Compile EU AI Act Articles 9–15 and SR 11-7 model risk management verification package', req: 'consortium_id, model_version, jurisdiction', res: 'dossier_id, compliance_score, audit_sha256, pdf_url' },
-                    { method: 'POST', path: '/api/v1/bridge/messages',    desc: 'Inter-Bank FININT Messaging: Exchange encrypted collaborative case intelligence tickets (Curve25519 ECDH + AES-256-GCM)', req: 'recipient_bic, encrypted_payload, evidence_hash, sla_hours', res: 'ticket_id, delivery_status: ENCRYPTED, timestamp' },
-                    { method: 'POST', path: '/api/v1/recall/payment',     desc: 'SEPA Instant Recall Automation: Dispatch ISO 20022 camt.056 cancellation & trigger sub-second provisional hold webhooks', req: 'msg_id, original_uetr, recall_reason: FRAD/TECH, return_amount', res: 'recall_id, xml_camt056, provisional_hold_status' },
+                    { method: 'GET',  path: '/api/v1/regulatory/dossier/export', desc: 'Regulatory Dossier Generator: Export EU AI Act Articles 9–15 & SR 11-7 model risk management verification package', req: 'format: json | pdf', res: 'dossier JSON payload / PDF artifact stream' },
+                    { method: 'POST', path: '/api/v1/bridge/tickets',     desc: 'Inter-Bank FININT Messaging: Exchange encrypted collaborative case intelligence tickets (Curve25519 ECDH + AES-256-GCM)', req: 'recipient_bic, encrypted_payload, evidence_hash, sla_hours', res: 'ticket_id, delivery_status: ENCRYPTED, timestamp' },
+                    { method: 'POST', path: '/api/v1/recalls',            desc: 'SEPA Instant Recall Automation: Dispatch ISO 20022 camt.056 cancellation & trigger sub-second provisional hold webhooks', req: 'msg_id, original_uetr, recall_reason: FRAD/TECH, return_amount', res: 'recall_id, xml_camt056, provisional_hold_status' },
                     { method: 'POST', path: '/api/v1/screening/screen',   desc: 'Sanctions & PEP Screening: Match entity against 5 multi-jurisdiction watchlists (EU/UN/OFAC/HMT/PEP) across 5 phonetic/fuzzy algorithms', req: 'entity_name, entity_type, nationalities, dob', res: 'risk_score, match_status, matched_sources, audit_id' },
                     { method: 'POST', path: '/api/v1/security/bridge/disburse', desc: 'Cross-Chain Settlement: disburse Leave-One-Out Shapley incentive payouts via Chainlink CCIP', req: 'epoch_id, pool_amount, currency', res: 'routes, gas_fees_usd, audit_hash' },
                     { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier σ_t via Rényi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
-                    { method: 'GET',  path: '/api/v1/audit/records',     desc: 'Query immutable SHA-256 cryptographic audit chain records', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
+                    { method: 'GET',  path: '/api/v1/security/audit-chain', desc: 'Query immutable SHA-256 cryptographic audit chain records and verify sequence integrity', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
                     { method: 'GET',  path: '/api/v1/diagnostics/connectors', desc: 'Enterprise Connector Diagnostics: probe health for Kafka, Vault, KMS, Splunk, Redis & PostgreSQL', req: 'none (HTTP GET)', res: 'connectors array, latency_ms, status: HEALTHY' },
                     { method: 'POST', path: '/api/v1/cases/export/fincen-xml', desc: 'Regulatory Export: generate validated FinCEN SAR XML package with SHA-256 digital signature', req: 'case_id, filer_id, narrative_override', res: 'xml_payload, sha256_hash, filing_status' },
                     { method: 'POST', path: '/v1/cron/rotate-keys',      desc: 'Tenant KMS Lifecycle: trigger scheduled rotation of AES-256-GCM data keys and re-encryption pipeline', req: 'tenant_id (optional), force_rotation: boolean', res: 'rotated_keys_count, reencrypted_records, status' },
@@ -2954,7 +2954,7 @@ telemetry.on('round.stage', (evt) => {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 9 — ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
+            SECTION 9 - ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
         ══════════════════════════════════════════════════════════ */}
         <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -3182,7 +3182,7 @@ function BankDetailsDrawerModal({
             { k: 'Hardware', v: bank.hardware },
             { k: 'Host RAM', v: bank.ram },
             { k: 'PyTorch', v: bank.pytorch },
-            { k: 'Status', v: 'READY (On-Premises Agent)' },
+            { k: 'Status', v: 'READY (Simulated Local Agent)' },
           ].map((row) => (
             <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
               <div className="text-slate-400 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">

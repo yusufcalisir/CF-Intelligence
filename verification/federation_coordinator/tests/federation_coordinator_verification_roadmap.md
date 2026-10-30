@@ -1,4 +1,4 @@
-# Scientific Verification Roadmap — Federation Coordinator Subsystem
+# Scientific Verification Roadmap - Federation Coordinator Subsystem
 
 **Subsystem:** Federation Coordinator & Distributed Orchestration Engine  
 **Module Paths:** `coordinator_service.py`, `servicer.py`, `client.py`, `flower_engine.py`, `region_failover.py`, `dr_coordinator.py`  
@@ -190,4 +190,4 @@ Upon execution of this roadmap, the following scientific verification artifacts 
 
 ---
 
-*End of Scientific Verification Roadmap — Federation Coordinator Subsystem*
+*End of Scientific Verification Roadmap - Federation Coordinator Subsystem*

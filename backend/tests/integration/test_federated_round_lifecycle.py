@@ -1,4 +1,4 @@
-"""Integration tests for Section 41.2: Federated Round Lifecycle — Real Coordinator Orchestration."""
+"""Integration tests for Section 41.2: Federated Round Lifecycle - Real Coordinator Orchestration."""
 
 from __future__ import annotations
 

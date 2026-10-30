@@ -1,5 +1,5 @@
 # ruff: noqa: E402, TC003
-"""Automated Unit Test Suite for SIEM Log Exporter & Support Diagnostics — Section 44.2."""
+"""Automated Unit Test Suite for SIEM Log Exporter & Support Diagnostics - Section 44.2."""
 
 from __future__ import annotations
 

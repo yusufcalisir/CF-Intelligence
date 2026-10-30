@@ -1,4 +1,4 @@
-# Security & Threat Model Review — Real-World Fraud ETL Pipeline
+# Security & Threat Model Review - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

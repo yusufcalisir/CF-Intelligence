@@ -80,7 +80,7 @@ def test_gcex1_client_crashes_mid_round():
 # =====================================================================
 
 def test_gcex2_duplicated_gradient_submissions():
-    """GCEX2: Same client submits gradient twice — dictionary overwrites, count stays 1."""
+    """GCEX2: Same client submits gradient twice - dictionary overwrites, count stays 1."""
     coord = CoordinatorService()
     coord.register_client("bank_dup_0")
     coord.register_client("bank_dup_1")

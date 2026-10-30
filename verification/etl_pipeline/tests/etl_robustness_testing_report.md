@@ -1,4 +1,4 @@
-# Adversarial Robustness & Failure Injection Report — Real-World Fraud ETL Pipeline
+# Adversarial Robustness & Failure Injection Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

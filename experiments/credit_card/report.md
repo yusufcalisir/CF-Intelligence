@@ -126,7 +126,7 @@
 | **Precision-Recall AUC (PR-AUC)** | **0.0033** | $\ge 0.85$ | ❌ **FAIL** |
 | **ROC-AUC** | **0.5561** | $\ge 0.90$ | ❌ **FAIL** |
 | **Brier Calibration Score** | **0.0020** | $\le 0.05$ | ✅ **PASS** |
-| **Overall Acceptance Contract** | — | All Criteria Met | ❌ **FAIL** |
+| **Overall Acceptance Contract** | - | All Criteria Met | ❌ **FAIL** |
 
 ### Scientific Verdict & Negative Result Preservation
 - **Execution Success**: The experiment executed cleanly to full convergence across 10 communication rounds without infrastructure failure.

@@ -1,4 +1,4 @@
-"""Integration tests for Section 35.1 — Production Database Persistence.
+"""Integration tests for Section 35.1 - Production Database Persistence.
 
 Tests every repository against a real (or in-memory SQLite) database to verify
 that domain objects survive across session boundaries.
@@ -380,7 +380,7 @@ async def test_entity_privacy_hash_lookup(db_session: AsyncSession) -> None:
     assert fetched.id == entity.id
     assert fetched.risk_level == "elevated"
 
-    # Unknown hash returns None — never raises
+    # Unknown hash returns None - never raises
     not_found = await repo.get_by_privacy_id("0000" * 16)
     assert not_found is None
 
@@ -428,7 +428,7 @@ async def test_round_lifecycle(db_session: AsyncSession) -> None:
     )
     assert not await repo.quorum_reached(round_model.id)
 
-    # Submit gradient from bank_beta — quorum met (2 of 2)
+    # Submit gradient from bank_beta - quorum met (2 of 2)
     await repo.record_gradient_submission(
         round_id=round_model.id,
         bank_id="bank_beta",

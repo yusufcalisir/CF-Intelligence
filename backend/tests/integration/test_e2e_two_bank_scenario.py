@@ -1,4 +1,4 @@
-"""End-to-End Two-Bank Scenario Integration Test — Section 43.1.
+"""End-to-End Two-Bank Scenario Integration Test - Section 43.1.
 
 Validates zero-mock multi-bank onboarding, gRPC mTLS communication, federated
 round orchestration, real-time transaction scoring, case management, and GDPR erasure.

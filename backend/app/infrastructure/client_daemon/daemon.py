@@ -1,4 +1,4 @@
-"""Standalone Bank Client Daemon (cfi-bank-client) Execution Engine — Section 41.1."""
+"""Standalone Bank Client Daemon (cfi-bank-client) Execution Engine - Section 41.1."""
 
 from __future__ import annotations
 

@@ -211,7 +211,7 @@ def test_markdown_table_formatting_and_strict_nulls() -> None:
 
     # Strict null representation markers
     assert "N/A (NOT RUN)" in md_table
-    assert "—" in md_table
+    assert "-" in md_table
 
 
 def test_documentation_section_29_in_enterprise_report() -> None:

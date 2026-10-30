@@ -31,7 +31,7 @@ def test_robustness_non_existent_provider_path():
 
 
 def generate_robustness_report():
-    report_md = """# Adversarial Robustness Report — Multi-Cloud Terraform IaC
+    report_md = """# Adversarial Robustness Report - Multi-Cloud Terraform IaC
 
 **Subsystem:** Multi-Cloud Terraform Infrastructure as Code (IaC)  
 **Date:** August 2026  

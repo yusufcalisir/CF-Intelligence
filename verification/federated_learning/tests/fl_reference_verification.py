@@ -329,7 +329,7 @@ def generate_report(scenarios: list[dict]):
     passed_count = len(scenarios)
 
     lines = [
-        "# Independent Reference Verification Report — FederatedLearningEngine",
+        "# Independent Reference Verification Report - FederatedLearningEngine",
         "",
         "## Executive Summary",
         "",

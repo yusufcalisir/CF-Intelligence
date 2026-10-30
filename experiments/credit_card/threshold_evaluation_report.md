@@ -11,7 +11,7 @@ The European Credit Card Fraud Detection benchmark encapsulates one of the most 
 - **Empirical Fraud Prevalence**: 0.173% (577.9:1 class imbalance ratio)
 - **Feature Space**: 30 numerical attributes (`Time`, `V1` through `V28` PCA principal components, `Amount`)
 
-In high-volume payment processing, uncalibrated classification thresholds (such as the naive $0.50$ probability cutoff) fail catastrophically under extreme skew—either generating tens of thousands of false positive investigations or failing to intercept fraud syndicates.
+In high-volume payment processing, uncalibrated classification thresholds (such as the naive $0.50$ probability cutoff) fail catastrophically under extreme skew-either generating tens of thousands of false positive investigations or failing to intercept fraud syndicates.
 
 To ensure operational viability, decision thresholds are strictly calibrated on an independent **Validation Split** for predefined **False Positive Rate (FPR)** budgets, and subsequently audited on an untouched **Global Test Set**:
 

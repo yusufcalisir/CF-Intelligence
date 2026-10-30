@@ -1,4 +1,4 @@
-﻿# Adversarial Security & Threat Assessment — FederatedLearningEngine Subsystem
+﻿# Adversarial Security & Threat Assessment - FederatedLearningEngine Subsystem
 
 This document presents a comprehensive adversarial security threat evaluation of the `FederatedLearningEngine` subsystem. It systematically analyzes 6 major attack vectors in federated learning: Byzantine client updates, untargeted model poisoning, gradient scaling, sign flipping, label flipping data poisoning, and colluding attackers.
 

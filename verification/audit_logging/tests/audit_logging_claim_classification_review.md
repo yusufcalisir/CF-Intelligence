@@ -1,4 +1,4 @@
-﻿# Claim Classification Review — Audit Logging Subsystem
+﻿# Claim Classification Review - Audit Logging Subsystem
 
 This document provides a scientific review of all engineering, security, auditability, compliance, traceability, and immutability claims made regarding the Audit Logging subsystem. Each claim is systematically evaluated and classified as **Supported**, **Partially Supported**, or **Unsupported**, accompanied by technically precise wording recommendations.
 

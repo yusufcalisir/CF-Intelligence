@@ -1,4 +1,4 @@
-﻿# Claim Classification Review — Secure Aggregation & TEE Subsystem
+﻿# Claim Classification Review - Secure Aggregation & TEE Subsystem
 
 This document presents a rigorous scientific review of all cryptographic, mathematical, and security claims associated with the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem.
 

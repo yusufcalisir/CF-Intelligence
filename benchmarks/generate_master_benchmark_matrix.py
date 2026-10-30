@@ -7,7 +7,7 @@ IBM AMLSim, SynthAML (Spar Nord), AMLNet (AUSTRAC), and CFI-CrossBank Consortium
 Enforces the Strict Null Representation Invariant:
 Unexecuted benchmarks, unmeasured operating thresholds, or inapplicable
 paradigms MUST be represented as None (null in JSON) and rendered as
-'N/A (NOT RUN)' or '—' in Markdown tables, NEVER as misleading 0.0000 or
+'N/A (NOT RUN)' or '-' in Markdown tables, NEVER as misleading 0.0000 or
 fabricated fallbacks (Vector 1 & Vector 4 compliance).
 """
 
@@ -169,7 +169,7 @@ class MasterBenchmarkMatrixGenerator:
             "dataset_name": "IEEE-CIS Fraud Detection",
             "domain": "E-Commerce Card-Not-Present (CNP)",
             "real_vs_synthetic": CANONICAL_REGISTRY["ieee_cis_real"].provenance_type.value,
-            "provenance_scale": "590,540 transactions (Kaggle / Vesta Corp) — Canonical Level 1" if ieee_can else "590k transactions (Kaggle / Vesta Corp) — Not Evaluated",
+            "provenance_scale": "590,540 transactions (Kaggle / Vesta Corp) - Canonical Level 1" if ieee_can else "590k transactions (Kaggle / Vesta Corp) - Not Evaluated",
             "evaluated_samples": ieee_can.get("dataset", {}).get("total_transactions", 590540) if ieee_can else None,
             "fraud_prevalence_pct": 3.50,
             "feature_dim": ieee_can.get("dataset", {}).get("feature_dim", 421) if ieee_can else 421,
@@ -747,7 +747,7 @@ class MasterBenchmarkMatrixGenerator:
 
         def _fmt(val: Any, bold: bool = False) -> str:
             if val is None:
-                return "—"
+                return "-"
             res = f"{val:.4f}" if isinstance(val, (int, float)) else str(val)
             return f"**{res}**" if bold else res
 
@@ -781,7 +781,7 @@ class MasterBenchmarkMatrixGenerator:
             elif fa_rounds is not None:
                 c_r = f"Graph / {fa_rounds} rnds"
             else:
-                c_r = "—"
+                c_r = "-"
             if fa_status == "EVALUATED":
                 status_badge = "`FEDERATED [OK]`"
             elif fa_status == "NOT_EVALUATED":
@@ -799,7 +799,7 @@ class MasterBenchmarkMatrixGenerator:
             if fp.get("status") == "EVALUATED":
                 fp_clients = fp.get("clients")
                 fp_rounds = fp.get("rounds")
-                fp_cr = f"{fp_clients} clients / {fp_rounds} rnds" if fp_clients and fp_rounds else "—"
+                fp_cr = f"{fp_clients} clients / {fp_rounds} rnds" if fp_clients and fp_rounds else "-"
                 lines.append(
                     f"| | Federated FedProx (Robust) | {fp.get('architecture', 'FedProx')} | {fp_cr} | "
                     f"{_fmt(fp.get('pr_auc'))} | {_fmt(fp.get('roc_auc'))} | {_fmt(fp.get('f1_score'))} | {_fmt(fp.get('precision'))} | "
@@ -807,8 +807,8 @@ class MasterBenchmarkMatrixGenerator:
                 )
             else:
                 lines.append(
-                    r"| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | "
-                    "— | — | — | — | — | — | `N/A (NOT RUN)` |"
+                    r"| | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | - | "
+                    "- | - | - | - | - | - | `N/A (NOT RUN)` |"
                 )
 
             # 4. Isolated Silos
@@ -824,21 +824,21 @@ class MasterBenchmarkMatrixGenerator:
                 elif det_rate is not None:
                     iso_str = f"Det: {_fmt(det_rate)}"
                 else:
-                    iso_str = "—"
+                    iso_str = "-"
                 lines.append(
                     f"| | Isolated Silos (No Sharing) | {iso.get('architecture', 'Local Silos')} | Isolated Local | "
-                    f"{iso_str} | — | — | — | — | — | `ISOLATED [OK]` |"
+                    f"{iso_str} | - | - | - | - | - | `ISOLATED [OK]` |"
                 )
             else:
                 lines.append(
-                    "| | Isolated Silos (No Sharing) | Local Independent Models | — | "
-                    "— | — | — | — | — | — | `N/A (NOT RUN)` |"
+                    "| | Isolated Silos (No Sharing) | Local Independent Models | - | "
+                    "- | - | - | - | - | - | `N/A (NOT RUN)` |"
                 )
 
             # 5. Classical Baselines
             lines.append(
                 "| | Classical Baselines | Random Forest / LogReg | Non-Neural | "
-                "— | — | — | — | — | — | `N/A (NOT RUN)` |"
+                "- | - | - | - | - | - | `N/A (NOT RUN)` |"
             )
 
         return "\n".join(lines)

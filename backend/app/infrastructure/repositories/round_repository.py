@@ -1,4 +1,4 @@
-"""Round repository — production AsyncSession CRUD for FederatedRoundModel
+"""Round repository - production AsyncSession CRUD for FederatedRoundModel
 and GradientSubmissionModel.
 
 Manages the full lifecycle of production federated training rounds:
@@ -76,7 +76,7 @@ class RoundRepository:
         return await self.get_round_by_id(round_id)
 
     async def mark_failed(self, round_id: str, reason: str = "") -> None:
-        """Mark round as FAILED — used when aggregation fails or quorum is not met."""
+        """Mark round as FAILED - used when aggregation fails or quorum is not met."""
         await self.session.execute(
             update(FederatedRoundModel)
             .where(FederatedRoundModel.id == round_id)

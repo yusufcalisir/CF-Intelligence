@@ -1,4 +1,4 @@
-# Scientific Verification Inventory — Telemetry & Observability Subsystem
+# Scientific Verification Inventory - Telemetry & Observability Subsystem
 
 **Project:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
 **Subsystem:** Telemetry, Metrics, Distributed Tracing, SIEM Logging & SLA Monitoring  
@@ -72,7 +72,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 1: `TelemetryRegistry` — Prometheus Metrics Exposition Engine
+### Component 1: `TelemetryRegistry` - Prometheus Metrics Exposition Engine
 - **Module:** `app/infrastructure/telemetry/__init__.py`
 - **Purpose:** Thread-safe Prometheus metrics registry for tracking counters, gauges, and histograms, rendering standard UTF-8 Prometheus text format responses (`GET /metrics`).
 - **Mathematical / Statistical Formulation:**
@@ -93,7 +93,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 2: `MetricProxy` — Dynamic Telemetry Interface Adapter
+### Component 2: `MetricProxy` - Dynamic Telemetry Interface Adapter
 - **Module:** `app/infrastructure/telemetry/__init__.py`
 - **Purpose:** Bridges Prometheus metric client semantics (`.set()`, `.inc()`, `.dec()`, `.add()`, `.observe()`, `.record()`, `.labels()`) to internal `TelemetryRegistry` backing storage.
 - **Mathematical / Statistical Formulation:**
@@ -110,7 +110,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 3: `track_fl_round` Decorator — Training Round Telemetry Harvester
+### Component 3: `track_fl_round` Decorator - Training Round Telemetry Harvester
 - **Module:** `app/infrastructure/telemetry/__init__.py`
 - **Purpose:** Measures execution duration and participant node count of federated learning training functions and records metrics to `TelemetryRegistry`.
 - **Mathematical / Statistical Formulation:**
@@ -127,7 +127,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 4: `track_grpc_latency` Decorator — Transport Latency Telemetry
+### Component 4: `track_grpc_latency` Decorator - Transport Latency Telemetry
 - **Module:** `app/infrastructure/telemetry/__init__.py`
 - **Purpose:** Measures execution time of gRPC handler functions and categorizes status as `"OK"` or `"ERROR"`.
 - **Mathematical / Statistical Formulation:**
@@ -143,7 +143,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 5: `OpenTelemetryTracer` — W3C Trace Context Propagation Engine
+### Component 5: `OpenTelemetryTracer` - W3C Trace Context Propagation Engine
 - **Module:** `app/infrastructure/telemetry/otel_tracer.py`
 - **Purpose:** Manages W3C Trace Context headers (`traceparent`, `tracestate`) across distributed coordinator services and remote bank daemons.
 - **Mathematical / Statistical Formulation:**
@@ -163,7 +163,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 6: Stage-Specific Trace Spans — Multi-Stage Pipeline Instrumentation
+### Component 6: Stage-Specific Trace Spans - Multi-Stage Pipeline Instrumentation
 - **Module:** `app/infrastructure/telemetry/otel_tracer.py`
 - **Purpose:** Context manager helpers for tracing 6 discrete pipeline stages: `ingest_transaction`, `feature_store_aggregation`, `local_pytorch_training`, `grpc_mtls_transmit`, `central_parameter_aggregation`, and `model_registry_save`.
 - **Mathematical / Statistical Formulation:**
@@ -193,7 +193,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 8: `SIEMLogExporter` — Multi-Format Security Audit Log Forwarder
+### Component 8: `SIEMLogExporter` - Multi-Format Security Audit Log Forwarder
 - **Module:** `app/infrastructure/logging/siem_exporter.py`
 - **Purpose:** Formats security audit events into Syslog (RFC 5424), Common Event Format (CEF), Splunk HEC JSON, or Datadog Log JSON, and forwards them over UDP/TCP or HTTP.
 - **Mathematical / Statistical Formulation:**
@@ -229,7 +229,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 10: `RealtimeSLAMonitor` — Latency Quantile Interpolation Engine
+### Component 10: `RealtimeSLAMonitor` - Latency Quantile Interpolation Engine
 - **Module:** `app/application/services/sla_monitor.py`
 - **Purpose:** Computes real-time p50, p95, and p99 latency percentiles and tracks SLA compliance percentage against a configured target threshold ($T_{\text{SLA}} = 100.0\,\text{ms}$).
 - **Mathematical / Statistical Formulation:**
@@ -253,7 +253,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 11: `TenantMeteringService` — Resource Quota & Usage Tracker
+### Component 11: `TenantMeteringService` - Resource Quota & Usage Tracker
 - **Module:** `app/application/services/tenant_metering.py`
 - **Purpose:** Tracks real-time tenant resource consumption (daily inferences, monthly FL rounds, storage MB), resets daily metrics at UTC midnight, and enforces resource quota bounds.
 - **Mathematical / Statistical Formulation:**
@@ -288,7 +288,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 13: `AlertIntelligenceService` — Risk Score Scaler & Severity Classifier
+### Component 13: `AlertIntelligenceService` - Risk Score Scaler & Severity Classifier
 - **Module:** `app/application/services/alert_service.py`
 - **Purpose:** Scales probability prediction scores $[0, 1]$ to integer risk scores $[0, 1000]$ and classifies severity into 5 discrete tiers.
 - **Mathematical / Statistical Formulation:**
@@ -341,7 +341,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 16: `SupportDiagnosticCompiler` — PII Redaction Engine
+### Component 16: `SupportDiagnosticCompiler` - PII Redaction Engine
 - **Module:** `app/application/services/support_diagnostics.py`
 - **Purpose:** Sanitizes raw system log strings by redacting PII patterns (IBANs, email addresses) before bundle packaging.
 - **Mathematical / Statistical Formulation:**
@@ -373,7 +373,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 18: `MetricsService` — Aggregate Model Improvement Evaluator
+### Component 18: `MetricsService` - Aggregate Model Improvement Evaluator
 - **Module:** `app/application/services/metrics_service.py`
 - **Purpose:** Converts raw model evaluation dicts into domain `EvaluationMetrics` objects and calculates mean metric deltas ($\Delta = \text{federated} - \text{local}$).
 - **Mathematical / Statistical Formulation:**
@@ -388,7 +388,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-### Component 19: `/drift/analyze` Endpoint — Real-Time Statistical Drift Exporter
+### Component 19: `/drift/analyze` Endpoint - Real-Time Statistical Drift Exporter
 - **Module:** `app/presentation/routers/monitoring.py`
 - **Purpose:** Executes statistical feature drift (KS-test, Wasserstein, PSI) and concept drift analysis, exposing metrics via REST API and recording values to Prometheus gauge proxies.
 - **Mathematical / Statistical Formulation:**
@@ -490,7 +490,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 |:---:|:---|:---|:---|:---:|:---|
 | **1** | Prometheus Metrics Exposition | `telemetry/__init__.py` | Standard Prometheus text format (v0.0.4) | **PARTIALLY SUPPORTED** | Unbounded list storage in histograms; no thread mutex locks |
 | **2** | MetricProxy Adapter | `telemetry/__init__.py` | Zero-dependency Prometheus SDK adapter | **PARTIALLY SUPPORTED** | Allows negative counter decrements violating Prometheus rules |
-| **3** | `track_fl_round` Decorator | `telemetry/__init__.py` | Automatic FL round latency & participant harvest | **SUPPORTED** | None — correctly measures wall-clock duration |
+| **3** | `track_fl_round` Decorator | `telemetry/__init__.py` | Automatic FL round latency & participant harvest | **SUPPORTED** | None - correctly measures wall-clock duration |
 | **4** | `track_grpc_latency` Decorator | `telemetry/__init__.py` | gRPC transport latency & status capture | **SUPPORTED** | Sync-only execution model (not async await aware) |
 | **5** | W3C Context Propagation Engine | `telemetry/otel_tracer.py` | W3C traceparent (00-id-id-01) spec compliance | **PARTIALLY SUPPORTED** | Uses pseudo-random `random.getrandbits()` instead of OTel IDs |
 | **6** | Multi-Stage Pipeline Spans | `telemetry/otel_tracer.py` | 6-stage end-to-end trace span attribution | **PARTIALLY SUPPORTED** | Stage helpers yield inner context manager results directly |
@@ -535,6 +535,6 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 
 ---
 
-*Scientific Verification Inventory — Telemetry & Observability Subsystem*  
+*Scientific Verification Inventory - Telemetry & Observability Subsystem*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

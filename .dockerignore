@@ -25,6 +25,11 @@ coverage
 .env
 .env.*
 !*.env.example
+.secrets
+secrets
+*.sqlite
+*.sqlite3
+*.db
 
 # Storage, Datasets & Run Artifacts
 storage/*

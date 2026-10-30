@@ -1,4 +1,4 @@
-﻿# Decision System & Sensitivity Analysis Report — Risk Scoring Engine Subsystem
+﻿# Decision System & Sensitivity Analysis Report - Risk Scoring Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine (`RiskScoringEngine`) & Hybrid Decision Governance  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

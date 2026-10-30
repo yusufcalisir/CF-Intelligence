@@ -429,9 +429,9 @@ export default function CaseDetailPage() {
       >
         <div className="font-semibold text-[var(--color-text-primary)]">
           {isForbidden
-            ? 'Institutional Access Denied (HTTP 403) — Case not found in your institution'
+            ? 'Institutional Access Denied (HTTP 403) - Case not found in your institution'
             : isUnauthorized
-              ? 'Institutional Session Required (HTTP 401) — Sign in to view institutional case resources'
+              ? 'Institutional Session Required (HTTP 401) - Sign in to view institutional case resources'
               : 'Case not found'}
         </div>
         {errMsg && (
@@ -1006,7 +1006,7 @@ export default function CaseDetailPage() {
       </motion.div>
 
 
-      {/* Cross-Bank Consortium Intelligence Workspace (M6.6 Task 1) */}
+      {/* Cross-Bank Consortium Intelligence Workspace */}
       {caseId && (
         <CrossBankIntelligenceWorkspace
           caseId={caseId}

@@ -172,7 +172,7 @@ def generate_report(results: list[tuple[str, bool, str]]) -> None:
     total_count = len(results)
 
     lines = [
-        "# Reference Verification & Specification Compliance Report — Audit Logging Subsystem",
+        "# Reference Verification & Specification Compliance Report - Audit Logging Subsystem",
         "",
         "## Executive Summary",
         "",

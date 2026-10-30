@@ -62,7 +62,7 @@ class SpectralAnomalyReport:
 
 
 # ---------------------------------------------------------------------------
-# Minimal linear algebra helpers (pure stdlib — no numpy required in domain)
+# Minimal linear algebra helpers (pure stdlib - no numpy required in domain)
 # ---------------------------------------------------------------------------
 
 

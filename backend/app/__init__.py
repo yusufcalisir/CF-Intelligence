@@ -1,1 +1,1 @@
-"""Collaborative Fraud Intelligence Simulator — Backend Application."""
+"""Collaborative Fraud Intelligence Simulator - Backend Application."""

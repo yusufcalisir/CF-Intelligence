@@ -1,4 +1,4 @@
-# Security & Threat Model Review — Zero Trust PKI & ABAC
+# Security & Threat Model Review - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

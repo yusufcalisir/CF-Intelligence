@@ -1,4 +1,4 @@
-"""Mutual TLS (mTLS) and PKI Manager — Section 40.1."""
+"""Mutual TLS (mTLS) and PKI Manager - Section 40.1."""
 
 from __future__ import annotations
 

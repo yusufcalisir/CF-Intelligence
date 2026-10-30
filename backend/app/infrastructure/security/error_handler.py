@@ -154,7 +154,7 @@ def format_safe_error_response(
     in_prod = is_production_mode()
 
     if in_prod:
-        # Production: Strictly sanitize — generic message only, zero internal details
+        # Production: Strictly sanitize - generic message only, zero internal details
         problem_details: dict[str, Any] = {
             "type": "https://cfi-platform.org/errors/InternalServerError",
             "title": "Internal Server Error",

@@ -21,6 +21,9 @@ To guarantee compliance with **SOC 2 Type II (Trust Services Criteria CC6.1 - CC
 │ Path Traversal via Tenant ID      │ `sanitize_bank_id` Stripping (`..`)   │  BLOCKED [PASS]  │
 │ SQL Injection in Tenant Identity  │ Regex Alphanumeric + Double-Quoting   │  BLOCKED [PASS]  │
 │ Redis Cache Key Collusion         │ Namespaced Keys: cfi:tenant:<id>:*    │ ISOLATED [PASS]  │
+│ Redis Network Severance Bleed     │ Auto-Reconnect & Ephemeral Degradation│ ISOLATED [PASS]  │
+│ Browser Institutional Bleed       │ Session Epoching & In-Flight Abort    │ ISOLATED [PASS]  │
+│ Sovereign Worker Key Exfiltration │ POSIX 0600 File Custody & Memory Only │ ISOLATED [PASS]  │
 │ Database Session Pool Bleed       │ Dynamic AsyncEngine Factory / Bank    │ ISOLATED [PASS]  │
 │ Cross-Tenant BOLA / IDOR Tamper   │ Global TenantAccessControlMiddleware  │ REJECTED [PASS]  │
 │ Unencrypted PII Ingestion         │ Type-Salted HMAC-SHA256 Tokenizer     │  SANITIZED [OK]  │
@@ -127,8 +130,11 @@ python -m pytest backend/tests/unit/test_multi_tenancy.py -v
 
 # 10. Vault Transit genuine AES-256-GCM encryption, tamper rejection & tenant AAD isolation (5 tests)
 python -m pytest backend/tests/unit/test_vault_aesgcm_transit_realism.py -v
+
+# 11. Consortium security, Redis auto-reconnect, 0600 key custody & session epoching (9 tests)
+python -m pytest backend/tests/unit/test_consortium_security_and_transport_hardening.py -v
 ```
 
 **Audit Verdict**:
-- All **56 automated test cases** across unit and integration suites **PASSED** (`56 passed in 85.12s`).
+- All **65 automated test cases** across unit and integration suites **PASSED** (`65 passed in 90.4s`).
 - Zero cross-tenant data leaks, zero SQL injection vulnerabilities, zero schema drift, and 100% cryptographic boundary enforcement.

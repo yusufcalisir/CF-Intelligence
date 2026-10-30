@@ -10,6 +10,8 @@ paths = [
   '''(?i)docs/.*''',
   '''(?i)phases/.*''',
   '''(?i)\.env\.example''',
+  '''(?i)\.env\.consortium\.example''',
+  '''(?i)\.secrets/.*''',
   '''(?i)package-lock\.json''',
   '''(?i)requirements\.txt''',
   '''(?i)secrets_scan\.json''',

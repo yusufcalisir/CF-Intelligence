@@ -106,7 +106,7 @@ def generate_report(data: dict[str, Any]):
     report_path = Path(__file__).parent / "dp_monte_carlo_report.md"
 
     lines = [
-        "# Monte Carlo Statistical Validation Report — Differential Privacy Subsystem",
+        "# Monte Carlo Statistical Validation Report - Differential Privacy Subsystem",
         "",
         "## Executive Summary",
         "",

@@ -1,4 +1,4 @@
-﻿# Property-Based Testing Report — Secure Aggregation Subsystem
+﻿# Property-Based Testing Report - Secure Aggregation Subsystem
 
 **Date:** August 2026  
 **Status:** ALL 6 INVARIANTS PASSED (6/6 Invariants, 450+ Randomized Scenarios)  

@@ -598,9 +598,9 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                       onChange={(e) => updateConfig('poisoning_bank_id', e.target.value)}
                       className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-status-error)] transition-colors"
                     >
-                      <option value="bank_a">Bank A — National Trust</option>
-                      <option value="bank_b">Bank B — Metro Commercial</option>
-                      <option value="bank_c">Bank C — Heritage Regional</option>
+                      <option value="bank_a">Bank A - National Trust</option>
+                      <option value="bank_b">Bank B - Metro Commercial</option>
+                      <option value="bank_c">Bank C - Heritage Regional</option>
                     </select>
                   </div>
                   <div>
@@ -647,8 +647,8 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                       onChange={(e) => updateConfig('adversarial_attack_type', e.target.value)}
                       className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-cyan-500 transition-colors"
                     >
-                      <option value="fgsm">FGSM (Fast Gradient Sign Method — 1 step)</option>
-                      <option value="pgd">PGD (Projected Gradient Descent — 5 steps)</option>
+                      <option value="fgsm">FGSM (Fast Gradient Sign Method - 1 step)</option>
+                      <option value="pgd">PGD (Projected Gradient Descent - 5 steps)</option>
                     </select>
                   </div>
                   <div>

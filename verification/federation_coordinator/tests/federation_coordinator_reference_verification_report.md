@@ -1,4 +1,4 @@
-# Reference Verification Report — Federation Coordinator Subsystem
+# Reference Verification Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`, `client.py`  
 **Test Script:** `scratch/federation_coordinator_reference_verification.py`  

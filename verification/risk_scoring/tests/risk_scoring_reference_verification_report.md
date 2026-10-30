@@ -1,4 +1,4 @@
-﻿# Independent Mathematical Reference Verification Report — Risk Scoring Engine Subsystem
+﻿# Independent Mathematical Reference Verification Report - Risk Scoring Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine (`RiskScoringEngine`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

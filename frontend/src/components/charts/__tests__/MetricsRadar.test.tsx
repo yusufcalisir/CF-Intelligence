@@ -46,6 +46,6 @@ describe('MetricsRadar Component Test Suite', () => {
 
     render(<MetricsRadar banks={mockBanks} />);
 
-    expect(screen.getByText(/Model Performance Comparison — All Banks|Metrics Overview/i)).toBeDefined();
+    expect(screen.getByText(/Model Performance Comparison - All Banks|Metrics Overview/i)).toBeDefined();
   });
 });

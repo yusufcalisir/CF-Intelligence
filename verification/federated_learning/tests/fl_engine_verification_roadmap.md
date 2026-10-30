@@ -1,4 +1,4 @@
-# Master Scientific Verification Roadmap — FederatedLearningEngine Subsystem
+# Master Scientific Verification Roadmap - FederatedLearningEngine Subsystem
 
 This document defines the 5-phase scientific verification roadmap for the `FederatedLearningEngine` module, mapping every audited algorithm and mathematical claim to specific, rigorous validation methodologies.
 

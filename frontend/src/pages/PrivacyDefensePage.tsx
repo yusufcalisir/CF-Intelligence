@@ -873,7 +873,7 @@ function BudgetLogSection() {
         )}
       </div>
 
-      {/* 3b. Empirical DP Privacy-Utility Frontier & RDP Noise Calibration (Phase 15.1) */}
+      {/* 3b. Empirical DP Privacy-Utility Frontier & RDP Noise Calibration */}
       <PrivacyBudgetWidget />
 
       {/* 4. Global Simulation Runs Audit Ledger */}

@@ -1,1 +1,1 @@
-"""Infrastructure layer — database, repositories, caching, task queue."""
+"""Infrastructure layer - database, repositories, caching, task queue."""

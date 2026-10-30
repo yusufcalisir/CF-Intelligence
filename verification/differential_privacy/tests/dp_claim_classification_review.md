@@ -1,4 +1,4 @@
-﻿# Claim Classification Review — Differential Privacy Subsystem
+﻿# Claim Classification Review - Differential Privacy Subsystem
 
 This document reviews the 18 mathematical, privacy, and cryptographic claims identified in the verification inventory for the Differential Privacy (DP), PETs, and Privacy Audit subsystem. Each claim is classified as **SUPPORTED**, **PARTIALLY SUPPORTED**, or **UNSUPPORTED**, with scientifically precise reformulations for any over-stated claims.
 
@@ -8,11 +8,11 @@ This document reviews the 18 mathematical, privacy, and cryptographic claims ide
 
 ```
 ===================================================================================
-         DIFFERENTIAL PRIVACY MODULE — FINAL CLAIM CLASSIFICATION SUMMARY
+         DIFFERENTIAL PRIVACY SUITE - FINAL CLAIM CLASSIFICATION SUMMARY
 ===================================================================================
-  SUPPORTED:           7 Claims (38.9%) — Mathematically sound & verified
-  PARTIALLY SUPPORTED: 11 Claims (61.1%) — Inherent theoretical bounds
-  UNSUPPORTED:          0 Claims (0.0%)  — All fabricated bounds eliminated
+  SUPPORTED:           7 Claims (38.9%) - Mathematically sound & verified
+  PARTIALLY SUPPORTED: 11 Claims (61.1%) - Inherent theoretical bounds
+  UNSUPPORTED:          0 Claims (0.0%)  - All fabricated bounds eliminated
 ===================================================================================
 ```
 

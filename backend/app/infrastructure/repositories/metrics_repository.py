@@ -1,4 +1,4 @@
-"""Metrics repository — persistence for training round metrics."""
+"""Metrics repository - persistence for training round metrics."""
 
 from __future__ import annotations
 

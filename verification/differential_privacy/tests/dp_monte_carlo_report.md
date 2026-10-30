@@ -1,4 +1,4 @@
-# Monte Carlo Statistical Validation Report — Differential Privacy Subsystem
+# Monte Carlo Statistical Validation Report - Differential Privacy Subsystem
 
 ## Executive Summary
 

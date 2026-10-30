@@ -261,7 +261,7 @@ import type {
 
 
 
-// ── Phase 1: Simulations ───────────────────
+// ── Simulations ───────────────────
 
 export function useSimulations() {
   return useQuery<SimulationSummary[]>({
@@ -527,7 +527,7 @@ export function useTrainingHistory(limit: number = 10) {
   });
 }
 
-// ── Phase 2: Alerts ────────────────────────
+// ── Alerts ────────────────────────
 
 export function useAlerts(filters?: { bank_id?: string; severity?: string; status?: string }) {
   return useQuery<Alert[]>({
@@ -636,7 +636,7 @@ export function useIntelligenceStats() {
   });
 }
 
-// ── Phase 2: Cases ─────────────────────────
+// ── Cases ─────────────────────────
 
 export function useCases(filters?: { status?: string; priority?: string; alert_id?: string }) {
   return useQuery<CaseSummary[]>({
@@ -812,7 +812,7 @@ export function useVerifyCaseTimeline(caseId: string | undefined) {
 export const useExportFinCENXml = useExportFinCENXmlMutation;
 
 
-// ── Phase 2: Entities ──────────────────────
+// ── Entities ──────────────────────
 
 export function useEntities(filters?: { entity_type?: string; bank_id?: string; risk_level?: string }) {
   return useQuery<Entity[]>({
@@ -825,7 +825,7 @@ export function useEntities(filters?: { entity_type?: string; bank_id?: string; 
   });
 }
 
-// ── Phase 2: Graph ─────────────────────────
+// ── Graph ─────────────────────────
 
 export function useGraph(entityId: string | undefined, depth: number = 2, maxNodes: number = 100) {
   return useQuery<GraphData>({
@@ -920,7 +920,7 @@ export function useSimilarEntities() {
   });
 }
 
-// ── Phase 2: Scenarios ─────────────────────
+// ── Scenarios ─────────────────────
 
 export function useScenarios() {
   return useQuery<ScenarioInfo[]>({
@@ -995,7 +995,7 @@ export function useActiveScenarios() {
   });
 }
 
-// ── Phase 2: Dashboard ─────────────────────
+// ── Dashboard ─────────────────────
 
 export function useDashboardStats(bankId?: string) {
   return useQuery<DashboardStats>({
@@ -2274,7 +2274,7 @@ export function useCopilotCaseNarrative() {
   });
 }
 
-// ── Phase 63: Label Feedback Loop & Retraining Store ────────
+// ── Label Feedback Loop & Retraining Store ────────
 export function useFeedbackStats(tenantId: string | undefined) {
   return useQuery<FeedbackStatsResponse>({
     queryKey: ['feedback-stats', tenantId],
@@ -3532,7 +3532,7 @@ export function useAttachCrossBankEvidence() {
   });
 }
 
-// ── M6.6 Multi-Counterparty Case Intelligence Workspace Queries & Mutations ──
+// ── Multi-Counterparty Case Intelligence Workspace Queries & Mutations ──
 
 export function useCaseEligibleEntities(caseId: string | undefined) {
   return useQuery<CaseEligibleEntity[]>({

@@ -1612,7 +1612,7 @@ class SimulationService:
 
                     auc_display = f"{global_auc:.4f}" if global_auc is not None else "None"
                     logger.info(
-                        "[Federated FL] Round %d/%d — loss: %.4f, auc: %s, participants: %d, dropped: %d, duration: %.0fms",
+                        "[Federated FL] Round %d/%d - loss: %.4f, auc: %s, participants: %d, dropped: %d, duration: %.0fms",
                         round_num,
                         config.num_rounds,
                         round_loss,
@@ -2365,14 +2365,14 @@ class SimulationService:
                     get_default_training_issuer,
                 )
 
-                # Strictly observe executed rounds — never substitute planned/configured counts
+                # Strictly observe executed rounds - never substitute planned/configured counts
                 fl_rounds_executed = len(rounds) if rounds else 0
                 fl_epochs_executed = 0
                 for r in (rounds or []):
                     if hasattr(r, "per_bank_epochs") and isinstance(r.per_bank_epochs, dict):
                         fl_epochs_executed += sum(r.per_bank_epochs.values())
 
-                # Strictly observe participant sample counts — never invent arbitrary counts or fall back to 100
+                # Strictly observe participant sample counts - never invent arbitrary counts or fall back to 100
                 total_fl_samples = 0
                 for b in banks:
                     if b.id in bank_data and "X_train" in bank_data[b.id]:

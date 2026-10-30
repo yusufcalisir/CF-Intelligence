@@ -1,4 +1,4 @@
-"""Unit tests for CoordinatorService — Item 18: Enterprise Federated Coordinator Suite."""
+"""Unit tests for CoordinatorService - Item 18: Enterprise Federated Coordinator Suite."""
 
 from __future__ import annotations
 

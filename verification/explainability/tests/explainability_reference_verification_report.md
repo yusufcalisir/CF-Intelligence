@@ -1,4 +1,4 @@
-# Numerical Reference Verification Report — Explainability (XAI) Subsystem
+# Numerical Reference Verification Report - Explainability (XAI) Subsystem
 
 **Module:** `explainability_service.py`, `realtime_explainer.py`  
 **Test Script:** `scratch/explainability_reference_verification.py`  

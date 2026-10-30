@@ -1,4 +1,4 @@
-﻿# Adversarial Robustness, Security, & Fault Injection Testing Report — FederatedLearningEngine
+﻿# Adversarial Robustness, Security, & Fault Injection Testing Report - FederatedLearningEngine
 
 This document presents the empirical results of adversarial robustness, security, and fault injection testing on the `FederatedLearningEngine` module. The test suite systematically attempted to break every aggregation algorithm using extreme float values, NaN/Inf injections, shape mismatches, $10^{12}$ scale malicious outliers, zero samples, and high-dimensional parameter tensors ($d=100,000$).
 

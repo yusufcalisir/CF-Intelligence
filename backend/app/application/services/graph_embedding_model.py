@@ -259,8 +259,8 @@ class GraphSAGEModel(nn.Module):
                                                                             Classifier (1)
 
     The model produces:
-    1. Node embeddings (64-dim vectors) — used for similarity search & visualization
-    2. Fraud predictions (0-1 probability) — used for training signal
+    1. Node embeddings (64-dim vectors) - used for similarity search & visualization
+    2. Fraud predictions (0-1 probability) - used for training signal
 
     Only the model weights (W_self, W_neigh, bias per layer + classifier) are
     federated. Embeddings stay local.
@@ -380,7 +380,7 @@ class GraphSAGEModel(nn.Module):
 
         Args:
             include_classifier: If True, includes classifier head parameters in the
-                exported weights. Only use for local inference — never for federation.
+                exported weights. Only use for local inference - never for federation.
                 Setting True in a federated round leaks local fraud label distributions.
         """
         layer_shapes = []

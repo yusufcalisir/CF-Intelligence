@@ -97,7 +97,7 @@ High-volume inference bursts and collaborative FL rounds require race-condition-
   - Daily Inferences: Automatically reset to 0 upon day boundary rollover (`last_reset_date != today`).
   - Monthly FL Rounds: Automatically reset to 0 upon month boundary rollover (`last_reset_month != this_month`), preventing historical rounds from blocking training in new billing cycles.
 - **Storage Telemetry & Quota Bounds:** Real-time storage consumption tracking via `update_storage_usage(tenant_id, storage_mb)`, incorporated into dynamic billing summaries (`daily_inferences`, `monthly_fl_rounds`, `storage_used_mb`, `estimated_cost_usd`).
-- **Redis Namespace Enclosure:** `CacheService.get_tenant_key` deterministically prefixes caching keys (`cfi:tenant:{clean_tenant}:{resource_key}`) to prevent cross-tenant cache pollution.
+- **Redis Namespace Enclosure & Dynamic Auto-Reconnect:** `CacheService.get_tenant_key` deterministically prefixes caching keys (`cfi:tenant:{clean_tenant}:{resource_key}`) to prevent cross-tenant cache pollution. If Redis disconnects during runtime, [redis_store.py](../backend/app/infrastructure/persistence/redis_store.py) dynamically falls back to in-memory caching while advertising `durability="ephemeral"` via `/health`. Background reconnect triggers every 1.0s, returning to `durability="durable"` when Redis recovers without service interruption.
 - **Three-State Idempotency Engine:** `IdempotencyService` guarantees request deduplication across `"ACQUIRED"`, `"IN_PROGRESS"`, and `"HIT"` states, rejecting concurrent duplicate submissions of financial cases or settlement claims.
 - **Thread-Safe Champion Promotion:** `ModelRegistry` enforces reentrant mutual exclusion (`threading.RLock()`) and atomic file replacement (`tempfile` + `os.replace`), preventing dual-champion states under parallel sign-offs.
 
@@ -114,7 +114,16 @@ Each institution maintains isolated cryptographic keys managed through `TenantKM
 
 ---
 
-## 📊 6. Tenant Lifecycle State Machine
+## 🌐 6. Browser-Side Institutional Tenant Isolation & Session Epoching
+
+Multi-bank operations in web consoles require strict client-side state boundary enforcement to prevent cross-institutional data bleed:
+- **Session Epoch Lifecycle (`advanceInstitutionalSessionEpoch`):** When an analyst switches institutions or logs out, the frontend increments a global session epoch counter. This immediately aborts in-flight fetch requests and purges all cached query keys in the React Query cache.
+- **Contextual Header Verification (`cfi_tenant_id`):** Every API request carries the authenticated tenant context. If an institutional identity mismatch occurs between the active tab session and stored tokens, requests fail closed with HTTP 403 Forbidden.
+- **Session Storage Guarding (`__cached_tenant_id`):** Investigative narratives, SAR drafts, and cached evidence verify against `__cached_tenant_id`. Any context change immediately wipes sensitive case drafts from `sessionStorage`.
+
+---
+
+## 📊 7. Tenant Lifecycle State Machine
 
 ```text
       ┌────────────────┐
@@ -139,7 +148,7 @@ Each institution maintains isolated cryptographic keys managed through `TenantKM
 
 ---
 
-## 🛠️ 7. Developer Code Example
+## 🛠️ 8. Developer Code Example
 
 ```python
 from app.infrastructure.database import active_tenant
@@ -165,7 +174,7 @@ finally:
 
 ---
 
-## 🧪 8. Automated Test Verification Matrix
+## 🧪 9. Automated Test Verification Matrix
 
 All SaaS multi-tenancy capabilities are verified by continuous automated test suites:
 
@@ -175,6 +184,7 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 | **Multi-Tenancy Hardening** | `backend/tests/unit/test_saas_multi_tenancy_hardening.py` | Invariants, thread concurrency, monthly rollover, fail-closed quota, storage | `9/9 PASSED` |
 | **KMS & DB Isolation** | `backend/tests/unit/test_multi_tenancy.py` | Engine isolation, KMS key persistence, model vault directories, log filtering | `18/18 PASSED` |
 | **BOLA / IDOR Security** | `backend/tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |
+| **Consortium Hardening** | `backend/tests/unit/test_consortium_security_and_transport_hardening.py` | Redis auto-reconnect, 0600 key custody, browser session epoch invalidation | `9/9 PASSED` |
 | **Tenant KMS & Metering** | `backend/tests/unit/test_tenant_kms_metering.py` | Quota boundary enforcement, 429 rate limits, per-tenant envelope encryption | `4/4 PASSED` |
 | **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Linear migration head (`005_case_institutional_ownership`), offline SQL, dynamic discovery | `4/4 PASSED` |
 | **KMS Key Lifecycle** | `backend/tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |

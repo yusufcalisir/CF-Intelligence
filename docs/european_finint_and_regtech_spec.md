@@ -58,6 +58,7 @@ To eliminate central cleartext data exposure during inter-bank communication, FI
 - **Key Derivation**: HKDF-SHA256 (`cryptography.hazmat.primitives.kdf.hkdf.HKDF`) deriving a 32-byte symmetric key with salt and contextual info binding (`b"cfi-finint-bridge-v1"`).
 - **Authenticated Encryption**: AES-256-GCM (`cryptography.hazmat.primitives.ciphers.aead.AESGCM`) with a cryptographically secure 12-byte random initialization vector (IV) per transmission.
 - **Evidence Integrity Verification**: Every case ticket carries an unambiguous SHA-256 hexadecimal hash commitment of the unencrypted evidence (`hashlib.sha256(payload.encode('utf-8')).hexdigest()`), verified by the recipient node upon decryption.
+- **Multi-Counterparty Private Set Intersection (OpenMined PSI 2.0.6)**: Beyond point-to-point ticket messaging, multi-bank investigative correlation is driven by isolated worker nodes executing OpenMined PSI 2.0.6 over Curve25519 ECDH. Matches yield authenticated `CaseEvidenceAttachment` records attached directly to case files (`POST /api/v1/cases/{id}/evidence`) with zero transmission of unflagged customer identifiers.
 
 ### 3.2 Immutability & Audit Trail
 Every ticket lifecycle transition (`SUBMITTED`, `ACKNOWLEDGED`, `IN_REVIEW`, `RESPONDED`, `CLOSED`) is recorded in a tamper-evident, append-only SHA-256 hash-chained audit log:
@@ -331,5 +332,8 @@ In strict compliance with Model Risk Management (SR 11-7) and European regulator
 | `/api/v1/operations/asset-recovery/timeline` | `GET` | Time-series asset recovery trend data | Bearer JWT / X-Tenant-ID |
 | `/api/v1/operations/asset-recovery/breakdown-by-typology` | `GET` | Per-typology EUR recovery & containment breakdown | Bearer JWT / X-Tenant-ID |
 | `/api/v1/operations/asset-recovery/events` | `POST` | Record new recall, freeze, or recovery event (201 Created) | Bearer JWT / X-Tenant-ID |
+| `/api/v1/cross-bank/investigate` | `POST` | Initiate multi-bank OpenMined PSI matching grid run | Bearer JWT + Analyst Role |
+| `/api/v1/cross-bank/worker/health` | `GET` | Health status of isolated bank matching workers | Internal mTLS / Bearer JWT |
+| `/api/v1/cases/{id}/evidence` | `POST` | Attach verified cross-bank PSI match evidence to case | Bearer JWT + 4-Eyes Sign-off |
 
 

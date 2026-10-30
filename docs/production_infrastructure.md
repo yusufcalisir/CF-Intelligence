@@ -4,7 +4,7 @@
 
 ## 1. Executive Overview: From Single-Node Compose to Multi-Region Cloud Mesh
 
-While local developers use `docker-compose.yml` for offline testing and `docker-compose.multinode.yml` for distributed multi-bank testbed validation, **production deployments of CF-Intelligence operate on a multi-cloud, multi-region, auto-scaling Kubernetes (EKS / AKS / GKE) and managed infrastructure mesh**.
+While local developers use `docker-compose.yml` for unified single-node testing, `docker-compose.multinode.yml` for network-isolated gRPC testbeds, and `docker-compose.consortium.yml` for the integrated 10-service consortium sandbox (`LOCAL_HTTP_SANDBOX`), **production deployments of CF-Intelligence operate on a multi-cloud, multi-region, auto-scaling Kubernetes (EKS / AKS / GKE) and managed infrastructure mesh**.
 
 The production cloud topology features an active-passive multi-region architecture designed for zero data loss, sub-100ms real-time fraud scoring SLAs, high-availability federated training rounds, and automated regional disaster recovery:
 
@@ -230,7 +230,7 @@ Dashboards are provisioned automatically via `monitoring/grafana/provisioning/`:
 * **`deployments/grafana/dashboards/fl_consortium_overview.json`**: Active federated consortium round progress, member node statuses, and convergence curves.
 * **`deployments/grafana/dashboards/privacy_security_audit.json`**: mTLS handshake metrics, cryptographic audit trails, and Byzantine attack quarantine logs.
 
-### 6.4. Enterprise SIEM Log Forwarding & Support Telemetry (Phase 34)
+### 6.4. Enterprise SIEM Log Forwarding & Support Telemetry
 * **SIEM Exporter (`backend/app/infrastructure/logging/siem_exporter.py`)**:
   * Streams real-time audit events formatted according to **Syslog RFC 5424** and **Elastic Common Schema (ECS)**.
   * Native connectors for enterprise bank SIEM platforms: **Splunk HEC**, **Elasticsearch / Logstash**, and **Datadog**.
@@ -248,6 +248,8 @@ All infrastructure components are continuously verified via automated tests exec
 
 | Component / Subsystem | Target Verification File | Criteria & Scope | Status | Test Command |
 | :--- | :--- | :--- | :--- | :--- |
+| **Consortium Deployment Sandbox** | `test_consortium_multi_bank_deployment.py` | 10-service health probes, storage isolation, multi-counterparty PSI, evidence attachment, recovery | ✅ PASSED | `python -m pytest backend/tests/integration/test_consortium_multi_bank_deployment.py` |
+| **Consortium Browser Workflow** | `consortium_live_analyst_workflow.spec.ts` | Playwright real browser E2E: analyst investigation, pilot governance, session isolation | ✅ PASSED | `cd frontend && npx playwright test -c playwright.consortium.config.ts` |
 | **Multi-Cloud Terraform** | `test_terraform_templates.py` | AWS, Azure, GCP VPCs, subnets, EKS/AKS/GKE clusters, KMS, and security groups | ✅ PASSED | `python -m pytest backend/tests/unit/test_terraform_templates.py` |
 | **Kubernetes Helm Packaging** | `test_helm_chart.py` | Chart SemVer, values schema, HPA, NetPol, PDB, and security posture | ✅ PASSED | `python -m pytest backend/tests/unit/test_helm_chart.py` |
 | **K8s Dry-Run Renderer** | `validate_k8s_manifests.py` | Rendered template dry-run client validation against Kubernetes API schema | ✅ PASSED | `python scripts/validate_k8s_manifests.py` |

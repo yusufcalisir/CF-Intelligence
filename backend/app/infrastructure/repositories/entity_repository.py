@@ -1,7 +1,7 @@
-"""Entity repository — production AsyncSession CRUD for EntityModel.
+"""Entity repository - production AsyncSession CRUD for EntityModel.
 
 Replaces in-memory dict + hash index. PostgreSQL is the single source of truth.
-privacy_id is the HMAC-SHA256 hash of the raw customer identifier — never the
+privacy_id is the HMAC-SHA256 hash of the raw customer identifier - never the
 raw value.
 """
 
@@ -96,7 +96,7 @@ class EntityRepository:
     async def get_by_privacy_id(self, privacy_id: str) -> EntityModel | None:
         """Look up an entity by its HMAC-SHA256 privacy hash.
 
-        This is the primary lookup path — raw customer identifiers are never
+        This is the primary lookup path - raw customer identifiers are never
         stored or passed through the repository layer.
         """
         result = await self.session.execute(

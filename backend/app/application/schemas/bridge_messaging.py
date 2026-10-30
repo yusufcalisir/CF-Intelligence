@@ -6,7 +6,7 @@ attachment, and audit chain retrieval.
 
 Privacy invariants:
 - Originating and recipient bank IDs must be HMAC-SHA256 hex strings
-  (64 hex chars) — not cleartext institution names.
+  (64 hex chars) - not cleartext institution names.
 - Evidence is transmitted only as SHA-256 hashes; raw bytes are never
   accepted or returned.
 """
@@ -82,7 +82,7 @@ class CreateTicketRequest(BaseModel):
         max_length=20,
         description=(
             "Optional list of base64url-encoded evidence blobs (max 1 MB each). "
-            "Only their SHA-256 hashes are persisted — raw data is discarded immediately."
+            "Only their SHA-256 hashes are persisted - raw data is discarded immediately."
         ),
     )
     actor: str = Field(
@@ -152,7 +152,7 @@ class AttachEvidenceRequest(BaseModel):
         ...,
         description=(
             "Base64url-encoded evidence blob (max 1 MB). "
-            "Only the SHA-256 hash is stored — the raw bytes are discarded."
+            "Only the SHA-256 hash is stored - the raw bytes are discarded."
         ),
     )
     actor: str = Field(
@@ -299,7 +299,7 @@ class GenerateKeypairResponse(BaseModel):
         ...,
         description=(
             "Base64url-encoded Curve25519 private key. "
-            "Store securely — never transmit over any channel."
+            "Store securely - never transmit over any channel."
         ),
     )
     public_key_b64: str = Field(

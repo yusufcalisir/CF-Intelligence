@@ -79,7 +79,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
         <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-300 text-xs flex items-start gap-3">
           <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <div className="font-semibold">Access Restricted — Compliance / Auditor Authority Required</div>
+            <div className="font-semibold">Access Restricted - Compliance / Auditor Authority Required</div>
             <p className="text-slate-400">
               Your authenticated principal does not hold compliance or audit clearance for dossier export.
               High-level status remains accessible; detailed cryptographic audit trails are restricted.

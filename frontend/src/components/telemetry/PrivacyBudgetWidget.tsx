@@ -1,5 +1,5 @@
 /**
- * PrivacyBudgetWidget — Phase 15.1
+ * PrivacyBudgetWidget - Empirical DP Accounting
  *
  * Renders the empirical DP-SGD privacy-utility frontier data:
  *   - Epsilon vs PR-AUC scatter with Pareto frontier overlay
@@ -224,7 +224,7 @@ export default function PrivacyBudgetWidget({
               DP-SGD Noise Calibration &amp; Privacy-Utility Frontier
             </h3>
             <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-              Phase 15.1 — RDP Moments Accountant · δ={delta.toExponential(0)} fixed
+              RDP Moments Accountant · δ={delta.toExponential(0)} fixed
             </p>
           </div>
         </div>
@@ -256,13 +256,13 @@ export default function PrivacyBudgetWidget({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KPICard
           label="Calibrated σ*"
-          value={calibrated_sigma !== null ? calibrated_sigma.toFixed(4) : '—'}
+          value={calibrated_sigma !== null ? calibrated_sigma.toFixed(4) : '-'}
           sub={`ε ≤ ${target_epsilon} at T=${Math.max(...roundCounts)}`}
         />
         <KPICard
           label="Best PR-AUC"
-          value={bestConfig ? bestConfig.pr_auc.toFixed(4) : '—'}
-          sub={bestConfig ? `σ=${bestConfig.sigma.toFixed(1)}, T=${bestConfig.num_rounds}` : '—'}
+          value={bestConfig ? bestConfig.pr_auc.toFixed(4) : '-'}
+          sub={bestConfig ? `σ=${bestConfig.sigma.toFixed(1)}, T=${bestConfig.num_rounds}` : '-'}
         />
         <KPICard
           label="Configurations"

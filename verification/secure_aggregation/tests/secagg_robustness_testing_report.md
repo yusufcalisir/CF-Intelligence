@@ -1,4 +1,4 @@
-﻿# Adversarial Robustness & Protocol Assumption Breakdown Report — Secure Aggregation Subsystem
+﻿# Adversarial Robustness & Protocol Assumption Breakdown Report - Secure Aggregation Subsystem
 
 **Date:** August 2026  
 **Status:** ALL 12 ADVERSARIAL STRESS SCENARIOS PASSED (12/12 Passed)  

@@ -120,7 +120,7 @@ def generate_report(results: dict):
     report_path = Path(__file__).parent / "fl_engine_benchmark_report.md"
 
     lines = [
-        "# Performance, Latency, & Asymptotic Complexity Benchmark Report — FederatedLearningEngine",
+        "# Performance, Latency, & Asymptotic Complexity Benchmark Report - FederatedLearningEngine",
         "",
         "## Executive Summary",
         "",

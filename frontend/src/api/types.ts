@@ -465,7 +465,7 @@ export const BANK_NAMES: Record<string, string> = {
   bank_c: 'Heritage Regional',
 };
 
-// ── Phase 2: AML Intelligence Platform ────────
+// ── AML Intelligence Platform ────────
 
 export interface Alert {
   id: string;
@@ -3646,7 +3646,7 @@ export interface CrossBankEvidenceAttachResponse {
   is_duplicate_submission?: boolean;
 }
 
-// ── M6.6 Multi-Counterparty Investigation Workspace Types ──
+// ── Multi-Counterparty Investigation Workspace Types ──
 
 export interface CaseEligibleEntity {
   entity_id: string;

@@ -1,4 +1,4 @@
-﻿# Scientific Verification Inventory — Risk Scoring & Decision Engine Subsystem
+﻿# Scientific Verification Inventory - Risk Scoring & Decision Engine Subsystem
 
 **Subsystem:** Risk Scoring Engine, Policy AST Evaluator & Decision Infrastructure  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

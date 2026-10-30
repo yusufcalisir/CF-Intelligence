@@ -1,4 +1,4 @@
-﻿# Fraud Domain & Risk Engine Production Assessment — Risk Scoring Subsystem
+﻿# Fraud Domain & Risk Engine Production Assessment - Risk Scoring Subsystem
 
 **Subsystem:** Risk Scoring Engine (`RiskScoringEngine`) & Policy Decision Infrastructure  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

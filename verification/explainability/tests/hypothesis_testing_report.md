@@ -1,4 +1,4 @@
-# Property-Based Testing Report — Explainability (XAI) Subsystem
+# Property-Based Testing Report - Explainability (XAI) Subsystem
 
 **Module:** `explainability_service.py`, `realtime_explainer.py`  
 **Test Suite:** `scratch/test_explainability_hypothesis.py`  

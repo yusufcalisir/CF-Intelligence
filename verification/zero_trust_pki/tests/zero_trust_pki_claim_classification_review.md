@@ -1,4 +1,4 @@
-# Claim Classification Review — Zero Trust PKI & ABAC
+# Claim Classification Review - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

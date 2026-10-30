@@ -132,7 +132,7 @@ class RiskWeightConfig:
     """Configurable weights for the risk scoring pipeline.
 
     All weights should sum to approximately 1.0 for interpretability,
-    but this is not enforced — weights are relative.
+    but this is not enforced - weights are relative.
     """
 
     ml_prediction: float = 0.25

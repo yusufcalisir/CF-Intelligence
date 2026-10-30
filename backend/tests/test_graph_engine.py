@@ -78,7 +78,7 @@ class TestNeighborTraversal:
 
 class TestClusterDetection:
     def test_single_cluster(self, graph: GraphEngine) -> None:
-        # All nodes are connected — one cluster of size 5
+        # All nodes are connected - one cluster of size 5
         clusters = graph.detect_clusters(min_size=3)
         assert len(clusters) == 1
         assert len(clusters[0]) == 5

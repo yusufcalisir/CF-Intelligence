@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models.
 
 These map domain concepts to PostgreSQL tables. They're separate from
-domain entities — the repository layer handles conversion between
+domain entities - the repository layer handles conversion between
 ORM models and domain objects.
 
 Uses SQLAlchemy 2.0 Mapped/mapped_column syntax.
@@ -381,7 +381,7 @@ class AuditEventModel(Base):
     # GRADIENT_RECEIVED | MODEL_DEPLOYED | GDPR_ERASURE | CERT_ROTATED | BANK_REGISTERED | etc.
     event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     actor_bank_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    # Serialized event payload (no raw PII — only hashed identifiers)
+    # Serialized event payload (no raw PII - only hashed identifiers)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     # SHA-256(prev_chain_hash + json.dumps(event_type + actor + timestamp + payload))
     chain_hash: Mapped[str] = mapped_column(String(64), nullable=False)

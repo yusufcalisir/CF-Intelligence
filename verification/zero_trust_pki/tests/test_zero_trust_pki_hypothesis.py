@@ -30,7 +30,7 @@ def test_property_abac_tenant_isolation(bank_id: str, target_bank: str):
 
 
 def generate_hypothesis_report():
-    report_md = """# Hypothesis Property-Based Testing Report — Zero Trust PKI & ABAC
+    report_md = """# Hypothesis Property-Based Testing Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

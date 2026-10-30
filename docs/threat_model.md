@@ -144,7 +144,7 @@ mindmap
 
 **Mitigation**: Differential privacy with ($\epsilon, \delta$)-guarantees provides formal bounds on membership inference advantage. With $\epsilon=1.0$, the adversary's advantage is bounded by $e^\epsilon \approx 2.72\times$ over random guessing.
 
-**Empirical Security Validation (`MIAuditor` — `mia_auditor.py`)**: Formal Yeom et al. (2018) loss-threshold oracle and Zhu et al. (2019) DLG cosine-similarity proxy evaluated across three DP regimes (`experiments/privacy/mia_results.json`):
+**Empirical Security Validation (`MIAuditor` - `mia_auditor.py`)**: Formal Yeom et al. (2018) loss-threshold oracle and Zhu et al. (2019) DLG cosine-similarity proxy evaluated across three DP regimes (`experiments/privacy/mia_results.json`):
 
 | DP Regime | $\sigma$ | $\epsilon$ | MIA ASR | MIA Advantage | DLG Alarm Rate |
 |:--- |:---:|:---:|:---:|:---:|:---:|
@@ -275,7 +275,7 @@ With default settings (ε=1.0, δ=1e-5) over 10 rounds:
 
 ---
 
-## 6. Gap Analysis — Simulator vs Production
+## 6. Gap Analysis - Simulator vs Production
 
 | Security Property | Simulator | Production Target |
 |---|---|---|
@@ -288,7 +288,7 @@ With default settings (ε=1.0, δ=1e-5) over 10 rounds:
 | Audit logging & Vulnerability Audits | **SHA-256 Cryptographic Hash Chain Ledger** ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) | Tamper-evident audit trail + Real-time vulnerability scanning |
 | Key management & Secrets | **HashiCorp Vault KV v2 Secret Engine Client** | HSM-backed key infrastructure / HashiCorp Vault |
 
-This gap analysis is intentional — the simulator demonstrates the concepts and simulates hardware constraints. Production deployment requires hardening each layer.
+This gap analysis is intentional - the simulator demonstrates the concepts and simulates hardware constraints. Production deployment requires hardening each layer.
 
 ---
 
@@ -317,6 +317,9 @@ The security configuration maps against the following **ASVS Level 2** controls,
     *   *1.1.2 (Threat Modeling):* **Secure.** Detailed trust boundaries and data flow assets defined within this threat model document.
 *   **V2 Authentication Verification Requirements:**
     *   *2.10.1 (API Key Management):* **Partial.** API Gateway supports salted token checks but relies on environment configurations rather than dynamic vault storage.
+*   **Consortium Development Sandbox Boundaries (`LOCAL_HTTP_SANDBOX`):**
+    *   The single-host Docker consortium deployment (`docker-compose.consortium.yml`) operates as a local development sandbox on a shared bridge network (`cfi-consortium-net`).
+    *   *Truthful Demarcation:* It simulates independent banking institutions (`bank_a`, `bank_b`, `bank_c`) using containerized processes and sovereign file-mounted key custody (`0600` permissions), but does NOT provide physical multi-cloud network isolation or hardware security (HSM) enclaves. Production banking deployments require independent physical or VPC-isolated infrastructure.
 *   **V3 Session Management Verification Requirements:**
     *   *3.4.1 (State Isolation):* **Secure.** Replicated stateless tasks and Redis session layers prevent cross-tenant memory leakage.
 *   **V5 Input Validation, Security Gate, and Parameter Handling:**
@@ -334,19 +337,19 @@ The security configuration maps against the following **ASVS Level 2** controls,
 
 Adversarial ML risks are audited against the **MITRE ATLAS** (Adversarial Threat Landscape for Artificial-Intelligence Systems) matrix:
 
-*   **AML.TA0001 — Reconnaissance (Active/Passive):**
+*   **AML.TA0001 - Reconnaissance (Active/Passive):**
     *   *Technique:* AML.T0002 (Identify Sensitive Data). An attacker attempts to discover transaction fields by intercepting weights.
     *   *Mitigation:* Salted one-way HMAC entity masking prevents reverse lookup of raw PII elements.
-*   **AML.TA0002 — Initial Access:**
+*   **AML.TA0002 - Initial Access:**
     *   *Technique:* AML.T0006 (Compromise Client Node). Adversary compromises Bank C's local trainer process.
     *   *Mitigation:* Aggregation coordinator operates outside the trust boundaries of individual clients, utilizing sandboxed PyTorch execution threads.
-*   **AML.TA0003 — Execution:**
+*   **AML.TA0003 - Execution:**
     *   *Technique:* AML.T0009 (User Execution of Malicious Model). Promoting a compromised global model to downstream banks.
     *   *Mitigation:* **Canary Evaluation** blocks promotion of poisoned weight updates if validation performance drops.
-*   **AML.TA0005 — Defense Evasion:**
+*   **AML.TA0005 - Defense Evasion:**
     *   *Technique:* AML.T0015 (Poisoning Attack). Scaling adversarial gradient weights to bypass FedAvg averages.
     *   *Mitigation:* **Krum** Byzantine-robust aggregation isolates the outlier updates, neutralizing poisoning attempts.
-*   **AML.TA0009 — Exfiltration:**
+*   **AML.TA0009 - Exfiltration:**
     *   *Technique:* AML.T0024 (Model Inversion). Reconstructing training distribution records.
     *   *Mitigation:* **Differential Privacy** adds calibrated Gaussian noise, mathematically bounding reconstruction success probability.
 
@@ -406,7 +409,7 @@ The `CoordinatorService` introduces a dynamic network control plane with its own
 **Threat**: A compromised bank node queries `/negotiate` with falsified hardware specifications (e.g., claiming 64GB CUDA) to receive full training parameters while running on an under-provisioned CPU node, causing gradient staleness and aggregation divergence.
 
 **Mitigations**:
-* **Server-Side Capability Store**: Hardware capability is stored server-side at registration time. The negotiate endpoint reads from the registry — the client cannot alter its stored hardware profile via the negotiate query.
+* **Server-Side Capability Store**: Hardware capability is stored server-side at registration time. The negotiate endpoint reads from the registry - the client cannot alter its stored hardware profile via the negotiate query.
 * **Parameter Validation**: Batch size and epoch values are clamped server-side regardless of reported hardware.
 
 ### 11.4 Client Dropout & Quorum Attack (Elevation of Privilege)
@@ -720,6 +723,7 @@ The Production Training Provenance and Execution Authority subsystem ([`backend/
 | **Elevation of Privilege** | Serving revoked model via warm-cache desynchronization | Redis Sentinel Pub/Sub instantaneous cross-worker model cache invalidation |
 | **Elevation of Privilege** | Replayed internal authority context for model demotion | Scoped `TrustedInternalContext` + `DurableNonceStore` atomic nonce consumption |
 | **Tampering** | Stale worker race conditions during Kafka streaming ingestion | Redis 3-state idempotency reservations with `owner_id` verification via Lua script |
+| **Denial of Service** | Redis connection drops & transient network partition | Dynamic auto-reconnect with 1s cooldown (_attempt_auto_reconnect), graceful ephemeral in-memory degradation, and automatic return to durable persistence |
 
 
 

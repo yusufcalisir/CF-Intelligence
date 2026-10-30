@@ -1,4 +1,4 @@
-# Verification Inventory — FederatedLearningEngine Subsystem
+# Verification Inventory - FederatedLearningEngine Subsystem
 
 This document provides a comprehensive scientific audit and verification inventory of the `FederatedLearningEngine` module and its associated value objects, server optimizers, Byzantine defenses, privacy mechanisms, and simulation utilities.
 

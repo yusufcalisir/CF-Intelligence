@@ -1,4 +1,4 @@
-"""Redis cache layer — Phase 35.2.
+"""Redis cache layer.
 
 Redis is the CACHE layer, not the primary data store.
 PostgreSQL (via repositories) is the single source of truth.
@@ -57,7 +57,7 @@ class CacheService:
 
     If Redis is unavailable on any operation the exception is swallowed
     and the caller falls back to the database.  This keeps every cache
-    interaction optional — the system stays correct without Redis.
+    interaction optional - the system stays correct without Redis.
     """
 
     _instance: CacheService | None = None
@@ -105,7 +105,7 @@ class CacheService:
                     retry_on_timeout=False,
                 )
             except Exception as exc:
-                logger.warning("Redis client creation failed: %s — cache disabled", exc)
+                logger.warning("Redis client creation failed: %s - cache disabled", exc)
                 self.__class__._unavailable = True
                 self.__class__._last_unavailable_at = time.monotonic()
         return self.__class__._client
@@ -222,7 +222,7 @@ class CacheService:
         return await self._get(f"alerts:bank:{bank_id}")
 
     async def set_bank_alert_list(self, bank_id: str, data: list[dict]) -> None:
-        """Cache bank alert list (short TTL — invalidated on each new alert)."""
+        """Cache bank alert list (short TTL - invalidated on each new alert)."""
         await self._set(f"alerts:bank:{bank_id}", data, TTL_ALERT_LIST)
 
     # ── Case cache ─────────────────────────────────────────────────────
@@ -400,7 +400,7 @@ class CacheService:
                         acquired = True
                         break
                 except Exception as exc:
-                    logger.debug("Redis distributed lock error key=%s: %s — falling back to in-memory lock", lock_key, exc)
+                    logger.debug("Redis distributed lock error key=%s: %s - falling back to in-memory lock", lock_key, exc)
                     self.__class__._unavailable = True
                     redis_failed = True
                     break

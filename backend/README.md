@@ -27,28 +27,28 @@ The engine coordinates privacy-preserving machine learning and collaborative ant
                                                  │
                                                  ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 1. PRESENTATION LAYER (46 Routers, WebSocket Managers, CLI)                                    │
+│ 1. PRESENTATION LAYER (47 Routers, WebSocket Managers, CLI)                                    │
 │    • simulations, alerts, cases, banks, graph, coordinator, privacy_defense, gateway, health   │
 │    • OpenAPI 3.1 Enriched Specification (/docs, /redoc, /scalar, /openapi.json)                │
 └────────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                                  │
                                                  ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 2. APPLICATION LAYER (79 Services & Pipeline Coordinators)                                     │
+│ 2. APPLICATION LAYER (87 Services & Pipeline Coordinators)                                     │
 │    • SimulationService, FLEngine, DirichletPartitioner, CaseService, AlertService              │
 │    • ExplainabilityService, FlinkStreaming, AMLCopilot, RegulatoryReporter, FeatureService     │
 └────────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                                  │
                                                  ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 3. DOMAIN LAYER (48 Modules: Entities, Value Objects, Mathematical Invariants)                 │
+│ 3. DOMAIN LAYER (54 Domain Units: Entities, Value Objects, Mathematical Invariants)            │
 │    • ByzantineDefenses (Krum, Bulyan, Trimmed Mean), AI Act Compliance, SAR Generator          │
 │    • Fuzzy PSI, MinHash LSH, QuorumManager, RiskEngine, RealtimeExplainer                      │
 └────────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                                  │
                                                  ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 4. INFRASTRUCTURE LAYER (33 Security Modules, Persistence Repositories, Messaging)             │
+│ 4. INFRASTRUCTURE LAYER (36 Security Drivers, Persistence Repositories, Messaging)             │
 │    • Security: FHE, TEE Sandbox Driver, HSM Key Service, ZK-SNARK Verifier, RDP Accountant     │
 │    • Persistence: RedisStore (RLock fallbacks), PostgreSQL/asyncpg, SQLite, Database Repos     │
 │    • Messaging: Kafka Consumers, Celery Workers, EventBus, WebhookDispatcher                   │
@@ -62,7 +62,7 @@ The engine coordinates privacy-preserving machine learning and collaborative ant
 The backend codebase strictly follows the **Ports & Adapters (Clean Architecture)** design pattern:
 
 ### 2.1 Presentation Layer (`app/presentation/`)
-- **46 API Routers**: Modular FastAPI endpoints covering simulation orchestration, case management, alert workflows, graph queries, regulatory reporting, and identity resolution.
+- **47 API Routers**: Modular FastAPI endpoints covering simulation orchestration, case management, alert workflows, graph queries, regulatory reporting, and identity resolution.
 - **Streaming WebSockets**: Real-time telemetry broadcasting training metrics, round convergence, and live AML incident notifications.
 - **OpenAPI 3.1 & Interactive Documentation**: Enriched interactive API documentation available at:
   - Swagger UI: `http://localhost:8000/docs`
@@ -86,7 +86,7 @@ The backend codebase strictly follows the **Ports & Adapters (Clean Architecture
 - **Zero Framework Couplings**: Pure Python domain entities and value objects containing zero dependencies on FastAPI, databases, or network drivers.
 
 ### 2.4 Infrastructure Layer (`app/infrastructure/`)
-- **Advanced Cryptography & Security (33 modules)**:
+- **Advanced Cryptography & Security (36 security components)**:
   - Differential Privacy: Renyi Differential Privacy (`RDPAccountant`), Gaussian noise calibration, and $L_2$ gradient clipping.
   - Trusted Execution Environments: `TEEDriver` with software emulation transparency.
   - Zero-Knowledge & Verification: `ZKSNARKVerifier`, Shamir secret sharing, and immutable cryptographic hash chains.
@@ -226,5 +226,5 @@ pytest tests/unit/test_runtime_truth_invariants.py -v
 pytest tests/integration/test_system_integration_reality.py -v
 
 # Run Byzantine robust aggregation unit tests
-pytest tests/benchmarks/test_byzantine_benchmark.py -v
+pytest tests/unit/test_byzantine_canonical_protocol.py tests/unit/test_byzantine_correctness.py -v
 ```

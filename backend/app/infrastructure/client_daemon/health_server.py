@@ -1,4 +1,4 @@
-"""Lightweight HTTP Health Status Server — Section 41.1."""
+"""Lightweight HTTP Health Status Server - Section 41.1."""
 
 from __future__ import annotations
 

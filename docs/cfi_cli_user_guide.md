@@ -215,7 +215,32 @@ cfi-cli deploy --target-version v2.2.0
 
 ---
 
-## 4. Bank Onboarding & Integration Sandbox CLI (`scripts/cfi_cli.py`)
+## 4. Multi-Bank Consortium Deployment & Operational Scripts
+
+For reproducible deployment of the integrated 10-service consortium sandbox (`docker-compose.consortium.yml`):
+
+### 4.1. `python scripts/generate_consortium_deployment_secrets.py`
+Generates independent cryptographic material and isolated credentials for all 10 containers:
+```bash
+# Generate secrets (fails closed if secrets exist unless --force is supplied)
+python scripts/generate_consortium_deployment_secrets.py --force
+```
+- Generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, and `GATEWAY_INTERNAL_SECRET`.
+- Generates sovereign Ed25519 signing keys (`0600` POSIX permissions) for Bank A, Bank B, and Bank C matching daemons in `.secrets/worker_bank_*.key`.
+
+### 4.2. `python scripts/bootstrap_consortium_deployment.py`
+Registers consortium institutional tenants and provisions analyst/compliance accounts:
+```bash
+# Bootstrap users (use --allow-credential-rotation to update existing passwords)
+python scripts/bootstrap_consortium_deployment.py --allow-credential-rotation
+```
+
+### 4.3. `docker compose -f docker-compose.consortium.yml up -d`
+Launches the complete 10-service sandbox topology in isolated local bridge network.
+
+---
+
+## 5. Bank Onboarding & Integration Sandbox CLI (`scripts/cfi_cli.py`)
 
 The self-service onboarding tool in [`scripts/cfi_cli.py`](../scripts/cfi_cli.py) provides pre-flight checks for bank IT infrastructure teams.
 
@@ -315,7 +340,7 @@ python scripts/cfi_cli.py sandbox run --transactions 5000
 
 ---
 
-## 5. Institutional Operator Workflows (Day-0, Day-1, Day-2)
+## 6. Institutional Operator Workflows (Day-0, Day-1, Day-2)
 
 ```
 [ Day-0: Pre-Flight Sandbox ] ──► [ Day-1: Production Onboarding ] ──► [ Day-2: SRE Maintenance ]
@@ -344,7 +369,7 @@ python scripts/cfi_cli.py sandbox run --transactions 5000
 
 ---
 
-## 6. Troubleshooting & Error Recovery Playbook
+## 7. Troubleshooting & Error Recovery Playbook
 
 | Error Signature | Root Cause | Operator Remediation |
 |---|---|---|
@@ -356,7 +381,7 @@ python scripts/cfi_cli.py sandbox run --transactions 5000
 
 ---
 
-## 7. Automated Test Verification Matrix
+## 8. Automated Test Verification Matrix
 
 All CLI subcommands, argument parsers, diagnostic SHA-256 signing routines, and network mocks are covered by automated unit and integration tests:
 
@@ -369,7 +394,7 @@ All CLI subcommands, argument parsers, diagnostic SHA-256 signing routines, and 
 
 ---
 
-## 8. Related Architectural & Operational References
+## 9. Related Architectural & Operational References
 
 * **Bank Onboarding & Integration Architecture:** [`docs/bank_onboarding_guide.md`](bank_onboarding_guide.md)
 * **Production Infrastructure & Vault HSM:** [`docs/production_infrastructure.md`](production_infrastructure.md)

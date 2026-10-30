@@ -1,15 +1,15 @@
 """Sanctions & PEP Screening API Router (Phase 108).
 
 Endpoints:
-- POST   /api/v1/screening/watchlists          — load watchlist entries
-- GET    /api/v1/screening/watchlists/counts   — counts per source
-- POST   /api/v1/screening/screen              — screen single entity
-- GET    /api/v1/screening/results             — list results (alerted/source filter)
-- GET    /api/v1/screening/results/{id}        — get full result
-- POST   /api/v1/screening/results/{id}/goodlist        — goodlist a hit
-- POST   /api/v1/screening/results/{id}/disposition     — update hit disposition
-- POST   /api/v1/screening/bulk-rescreen       — portfolio re-screening
-- GET    /api/v1/screening/metrics             — aggregate metrics
+- POST   /api/v1/screening/watchlists          - load watchlist entries
+- GET    /api/v1/screening/watchlists/counts   - counts per source
+- POST   /api/v1/screening/screen              - screen single entity
+- GET    /api/v1/screening/results             - list results (alerted/source filter)
+- GET    /api/v1/screening/results/{id}        - get full result
+- POST   /api/v1/screening/results/{id}/goodlist        - goodlist a hit
+- POST   /api/v1/screening/results/{id}/disposition     - update hit disposition
+- POST   /api/v1/screening/bulk-rescreen       - portfolio re-screening
+- GET    /api/v1/screening/metrics             - aggregate metrics
 
 All endpoints also available under /v1/screening for compatibility.
 """

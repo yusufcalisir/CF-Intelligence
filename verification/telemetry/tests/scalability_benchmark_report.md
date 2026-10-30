@@ -1,4 +1,4 @@
-# Benchmark & Scalability Evaluation Report — Telemetry Subsystem
+# Benchmark & Scalability Evaluation Report - Telemetry Subsystem
 
 **Audited Modules:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`  
 **Test Script:** `scratch/telemetry_benchmark_scalability.py`  
@@ -45,7 +45,7 @@ Metric recording latency (`TelemetryRegistry.record_inference_latency()`) was ev
 
 | Benchmark Parameter | Observed Value | Performance SLA | Status |
 |:---|:---:|:---:|:---:|
-| **Total Iterations** | $50,000$ calls | — | — |
+| **Total Iterations** | $50,000$ calls | - | - |
 | **Total Execution Time** | $23.50\,\text{ms}$ | $< 100.0\,\text{ms}$ | ✅ **MET** |
 | **Per-Call Collection Latency** | **$0.470\,\mu\text{s}$ / call** | $< 5.0\,\mu\text{s}$ | ✅ **EXCEEDED** |
 | **Metric Recording Throughput** | **$2,128,013$ calls / sec** | $> 100,000$ calls/sec | ✅ **EXCEEDED** |
@@ -126,4 +126,4 @@ The telemetry subsystem introduces negligible latency overhead, consuming less t
 
 ---
 
-*End of Benchmark & Scalability Evaluation Report — Telemetry Subsystem*
+*End of Benchmark & Scalability Evaluation Report - Telemetry Subsystem*

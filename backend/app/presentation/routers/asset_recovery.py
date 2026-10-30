@@ -1,4 +1,4 @@
-"""Asset Recovery & Collaborative FININT Operational Hub — REST Router.
+"""Asset Recovery & Collaborative FININT Operational Hub - REST Router.
 
 Exposes the operational ROI metrics and MTTR analytics for the SaaS
 investigation dashboard and live telemetry card.

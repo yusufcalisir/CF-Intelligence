@@ -1,4 +1,4 @@
-# Security & Threat Model Review — Smart Contracts Subsystem
+# Security & Threat Model Review - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

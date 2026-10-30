@@ -1,4 +1,4 @@
-# Performance, Latency, & Asymptotic Complexity Benchmark Report — FederatedLearningEngine
+# Performance, Latency, & Asymptotic Complexity Benchmark Report - FederatedLearningEngine
 
 ## Executive Summary
 

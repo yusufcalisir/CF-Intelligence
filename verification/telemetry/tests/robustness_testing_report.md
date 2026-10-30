@@ -1,4 +1,4 @@
-# Robustness & Fault Injection Report — Telemetry & Observability Subsystem
+# Robustness & Fault Injection Report - Telemetry & Observability Subsystem
 
 **Module:** Telemetry Registry, OpenTelemetry Tracer, SIEM Log Exporter, SLA Monitor, Tenant Metering, Diagnostic Compiler, Health Probes  
 **Audited Code Files:** `telemetry/__init__.py`, `otel_tracer.py`, `siem_exporter.py`, `sla_monitor.py`, `tenant_metering.py`, `support_diagnostics.py`, `health.py`  
@@ -136,4 +136,4 @@ Zero Crash Verification:                          VERIFIED (0 Unhandled Exceptio
 
 ---
 
-*End of Robustness & Fault Injection Report — Telemetry & Observability Subsystem*
+*End of Robustness & Fault Injection Report - Telemetry & Observability Subsystem*

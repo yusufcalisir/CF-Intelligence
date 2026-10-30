@@ -140,7 +140,7 @@ def _cleanup_pytorch_memory() -> None:
 
 
 class FraudFlowerClient(fl.client.NumPyClient):
-    """Flower NumPyClient wrapping our ModelService — defined at top-level for Ray serialization."""
+    """Flower NumPyClient wrapping our ModelService - defined at top-level for Ray serialization."""
 
     def __init__(
         self,
@@ -247,7 +247,7 @@ class FraudFlowerClient(fl.client.NumPyClient):
 
 
 class CallbackFedAvg(fl.server.strategy.FedAvg):
-    """FedAvg strategy that fires progress callbacks after each round — defined at top-level."""
+    """FedAvg strategy that fires progress callbacks after each round - defined at top-level."""
 
     def __init__(
         self,

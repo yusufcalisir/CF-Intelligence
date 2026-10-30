@@ -802,7 +802,7 @@ export default function ObservabilityPage() {
           <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-500/5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
-                <span className="truncate">🌸 Flower FL Framework — Serverless P2P Peer Mesh Topology</span>
+                <span className="truncate">🌸 Flower FL Framework - Serverless P2P Peer Mesh Topology</span>
               </h3>
               <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
                 ⚡ SERVERLESS P2P MESH (NO CENTRAL SERVER)
@@ -840,7 +840,7 @@ export default function ObservabilityPage() {
           <div className="glass-card p-5 space-y-4 border border-emerald-500/30 bg-emerald-500/5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
-                <span className="truncate">⚡ Apache Flink — Sub-Second Real-Time Graph Streaming Engine</span>
+                <span className="truncate">⚡ Apache Flink - Sub-Second Real-Time Graph Streaming Engine</span>
               </h3>
               <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto font-mono">
                 ● SUB-SECOND SLA (&lt; 50ms PROCESSING LATENCY)

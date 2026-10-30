@@ -1,1 +1,1 @@
-"""Presentation layer — API routers and WebSocket handlers."""
+"""Presentation layer - API routers and WebSocket handlers."""

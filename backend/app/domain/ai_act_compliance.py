@@ -29,12 +29,12 @@ logger = logging.getLogger(__name__)
 # EU AI Act Article Coverage Constants
 # ---------------------------------------------------------------------------
 
-ARTICLE_10 = "Article 10 — Data Governance & Dataset Management"
-ARTICLE_11 = "Article 11 — Technical Documentation"
-ARTICLE_12 = "Article 12 — Record-Keeping & Audit Log Integrity"
-ARTICLE_13 = "Article 13 — Transparency & Information to Users"
-ARTICLE_14 = "Article 14 — Human Oversight"
-ARTICLE_15 = "Article 15 — Accuracy, Robustness & Cybersecurity"
+ARTICLE_10 = "Article 10 - Data Governance & Dataset Management"
+ARTICLE_11 = "Article 11 - Technical Documentation"
+ARTICLE_12 = "Article 12 - Record-Keeping & Audit Log Integrity"
+ARTICLE_13 = "Article 13 - Transparency & Information to Users"
+ARTICLE_14 = "Article 14 - Human Oversight"
+ARTICLE_15 = "Article 15 - Accuracy, Robustness & Cybersecurity"
 
 REGULATION_REFERENCE = "Regulation (EU) 2024/1689 of the European Parliament and of the Council"
 
@@ -158,7 +158,7 @@ class EUAIActComplianceEngine:
         self.consortium_size = consortium_size
 
     # -----------------------------------------------------------------------
-    # Article 10 — Data Governance & Dataset Management
+    # Article 10 - Data Governance & Dataset Management
     # -----------------------------------------------------------------------
 
     def assess_article_10_data_governance(self) -> ArticleAssessment:
@@ -183,7 +183,7 @@ class EUAIActComplianceEngine:
         if self.fl_rounds_completed < 1:
             compliant = False
             findings.append(
-                "No FL training rounds completed — dataset processing cannot be verified."
+                "No FL training rounds completed - dataset processing cannot be verified."
             )
 
         return ArticleAssessment(
@@ -201,7 +201,7 @@ class EUAIActComplianceEngine:
         )
 
     # -----------------------------------------------------------------------
-    # Article 11 — Technical Documentation
+    # Article 11 - Technical Documentation
     # -----------------------------------------------------------------------
 
     def assess_article_11_technical_documentation(self) -> ArticleAssessment:
@@ -212,7 +212,7 @@ class EUAIActComplianceEngine:
         if not self.hyperparams_sha256:
             compliant = False
             findings.append(
-                "Hyperparameter SHA-256 hash not provided — technical documentation incomplete."
+                "Hyperparameter SHA-256 hash not provided - technical documentation incomplete."
             )
 
         if self.consortium_size < 1:
@@ -234,7 +234,7 @@ class EUAIActComplianceEngine:
         )
 
     # -----------------------------------------------------------------------
-    # Article 12 — Record-Keeping & Audit Log Integrity
+    # Article 12 - Record-Keeping & Audit Log Integrity
     # -----------------------------------------------------------------------
 
     def assess_article_12_record_keeping(self) -> ArticleAssessment:
@@ -245,12 +245,12 @@ class EUAIActComplianceEngine:
         if not self.audit_log_sha256:
             compliant = False
             findings.append(
-                "FL round audit log SHA-256 hash not provided — record-keeping incomplete."
+                "FL round audit log SHA-256 hash not provided - record-keeping incomplete."
             )
 
         if self.fl_rounds_completed < 1:
             compliant = False
-            findings.append("No FL rounds recorded — audit log cannot be verified.")
+            findings.append("No FL rounds recorded - audit log cannot be verified.")
 
         return ArticleAssessment(
             article=ARTICLE_12,
@@ -266,7 +266,7 @@ class EUAIActComplianceEngine:
         )
 
     # -----------------------------------------------------------------------
-    # Article 13 — Transparency & Information to Users
+    # Article 13 - Transparency & Information to Users
     # -----------------------------------------------------------------------
 
     def assess_article_13_transparency(self) -> ArticleAssessment:
@@ -277,7 +277,7 @@ class EUAIActComplianceEngine:
         if not self.explainability_method:
             compliant = False
             findings.append(
-                "No explainability method specified — transparency requirements not met."
+                "No explainability method specified - transparency requirements not met."
             )
 
         return ArticleAssessment(
@@ -285,7 +285,7 @@ class EUAIActComplianceEngine:
             compliant=compliant,
             evidence={
                 "explainability_method": self.explainability_method or "NOT_PROVIDED",
-                "risk_tier": "Financial AI — Proactive Alignment with Articles 9–15 (Annex III §5(b) Fraud Detection Carve-Out Noted)",
+                "risk_tier": "Financial AI - Proactive Alignment with Articles 9–15 (Annex III §5(b) Fraud Detection Carve-Out Noted)",
                 "user_information_format": "Human-readable fraud alert with SHAP feature attribution scores",
                 "transparency_standard": "GDPR Article 22 + EU AI Act Article 13 combined disclosure",
             },
@@ -293,7 +293,7 @@ class EUAIActComplianceEngine:
         )
 
     # -----------------------------------------------------------------------
-    # Article 14 — Human Oversight
+    # Article 14 - Human Oversight
     # -----------------------------------------------------------------------
 
     def assess_article_14_human_oversight(self) -> ArticleAssessment:
@@ -321,7 +321,7 @@ class EUAIActComplianceEngine:
         )
 
     # -----------------------------------------------------------------------
-    # Article 15 — Accuracy, Robustness & Cybersecurity
+    # Article 15 - Accuracy, Robustness & Cybersecurity
     # -----------------------------------------------------------------------
 
     def assess_article_15_accuracy_robustness(self) -> ArticleAssessment:
@@ -412,7 +412,7 @@ class EUAIActComplianceEngine:
         cert_hash = hashlib.sha256(signed_doc.encode("utf-8")).hexdigest()
 
         logger.info(
-            "Generated compliance certificate %s for model %s — overall_compliant=%s, cert_hash=%s",
+            "Generated compliance certificate %s for model %s - overall_compliant=%s, cert_hash=%s",
             cert_id,
             self.model_version,
             overall_compliant,

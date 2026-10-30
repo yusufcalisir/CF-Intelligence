@@ -48,7 +48,7 @@ def assert_finite(val: float, name: str) -> None:
 # =====================================================================
 
 def test_gex1_nan_risk_score_in_alert():
-    """GEX1: NaN alert risk_score — must not crash or return NaN breakdown scores."""
+    """GEX1: NaN alert risk_score - must not crash or return NaN breakdown scores."""
     alert = Alert(
         id="alt_nan_01",
         risk_score=float("nan"),
@@ -66,7 +66,7 @@ def test_gex1_nan_risk_score_in_alert():
 
 
 def test_gex2_nan_feature_values_in_shap():
-    """GEX2: NaN feature values in compute_shap_values — must fail-closed deterministically (INV-C/INV-08)."""
+    """GEX2: NaN feature values in compute_shap_values - must fail-closed deterministically (INV-C/INV-08)."""
     txn_dict = {
         "transaction_amount": float("nan"),
         "velocity": float("nan"),
@@ -81,14 +81,14 @@ def test_gex2_nan_feature_values_in_shap():
 # =====================================================================
 
 def test_gex3_positive_infinity_amount():
-    """GEX3a: +Inf transaction_amount — must fail-closed deterministically (INV-C/INV-08)."""
+    """GEX3a: +Inf transaction_amount - must fail-closed deterministically (INV-C/INV-08)."""
     txn_dict = {"transaction_amount": float("inf"), "velocity": 5.0}
     with pytest.raises(ValueError, match="Feature 'transaction_amount' contains non-finite value: inf"):
         explainer_service.compute_shap_values(txn_dict)
 
 
 def test_gex3_negative_infinity_risk_score():
-    """GEX3b: -Inf alert risk_score — successfully handled post-remediation (BUG-EX-01 fixed)."""
+    """GEX3b: -Inf alert risk_score - successfully handled post-remediation (BUG-EX-01 fixed)."""
     alert = Alert(
         id="alt_inf_01",
         risk_score=float("-inf"),
@@ -103,7 +103,7 @@ def test_gex3_negative_infinity_risk_score():
 
 
 def test_gex7_malformed_feature_data_types():
-    """GEX7: Malformed string amount — must fail-closed deterministically without coercion (INV-D/INV-09)."""
+    """GEX7: Malformed string amount - must fail-closed deterministically without coercion (INV-D/INV-09)."""
     txn_dict = {
         "transaction_amount": "invalid_string_1000",
         "velocity": [1, 2, 3],
@@ -118,7 +118,7 @@ def test_gex7_malformed_feature_data_types():
 # =====================================================================
 
 def test_gex8_extreme_floating_point_values():
-    """GEX8: Extreme values (1e308) in compute_shap_values — must not overflow."""
+    """GEX8: Extreme values (1e308) in compute_shap_values - must not overflow."""
     txn_dict = {
         "transaction_amount": 1e308,
         "velocity": 1e-308,
@@ -135,7 +135,7 @@ def test_gex8_extreme_floating_point_values():
 # =====================================================================
 
 def test_gex9_empty_category_strings_realtime():
-    """GEX9: Empty string merchant_category in explain_realtime_score — no exception."""
+    """GEX9: Empty string merchant_category in explain_realtime_score - no exception."""
     attributions = fast_explainer.explain_realtime_score(
         amount=100.0, velocity_1h=1, merchant_category="", risk_score=0.1
     )
@@ -143,7 +143,7 @@ def test_gex9_empty_category_strings_realtime():
 
 
 def test_gex10_empty_feature_vector_list_realtime():
-    """GEX10: Empty list [] passed as feature_vector to compute_shap — returns fallback attributions."""
+    """GEX10: Empty list [] passed as feature_vector to compute_shap - returns fallback attributions."""
     res = fast_explainer.compute_shap("tx_empty_01", [])
     assert res["status"] == "COMPLETED"
     assert isinstance(res["shap_values"], list)
@@ -154,7 +154,7 @@ def test_gex10_empty_feature_vector_list_realtime():
 # =====================================================================
 
 def test_gex11_path_traversal_transaction_id():
-    """GEX11: Transaction ID with path traversal `../../etc/passwd` — sanitized key in Redis/cache."""
+    """GEX11: Transaction ID with path traversal `../../etc/passwd` - sanitized key in Redis/cache."""
     res = fast_explainer.compute_shap("../../etc/passwd", {"amount": 500.0})
     assert res["transaction_id"] == "../../etc/passwd"
     assert res["status"] == "COMPLETED"
@@ -165,7 +165,7 @@ def test_gex11_path_traversal_transaction_id():
 # =====================================================================
 
 def test_gex12_non_existent_gnn_node():
-    """GEX12: Non-existent node_id in explain_gnn_embedding — safely returns zero-edge isolated report."""
+    """GEX12: Non-existent node_id in explain_gnn_embedding - safely returns zero-edge isolated report."""
     gnn_rpt = explainer_service.explain_gnn_embedding("non_existent_node_99999")
     assert gnn_rpt.node_id == "non_existent_node_99999"
     assert len(gnn_rpt.top_contributing_edges) == 0
@@ -178,7 +178,7 @@ def test_gex12_non_existent_gnn_node():
 # =====================================================================
 
 def test_gex13_target_score_higher_than_original():
-    """GEX13: Target score higher than original alert score — is_cleared must be True."""
+    """GEX13: Target score higher than original alert score - is_cleared must be True."""
     alert = Alert(
         id="alt_cf_01",
         risk_score=200.0,
@@ -193,7 +193,7 @@ def test_gex13_target_score_higher_than_original():
 
 
 def test_gex14_extreme_low_target_score():
-    """GEX14: Target score = 0.0 — counterfactuals clamp remediated score to min 50.0."""
+    """GEX14: Target score = 0.0 - counterfactuals clamp remediated score to min 50.0."""
     alert = Alert(
         id="alt_cf_02",
         risk_score=800.0,

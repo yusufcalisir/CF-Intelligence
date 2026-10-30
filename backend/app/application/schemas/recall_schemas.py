@@ -154,7 +154,7 @@ class InitiateRecallRequest(BaseModel):
 
 
 class PositiveResolutionRequest(BaseModel):
-    """Request to resolve a recall positively (funds returned — pacs.004)."""
+    """Request to resolve a recall positively (funds returned - pacs.004)."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -175,7 +175,7 @@ class PositiveResolutionRequest(BaseModel):
 
 
 class NegativeResolutionRequest(BaseModel):
-    """Request to resolve a recall negatively (unable to return — camt.029)."""
+    """Request to resolve a recall negatively (unable to return - camt.029)."""
 
     model_config = ConfigDict(extra="ignore")
 

@@ -1,4 +1,4 @@
-﻿# Scientific Verification Roadmap — Secure Aggregation & TEE Subsystem
+﻿# Scientific Verification Roadmap - Secure Aggregation & TEE Subsystem
 
 This document defines the 5-phase scientific verification roadmap for validating the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem.
 

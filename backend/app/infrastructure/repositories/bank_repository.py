@@ -1,4 +1,4 @@
-"""Bank repository — persistence for bank configurations."""
+"""Bank repository - persistence for bank configurations."""
 
 from __future__ import annotations
 

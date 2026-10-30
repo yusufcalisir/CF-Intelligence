@@ -1,4 +1,4 @@
-"""Pilot Operations API Router — Governed Two-Bank Pilot Lifecycle & Kill Switch.
+"""Pilot Operations API Router - Governed Two-Bank Pilot Lifecycle & Kill Switch.
 
 Exposes REST APIs for controlled pilot operations:
 - Multi-prefix: /api/v1/pilots and /v1/pilots

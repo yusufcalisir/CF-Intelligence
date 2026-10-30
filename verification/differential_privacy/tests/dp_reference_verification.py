@@ -215,7 +215,7 @@ def generate_report(results: dict[str, Any]):
     report_path = Path(__file__).parent / "dp_reference_verification_report.md"
 
     lines = [
-        "# Independent Mathematical Reference Verification Report — Differential Privacy Subsystem",
+        "# Independent Mathematical Reference Verification Report - Differential Privacy Subsystem",
         "",
         "## Executive Summary",
         "",

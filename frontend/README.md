@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-06B6D4.svg?style=flat&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Vitest Passing](https://img.shields.io/badge/tests-373%2F373_passing-success.svg?style=flat&logo=vitest&logoColor=white)](https://vitest.dev)
+[![Vitest Passing](https://img.shields.io/badge/tests-400%2F400_passing-success.svg?style=flat&logo=vitest&logoColor=white)](https://vitest.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
 This directory contains the production-grade **Enterprise Fraud Intelligence Web Console & Commercial Dashboard** for the **Collaborative Fraud Intelligence (CF-Intelligence)** platform. Built with React 19, TypeScript, and Vite, the frontend delivers a high-performance, real-time user interface for fraud analysts, compliance officers, and consortium operators.
@@ -29,6 +29,7 @@ frontend/
 ├── e2e-visual/                    # Playwright visual regression baseline tests
 ├── e2e-responsive/                # Viewport responsive layout regression tests
 ├── e2e-a11y/                      # Axe-core automated accessibility compliance tests
+├── e2e-consortium/                # Playwright multi-bank consortium analyst workflow verification suites
 │
 └── src/
     ├── main.tsx                   # Application entry point & React root mount
@@ -40,7 +41,7 @@ frontend/
     │   ├── queries.ts             # TanStack React Query hooks for REST endpoints
     │   └── types.ts               # TypeScript schemas synchronized with backend Pydantic models
     │
-    ├── pages/                     # 19 Enterprise Commercial Console Views
+    ├── pages/                     # 23 Enterprise Commercial Console Views
     │   ├── LandingPage.tsx        # High-converting SaaS landing page & interactive capability demo
     │   ├── Dashboard.tsx          # Executive overview & multi-bank consortium KPI telemetry
     │   ├── LiveOperationsView.tsx # Real-time transaction streaming terminal & scoring inspector
@@ -59,7 +60,11 @@ frontend/
     │   ├── PoliciesPage.tsx       # Dynamic AML risk policy rule manager & threshold tuning
     │   ├── PsiPage.tsx            # Private Set Intersection (Fuzzy PSI) cross-bank entity lookup
     │   ├── SimulationView.tsx     # Multi-bank round orchestrator & live simulation launcher
-    │   └── ScenariosPage.tsx      # Pre-packaged fraud typology attack scenario simulator
+    │   ├── ScenariosPage.tsx      # Pre-packaged fraud typology attack scenario simulator
+    │   ├── ConsortiumPage.tsx     # Multi-bank consortium status, institutional topology & participation health
+    │   ├── CounterfactualPage.tsx # Counterfactual explainability analysis & feature perturbation playground
+    │   ├── PilotOperationsPage.tsx# Production pilot operations manager, deployment canary stages & member rollouts
+    │   └── PilotDetailPage.tsx    # Granular pilot deployment audit, live canary telemetry & rollback triggers
     │
     ├── components/                # Modular UI Design System
     │   ├── layout/                # Responsive layout primitives (Header, Sidebar, Layout)
@@ -110,18 +115,18 @@ The frontend enforces strict quality gates across multiple testing dimensions:
 │                     FRONTEND VERIFICATION PIPELINE                     │
 │                                                                        │
 │   [ Vitest Suite ]       [ TypeScript Engine ]     [ ESLint Engine ]   │
-│   (373 / 373 Tests)      (tsc -b Clean Build)      (0 Errors)          │
+│   (400 / 400 Tests)      (tsc -b Clean Build)      (0 Errors)          │
 │          │                         │                        │          │
 │          └─────────────────────────┼────────────────────────┘          │
 │                                    ▼                                   │
 │                     ┌─────────────────────────────┐                    │
 │                     │ Vite Production Bundle Pass │                    │
-│                     │ (3,109 Modules Transformed) │                    │
+│                     │  (3,122 Assets Compiled)    │                    │
 │                     └─────────────────────────────┘                    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-* **Vitest Unit & Component Suite**: 373 tests across 87 test files validating UI rendering, hook state lifecycles, and API query client contracts.
+* **Vitest Unit & Component Suite**: 400 tests across 91 test files validating UI rendering, hook state lifecycles, and API query client contracts.
 * **Static Type Checking**: `tsc -b` runs with zero compilation errors across all source files and test suites.
 * **Production Linting**: `eslint .` enforces zero errors across React Hooks, JSX syntax, and TypeScript invariants.
 * **End-to-End Playwright Automation**: Multi-device viewport validation (Desktop 1440, Laptop 1280), visual snapshot regression, and Axe-core accessibility compliance.

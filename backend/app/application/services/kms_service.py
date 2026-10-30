@@ -9,10 +9,10 @@ and are never shared across tenants.  The system-level coordinator has its own
 key namespace (``storage/kms/system/``).
 
 Key types managed:
-    * HMAC keys   — used for privacy-preserving entity hashing
-    * PSI exponents — Diffie-Hellman private scalars for Private Set Intersection
-    * Aggregation mask seeds — seed bytes for secure aggregation mask generation
-    * Envelope encryption keys — AES-256 Fernet multi-version keys for stored payload encryption
+    * HMAC keys   - used for privacy-preserving entity hashing
+    * PSI exponents - Diffie-Hellman private scalars for Private Set Intersection
+    * Aggregation mask seeds - seed bytes for secure aggregation mask generation
+    * Envelope encryption keys - AES-256 Fernet multi-version keys for stored payload encryption
 """
 
 from __future__ import annotations

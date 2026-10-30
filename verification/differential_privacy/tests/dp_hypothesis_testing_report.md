@@ -1,4 +1,4 @@
-﻿# Property-Based Testing Report — Differential Privacy Subsystem
+﻿# Property-Based Testing Report - Differential Privacy Subsystem
 
 This document presents the empirical results of property-based testing on the Differential Privacy (DP), PETs, and Privacy Audit subsystem using the `Hypothesis` framework. Rather than testing fixed example values, property-based testing proves core mathematical invariants across hundreds of randomized parameter configurations, high-dimensional tensors ($d \le 2,000$), extreme floating point values, zero gradients, and multi-tenant keys.
 

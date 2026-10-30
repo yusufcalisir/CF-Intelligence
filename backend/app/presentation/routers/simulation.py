@@ -1293,7 +1293,7 @@ async def get_ai_act_report(
         "simulation_id": simulation_id,
         "report_type": "EU_AI_ACT_COMPLIANCE",
         "generated_at": timestamp,
-        "note": "Demo report — run a federated training simulation to generate a real report.",
+        "note": "Demo report - run a federated training simulation to generate a real report.",
         "regulation_version": "EU AI Act 2024/1689",
         "system_metadata": {
             "system_name": "CF-Intelligence Federated Fraud Detection",

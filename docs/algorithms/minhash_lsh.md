@@ -1,9 +1,9 @@
 # MinHash Locality-Sensitive Hashing (LSH) & Fuzzy PSI Specification
 
 ## 1. Executive Summary & Problem Framing
-In cross-bank financial crime investigation, independent financial institutions often need to identify whether a suspect entity—such as a mule account holder, shell company, fraudulent merchant, or stolen device identifier—is operating across institutional boundaries. Because banks operate under stringent banking secrecy, privacy regulations (GDPR Article 9, CCPA), and anti-trust laws, they cannot share unencrypted customer master data or raw transaction directories.
+In cross-bank financial crime investigation, independent financial institutions often need to identify whether a suspect entity-such as a mule account holder, shell company, fraudulent merchant, or stolen device identifier-is operating across institutional boundaries. Because banks operate under stringent banking secrecy, privacy regulations (GDPR Article 9, CCPA), and anti-trust laws, they cannot share unencrypted customer master data or raw transaction directories.
 
-Classical Diffie-Hellman Private Set Intersection (DH-PSI) enables exact string matching with zero leakage of non-intersecting sets. However, real-world financial fraud entities are deliberately obscured through:
+Classical Diffie-Hellman Private Set Intersection (DH-PSI) and production OpenMined PSI 2.0.6 (Curve25519 ECDH) enable exact string matching with zero leakage of non-intersecting sets. However, real-world financial fraud entities are deliberately obscured through:
 - Minor typos and phonetic alterations (e.g., `"Muller Logistics GmbH"` vs. `"Mueller Logistics GmbH"`).
 - Case variations and corporate legal suffix discrepancies (e.g., `"acme corp"` vs. `"ACME CORPORATION"`).
 - Word-order transpositions in personal names (e.g., `"John Alexander Smith"` vs. `"Smith John Alexander"`).

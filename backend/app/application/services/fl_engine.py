@@ -370,7 +370,7 @@ class FederatedLearningEngine:
                     raise ValueError(
                         f"Trimmed Mean theoretical precondition violated: n={n} <= 2*f={2 * f}"
                     )
-                # Not enough clients for trimming — fall back to plain mean
+                # Not enough clients for trimming - fall back to plain mean
                 logger.warning(
                     "Trimmed Mean: too few clients (%d <= 2*f=%d), falling back to FedAvg",
                     n,
@@ -539,7 +539,7 @@ class FederatedLearningEngine:
             # variate c ← c + (1/N) * Σ (c_i_new - c_i_old), but since we
             # don't receive per-client c_i deltas through the connector layer,
             # this server step degrades to a weighted FedAvg which is still
-            # correct — the client-side variate correction ensures drift is fixed.
+            # correct - the client-side variate correction ensures drift is fixed.
             proportions = _get_proportions(client_samples, len(client_weights))
             w_avg = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
@@ -800,7 +800,7 @@ class FederatedLearningEngine:
         poisoned = (honest_arr + noise).tolist()
 
         logger.warning(
-            "Applied model poisoning (scale=%.1f) — %d parameters corrupted",
+            "Applied model poisoning (scale=%.1f) - %d parameters corrupted",
             scale,
             len(poisoned),
         )
@@ -820,7 +820,7 @@ class FederatedLearningEngine:
         Supported defense types:
         - ``krum``: Keep only the single update closest to the cluster of honest clients.
         - ``coordinate_wise_median``: Return a synthetic weight equal to the
-          element-wise median — already handled by the aggregation step, so this
+          element-wise median - already handled by the aggregation step, so this
           path returns the full list unchanged to let aggregation do the work.
         - Any other value: no filtering, all weights returned.
 
@@ -910,7 +910,7 @@ class FederatedLearningEngine:
             return [client_weights[i] for i in honest_indices]
 
         # coordinate_wise_median and any unknown defense: return all weights
-        # unchanged — the aggregation method will apply robustness if configured.
+        # unchanged - the aggregation method will apply robustness if configured.
         return client_weights
 
     def aggregate_graph_parameters(

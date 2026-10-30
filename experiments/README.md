@@ -1,4 +1,4 @@
-# Collaborative Fraud Intelligence (CFI) — Scientific Experimentation Framework 🧪
+# Collaborative Fraud Intelligence (CFI) - Scientific Experimentation Framework 🧪
 
 This directory contains the authoritative research, empirical benchmark suites, ablation matrices, and cryptographic evaluation pipelines for the **Privacy-Preserving Cross-Bank Fraud Detection Platform (CF-Intelligence)**.
 

@@ -2,18 +2,18 @@
 
 Implements the ISO 20022 payment recall workflow endpoints:
 
-- POST   /api/v1/recalls                         — initiate camt.056 recall
-- GET    /api/v1/recalls                         — list recall cases
-- GET    /api/v1/recalls/{id}                    — retrieve full recall case
-- POST   /api/v1/recalls/{id}/send               — mark camt.056 as sent
-- POST   /api/v1/recalls/{id}/acknowledge        — record creditor agent ack
-- POST   /api/v1/recalls/{id}/hold               — trigger provisional hold
-- POST   /api/v1/recalls/{id}/resolve/positive   — pacs.004 funds returned
-- POST   /api/v1/recalls/{id}/resolve/negative   — camt.029 unable to recall
-- POST   /api/v1/recalls/{id}/cancel             — cancel recall
-- GET    /api/v1/recalls/{id}/audit-chain        — retrieve audit trail
-- GET    /api/v1/recalls/{id}/verify-chain       — verify hash chain integrity
-- GET    /api/v1/recalls/metrics                 — aggregate metrics
+- POST   /api/v1/recalls                         - initiate camt.056 recall
+- GET    /api/v1/recalls                         - list recall cases
+- GET    /api/v1/recalls/{id}                    - retrieve full recall case
+- POST   /api/v1/recalls/{id}/send               - mark camt.056 as sent
+- POST   /api/v1/recalls/{id}/acknowledge        - record creditor agent ack
+- POST   /api/v1/recalls/{id}/hold               - trigger provisional hold
+- POST   /api/v1/recalls/{id}/resolve/positive   - pacs.004 funds returned
+- POST   /api/v1/recalls/{id}/resolve/negative   - camt.029 unable to recall
+- POST   /api/v1/recalls/{id}/cancel             - cancel recall
+- GET    /api/v1/recalls/{id}/audit-chain        - retrieve audit trail
+- GET    /api/v1/recalls/{id}/verify-chain       - verify hash chain integrity
+- GET    /api/v1/recalls/metrics                 - aggregate metrics
 
 All endpoints are also available on /v1/recalls for compatibility.
 """
@@ -248,7 +248,7 @@ def _register_routes(r: APIRouter) -> None:  # noqa: C901
     @r.post(
         "/{case_id}/resolve/positive",
         response_model=RecallCaseResponse,
-        summary="Positive Recall Resolution — pacs.004 PaymentReturn",
+        summary="Positive Recall Resolution - pacs.004 PaymentReturn",
         description=(
             "Records a positive recall resolution: funds returned by creditor agent. "
             "Generates a conformant pacs.004.001.09 PaymentReturn XML. "
@@ -276,7 +276,7 @@ def _register_routes(r: APIRouter) -> None:  # noqa: C901
     @r.post(
         "/{case_id}/resolve/negative",
         response_model=RecallCaseResponse,
-        summary="Negative Recall Resolution — camt.029 ResolutionOfInvestigation",
+        summary="Negative Recall Resolution - camt.029 ResolutionOfInvestigation",
         description=(
             "Records that recall funds cannot be returned. "
             "Generates a conformant camt.029.001.09 ResolutionOfInvestigation XML. "

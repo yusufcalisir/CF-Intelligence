@@ -36,6 +36,17 @@ The Collaborative Fraud Intelligence (CFI) platform supports fully air-gapped, z
 
 ---
 
+## Offline Multi-Bank Consortium Sandbox Topology
+
+In offline bank consortium testbeds, the platform can be deployed via the self-contained 10-service compose profile:
+```bash
+docker compose -f docker-compose.consortium.yml up -d
+```
+- **Air-Gapped Bridge Isolation**: Services communicate via the offline bridge network (`cfi-consortium-net`) with zero external socket dependencies.
+- **Resilient Redis Caching**: If the local Redis instance disconnects, [redis_store.py](../backend/app/infrastructure/persistence/redis_store.py) falls back gracefully to in-memory caching (`durability="ephemeral"`). It retries reconnection every 1.0s, returning to `durability="durable"` once the cache container restarts without dropping inference requests.
+
+---
+
 ## Air-Gapped Bundle Structure & Manifest
 
 The [AirGapBundleBuilder](../backend/app/infrastructure/deployment/airgap_installer.py) generates deterministic, versioned deployment bundles with an immutable cryptographic manifest.

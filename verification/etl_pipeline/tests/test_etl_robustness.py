@@ -49,7 +49,7 @@ def test_robustness_parquet_export_directory_creation(tmp_path: Path):
 
 
 def generate_robustness_report():
-    report_md = """# Adversarial Robustness & Failure Injection Report — Real-World Fraud ETL Pipeline
+    report_md = """# Adversarial Robustness & Failure Injection Report - Real-World Fraud ETL Pipeline
 
 **Subsystem:** Real-World Fraud ETL Pipeline (`etl_service.py`)  
 **Date:** August 2026  

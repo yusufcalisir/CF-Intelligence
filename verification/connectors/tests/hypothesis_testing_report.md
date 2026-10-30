@@ -1,4 +1,4 @@
-# Property-Based Testing Report — Connector Framework
+# Property-Based Testing Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Codebase Files:** `app/application/interfaces/bank_connector.py`, `app/infrastructure/connectors/*`, `app/application/services/bank_onboarding_service.py`, `app/infrastructure/client_daemon/*`  
@@ -103,6 +103,6 @@ The Hypothesis property-based test suite confirms that the Connector Framework m
 
 ---
 
-*Property-Based Testing Report — Connector Framework*  
+*Property-Based Testing Report - Connector Framework*  
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*  
-*Version 1.0 — 2026-08-01*
+*Version 1.0 - 2026-08-01*

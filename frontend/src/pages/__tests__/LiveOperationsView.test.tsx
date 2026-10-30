@@ -183,7 +183,7 @@ describe('LiveOperationsView Component', () => {
 
     // Verify OFFLINE mode triggered
     expect(screen.getByText('OFFLINE')).toBeInTheDocument();
-    expect(screen.getByText(/Offline Demo Mode \(Connection Lost — Simulated\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Offline Demo Mode \(Connection Lost - Simulated\)/i)).toBeInTheDocument();
 
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -403,7 +403,7 @@ describe('LiveOperationsView Component', () => {
     // ROC curve and Training Loss charts are present (they do not require local_metrics)
     expect(screen.getByText(/ROC Curve - Federated Model/i)).toBeInTheDocument();
     expect(screen.getByText(/Training Loss Convergence/i)).toBeInTheDocument();
-    expect(screen.getByText(/Model Performance Comparison — All Banks/i)).toBeInTheDocument();
+    expect(screen.getByText(/Model Performance Comparison - All Banks/i)).toBeInTheDocument();
 
     // ConfusionMatrix and FeatureImportance are intentionally absent without simulation data:
     // they return null when local_metrics is null (no static fallback).

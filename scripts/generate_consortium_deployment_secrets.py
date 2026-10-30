@@ -209,7 +209,7 @@ def write_env_file(env_vars: dict[str, str], target_path: Path, force: bool = Fa
     ensure_safe_secret_file_target(target_path, force=force)
     lines = [
         "# ==============================================================================",
-        "# Cross-Bank Federated Intelligence (CFI) — Local Consortium Sandbox Secrets",
+        "# Cross-Bank Federated Intelligence (CFI) - Local Consortium Sandbox Secrets",
         "# Classification: SINGLE_HOST_DOCKER_SANDBOX (Not multi-institution HSM custody)",
         "# Generated automatically. DO NOT COMMIT OR LEAK THIS FILE.",
         "# ==============================================================================",

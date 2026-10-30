@@ -1,4 +1,4 @@
-"""Integration tests for Section 37.2: Gradient Transmission — Real SecAgg Wire Protocol."""
+"""Integration tests for Section 37.2: Gradient Transmission - Real SecAgg Wire Protocol."""
 
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ async def test_quorum_triggers_aggregation() -> None:
     assert ack2.received is True
     assert "Waiting for quorum" in ack2.status_message
 
-    # Submission 3 (3/3 — Quorum reached!)
+    # Submission 3 (3/3 - Quorum reached!)
     ack3 = await client.submit_gradient(
         round_id=round_id,
         bank_id="bank_3",

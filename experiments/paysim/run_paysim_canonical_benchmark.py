@@ -1,4 +1,4 @@
-"""PaySim Canonical Real-Data Benchmark — Centralized vs Federated Learning.
+"""PaySim Canonical Real-Data Benchmark - Centralized vs Federated Learning.
 
 Methodology:
     Dataset    : Real PaySim CSV (PS_20174392719_1491204439457_log.csv)
@@ -11,13 +11,13 @@ Methodology:
                  temporal split would introduce a 4x fraud-rate imbalance between
                  train and test (confirmed empirically), making PR-AUC
                  incomparable between splits.
-    Test set   : ~127k samples, ~179 fraud — statistically meaningful for PR-AUC.
+    Test set   : ~127k samples, ~179 fraud - statistically meaningful for PR-AUC.
     Partition  : Dirichlet alpha=0.5, 3 clients.
     Budget     : Centralized: num_rounds * local_epochs epochs over pooled data.
                  Federated: num_rounds rounds × local_epochs local epochs/client.
                  Both receive the same optimizer-step budget.
     Seeds      : 42, 123, 456 (model/training seeds, fixed data split seed=42).
-    Dataset mode: EXPLICIT — never falls back silently to synthetic data.
+    Dataset mode: EXPLICIT - never falls back silently to synthetic data.
 
 Usage:
     python experiments/paysim/run_paysim_canonical_benchmark.py
@@ -410,7 +410,7 @@ def train_centralized(
         loss = _train_epoch(model, X_train, y_train, optimizer, criterion, batch_size, device)
         _, metrics = evaluate(model, X_test, y_test, device=device)
         history.append({"epoch": ep, "train_loss": round(loss, 6), **{k: round(v, 6) for k, v in metrics.items()}})
-        logger.info("  [Central] Epoch %2d/%d — loss=%.4f PR-AUC=%.4f ROC-AUC=%.4f",
+        logger.info("  [Central] Epoch %2d/%d - loss=%.4f PR-AUC=%.4f ROC-AUC=%.4f",
                     ep, num_epochs, loss, metrics["pr_auc"], metrics["roc_auc"])
 
     _, final_metrics = evaluate(model, X_test, y_test, device=device)
@@ -499,7 +499,7 @@ def train_fedavg(
 
         _, metrics = evaluate(global_model, X_test, y_test, device=device)
         history.append({"round": r, **{k: round(v, 6) for k, v in metrics.items()}})
-        logger.info("  [FedAvg]  Round %2d/%d — PR-AUC=%.4f ROC-AUC=%.4f",
+        logger.info("  [FedAvg]  Round %2d/%d - PR-AUC=%.4f ROC-AUC=%.4f",
                     r, num_rounds, metrics["pr_auc"], metrics["roc_auc"])
 
     _, final_metrics = evaluate(global_model, X_test, y_test, device=device)
@@ -722,7 +722,7 @@ def run_canonical_benchmark(
                 "dataset_type": "synthetic_10_feature_fallback",
                 "rounds": 3,
                 "clients": 5,
-                "status": "ARCHIVED — produced when benchmarks/datasets/paysim/processed/ was missing",
+                "status": "ARCHIVED - produced when benchmarks/datasets/paysim/processed/ was missing",
             },
             "limited_30k_real": {
                 "fedavg_pr_auc": 0.11838,
@@ -730,7 +730,7 @@ def run_canonical_benchmark(
                 "dataset_type": "real_csv_first_30k_rows",
                 "nrows": 30000,
                 "test_fraud_count": 3,
-                "status": "ARCHIVED — test set had only 3 fraud examples; PR-AUC statistically unreliable",
+                "status": "ARCHIVED - test set had only 3 fraud examples; PR-AUC statistically unreliable",
                 "sha256_bug": "results.json recorded sha256('') (empty string hash) instead of real file hash",
             },
         },

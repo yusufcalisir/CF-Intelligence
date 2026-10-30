@@ -67,6 +67,8 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 * [`services/european_scenario_library.py`](../backend/app/application/services/european_scenario_library.py): 16 European AML Monitoring Scenarios & Hybrid Deterministic Rule Engine blending EBA/FATF typologies with federated machine learning and GNN anomaly embeddings.
 * [`services/model_registry.py`](../backend/app/application/services/model_registry.py): Manifest-backed enterprise model repository managing versioning, active symlinks, production admission validation, Four-Eyes dual control approvals (`DOMAIN_APPROVAL_SIGNOFF`), Canary Gates (PR-AUC / Recall@FPR thresholds), instant cross-worker cache invalidation via Redis pub/sub, secure deserialization (`weights_only=True`), and atomic disk writes (`tempfile.NamedTemporaryFile` + `os.replace`) to prevent partial read corruption.
 * [`services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py): Cryptographic training provenance authority managing asymmetric Ed25519 receipt signing and public-key verification (`TrainingReceiptVerifier`), domain separation token validation, feature schema hashing, canonical execution epoch verification, and trusted public key registry management with instant revocation.
+* [`services/isolated_matching_service.py`](../backend/app/application/services/isolated_matching_service.py): Multi-counterparty Private Set Intersection (PSI) service running OpenMined PSI 2.0.6 over Curve25519 ECDH across process-isolated bank worker nodes (`IsolatedBankWorkerNode`). Features Bloom filter intersection matching, authentic match evidence packaging (`CaseEvidenceAttachment`), and mTLS transport security configurations (`TransportSecurityConfig.HARDENED_MTLS`).
+* [`services/pilot_operations_service.py`](../backend/app/application/services/pilot_operations_service.py): Governed Two-Bank & Consortium Pilot Operations engine orchestrating the full pilot lifecycle (`DRAFT` $\to$ `PREFLIGHT` $\to$ `AWAITING_APPROVAL` $\to$ `AUTHORIZED` $\to$ `ACTIVE` $\to$ `PAUSED` $\to$ `COMPLETED`). Enforces preflight readiness probes (`CONSORTIUM_ACTIVE`, `OPERATIONAL_GRANT_VALID`, `INSTITUTIONAL_KEYS_ENROLLED`), strict operational grant identity binding, multi-party Ed25519 cryptographic approvals over canonical scope digest bytes, emergency kill-switch (`pause`/`resume`), query quotas, and tamper-evident audit dossier export.
 * [`services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py): Multi-process isolated federated training manager (`DistributedFederatedTrainingManager`), bank node private storage vault management (`BankPrivateStorageVault`) with exclusive OS-level file locking (`CreateFileW` with `dwShareMode=0` / `flock`), decoupled receipt signing authority interface (`IsolatedReceiptSigningAuthority`), and zero-parameter production enforcement.
 * [`services/operational_federation_service.py`](../backend/app/application/services/operational_federation_service.py): Production operational federation orchestrator executing genuine process-isolated bank worker nodes (`run_worker_node.py`) under Windows Restricted Tokens (`advapi32.CreateRestrictedToken`) or POSIX fork/unshare with server-side authority resolution, transactional row-locking in PostgreSQL (`PostgresTrainingJobAuthority`), asymmetric Ed25519 receipt verification, and inactive model admission gate registration into `ModelRegistryVault`.
 * [`services/connector_diagnostics_service.py`](../backend/app/application/services/connector_diagnostics_service.py): Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
@@ -87,7 +89,8 @@ Contains concrete implementations of adapters, persistence engines, cryptographi
 * [`security/security_headers.py`](../backend/app/infrastructure/security/security_headers.py): Comprehensive HTTP security headers (CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff) and strict CORS whitelist enforcement.
 * [`feature_store/`](../backend/app/infrastructure/feature_store): Low-latency online feature store (`redis_store.py`, `feast_store.py`) and rolling velocity/amount aggregators (<5ms retrieval).
 * [`disaster_recovery/`](../backend/app/infrastructure/disaster_recovery): Multi-region active-passive failover manager ([`region_failover.py`](../backend/app/infrastructure/disaster_recovery/region_failover.py), RTO < 30s, RPO = 0), continuous cryptographic backup verifier ([`backup_verifier.py`](../backend/app/infrastructure/disaster_recovery/backup_verifier.py), sub-5ms sandbox restore probes), and automated chaos DR drill runner ([`chaos_dr_drill.py`](../backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py)).
-* [`redis_store.py`](../backend/app/infrastructure/redis_store.py): Distributed coordination and state management adapter. In clustered deployments, interfaces with Redis Sentinel for high-availability caching, sliding-window rate limiting (`slowapi`), 3-state idempotency reservations (`ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `HIT`), and instant cross-worker model revocation pub/sub. In single-process development and standalone testing environments without Redis, gracefully routes operations to an in-memory dictionary backend truthfully labeled with single-process non-durability limitations (zero distributed multi-process coordination).
+* [`redis_store.py`](../backend/app/infrastructure/redis_store.py) & [`cache.py`](../backend/app/infrastructure/cache.py): Distributed coordination and state management adapter. In clustered deployments, interfaces with Redis for high-availability caching, sliding-window rate limiting (`slowapi`), 3-state idempotency reservations (`ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `HIT`), and instant cross-worker model revocation pub/sub. Features self-healing automatic reconnection (`_attempt_auto_reconnect` with 1.0s cooldown): gracefully falls back to an in-memory dictionary during transient outages (truthfully reporting `storage_backend="in_memory"`, `durability="ephemeral"`) and automatically re-establishes durable Redis persistence (`storage_backend="redis"`, `durability="durable"`) once connectivity is restored, eliminating permanent degraded latching.
+* [`institutional_identity.py`](../backend/app/domain/institutional_identity.py): Sovereign institutional identity and cryptographic verification registry (`InstitutionalVerificationRegistry`). Enforces non-overwrite enrollment for participant public keys, requires signed cryptographic key rotations (`rotate_public_key`), supports isolated file-mounted Ed25519 key custody (`WORKER_SIGNING_KEY_FILE`, `0600` permissions), and verifies canonical Ed25519 digital signatures across pilot approvals and matching evidence.
 * [`security/p2p_secagg_driver.py`](../backend/app/infrastructure/security/p2p_secagg_driver.py) & [`security/shamir_engine.py`](../backend/app/infrastructure/security/shamir_engine.py): Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 * [`security/pqc_secagg_driver.py`](../backend/app/infrastructure/security/pqc_secagg_driver.py): NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
 * [`security/layer2_crosschain_bridge.py`](../backend/app/infrastructure/security/layer2_crosschain_bridge.py): Chainlink CCIP `EVM2AnyMessage` and LayerZero V2 multi-ledger settlement bridge for Arbitrum, Optimism, Canton, and Hyperledger Fabric.
@@ -191,13 +194,13 @@ $$S(x) = 1000 \cdot \frac{\sum_{i=1}^M w_i \cdot \mathrm{clamp}(s_i(x), 0, 1)}{\
 | `behavioral_anomaly`| Biometric Session, Typing Cadence & Navigational Anomaly | $0.07$ | $[0.0, 1.0]$ |
 
 The composite scalar $S(x) \in [0.0, 1000.0]$ is partitioned into mutually exclusive, collectively exhaustive half-open intervals mapped directly to supervisory policy actions:
-- **MINIMAL** ($[0.0, 200.0)$): `ALLOW` — Frictionless automated settlement.
-- **LOW** ($[200.0, 400.0)$): `REQUIRE_MFA` — Step-up biometric / OTP authentication challenge.
-- **MEDIUM** ($[400.0, 600.0)$): `HOLD_FOR_REVIEW` — Asynchronous tier-1 analyst queue placement.
-- **HIGH** ($[600.0, 800.0)$): `HOLD_FOR_REVIEW` — Immediate transaction pause & priority AML queue hold.
+- **MINIMAL** ($[0.0, 200.0)$): `ALLOW` - Frictionless automated settlement.
+- **LOW** ($[200.0, 400.0)$): `REQUIRE_MFA` - Step-up biometric / OTP authentication challenge.
+- **MEDIUM** ($[400.0, 600.0)$): `HOLD_FOR_REVIEW` - Asynchronous tier-1 analyst queue placement.
+- **HIGH** ($[600.0, 800.0)$): `HOLD_FOR_REVIEW` - Immediate transaction pause & priority AML queue hold.
 - **CRITICAL** ($[800.0, 1000.0]$):
-  - If $S(x) \ge 900.0$: `BLOCK_TRANSACTION` — Hard inline gateway block & immediate asset freeze.
-  - If $800.0 \le S(x) < 900.0$: `ESCALATE_TO_SAR` — Immediate regulatory Suspicious Activity Report escalation.
+  - If $S(x) \ge 900.0$: `BLOCK_TRANSACTION` - Hard inline gateway block & immediate asset freeze.
+  - If $800.0 \le S(x) < 900.0$: `ESCALATE_TO_SAR` - Immediate regulatory Suspicious Activity Report escalation.
 
 ### 3.3 High-Performance Bidirectional gRPC Transport Layer
 ```
@@ -302,7 +305,7 @@ The parameter exchange pipeline (`backend/app/infrastructure/security/secure_par
 Prevents training round deadlocks caused by bank node network outages, maintenance windows, or latency spikes.
 
 ### 6.1 Asynchronous Federated Aggregation (`async_fl_engine.py`, `coordinator_service.py`)
-The `AsyncFLEngine` implements the **FedAsync** parameter update protocol (Xie et al., 2019). Fast bank nodes submit model updates immediately — without blocking on straggler nodes — using a staleness attenuation factor to preserve convergence quality.
+The `AsyncFLEngine` implements the **FedAsync** parameter update protocol (Xie et al., 2019). Fast bank nodes submit model updates immediately - without blocking on straggler nodes - using a staleness attenuation factor to preserve convergence quality.
 
 **Staleness Attenuation Functions** $(S(\tau))$:
 
@@ -329,7 +332,7 @@ where $\alpha_\tau = \eta \cdot S(\tau)$ is the learning rate weighted by stalen
 - **Memory Management:** Bounded update history buffer (`maxlen=500`) and round pruning (`prune_completed_rounds`) prevent heap accumulation.
 
 ### 6.2 Dynamic Quorum Timeout Manager (`quorum_manager.py`)
-The `DynamicQuorumManager` monitors real-time round submission progress across all registered bank nodes. It automatically triggers round aggregation as soon as the minimum quorum threshold is satisfied — without waiting for the target window to expire.
+The `DynamicQuorumManager` monitors real-time round submission progress across all registered bank nodes. It automatically triggers round aggregation as soon as the minimum quorum threshold is satisfied - without waiting for the target window to expire.
 
 **Quorum States:**
 | State | Condition |
@@ -350,23 +353,23 @@ The `DynamicQuorumManager` monitors real-time round submission progress across a
 ## 7. Spectral Anomaly Detection & Backdoor Poisoning Defense (`spectral_defense.py`)
 
 ### 7.1 Threat Model
-Targeted backdoor attacks attempt to inject a **low-rank gradient perturbation** into the federated aggregation process — malicious bank nodes submit parameter updates that are indistinguishable from legitimate updates in L2 norm, but align along a shared stealthy subspace designed to bypass fraud detection for specific money mule accounts.
+Targeted backdoor attacks attempt to inject a **low-rank gradient perturbation** into the federated aggregation process - malicious bank nodes submit parameter updates that are indistinguishable from legitimate updates in L2 norm, but align along a shared stealthy subspace designed to bypass fraud detection for specific money mule accounts.
 
 ### 7.2 SVD Spectral Projection Algorithm
 The `SpectralAnomalyDetector` applies Singular Value Decomposition to the stacked gradient matrix $G \in \mathbb{R}^{K \times d}$ (K clients, d parameters) before aggregation:
 
-**Step 1 — Stack gradient matrix:**
+**Step 1 - Stack gradient matrix:**
 $$G = \begin{bmatrix} \Delta w_1^T \\ \Delta w_2^T \\ \vdots \\ \Delta w_K^T \end{bmatrix}$$
 
-**Step 2 — Compute dominant right singular vector via power iteration:**
+**Step 2 - Compute dominant right singular vector via power iteration:**
 $$G = U \Sigma V^T \quad \Rightarrow \quad v_1 = \arg\max_{‖v‖=1} ‖Gv‖$$
 
-**Step 3 — Compute per-client spectral projection scores:**
+**Step 3 - Compute per-client spectral projection scores:**
 $$s_i = |\langle \Delta w_i, v_1 \rangle|^2$$
 
 Backdoor-poisoned updates inject a dominant low-rank perturbation that results in disproportionately large $s_i$ values, separating malicious clients from the honest majority.
 
-**Step 4 — Threshold detection:**
+**Step 4 - Threshold detection:**
 $$\theta = \mu_s + \tau \cdot \sigma_s$$
 $$\text{quarantine}(i) \iff s_i > \theta$$
 where $\tau$ = `spectral_threshold_multiplier` (default: 1.5), $\mu_s$ = mean score, $\sigma_s$ = standard deviation.
@@ -428,6 +431,18 @@ The platform implements multi-tenant database isolation informed by SOC 2 and PC
 - **Serializable Isolation & Retry Loop**: `run_cockroach_transaction()` handles SQLSTATE `40001` transaction conflicts with exponential retry loops.
 - **Alembic Schema Migrations**: Managed via [`alembic.ini`](../backend/alembic.ini), [`env.py`](../backend/app/infrastructure/database/migrations/env.py), and [`migration_manager.py`](../backend/app/infrastructure/database/migration_manager.py) for programmatic `upgrade_head()` / `downgrade_revision()` auto-migrations.
 
+### 8.4 Integrated 10-Service Multi-Bank Consortium Sandbox (`docker-compose.consortium.yml`)
+To evaluate multi-counterparty financial intelligence across independent institutional boundaries, the platform provides a 10-service Docker consortium deployment (`LOCAL_HTTP_SANDBOX`):
+- **Gateway & Web Ingress (`cfi-gateway`, `cfi-frontend`)**: Nginx reverse proxy routing port 80/443 to the React 19 SPA (port 3000) and backend FastAPI API (port 8000), implementing strict session epoching and in-flight request cancellation.
+- **Durable Core Services (`cfi-postgres`, `cfi-redis`, `cfi-consortium-migrations`)**: PostgreSQL 16 database, Alembic linear schema migrator, and Redis 7.2 coordination store with automatic reconnection after transient outages.
+- **Backend Application API (`cfi-api-server`)**: 44 modular REST routers with fail-closed tenant isolation (`enforce_tenant_isolation`), pilot governance lifecycle, and audit dossier generation.
+- **OpenMined PSI 2.0.6 Grid (`cfi-psi-coordinator`, `cfi-worker-bank-a`, `cfi-worker-bank-b`, `cfi-worker-bank-c`)**:
+  - Independent institutional worker containers representing Bank A (port 8100), Bank B (port 8101), and Bank C (port 8102).
+  - Isolated Ed25519 sovereign key custody files (`WORKER_SIGNING_KEY_FILE`, `0600` permissions).
+  - Genuine Private Set Intersection over Curve25519 ECDH via OpenMined PSI 2.0.6 with Bloom filter match dispatch.
+  - Authentic cryptographic match evidence packaging (`CaseEvidenceAttachment`) attached directly to investigation cases.
+  - Truthful failure reporting: counterparty worker container downtime returns `PARTIAL_FAILURE` without fabricating matching results.
+
 ---
 
 ## 9. Technology Stack & Directory Structure
@@ -485,8 +500,8 @@ The CFI Platform ships production Kubernetes workloads managed through a Helm 3 
 |:---|:---|
 | `Chart.yaml` | Chart metadata, semver versioning, bitnami dependency declarations |
 | `values.yaml` | Environment-agnostic defaults; override per-env via `-f values-prod.yaml` |
-| `templates/aggregator-deployment.yaml` | Central FL Aggregator — 2 replicas, gRPC + HTTP ports, HPA-enabled |
-| `templates/bank-node-deployment.yaml` | Bank Client Nodes — HSM secret mounts, conditional PKCS#11 env injection |
+| `templates/aggregator-deployment.yaml` | Central FL Aggregator - 2 replicas, gRPC + HTTP ports, HPA-enabled |
+| `templates/bank-node-deployment.yaml` | Bank Client Nodes - HSM secret mounts, conditional PKCS#11 env injection |
 | `templates/service.yaml` | ClusterIP services for both aggregator and bank-node |
 | `templates/ingress.yaml` | NGINX Ingress with TLS termination and gRPC backend annotation |
 | `templates/hpa-and-netpol.yaml` | HPA (`autoscaling/v2`) + Zero-Trust NetworkPolicy |
@@ -708,7 +723,7 @@ In legacy configurations, symmetric HMAC keys created an architectural flaw wher
 ### 14.5 Bank Node Private Storage Vaults & Physical OS Locks
 
 Bank node data sovereignty is enforced at the operating system level via [`BankPrivateStorageVault`](../backend/app/application/services/distributed_fl_service.py):
-- **Exclusive OS File Locking**: Vault files are locked using platform-native APIs—`kernel32.CreateFileW` with `dwShareMode=0` on Windows, and `fcntl.flock(LOCK_EX)` on POSIX—guaranteeing exclusive read/write access and preventing concurrent file access or race tampering by other processes.
+- **Exclusive OS File Locking**: Vault files are locked using platform-native APIs-`kernel32.CreateFileW` with `dwShareMode=0` on Windows, and `fcntl.flock(LOCK_EX)` on POSIX-guaranteeing exclusive read/write access and preventing concurrent file access or race tampering by other processes.
 - **Zero Raw Data Access**: The central coordinator process has zero filesystem access to raw bank transaction ledgers. Model training executes in dedicated worker processes (`DistributedFederatedTrainingManager`), which serialize only gradient/weight updates through secure aggregation pipelines.
 
 ---

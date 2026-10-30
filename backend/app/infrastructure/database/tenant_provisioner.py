@@ -1,4 +1,4 @@
-"""Automated Tenant Provisioner & Schema Migration Worker — Section 39.1."""
+"""Automated Tenant Provisioner & Schema Migration Worker - Section 39.1."""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ def _pg_quote_identifier(identifier: str) -> str:
     that cannot be passed as bind parameters (CREATE SCHEMA, GRANT, SET).
     Any embedded double-quote characters are escaped by doubling them.
 
-    The input MUST already have been validated by ``sanitize_bank_id`` — this
+    The input MUST already have been validated by ``sanitize_bank_id`` - this
     function is a belt-and-suspenders measure, not a primary sanitizer.
     """
     # Escape any embedded double-quotes (shouldn't exist after sanitize, but be safe)
@@ -136,7 +136,7 @@ class TenantProvisioner:
                     # 1. CREATE SCHEMA
                     await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {q_schema}"))
 
-                    # 2. CREATE ROLE if not exists (password is a bind parameter — never interpolated)
+                    # 2. CREATE ROLE if not exists (password is a bind parameter - never interpolated)
                     res = await conn.execute(
                         text("SELECT 1 FROM pg_roles WHERE rolname = :role_name"),
                         {"role_name": role_name},

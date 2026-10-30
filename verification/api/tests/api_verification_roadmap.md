@@ -1,4 +1,4 @@
-﻿# Scientific Verification Roadmap — API Subsystem
+﻿# Scientific Verification Roadmap - API Subsystem
 
 This document defines the complete scientific verification roadmap for the API subsystem. It maps every endpoint, middleware, and communication mechanism to its required verification methodologies and explains the scientific rationale for each testing strategy.
 

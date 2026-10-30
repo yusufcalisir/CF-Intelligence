@@ -1,4 +1,4 @@
-"""Federated Learning Coordinator Service — Section 41.2."""
+"""Federated Learning Coordinator Service - Section 41.2."""
 
 from __future__ import annotations
 

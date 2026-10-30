@@ -239,7 +239,7 @@ def format_report_markdown(metrics: LoadTestMetrics) -> str:
         return "✅ PASS" if val <= metrics.sla_threshold_ms else "❌ BREACHED"
 
     lines = [
-        "# Real-Time Scoring Gateway — Load & Latency SLA Verification Report",
+        "# Real-Time Scoring Gateway - Load & Latency SLA Verification Report",
         "",
         f"> **Test Execution Timestamp:** {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}  ",
         f"> **Status:** {sla_badge}  ",

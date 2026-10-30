@@ -433,13 +433,13 @@ class ByzantineDefenseEvaluator:
         all_weights = np.array(honest_weights + byzantine_weights)
         n = len(all_weights)
 
-        # 1. Standard FedAvg (Unweighted Mean) — highly vulnerable to poisoning
+        # 1. Standard FedAvg (Unweighted Mean) - highly vulnerable to poisoning
         w_fedavg = np.mean(all_weights, axis=0)
 
-        # 2. FedProx — proximal server aggregation without Byzantine filtering
+        # 2. FedProx - proximal server aggregation without Byzantine filtering
         w_fedprox = (np.mean(all_weights, axis=0) * 0.98).astype(np.float64)
 
-        # 3. Coordinate-wise Median — robust to extreme outlier coordinates
+        # 3. Coordinate-wise Median - robust to extreme outlier coordinates
         w_median = np.median(all_weights, axis=0)
 
         # 4. Coordinate-wise Trimmed Mean
@@ -461,7 +461,7 @@ class ByzantineDefenseEvaluator:
         best_krum_idx = int(np.argmin(krum_scores))
         w_krum = all_weights[best_krum_idx]
 
-        # 6. Bulyan (El Mhamdi et al., 2018) — Multi-Krum selection + coordinate-wise trimmed mean
+        # 6. Bulyan (El Mhamdi et al., 2018) - Multi-Krum selection + coordinate-wise trimmed mean
         # Iteratively selects candidate updates with minimal Krum scores, then trims coordinate extremes
         theta = max(1, n - 2 * f_byzantine)
         bulyan_candidates = list(range(n))

@@ -1,4 +1,4 @@
-# Independent Mathematical Reference Verification Report — Differential Privacy Subsystem
+# Independent Mathematical Reference Verification Report - Differential Privacy Subsystem
 
 ## Executive Summary
 

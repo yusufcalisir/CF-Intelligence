@@ -1,4 +1,4 @@
-# Scalability & Performance Benchmark Report — Connector Framework
+# Scalability & Performance Benchmark Report - Connector Framework
 
 **Subsystem:** Connector Framework & Bank Integration Adapters  
 **Audited Codebase Files:** `app/application/interfaces/bank_connector.py`, `app/infrastructure/connectors/*`, `app/application/services/bank_onboarding_service.py`, `app/infrastructure/client_daemon/*`  
@@ -111,4 +111,4 @@ Memory Consumption           10,000 In-Memory Events               2.59 MB
 
 ---
 
-*End of Scalability & Performance Benchmark Report — Connector Framework*
+*End of Scalability & Performance Benchmark Report - Connector Framework*

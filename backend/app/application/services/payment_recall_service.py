@@ -1,11 +1,11 @@
-"""SEPA Instant Payment Recall Service — ISO 20022 camt.056 / pacs.004 / camt.029.
+"""SEPA Instant Payment Recall Service - ISO 20022 camt.056 / pacs.004 / camt.029.
 
 Implements the full EPC SCT Inst payment recall workflow for compliance officers:
 
-- camt.056.001.08  FIToFIPaymentCancellationRequest — XML generator
-- pacs.004.001.09  PaymentReturn — positive recall resolution handler
-- camt.029.001.09  ResolutionOfInvestigation — negative/partial resolution handler
-- Provisional Hold — sub-second webhook callback to core banking rails
+- camt.056.001.08  FIToFIPaymentCancellationRequest - XML generator
+- pacs.004.001.09  PaymentReturn - positive recall resolution handler
+- camt.029.001.09  ResolutionOfInvestigation - negative/partial resolution handler
+- Provisional Hold - sub-second webhook callback to core banking rails
 
 Reason code SLAs (EPC SCT Inst Rulebook v1.1, Section 4.4):
     FRAD  → 4 business hours
@@ -541,7 +541,7 @@ class PaymentRecallService:
             action="CREDITOR_AGENT_ACKNOWLEDGED", message_type=RecallMessageType.CAMT_056,
         )
 
-    # ── Positive resolution — pacs.004 ────────────────────────────────────────
+    # ── Positive resolution - pacs.004 ────────────────────────────────────────
 
     def resolve_positive(
         self,
@@ -607,7 +607,7 @@ class PaymentRecallService:
         logger.info("Recall %s resolved positively: returned=%s status=%s", case_id, returned_amount_eur, new_status)
         return case
 
-    # ── Negative resolution — camt.029 ────────────────────────────────────────
+    # ── Negative resolution - camt.029 ────────────────────────────────────────
 
     def resolve_negative(
         self,

@@ -1,4 +1,4 @@
-# Verification Inventory & Artifact Registry — Zero Trust PKI & ABAC
+# Verification Inventory & Artifact Registry - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI & ABAC Infrastructure  
 **Date:** August 2026  

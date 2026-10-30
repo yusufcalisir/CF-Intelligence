@@ -24,6 +24,10 @@ To accelerate bank consortium onboarding, core banking connectivity, and SIEM in
 | `POST /api/v1/predict` | HTTP/1.1 | Bearer JWT / API Key | Full 9-signal composite risk inference with dynamic policy rule evaluation |
 | `POST /api/v1/predict/feedback` | HTTP/1.1 | Bearer JWT / API Key | Ground-truth fraud label ingestion into feedback loop with DP noise injection |
 | `POST /api/v1/psi/match` | HTTP/1.1 | mTLS + Bearer JWT | Privacy-Preserving Diffie-Hellman Private Set Intersection (DH-PSI) cross-bank mule detection (alias `/api/v1/entities/psi-match`) |
+| `POST /api/v1/cross-bank/investigate` | HTTP/1.1 | Bearer JWT | OpenMined PSI 2.0.6 (Curve25519 ECDH) multi-bank isolated matching grid |
+| `POST /api/v1/cases/{id}/evidence` | HTTP/1.1 | Bearer JWT | Attach verified cross-bank PSI match evidence to case file |
+| `POST /api/v1/pilots` | HTTP/1.1 | Bearer JWT | Provision controlled operational pilot with preflight health probes |
+| `POST /api/v1/pilots/{id}/approve` | HTTP/1.1 | Bearer JWT | Submit sovereign Ed25519 signature approval over scope challenge |
 | `POST /api/v1/entities/psi` | HTTP/1.1 | Bearer JWT | Cross-bank entity set intersection with fuzzy MinHash LSH matching |
 | `POST /api/v1/entities/fuzzy-resolve` | HTTP/1.1 | Bearer JWT | Resolve fuzzy entity names against consortium identity graph via MinHash LSH |
 | `POST /api/v1/entities/hmac-tokenize` | HTTP/1.1 | Bearer JWT | Tokenize raw identifiers into tenant-salted HMAC tokens enforcing Zero Raw PII |

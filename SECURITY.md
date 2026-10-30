@@ -48,6 +48,16 @@ The platform enforces non-negotiable security and privacy guarantees across all 
    - Hardware-anchored cryptographic protection enforcing the Zero-Disk and Zero-Process-Memory Private Key Invariant (`is_exportable = False`).
    - Digital signatures (RSA-PSS, ECDSA-P256, Ed25519) and Curve25519 / X25519 ECDH shared secret derivation are executed strictly within physical FIPS 140-2 Level 3 HSM enclaves (PKCS#11 / AWS CloudHSM) or HashiCorp Vault Transit engine boundaries.
    - Continuous automated mTLS 1.3 consortium certificate rotation monitoring (30-day proactive threshold) and X.509 SHA-256 peer thumbprint attestation ensure authentic institutional node identity across all inter-bank messaging channels.
+10. **Sovereign Worker Key Custody (POSIX 0600 File Permissions)**:
+    - Institutional bank worker matching daemons custody their private signing keys locally in `.secrets/worker_bank_*.key` with strict POSIX `0600` permissions.
+    - Private keys are loaded into isolated worker process memory only and are never transmitted over the wire or accessible by the central coordinator.
+11. **Browser Institutional Session Isolation & Epoch Lifecycle**:
+    - The web console executes `advanceInstitutionalSessionEpoch` upon login, logout, or institutional tenant switch, instantly aborting in-flight fetch queries and purging cached React Query state.
+    - Sensitive case drafts and evidence verify `__cached_tenant_id` before hydrating `sessionStorage`, wiping mismatched records to prevent cross-tenant client-side data bleed.
+12. **Dynamic Auto-Reconnecting State & Durability Truthfulness**:
+    - The Redis caching layer in `redis_store.py` dynamically handles connection severances via auto-reconnection backoff (`_RECONNECT_COOLDOWN_SECONDS = 1.0`), gracefully degrading to in-memory caching while advertising `durability="ephemeral"` via `/health`, and returning to `durability="durable"` once connectivity resumes.
+13. **Consortium Development Sandbox Demarcation (`LOCAL_HTTP_SANDBOX`)**:
+    - The integrated 10-service environment (`docker-compose.consortium.yml`) operates as a single-host development sandbox on a local bridge network (`cfi-consortium-net`). It is formally classified as `LOCAL_HTTP_SANDBOX` and does not claim physical multi-cloud HSM enclaves or multi-datacenter isolation.
 
 ---
 
@@ -141,9 +151,10 @@ To demonstrate our appreciation for responsible researchers who help protect the
 
 For technical specifications, testing boundaries, and automated audit proofs, refer to:
 
-- [Penetration Testing Scope & Rules of Engagement](docs/security/pentest_scope.md) — Authorized endpoints, in-scope interfaces, and testing constraints.
-- [SOC 2 Type II Controls Matrix](docs/security/soc2_type2_controls_matrix.md) — Trust Services Criteria implementations and automated verification proofs.
-- [Enterprise Incident Response Playbook](docs/incident_response_playbook.md) — 24/7 on-call escalation, P0–P4 runbooks, and recovery protocols.
-- [Master Threat Model & Attack Surface](docs/threat_model.md) — Formal STRIDE/DREAD threat evaluations.
-- [Perimeter WAF Guard Implementation](backend/app/infrastructure/security/perimeter_waf.py) — WAF rule definitions and payload filters.
-- [Immutable Cryptographic Audit Chain](backend/app/infrastructure/security/immutable_audit_chain.py) — Append-only SHA-256 block hash chaining.
+- [Penetration Testing Scope & Rules of Engagement](docs/security/pentest_scope.md) - Authorized endpoints, in-scope interfaces, and testing constraints.
+- [SOC 2 Type II Controls Matrix](docs/security/soc2_type2_controls_matrix.md) - Trust Services Criteria implementations and automated verification proofs.
+- [Enterprise Incident Response Playbook](docs/incident_response_playbook.md) - 24/7 on-call escalation, P0–P4 runbooks, and recovery protocols.
+- [Master Threat Model & Attack Surface](docs/threat_model.md) - Formal STRIDE/DREAD threat evaluations.
+- [Consortium Security & Transport Hardening Suite](backend/tests/unit/test_consortium_security_and_transport_hardening.py) - Automated test verification for Redis auto-reconnect, 0600 key custody, and session epoch invalidation.
+- [Perimeter WAF Guard Implementation](backend/app/infrastructure/security/perimeter_waf.py) - WAF rule definitions and payload filters.
+- [Immutable Cryptographic Audit Chain](backend/app/infrastructure/security/immutable_audit_chain.py) - Append-only SHA-256 block hash chaining.

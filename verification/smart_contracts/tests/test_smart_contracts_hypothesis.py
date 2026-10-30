@@ -90,7 +90,7 @@ def test_property_quarantined_node_payout_zero(reason: str):
 
 
 def generate_hypothesis_report():
-    report_md = """# Hypothesis Property-Based Testing Report — Smart Contracts Subsystem
+    report_md = """# Hypothesis Property-Based Testing Report - Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement (`ConsortiumIncentiveSettlement.sol`)  
 **Date:** August 2026  

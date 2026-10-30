@@ -1,4 +1,4 @@
-﻿# Production Engineering & Reliability Evaluation — API Subsystem
+﻿# Production Engineering & Reliability Evaluation - API Subsystem
 
 This document provides an in-depth production engineering evaluation of the API subsystem. It analyzes 9 core architectural pillars: request consistency, error handling, response determinism, validation correctness, retry safety, idempotency, logging, observability, and backward compatibility.
 

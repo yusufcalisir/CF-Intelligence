@@ -1,4 +1,4 @@
-﻿# Scientific Verification Roadmap — Audit Logging Subsystem
+﻿# Scientific Verification Roadmap - Audit Logging Subsystem
 
 This document defines the 5-phase master scientific verification roadmap for the Audit Logging implementation. It specifies exact empirical methodologies across unit testing, contract verification, property-based testing, fault injection, adversarial security, performance benchmarking, and compliance validation.
 

@@ -1,4 +1,4 @@
-# Pure-Python Reference Verification Report — Zero Trust PKI & ABAC
+# Pure-Python Reference Verification Report - Zero Trust PKI & ABAC
 
 **Subsystem:** Zero Trust PKI, mTLS & ABAC Infrastructure  
 **Date:** August 2026  

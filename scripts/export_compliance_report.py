@@ -54,7 +54,7 @@ def _resolve_signing_key(env_var: str, hex_key: str | None) -> bytes:
         except ValueError:
             return raw.encode("utf-8")
 
-    # Default insecure dev key — warns loudly
+    # Default insecure dev key - warns loudly
     print(
         "WARNING: No signing key provided via --signing-key-hex or "
         f"${env_var}. Using insecure development key. DO NOT use in production.",

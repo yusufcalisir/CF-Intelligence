@@ -13,7 +13,7 @@
 * **Guarantees Provided:**
   - Raw adjacency topology and transaction edge records are never serialized or transmitted over gRPC/REST APIs.
   - Neighbor sampling indexes stay local to PyTorch sparse tensor multiplications during training.
-* **Evaluation:** 🟢 **SUPPORTED** — Absolute local data boundary.
+* **Evaluation:** 🟢 **SUPPORTED** - Absolute local data boundary.
 
 ---
 
@@ -24,7 +24,7 @@
 * **Guarantees Provided:**
   - Prevents direct gradient or parameter leakage of local bank fraud label distributions.
   - Only inductive graph representation weights participate in FedAvg parameter aggregation.
-* **Evaluation:** 🟢 **SUPPORTED** — Classifier head parameters remain strictly local to each bank.
+* **Evaluation:** 🟢 **SUPPORTED** - Classifier head parameters remain strictly local to each bank.
 
 ---
 
@@ -35,7 +35,7 @@
 * **Guarantees Provided:**
   - Perturbs raw vector coordinates before exposing embeddings via external APIs.
   - Maintains $L_2$ unit-sphere norm invariant ($\|\hat{\mathbf{h}}^{\text{DP}}\|_2 = 1.0$) for downstream similarity search.
-* **Evaluation:** 🟢 **SUPPORTED** — Calibrated DP noise protects vector outputs against exact coordinate extraction.
+* **Evaluation:** 🟢 **SUPPORTED** - Calibrated DP noise protects vector outputs against exact coordinate extraction.
 
 ---
 
@@ -46,7 +46,7 @@
 * **Mitigation Mechanisms Implemented:**
   1. Gaussian noise injection in `get_all_embeddings()` corrupts small pairwise distances used in graph structure recovery algorithms.
   2. Query rate-limiting budget (`max_query_budget = 100`) in `find_similar_entities()` blocks automated boundary probing and membership triangulation.
-* **Evaluation:** 🟢 **SUPPORTED** — Differential Privacy noise and query rate-limiting significantly elevate the computational complexity of graph reconstruction attacks.
+* **Evaluation:** 🟢 **SUPPORTED** - Differential Privacy noise and query rate-limiting significantly elevate the computational complexity of graph reconstruction attacks.
 
 ---
 
@@ -57,7 +57,7 @@
 * **Guarantees Provided:**
   - Prevents parameter alignment corruption caused by mismatched client layer configurations.
   - Exact weighted linear combination over representation weight spaces.
-* **Evaluation:** 🟢 **SUPPORTED** — Parameter aggregation logic is mathematically exact and structurally validated.
+* **Evaluation:** 🟢 **SUPPORTED** - Parameter aggregation logic is mathematically exact and structurally validated.
 
 ---
 
@@ -68,7 +68,7 @@
 * **Behavior under Heterogeneity:**
   - FedAvg aggregates weight matrices across non-IID local graphs. While representation layers synchronize, local feature distribution skew across banks can induce representation drift.
   - Subgraphs with zero fraud nodes ($y_v = 0, \forall v$) optimize local feature projections without gradient collapse via BCELoss log-stability handling.
-* **Evaluation:** 🟡 **PARTIALLY SUPPORTED** — Handles numerical heterogeneity safely; optimal non-IID representation alignment requires domain-adversarial loss or anchor node calibration.
+* **Evaluation:** 🟡 **PARTIALLY SUPPORTED** - Handles numerical heterogeneity safely; optimal non-IID representation alignment requires domain-adversarial loss or anchor node calibration.
 
 ---
 

@@ -1,4 +1,4 @@
-# Reference Verification & Specification Compliance Report — Audit Logging Subsystem
+# Reference Verification & Specification Compliance Report - Audit Logging Subsystem
 
 ## Executive Summary
 

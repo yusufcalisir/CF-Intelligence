@@ -280,7 +280,7 @@ def test_robustness_13_classifier_head_isolation():
 
 
 def test_robustness_14_production_dp_noise_guard():
-    """ROBUSTNESS 14: Production DP Noise Guard — dp_noise=False raises RuntimeError in production.
+    """ROBUSTNESS 14: Production DP Noise Guard - dp_noise=False raises RuntimeError in production.
 
     When APP_ENV=production, disabling DP noise on get_all_embeddings() must be
     rejected with RuntimeError to prevent raw embedding export (topology reconstruction risk).

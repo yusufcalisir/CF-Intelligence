@@ -1,4 +1,4 @@
-"""Simulation repository — persistence for simulation runs.
+"""Simulation repository - persistence for simulation runs.
 
 Handles conversion between domain entities and ORM models.
 Manages commits at the repository boundary (simpler for this project;

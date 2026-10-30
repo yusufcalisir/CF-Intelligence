@@ -1,15 +1,15 @@
 """Enterprise Open AML OpenAPI Adapter Router (Phase 110).
 
 Exposes standard European / International AML OpenAPI specifications:
-- POST /api/v2/persons (and /api/v1/persons) — Ingest Individual or Corporate Legal Entity
-- GET  /api/v2/persons/{person_id} — Lookup registered person profile
-- POST /api/v1/persons/{person_id}/transactions — Ingest customer transaction
-- POST /api/v1/transactions/{transaction_id}/monitoring-checks — Real-time online/offline monitoring
-- POST /api/v1/persons/{person_id}/screening-checks — Screen registered customer
-- POST /api/v2/screening-searches — Ad-hoc multi-watchlist fuzzy search
-- POST /api/v1/aml-adapter/webhooks/subscriptions — Subscribe to webhook events
-- GET  /api/v1/aml-adapter/webhooks/events — Audit recent webhook dispatches
-- GET  /api/v1/aml-adapter/metrics — Adapter throughput and latency telemetry
+- POST /api/v2/persons (and /api/v1/persons) - Ingest Individual or Corporate Legal Entity
+- GET  /api/v2/persons/{person_id} - Lookup registered person profile
+- POST /api/v1/persons/{person_id}/transactions - Ingest customer transaction
+- POST /api/v1/transactions/{transaction_id}/monitoring-checks - Real-time online/offline monitoring
+- POST /api/v1/persons/{person_id}/screening-checks - Screen registered customer
+- POST /api/v2/screening-searches - Ad-hoc multi-watchlist fuzzy search
+- POST /api/v1/aml-adapter/webhooks/subscriptions - Subscribe to webhook events
+- GET  /api/v1/aml-adapter/webhooks/events - Audit recent webhook dispatches
+- GET  /api/v1/aml-adapter/metrics - Adapter throughput and latency telemetry
 """
 
 from __future__ import annotations

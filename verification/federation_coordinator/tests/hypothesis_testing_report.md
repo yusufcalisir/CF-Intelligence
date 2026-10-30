@@ -1,4 +1,4 @@
-# Property-Based Testing Report — Federation Coordinator Subsystem
+# Property-Based Testing Report - Federation Coordinator Subsystem
 
 **Module:** `coordinator_service.py`, `servicer.py`  
 **Test Suite:** `scratch/test_federation_coordinator_hypothesis.py`  
