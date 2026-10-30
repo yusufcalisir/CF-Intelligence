@@ -1,7 +1,11 @@
 import { useState, useEffect, useContext } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
 import { useRealTimeFraudStream } from '../../hooks/useRealTimeFraudStream';
-import { apiClient, formatApiError } from '../../api/client';
+import {
+  apiClient,
+  formatApiError,
+  advanceInstitutionalSessionEpoch,
+} from '../../api/client';
 import { Activity, Radio, ShieldCheck, LogIn, LogOut } from 'lucide-react';
 
 interface HeaderProps {
@@ -48,7 +52,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
         }
         if (rawUser) {
           setSessionUser(JSON.parse(rawUser) as SessionUserProfile);
-          return;
         }
         const { data } = await apiClient.get<SessionUserProfile>('/api/v1/auth/me');
         if (data?.username) {
@@ -58,8 +61,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
           }
           setSessionUser(data);
         }
-      } catch {
-        // Ignore unauthenticated or offline status on initial mount
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 401) {
+          await advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: false });
+          setSessionUser(null);
+        }
       }
     };
 
@@ -73,7 +80,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('cfi-auth-changed', handleStorageChange);
     };
-  }, []);
+  }, [queryClient]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +97,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
         password,
       });
 
+      await advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: false });
+
       localStorage.setItem('cfi_token', data.access_token);
       if (data.refresh_token) {
         localStorage.setItem('cfi_refresh_token', data.refresh_token);
@@ -102,7 +111,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
       setPassword('');
       setIsLoginModalOpen(false);
       window.dispatchEvent(new Event('cfi-auth-changed'));
-      await queryClient?.resetQueries();
       await queryClient?.invalidateQueries();
     } catch (err: unknown) {
       setLoginError(formatApiError(err, 'Institutional authentication failed.'));
@@ -117,17 +125,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
     } catch {
       // Proceed with local session cleanup even if backend logout fails
     }
-    try {
-      localStorage.removeItem('cfi_token');
-      localStorage.removeItem('cfi_refresh_token');
-      localStorage.removeItem('cfi_tenant_id');
-      localStorage.removeItem('cfi_session_user');
-    } catch {
-      // ignore storage errors
-    }
+    await advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: false });
     setSessionUser(null);
     window.dispatchEvent(new Event('cfi-auth-changed'));
-    await queryClient?.resetQueries();
     await queryClient?.invalidateQueries();
   };
 

@@ -62,7 +62,9 @@ class CacheService:
 
     _instance: CacheService | None = None
     _client: aioredis.Redis | None = None
-    _unavailable: bool = False  # once True, skip all Redis attempts
+    _unavailable: bool = False  # once True, skip all Redis attempts until cooldown
+    _last_unavailable_at: float = 0.0
+    _RECONNECT_COOLDOWN_SECONDS: float = 1.0
     _local_rate_limits: dict[str, list[float]] = {}
     _local_lock: threading.Lock = threading.Lock()
 
@@ -81,7 +83,10 @@ class CacheService:
     def client(self) -> aioredis.Redis | None:
         """Return the Redis client, or None when Redis is unavailable."""
         if self._unavailable:
-            return None
+            if (time.monotonic() - self._last_unavailable_at) < self._RECONNECT_COOLDOWN_SECONDS:
+                return None
+            self.__class__._unavailable = False
+            self.__class__._client = None
         if self._client is None:
             settings = get_settings()
             url = getattr(settings, "redis_url", None) or getattr(
@@ -89,6 +94,7 @@ class CacheService:
             )
             if not url:
                 self.__class__._unavailable = True
+                self.__class__._last_unavailable_at = time.monotonic()
                 return None
             try:
                 self.__class__._client = aioredis.from_url(
@@ -101,6 +107,7 @@ class CacheService:
             except Exception as exc:
                 logger.warning("Redis client creation failed: %s — cache disabled", exc)
                 self.__class__._unavailable = True
+                self.__class__._last_unavailable_at = time.monotonic()
         return self.__class__._client
 
     async def ping(self) -> bool:
@@ -109,7 +116,10 @@ class CacheService:
         if c is None:
             return False
         try:
-            return bool(await c.ping())
+            ok = bool(await c.ping())
+            if ok:
+                self.__class__._unavailable = False
+            return ok
         except Exception:
             # In development, try auto-healing with alternate dev password or 127.0.0.1
             settings = get_settings()
@@ -151,12 +161,15 @@ class CacheService:
                                 )
                                 if await alt.ping():
                                     self.__class__._client = alt
+                                    self.__class__._unavailable = False
                                     return True
                             except Exception:
                                 continue
                 except Exception:
                     pass
             self.__class__._unavailable = True
+            self.__class__._last_unavailable_at = time.monotonic()
+            self.__class__._client = None
             return False
 
     # ── Generic helpers ────────────────────────────────────────────────

@@ -164,7 +164,7 @@ def _build_health_response() -> HealthCheckResponse:
     from app.infrastructure.redis_store import RedisStore
 
     probe_store = RedisStore("_health_probe")
-    using_redis = probe_store.client is not None
+    using_redis = probe_store.is_live()
     backend_mode = "redis" if using_redis else "in_memory"
     durability_mode = "durable" if using_redis else "ephemeral"
 

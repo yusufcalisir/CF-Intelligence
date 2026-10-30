@@ -149,11 +149,68 @@ def _restrict_file_permissions(target_path: Path) -> None:
             )
 
 
-def write_env_file(env_vars: dict[str, str], target_path: Path) -> None:
+def ensure_safe_secret_file_target(target_path: Path, force: bool = False) -> None:
+    """Prevent accidental overwrite of active institutional signing keys and credentials."""
+    if not target_path.exists():
+        return
+    try:
+        existing_text = target_path.read_text(encoding="utf-8")
+    except OSError:
+        existing_text = ""
+    has_active_secrets = any(
+        marker in existing_text
+        for marker in (
+            "WORKER_BANK_A_SIGNING_KEY=",
+            "CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON=",
+            "ANALYST_BANK_A_PASSWORD=",
+        )
+    )
+    if (existing_text.strip() or has_active_secrets) and not force:
+        raise FileExistsError(
+            f"Refusing to overwrite existing consortium secret file '{target_path}' containing active "
+            "institutional keys/credentials. Pass --force (or force=True) to explicitly rotate/overwrite."
+        )
+
+
+def write_isolated_key_custody_files(env_vars: dict[str, str], custody_dir: Path, force: bool = False) -> dict[str, Path]:
+    """Write per-institution isolated key files and public verification registry with 0600 permissions."""
+    custody_dir.mkdir(parents=True, exist_ok=True)
+    written: dict[str, Path] = {}
+    key_map = {
+        "bank_a": env_vars["WORKER_BANK_A_SIGNING_KEY"],
+        "bank_b": env_vars["WORKER_BANK_B_SIGNING_KEY"],
+        "bank_c": env_vars["WORKER_BANK_C_SIGNING_KEY"],
+    }
+    for bank_id, priv_hex in key_map.items():
+        key_path = custody_dir / f"{bank_id}.ed25519.key"
+        if key_path.exists() and key_path.stat().st_size > 0 and not force:
+            raise FileExistsError(
+                f"Refusing to overwrite existing institutional private key file '{key_path}' without --force."
+            )
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        fd = os.open(str(key_path), flags, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(priv_hex)
+        _restrict_file_permissions(key_path)
+        written[bank_id] = key_path
+
+    reg_path = custody_dir / "institutional_public_keys.json"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(str(reg_path), flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(env_vars["CFI_INSTITUTIONAL_PUBLIC_KEYS_JSON"])
+    _restrict_file_permissions(reg_path)
+    written["public_registry"] = reg_path
+    return written
+
+
+def write_env_file(env_vars: dict[str, str], target_path: Path, force: bool = False) -> None:
     """Format and write environment dictionary to file with restrictive permissions."""
+    ensure_safe_secret_file_target(target_path, force=force)
     lines = [
         "# ==============================================================================",
         "# Cross-Bank Federated Intelligence (CFI) — Local Consortium Sandbox Secrets",
+        "# Classification: SINGLE_HOST_DOCKER_SANDBOX (Not multi-institution HSM custody)",
         "# Generated automatically. DO NOT COMMIT OR LEAK THIS FILE.",
         "# ==============================================================================",
         "",
@@ -182,14 +239,32 @@ def main() -> None:
         help="Target output file path (default: .env.consortium)",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Explicitly authorize overwriting an existing .env.consortium secret file.",
+    )
+    parser.add_argument(
+        "--key-custody-dir",
+        type=Path,
+        default=None,
+        help="Optional directory to write isolated per-institution Ed25519 key files.",
+    )
+    parser.add_argument(
         "--print-registry",
         action="store_true",
         help="Print the generated public verification keys registry to stdout.",
     )
     args = parser.parse_args()
 
-    env_vars = generate_consortium_deployment_secrets()
-    write_env_file(env_vars, args.output)
+    try:
+        ensure_safe_secret_file_target(args.output, force=args.force)
+        env_vars = generate_consortium_deployment_secrets()
+        write_env_file(env_vars, args.output, force=args.force)
+        if args.key_custody_dir is not None:
+            write_isolated_key_custody_files(env_vars, args.key_custody_dir, force=args.force)
+    except FileExistsError as exc:
+        sys.stderr.write(f"ERROR: {exc}\n")
+        sys.exit(1)
 
     sys.stdout.write(f"Consortium deployment secrets written successfully to '{args.output}'.\n")
     if args.print_registry:

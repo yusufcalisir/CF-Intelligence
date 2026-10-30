@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 from typing import Any
 
 import redis
@@ -34,6 +35,9 @@ class RedisStore:
 
     # Class-level flag: once Redis is confirmed unreachable, skip for all instances
     _global_redis_unavailable: bool = False
+    _ever_connected_globally: bool = False
+    _last_reconnect_attempt: float = 0.0
+    _RECONNECT_COOLDOWN_SECONDS: float = 1.0
 
     # Class-level shared in-memory stores for fallback mode, keyed by prefix
     _shared_fallback_stores: dict[str, dict] = {}
@@ -46,29 +50,75 @@ class RedisStore:
         self._redis_client: Any = None
         self._redis_failed: bool = False
         self._had_command_failure: bool = False
+        self._ever_connected: bool = False
+        self._last_instance_failure_at: float = 0.0
 
     @property
     def is_production(self) -> bool:
         return getattr(self.settings, "app_env", "development").lower().strip() == "production"
 
+    def _attempt_auto_reconnect(self) -> bool:
+        """Attempt bounded automatic reconnection after a transient Redis outage."""
+        if not (self._ever_connected or RedisStore._ever_connected_globally or self.is_production):
+            return False
+        now = time.monotonic()
+        last_attempt = max(self._last_instance_failure_at, RedisStore._last_reconnect_attempt)
+        if (now - last_attempt) < RedisStore._RECONNECT_COOLDOWN_SECONDS:
+            return False
+
+        self._last_instance_failure_at = now
+        RedisStore._last_reconnect_attempt = now
+
+        if self._redis_client is not None:
+            try:
+                if bool(self._redis_client.ping()):
+                    self._redis_failed = False
+                    self._had_command_failure = False
+                    RedisStore._global_redis_unavailable = False
+                    self._ever_connected = True
+                    RedisStore._ever_connected_globally = True
+                    return True
+            except Exception:
+                self._redis_failed = True
+                return False
+            return False
+
+        # Re-establish a fresh client connection after cooldown
+        self._redis_failed = False
+        RedisStore._global_redis_unavailable = False
+        c = self.client
+        if c is not None:
+            self._had_command_failure = False
+            self._ever_connected = True
+            RedisStore._ever_connected_globally = True
+            return True
+        return False
+
     def is_live(self) -> bool:
         """Check if the Redis client is operational and responding to PING."""
-        if self._redis_failed or RedisStore._global_redis_unavailable:
+        if (self._redis_failed or RedisStore._global_redis_unavailable) and not self._attempt_auto_reconnect():
             return False
         c = self.client
         if not c:
             return False
         try:
-            return bool(c.ping())
+            live = bool(c.ping())
+            if live:
+                self._ever_connected = True
+                RedisStore._ever_connected_globally = True
+            return live
         except Exception as e:
             logger.warning("Redis ping failed for prefix '%s': %s", self.prefix, e)
             self._redis_failed = True
             self._had_command_failure = True
+            self._last_instance_failure_at = time.monotonic()
             return False
 
     def has_active_shared_storage(self) -> bool:
         """Verify that genuine shared authoritative Redis storage is actively reachable and healthy."""
-        if self._redis_failed or self._had_command_failure or RedisStore._global_redis_unavailable:
+        if (
+            self._redis_failed or self._had_command_failure or RedisStore._global_redis_unavailable
+        ) and not self._attempt_auto_reconnect():
             return False
         return self.is_live()
 
@@ -76,6 +126,8 @@ class RedisStore:
         """Attempt to re-establish connection to authoritative Redis after an outage."""
         self._redis_failed = False
         self._had_command_failure = False
+        self._last_instance_failure_at = 0.0
+        RedisStore._last_reconnect_attempt = 0.0
         RedisStore._global_redis_unavailable = False
         self._redis_client = None
         return self.is_live()
@@ -89,7 +141,7 @@ class RedisStore:
 
     @property
     def client(self) -> Any:
-        if self._redis_failed or RedisStore._global_redis_unavailable:
+        if (self._redis_failed or RedisStore._global_redis_unavailable) and not self._attempt_auto_reconnect():
             return None
         if self._redis_client is None:
             url = self.settings.redis_url
@@ -109,6 +161,8 @@ class RedisStore:
                 r_client.ping()
                 self._redis_client = r_client
                 self._redis_failed = False
+                self._ever_connected = True
+                RedisStore._ever_connected_globally = True
             except Exception as e:
                 recovered = False
                 if getattr(self.settings, "app_env", "development") == "development":
@@ -154,6 +208,8 @@ class RedisStore:
                                     alt_client.ping()
                                     self._redis_client = alt_client
                                     self._redis_failed = False
+                                    self._ever_connected = True
+                                    RedisStore._ever_connected_globally = True
                                     recovered = True
                                     logger.info(
                                         "RedisStore auto-recovered connection for prefix '%s' on %s",
@@ -186,6 +242,8 @@ class RedisStore:
                         )
                     self._redis_client = None
                     self._redis_failed = True
+                    self._last_instance_failure_at = time.monotonic()
+                    RedisStore._last_reconnect_attempt = time.monotonic()
                     RedisStore._global_redis_unavailable = True
         return self._redis_client
 

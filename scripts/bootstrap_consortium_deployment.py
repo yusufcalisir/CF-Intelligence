@@ -132,7 +132,7 @@ def run_docker_exec(
     )
     if res.returncode != 0:
         raise RuntimeError(
-            f"docker exec failed on '{container_name}' (exit {res.returncode})"
+            f"docker exec failed on '{container_name}' (exit {res.returncode}):\n{res.stderr}\n{res.stdout}"
         )
     return res.stdout.strip()
 
@@ -178,6 +178,60 @@ def compute_deterministic_privacy_id(raw_id: str, entity_type: str = "customer")
     return hashlib.sha256(canonical).hexdigest()[:32]
 
 
+def provision_or_verify_institutional_user(
+    auth_svc: Any,
+    username: str,
+    plain_password: str | None = None,
+    bank_id: str | None = None,
+    roles: list[str] | None = None,
+    clearance_level: int = 1,
+    allow_credential_rotation: bool = False,
+    **kwargs: Any,
+) -> Any:
+    """Register an institutional principal or verify and preserve an existing active principal.
+
+    Refuses to silently overwrite an existing active principal's credentials or user_id
+    unless allow_credential_rotation=True is explicitly supplied.
+    """
+    effective_password = plain_password or kwargs.get("password") or ""
+    effective_bank_id = bank_id or kwargs.get("tenant_id") or ""
+    effective_roles = roles if roles is not None else kwargs.get("roles", ["analyst"])
+    existing = auth_svc.get_user(username) if hasattr(auth_svc, "get_user") else auth_svc.get_user_by_username(username)
+    if existing is None:
+        return auth_svc.register_user(
+            username=username,
+            plain_password=effective_password,
+            bank_id=effective_bank_id,
+            roles=effective_roles,
+            clearance_level=clearance_level,
+        )
+
+    try:
+        from app.infrastructure.security.auth_service import verify_password
+        password_matches = bool(verify_password(effective_password, existing.password_hash))
+    except Exception:
+        password_matches = bool(auth_svc.authenticate(username, effective_password)[0])
+    bank_matches = existing.bank_id == effective_bank_id
+    if password_matches and bank_matches and existing.is_active:
+        auth_svc.lockout_manager.reset(username)
+        return existing
+
+    if not allow_credential_rotation:
+        raise PermissionError(
+            f"Active institutional principal '{username}' (bank='{existing.bank_id}') already exists "
+            "with different credentials. Refusing to overwrite active principal without "
+            "--allow-credential-rotation."
+        )
+
+    return auth_svc.register_user(
+        username=username,
+        plain_password=effective_password,
+        bank_id=effective_bank_id,
+        roles=effective_roles,
+        clearance_level=clearance_level,
+    )
+
+
 def bootstrap_consortium(
     env_file: Path,
     backend_url: str = "http://127.0.0.1:8000",
@@ -187,6 +241,7 @@ def bootstrap_consortium(
     worker_c_url: str = "http://127.0.0.1:8103",
     gateway_url: str = "http://127.0.0.1:80",
     consortium_id: str = "consortium_consortium_deployment_01",
+    allow_credential_rotation: bool = False,
 ) -> dict[str, Any]:
     """Execute complete bootstrap sequence."""
     env = load_env_file(env_file)
@@ -281,41 +336,73 @@ def bootstrap_consortium(
     py_bootstrap_script = f"""
 import json
 import sys
-from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.auth_service import AuthenticationService, verify_password
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.domain.consortium_governance import MemberRole
 
 creds = json.loads(sys.stdin.read())
+allow_rotation = bool(creds.get("__allow_credential_rotation__", False))
 auth_svc = AuthenticationService.get_instance()
 
-# Register or update institutional analysts with least-privilege institutional roles
-u_a = auth_svc.register_user(
-    username="analyst_bank_a",
-    plain_password=creds["ANALYST_BANK_A_PASSWORD"],
-    bank_id="bank_a",
-    roles=["compliance", "investigator"],
-    clearance_level=2,
+def _provision_or_preserve(username, password, bank_id, roles, clearance):
+    existing = auth_svc.get_user(username)
+    if existing is None:
+        return auth_svc.register_user(
+            username=username,
+            plain_password=password,
+            bank_id=bank_id,
+            roles=roles,
+            clearance_level=clearance,
+        )
+    password_matches = False
+    try:
+        password_matches = bool(verify_password(password, existing.password_hash))
+    except Exception:
+        password_matches = bool(auth_svc.authenticate(username, password)[0])
+    if existing.bank_id == bank_id and existing.is_active and password_matches:
+        auth_svc.lockout_manager.reset(username)
+        return existing
+    if not allow_rotation:
+        raise PermissionError(
+            f"Active institutional principal '{{username}}' already exists with different credentials. "
+            "Refusing to overwrite without --allow-credential-rotation."
+        )
+    return auth_svc.register_user(
+        username=username,
+        plain_password=password,
+        bank_id=bank_id,
+        roles=roles,
+        clearance_level=clearance,
+    )
+
+# Register or preserve institutional analysts with least-privilege institutional roles
+u_a = _provision_or_preserve(
+    "analyst_bank_a",
+    creds["ANALYST_BANK_A_PASSWORD"],
+    "bank_a",
+    ["compliance", "investigator"],
+    2,
 )
-u_b = auth_svc.register_user(
-    username="analyst_bank_b",
-    plain_password=creds["ANALYST_BANK_B_PASSWORD"],
-    bank_id="bank_b",
-    roles=["compliance", "investigator"],
-    clearance_level=2,
+u_b = _provision_or_preserve(
+    "analyst_bank_b",
+    creds["ANALYST_BANK_B_PASSWORD"],
+    "bank_b",
+    ["compliance", "investigator"],
+    2,
 )
-u_c = auth_svc.register_user(
-    username="analyst_bank_c",
-    plain_password=creds["ANALYST_BANK_C_PASSWORD"],
-    bank_id="bank_c",
-    roles=["compliance", "investigator"],
-    clearance_level=2,
+u_c = _provision_or_preserve(
+    "analyst_bank_c",
+    creds["ANALYST_BANK_C_PASSWORD"],
+    "bank_c",
+    ["compliance", "investigator"],
+    2,
 )
-u_op = auth_svc.register_user(
-    username="operator_consortium",
-    plain_password=creds["CONSORTIUM_OPERATOR_PASSWORD"],
-    bank_id="consortium",
-    roles=["operator", "compliance"],
-    clearance_level=3,
+u_op = _provision_or_preserve(
+    "operator_consortium",
+    creds["CONSORTIUM_OPERATOR_PASSWORD"],
+    "consortium",
+    ["operator", "compliance"],
+    3,
 )
 for uname in ("analyst_bank_a", "analyst_bank_b", "analyst_bank_c", "operator_consortium"):
     auth_svc.lockout_manager.reset(uname)
@@ -459,10 +546,12 @@ result = {{
 print(json.dumps(result))
 """
 
+    bootstrap_input = dict(analyst_creds)
+    bootstrap_input["__allow_credential_rotation__"] = str(allow_credential_rotation)
     stdout = run_docker_exec(
         "cfi-api-server",
         ["python", "-c", py_bootstrap_script],
-        stdin_input=json.dumps(analyst_creds),
+        stdin_input=json.dumps(bootstrap_input),
     )
     # Extract the last line which contains JSON output
     last_line = [ln for ln in stdout.splitlines() if ln.strip().startswith("{")][-1]
@@ -582,6 +671,11 @@ def main() -> None:
     parser.add_argument("--worker-c-url", default="http://127.0.0.1:8103")
     parser.add_argument("--gateway-url", default="http://127.0.0.1:80")
     parser.add_argument("--consortium-id", default="consortium_consortium_deployment_01")
+    parser.add_argument(
+        "--allow-credential-rotation",
+        action="store_true",
+        help="Explicitly allow overwriting existing active institutional user credentials.",
+    )
     args = parser.parse_args()
 
     summary = bootstrap_consortium(
@@ -593,6 +687,7 @@ def main() -> None:
         worker_c_url=args.worker_c_url,
         gateway_url=args.gateway_url,
         consortium_id=args.consortium_id,
+        allow_credential_rotation=args.allow_credential_rotation,
     )
     sys.stdout.write(json.dumps(summary, indent=2) + "\n")
 

@@ -514,6 +514,7 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
 
     // 4a. Bank A Compliance Approval (signed with Bank A Ed25519 key)
     await signInThroughBrowserModal(page, 'analyst_bank_a', bankAPassword, 'BANK_A');
+    await expect(page.locator('form select')).toHaveValue('bank_a');
     const sigBankA = signEd25519Canonical(
       privKeyA,
       `PILOT_APPROVAL:${pilotId}:${revision}:${scopeDigest}:bank_a:analyst_bank_a`,
@@ -532,6 +533,7 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
 
     // 4b. Bank B Compliance Approval (signed with Bank B Ed25519 key)
     await signInThroughBrowserModal(page, 'analyst_bank_b', bankBPassword, 'BANK_B');
+    await expect(page.locator('form select')).toHaveValue('bank_b');
     const sigBankB = signEd25519Canonical(
       privKeyB,
       `PILOT_APPROVAL:${pilotId}:${revision}:${scopeDigest}:bank_b:analyst_bank_b`,
@@ -550,6 +552,7 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
 
     // 4c. Consortium Operator Approval -> transitions pilot to AUTHORIZED
     await signInThroughBrowserModal(page, 'operator_consortium', operatorPassword, 'CONSORTIUM');
+    await expect(page.locator('form select')).toHaveValue('OPERATOR');
     const approveOpRespPromise = page.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/v1/pilots/${pilotId}/approve`) &&
@@ -621,6 +624,89 @@ test.describe('Consortium Live Browser Analyst & Pilot Operations Acceptance Sui
     ).toBeVisible();
     await expect(page.getByText('PILOT_PROVISIONED').first()).toBeVisible();
     await expect(page.getByText('PILOT_ACTIVATED').first()).toBeVisible();
+  });
+
+  test('enforces browser institutional session isolation across principal switching, purges investigation session storage, and fails closed for unauthorized tenants', async ({
+    page,
+  }) => {
+    const bankAPassword = getRequiredSecret(env, 'ANALYST_BANK_A_PASSWORD');
+    const bankBPassword = getRequiredSecret(env, 'ANALYST_BANK_B_PASSWORD');
+
+    // 1. Sign in as Bank A analyst
+    await page.goto('/cases');
+    await signInThroughBrowserModal(page, 'analyst_bank_a', bankAPassword, 'BANK_A');
+
+    // 2. Ingest alert and create a new Bank A case
+    const runSuffix = `${Date.now()}`;
+    const freshAlertId = `alert_isolation_${runSuffix}`;
+    execFileSync(
+      'docker',
+      [
+        'exec',
+        'cfi-api-server',
+        'python',
+        '-c',
+        `from app.application.services.alert_service import AlertIntelligenceService, _alert_to_dict; from app.domain.enums import AlertSeverity, AlertStatus; from app.domain.investigation_entities import Alert; svc = AlertIntelligenceService(); a = Alert(id='${freshAlertId}', bank_id='bank_a', transaction_id='tx_iso_${runSuffix}', risk_score=850.0, severity=AlertSeverity.HIGH, status=AlertStatus.NEW, reason_codes=['ISOLATION_TEST'], confidence=0.91, involved_entity_ids=['iso_entity_01']); svc._alert_store.set(a.id, _alert_to_dict(a))`,
+      ],
+      { stdio: 'pipe' },
+    );
+
+    const newCaseBtn = page.getByRole('button', { name: '+ New Case' });
+    await expect(newCaseBtn).toBeVisible();
+    await newCaseBtn.click();
+    await page.locator('#case-title-input').fill(`Isolation Case Bank A ${runSuffix}`);
+    await page.locator('#case-priority-select').selectOption('p1_critical');
+    await page.locator('#case-alert-id-input').fill(freshAlertId);
+    const createCaseRespPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/cases') && resp.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Create Case' }).click();
+    const createCaseResp = await createCaseRespPromise;
+    expect(createCaseResp.status()).toBe(200);
+    const createdCaseJson = (await createCaseResp.json()) as { id: string; bank_id: string };
+    expect(createdCaseJson.id).toBeTruthy();
+    const caseId = createdCaseJson.id;
+
+    // 3. Open the newly created case
+    await page.goto(`/cases/${caseId}`);
+
+    // 4. Generate Copilot narrative to populate investigation session storage
+    const generateCopilotBtn = page.getByRole('button', { name: /Generate Copilot SAR Draft/i });
+    if (await generateCopilotBtn.isVisible()) {
+      await generateCopilotBtn.click();
+      await expect(page.getByText(/FinCEN SAR Narrative Preview/i)).toBeVisible();
+    }
+
+    // Verify session storage contains case copilot item tagged with bank_a
+    const storedBeforeSwitch = await page.evaluate((cid) => {
+      return sessionStorage.getItem(`cfi_copilot_case_${cid}`);
+    }, caseId);
+    if (storedBeforeSwitch) {
+      expect(storedBeforeSwitch).toContain('"__cached_tenant_id":"bank_a"');
+    }
+
+    // 5. Switch principal to Bank B via header authentication modal
+    await signInThroughBrowserModal(page, 'analyst_bank_b', bankBPassword, 'BANK_B');
+
+    // 6. Verify Bank A investigation session storage is completely purged
+    const storedAfterSwitch = await page.evaluate((cid) => {
+      return sessionStorage.getItem(`cfi_copilot_case_${cid}`);
+    }, caseId);
+    expect(storedAfterSwitch).toBeNull();
+
+    // 7. Verify Bank B cannot access Bank A case detail (renders case-access-denied / 403)
+    await page.goto(`/cases/${caseId}`);
+    await expect(page.getByTestId('case-access-denied')).toBeVisible();
+
+    // 8. Sign out entirely (unauthenticated)
+    const signOutBtn = page.getByTestId('institutional-sign-out-btn');
+    if (await signOutBtn.isVisible()) {
+      await signOutBtn.click();
+    }
+
+    // 9. Verify unauthenticated access to the case detail fails closed (401 / case-access-denied)
+    await page.goto(`/cases/${caseId}`);
+    await expect(page.getByTestId('case-access-denied')).toBeVisible();
   });
 });
 

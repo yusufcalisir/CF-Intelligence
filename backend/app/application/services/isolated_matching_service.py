@@ -27,6 +27,7 @@ import os
 import re
 import secrets
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -85,6 +86,229 @@ logger = logging.getLogger(__name__)
 SCOPE_MATCHING = "matching"
 SCOPE_DATA_INGESTION = "ingestion"
 SCOPE_ADMINISTRATION = "admin"
+
+TRANSPORT_PROFILE_SANDBOX = "LOCAL_HTTP_SANDBOX"
+TRANSPORT_PROFILE_MTLS = "HARDENED_MTLS"
+
+
+def _normalize_peer_identity_token(raw_token: str) -> set[str]:
+    """Derive canonical peer identity tokens from an X.509 CN, DNS SAN, or SPIFFE URI."""
+    clean = raw_token.lower().strip()
+    if not clean:
+        return set()
+    tokens = {clean, clean.replace("-", "_")}
+    for suffix in (".consortium.local", ".consortium.internal", ".local", ".internal"):
+        if clean.endswith(suffix):
+            stem = clean[: -len(suffix)]
+            tokens.add(stem)
+            tokens.add(stem.replace("-", "_"))
+            clean = stem
+            break
+    for prefix in ("cfi-worker-", "cfi_worker_", "worker-", "worker_", "cfi-"):
+        if clean.startswith(prefix):
+            stripped = clean[len(prefix) :]
+            tokens.add(stripped)
+            tokens.add(stripped.replace("-", "_"))
+    if clean.startswith("spiffe://"):
+        last_seg = clean.rstrip("/").rsplit("/", 1)[-1]
+        if last_seg:
+            tokens.add(last_seg)
+            tokens.add(last_seg.replace("-", "_"))
+    return tokens
+
+
+def _extract_x509_peer_identities(der_cert_bytes: bytes | None) -> set[str]:
+    """Extract all verifiable Subject CN and SAN identities from a DER-encoded X.509 peer certificate."""
+    if not der_cert_bytes:
+        raise ConsortiumSecurityError(
+            "Mutual TLS verification failed: peer did not present an X.509 certificate."
+        )
+    from cryptography import x509
+    from cryptography.x509.oid import ExtensionOID, NameOID
+
+    try:
+        cert = x509.load_der_x509_certificate(der_cert_bytes)
+    except Exception as exc:
+        raise ConsortiumSecurityError(
+            f"Mutual TLS verification failed: unable to parse peer X.509 certificate: {exc}"
+        ) from exc
+
+    now = datetime.datetime.now(UTC)
+    if now < cert.not_valid_before_utc or now > cert.not_valid_after_utc:
+        raise ConsortiumSecurityError(
+            "Mutual TLS verification failed: peer X.509 certificate is outside its validity window."
+        )
+
+    identities: set[str] = set()
+    for attr in cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
+        val = attr.value if isinstance(attr.value, str) else attr.value.decode("utf-8", errors="ignore")
+        identities.update(_normalize_peer_identity_token(val))
+
+    with contextlib.suppress(x509.ExtensionNotFound):
+        san_ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+        for dns_name in san_ext.value.get_values_for_type(x509.DNSName):
+            identities.update(_normalize_peer_identity_token(dns_name))
+        for uri_name in san_ext.value.get_values_for_type(x509.UniformResourceIdentifier):
+            identities.update(_normalize_peer_identity_token(uri_name))
+
+    return identities
+
+
+@dataclass(frozen=True)
+class TransportSecurityConfig:
+    """Explicit transport security configuration separating local HTTP sandbox from hardened mTLS."""
+
+    profile: str = TRANSPORT_PROFILE_SANDBOX
+    ca_cert_path: str | None = None
+    cert_path: str | None = None
+    key_path: str | None = None
+    expected_peer_identity: str | None = None
+    allowed_client_identities: tuple[str, ...] = ()
+
+    @property
+    def is_mtls(self) -> bool:
+        return self.profile.upper().strip() == TRANSPORT_PROFILE_MTLS
+
+    def validate_files(self) -> None:
+        if self.profile.upper().strip() not in (TRANSPORT_PROFILE_SANDBOX, TRANSPORT_PROFILE_MTLS):
+            raise ConsortiumSecurityError(
+                f"Unsupported transport security profile '{self.profile}'. "
+                f"Supported profiles: {TRANSPORT_PROFILE_SANDBOX}, {TRANSPORT_PROFILE_MTLS}."
+            )
+        if not self.is_mtls:
+            return
+        for label, path_val in (
+            ("ca_cert_path", self.ca_cert_path),
+            ("cert_path", self.cert_path),
+            ("key_path", self.key_path),
+        ):
+            if not path_val or not os.path.exists(path_val):
+                raise ConsortiumSecurityError(
+                    f"HARDENED_MTLS transport profile requires an existing file for '{label}' (got {path_val!r}). "
+                    "Failing closed without HTTP fallback."
+                )
+
+    def create_server_ssl_context(self) -> ssl.SSLContext:
+        self.validate_files()
+        if self.is_mtls and not self.allowed_client_identities:
+            raise ConsortiumSecurityError(
+                "HARDENED_MTLS server profile requires a non-empty client certificate allowlist."
+            )
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        assert self.ca_cert_path and self.cert_path and self.key_path
+        ctx.load_verify_locations(cafile=self.ca_cert_path)
+        ctx.load_cert_chain(certfile=self.cert_path, keyfile=self.key_path)
+        return ctx
+
+    def create_client_ssl_context(self) -> ssl.SSLContext:
+        self.validate_files()
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        ctx.check_hostname = False
+        assert self.ca_cert_path and self.cert_path and self.key_path
+        ctx.load_verify_locations(cafile=self.ca_cert_path)
+        ctx.load_cert_chain(certfile=self.cert_path, keyfile=self.key_path)
+        return ctx
+
+    def verify_peer_cert_bytes(
+        self,
+        der_cert_bytes: bytes | None,
+        expected_identity: str | None = None,
+    ) -> set[str]:
+        identities = _extract_x509_peer_identities(der_cert_bytes)
+        target_expected = (expected_identity or self.expected_peer_identity or "").lower().strip()
+        if target_expected:
+            expected_tokens = _normalize_peer_identity_token(target_expected)
+            if not (identities & expected_tokens):
+                raise ConsortiumSecurityError(
+                    f"Mutual TLS peer identity mismatch: expected peer certificate for '{target_expected}', "
+                    f"but peer presented identities {sorted(identities)}."
+                )
+        return identities
+
+    def verify_client_cert_bytes(self, der_cert_bytes: bytes | None) -> set[str]:
+        identities = _extract_x509_peer_identities(der_cert_bytes)
+        if self.allowed_client_identities:
+            allowed_tokens: set[str] = set()
+            for item in self.allowed_client_identities:
+                allowed_tokens.update(_normalize_peer_identity_token(item))
+            if not (identities & allowed_tokens):
+                raise ConsortiumSecurityError(
+                    f"Mutual TLS client certificate rejected: client identities {sorted(identities)} "
+                    f"are not in allowed_client_identities {list(self.allowed_client_identities)}."
+                )
+        return identities
+
+    @classmethod
+    def from_environment(
+        cls,
+        expected_peer_identity: str | None = None,
+    ) -> TransportSecurityConfig:
+        profile = os.environ.get("CFI_TRANSPORT_PROFILE", TRANSPORT_PROFILE_SANDBOX).strip().upper()
+        allowed_raw = os.environ.get("CFI_MTLS_ALLOWED_CLIENTS", "")
+        allowed = tuple(x.strip() for x in allowed_raw.split(",") if x.strip())
+        return cls(
+            profile=profile,
+            ca_cert_path=os.environ.get("CFI_MTLS_CA_CERT"),
+            cert_path=os.environ.get("CFI_MTLS_CERT"),
+            key_path=os.environ.get("CFI_MTLS_KEY"),
+            expected_peer_identity=expected_peer_identity,
+            allowed_client_identities=allowed,
+        )
+
+
+class _VerifiedInstitutionalHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPSConnection that enforces X.509 peer identity binding immediately upon TLS handshake."""
+
+    def __init__(
+        self,
+        host: str,
+        *args: Any,
+        transport_config: TransportSecurityConfig,
+        expected_peer_identity: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(host, *args, **kwargs)
+        self._transport_config = transport_config
+        self._expected_peer_identity = expected_peer_identity
+
+    def connect(self) -> None:
+        super().connect()
+        if self.sock is None:
+            raise ConsortiumSecurityError("Mutual TLS connection failed: socket not established.")
+        der_cert = self.sock.getpeercert(binary_form=True)
+        self._transport_config.verify_peer_cert_bytes(
+            der_cert,
+            expected_identity=self._expected_peer_identity,
+        )
+
+
+class _VerifiedInstitutionalHTTPSHandler(urllib.request.HTTPSHandler):
+    """urllib HTTPSHandler binding TransportSecurityConfig and peer identity verification."""
+
+    def __init__(
+        self,
+        transport_config: TransportSecurityConfig,
+        expected_peer_identity: str | None = None,
+    ) -> None:
+        self._transport_config = transport_config
+        self._expected_peer_identity = expected_peer_identity
+        self._ssl_ctx = transport_config.create_client_ssl_context()
+        super().__init__(context=self._ssl_ctx)
+
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        def _conn_factory(host: str, **kwargs: Any) -> _VerifiedInstitutionalHTTPSConnection:
+            return _VerifiedInstitutionalHTTPSConnection(
+                host,
+                transport_config=self._transport_config,
+                expected_peer_identity=self._expected_peer_identity,
+                **kwargs,
+            )
+
+        return self.do_open(_conn_factory, req, context=self._ssl_ctx)
 
 
 @dataclass(frozen=True)
@@ -313,24 +537,25 @@ class IsolatedBankWorkerNode:
         self._auth_secret = auth_secret or secrets.token_hex(32)
 
         # Asymmetric institutional signing identity (strictly tenant-sovereign)
+        key_file = (
+            os.environ.get("WORKER_SIGNING_KEY_FILE")
+            or os.environ.get(f"CFI_WORKER_SIGNING_KEY_FILE_{self.bank_id.upper()}")
+        )
         signing_key_candidate = (
             signing_key
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{self.bank_id.upper()}")
             or os.environ.get("WORKER_SIGNING_KEY")
         )
-        if isinstance(signing_key_candidate, InstitutionalSigningIdentity):
-            self._signing_identity: InstitutionalSigningIdentity | None = signing_key_candidate
+        if isinstance(signing_key, InstitutionalSigningIdentity):
+            self._signing_identity: InstitutionalSigningIdentity | None = signing_key
+        elif isinstance(signing_key, str) and len(signing_key.strip()) == 64:
+            self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key)
+        elif key_file and os.path.exists(key_file):
+            self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
         else:
-            key_file = (
-                os.environ.get("WORKER_SIGNING_KEY_FILE")
-                or os.environ.get(f"CFI_WORKER_SIGNING_KEY_FILE_{self.bank_id.upper()}")
-            )
-            if key_file and os.path.exists(key_file):
-                self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
-            else:
-                self._signing_identity = None
+            self._signing_identity = None
 
         # Scoped RPC authorization credentials (least-privilege separation)
         self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
@@ -406,6 +631,37 @@ class IsolatedBankWorkerNode:
                 "Invalid institutional signing identity: must be InstitutionalSigningIdentity "
                 "or 64-character private hex."
             )
+
+    def get_health(self, nonce: str = "") -> dict[str, Any]:
+        """Return truthful node health and key custody metadata."""
+        now_iso = datetime.datetime.now(UTC).isoformat()
+        protocol = "OPENMINED-PSI-2.0.6-ECDH"
+        resp_data: dict[str, Any] = {
+            "status": "ONLINE",
+            "bank_id": self.bank_id,
+            "role": "worker",
+            "protocol": protocol,
+            "pid": os.getpid(),
+            "timestamp": now_iso,
+            "nonce": nonce,
+        }
+        signing_id = self._signing_identity
+        if signing_id is not None:
+            canonical_stmt = canonical_worker_readiness_bytes(
+                bank_id=self.bank_id,
+                nonce=nonce,
+                timestamp=now_iso,
+                protocol=protocol,
+            )
+            sig_hex = signing_id.sign(canonical_stmt)
+            resp_data["signature"] = sig_hex
+            resp_data["public_key_hex"] = signing_id.public_key_hex
+            resp_data["signing_public_key_hex"] = signing_id.public_key_hex
+            resp_data["key_version"] = 1
+            resp_data["key_custody_mode"] = getattr(
+                signing_id, "custody_mode", "LOCAL_SANDBOX_ENV"
+            )
+        return resp_data
 
     @property
     def matching_token(self) -> str:
@@ -1691,7 +1947,7 @@ class IsolatedBankWorkerNode:
 
 
 class InstitutionalWorkerDaemon:
-    """Daemon running inside an independent worker OS process or thread exposing loopback HTTP transport."""
+    """Daemon running inside an independent worker OS process or thread exposing loopback HTTP/mTLS transport."""
 
     def __init__(
         self,
@@ -1699,17 +1955,22 @@ class InstitutionalWorkerDaemon:
         host: str = "127.0.0.1",
         port: int = 0,
         run_as_process: bool = False,
+        transport_config: TransportSecurityConfig | None = None,
     ) -> None:
         self.node = node
         self.host = host
         self.port = port
         self.run_as_process = run_as_process
+        self.transport_config = transport_config or TransportSecurityConfig.from_environment(
+            expected_peer_identity=node.bank_id
+        )
         self.server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._process: subprocess.Popen[str] | None = None
         self.pid: int = os.getpid()
 
     def start(self) -> str:
+        self.transport_config.validate_files()
         if self.run_as_process:
             storage_root = os.path.dirname(os.path.dirname(os.path.abspath(self.node.vault_dir)))
             peers_json = json.dumps(self.node._trusted_peer_verification_keys)
@@ -1743,6 +2004,17 @@ class InstitutionalWorkerDaemon:
             proc_env["WORKER_INGESTION_TOKEN"] = self.node._ingestion_token
             proc_env["WORKER_ADMIN_TOKEN"] = self.node._admin_token
             proc_env["WORKER_TRUSTED_PEERS_JSON"] = peers_json
+            proc_env["CFI_TRANSPORT_PROFILE"] = self.transport_config.profile
+            if self.transport_config.ca_cert_path:
+                proc_env["CFI_MTLS_CA_CERT"] = self.transport_config.ca_cert_path
+            if self.transport_config.cert_path:
+                proc_env["CFI_MTLS_CERT"] = self.transport_config.cert_path
+            if self.transport_config.key_path:
+                proc_env["CFI_MTLS_KEY"] = self.transport_config.key_path
+            if self.transport_config.allowed_client_identities:
+                proc_env["CFI_MTLS_ALLOWED_CLIENTS"] = ",".join(
+                    self.transport_config.allowed_client_identities
+                )
 
             self._process = subprocess.Popen(
                 cmd,
@@ -1769,15 +2041,38 @@ class InstitutionalWorkerDaemon:
                 raise RuntimeError(
                     f"Invalid worker startup response from {self.node.bank_id}: {line}. Stderr: {stderr_out}"
                 ) from exc
-            return f"http://{self.host}:{self.port}"
+            scheme = "https" if self.transport_config.is_mtls else "http"
+            return f"{scheme}://{self.host}:{self.port}"
 
         node = self.node
+        daemon_transport = self.transport_config
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
                 pass  # suppress noisy stdout logs in test runner
 
+            def _verify_mtls_client_identity(self) -> bool:
+                if not daemon_transport.is_mtls:
+                    return True
+                try:
+                    der_cert = self.connection.getpeercert(binary_form=True)
+                    daemon_transport.verify_client_cert_bytes(der_cert)
+                    return True
+                except Exception as exc:
+                    self.send_response(403)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({
+                            "error": str(exc),
+                            "error_type": "ConsortiumSecurityError",
+                        }).encode()
+                    )
+                    return False
+
             def _authenticate(self, required_scope: str) -> bool:
+                if not self._verify_mtls_client_identity():
+                    return False
                 auth_hdr = self.headers.get("Authorization", "")
                 if not auth_hdr.startswith("Bearer "):
                     self.send_response(401)
@@ -1805,34 +2100,15 @@ class InstitutionalWorkerDaemon:
                 return True
 
             def do_GET(self) -> None:
+                if not self._verify_mtls_client_identity():
+                    return
                 parsed_url = urllib.parse.urlparse(self.path)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 nonce = query_params.get("nonce", [""])[0]
 
                 if parsed_url.path in ("/health", "/worker/health"):
-                    now_iso = datetime.datetime.now(UTC).isoformat()
-                    protocol = "OPENMINED-PSI-2.0.6-ECDH"
-                    resp_data: dict[str, Any] = {
-                        "status": "ONLINE",
-                        "bank_id": node.bank_id,
-                        "role": "worker",
-                        "protocol": protocol,
-                        "pid": os.getpid(),
-                        "timestamp": now_iso,
-                        "nonce": nonce,
-                    }
-                    signing_id = getattr(node, "_signing_identity", None)
-                    if signing_id is not None:
-                        canonical_stmt = canonical_worker_readiness_bytes(
-                            bank_id=node.bank_id,
-                            nonce=nonce,
-                            timestamp=now_iso,
-                            protocol=protocol,
-                        )
-                        sig_hex = signing_id.sign(canonical_stmt)
-                        resp_data["signature"] = sig_hex
-                        resp_data["public_key_hex"] = signing_id.public_key_hex
-                        resp_data["key_version"] = 1
+                    resp_data = node.get_health(nonce=nonce)
+                    resp_data["transport_profile"] = daemon_transport.profile
 
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
@@ -2015,11 +2291,15 @@ class InstitutionalWorkerDaemon:
                     )
 
         self.server = ThreadingHTTPServer((self.host, self.port), Handler)
+        if self.transport_config.is_mtls:
+            ssl_ctx = self.transport_config.create_server_ssl_context()
+            self.server.socket = ssl_ctx.wrap_socket(self.server.socket, server_side=True)
         self.port = self.server.server_address[1]
         self.pid = os.getpid()
         self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self._thread.start()
-        return f"http://{self.host}:{self.port}"
+        scheme = "https" if self.transport_config.is_mtls else "http"
+        return f"{scheme}://{self.host}:{self.port}"
 
     def stop(self) -> None:
         if self._process:
@@ -2036,7 +2316,7 @@ class InstitutionalWorkerDaemon:
 
 
 class InstitutionalWorkerClient:
-    """Client communicating with an independent institutional worker over loopback HTTP transport."""
+    """Client communicating with an independent institutional worker over loopback HTTP or mTLS transport."""
 
     def __init__(
         self,
@@ -2047,6 +2327,7 @@ class InstitutionalWorkerClient:
         ingestion_token: str | None = None,
         admin_token: str | None = None,
         default_timeout: float = 5.0,
+        transport_config: TransportSecurityConfig | None = None,
     ) -> None:
         self.bank_id = bank_id.lower().strip()
         self.base_url = base_url.rstrip("/")
@@ -2056,7 +2337,47 @@ class InstitutionalWorkerClient:
         self.admin_token = admin_token or auth_secret or ""
         self.auth_secret = self.matching_token
         self.default_timeout = default_timeout
+        self.transport_config = transport_config or TransportSecurityConfig.from_environment(
+            expected_peer_identity=self.bank_id
+        )
+        if self.transport_config.is_mtls:
+            self.transport_config.validate_files()
+            if self.base_url.startswith("http://"):
+                raise ConsortiumSecurityError(
+                    f"Protocol downgrade rejected: HARDENED_MTLS profile forbids plaintext HTTP worker URL '{self.base_url}'."
+                )
         self._is_network_transport = True
+
+    def _open_request(self, req: urllib.request.Request, timeout: float) -> Any:
+        if not self.transport_config.is_mtls:
+            return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
+        if req.full_url.startswith("http://"):
+            raise ConsortiumSecurityError(
+                f"Protocol downgrade rejected: HARDENED_MTLS profile forbids plaintext HTTP request '{req.full_url}'."
+            )
+        expected_peer = self.transport_config.expected_peer_identity or self.bank_id
+        handler = _VerifiedInstitutionalHTTPSHandler(
+            transport_config=self.transport_config,
+            expected_peer_identity=expected_peer,
+        )
+        opener = urllib.request.build_opener(handler)
+        try:
+            return opener.open(req, timeout=timeout)
+        except ConsortiumSecurityError:
+            raise
+        except ssl.SSLError as ssl_err:
+            raise ConsortiumSecurityError(
+                f"Mutual TLS handshake or certificate verification failed for worker '{self.bank_id}': {ssl_err}"
+            ) from ssl_err
+        except urllib.error.URLError as url_err:
+            reason = getattr(url_err, "reason", None)
+            if isinstance(reason, ConsortiumSecurityError):
+                raise reason from url_err
+            if isinstance(reason, ssl.SSLError):
+                raise ConsortiumSecurityError(
+                    f"Mutual TLS handshake or certificate verification failed for worker '{self.bank_id}': {reason}"
+                ) from url_err
+            raise
 
     def health_check(self, timeout: float | None = None) -> dict[str, Any]:
         """Perform health check probe to worker node."""
@@ -2070,8 +2391,10 @@ class InstitutionalWorkerClient:
         )
         probe_timeout = 5.0 if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=probe_timeout) as resp:  # nosec B310
+            with self._open_request(req, timeout=probe_timeout) as resp:
                 body = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
                 f"Worker probe timed out for '{self.bank_id}': {type(exc).__name__}"
@@ -2126,8 +2449,10 @@ class InstitutionalWorkerClient:
             raise ValueError(f"Unsupported URL scheme for worker client: {url}")
         req = urllib.request.Request(url, method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+            with self._open_request(req, timeout=5.0) as resp:
                 body = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
                 f"Worker probe timed out for '{self.bank_id}': {exc}"
@@ -2196,8 +2521,10 @@ class InstitutionalWorkerClient:
         )
         effective_timeout = self.default_timeout if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=effective_timeout) as resp:  # nosec B310
+            with self._open_request(req, timeout=effective_timeout) as resp:
                 body = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except urllib.error.HTTPError as http_err:
             try:
                 err_body = json.loads(http_err.read().decode())
@@ -2995,7 +3322,7 @@ class CrossBankMatchingCoordinator:
 
 
 class InstitutionalCoordinatorDaemon:
-    """Daemon running inside a restricted coordinator container exposing matching HTTP transport.
+    """Daemon running inside a restricted coordinator container exposing matching HTTP/mTLS transport.
 
     The coordinator has zero volume mounts and zero access to bank secrets or private entity vaults.
     """
@@ -3006,6 +3333,7 @@ class InstitutionalCoordinatorDaemon:
         host: str = "0.0.0.0",  # nosec B104
         port: int = 8200,
         coordinator_secret: str | None = None,
+        transport_config: TransportSecurityConfig | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.host = host
@@ -3016,11 +3344,15 @@ class InstitutionalCoordinatorDaemon:
             or os.environ.get("COORDINATOR_SECRET")
             or ""
         )
+        self.transport_config = transport_config or TransportSecurityConfig.from_environment(
+            expected_peer_identity="coordinator"
+        )
         self.server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self.pid: int = os.getpid()
 
     def start(self) -> str:
+        self.transport_config.validate_files()
         coord = self.coordinator
         self_daemon = self
 
@@ -3028,7 +3360,28 @@ class InstitutionalCoordinatorDaemon:
             def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
                 pass
 
+            def _verify_mtls_client_identity(self) -> bool:
+                if not self_daemon.transport_config.is_mtls:
+                    return True
+                try:
+                    der_cert = self.connection.getpeercert(binary_form=True)
+                    self_daemon.transport_config.verify_client_cert_bytes(der_cert)
+                    return True
+                except Exception as exc:
+                    self.send_response(403)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({
+                            "error": str(exc),
+                            "error_type": "ConsortiumSecurityError",
+                        }).encode()
+                    )
+                    return False
+
             def do_GET(self) -> None:
+                if not self._verify_mtls_client_identity():
+                    return
                 parsed_url = urllib.parse.urlparse(self.path)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 nonce = query_params.get("nonce", [""])[0]
@@ -3042,6 +3395,7 @@ class InstitutionalCoordinatorDaemon:
                         "role": "coordinator",
                         "coordinator_id": coord_id,
                         "protocol": proto,
+                        "transport_profile": self_daemon.transport_config.profile,
                         "registered_workers": list(coord._workers.keys()),
                         "pid": os.getpid(),
                         "timestamp": now_iso,
@@ -3073,6 +3427,8 @@ class InstitutionalCoordinatorDaemon:
                     self.end_headers()
 
             def do_POST(self) -> None:
+                if not self._verify_mtls_client_identity():
+                    return
                 if self.path != "/coordinator/execute-match":
                     self.send_response(404)
                     self.end_headers()
@@ -3116,11 +3472,15 @@ class InstitutionalCoordinatorDaemon:
                     )
 
         self.server = ThreadingHTTPServer((self.host, self.port), CoordinatorHandler)
+        if self.transport_config.is_mtls:
+            ssl_ctx = self.transport_config.create_server_ssl_context()
+            self.server.socket = ssl_ctx.wrap_socket(self.server.socket, server_side=True)
         self.port = self.server.server_address[1]
         self.pid = os.getpid()
         self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self._thread.start()
-        return f"http://{self.host}:{self.port}"
+        scheme = "https" if self.transport_config.is_mtls else "http"
+        return f"{scheme}://{self.host}:{self.port}"
 
     def stop(self) -> None:
         if self.server:
@@ -3130,21 +3490,67 @@ class InstitutionalCoordinatorDaemon:
 
 
 class InstitutionalCoordinatorClient:
-    """Client for invoking coordinator daemon over loopback/Docker network transport."""
+    """Client for invoking coordinator daemon over loopback/Docker HTTP or mTLS transport."""
 
-    def __init__(self, base_url: str) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        transport_config: TransportSecurityConfig | None = None,
+    ) -> None:
         clean_url = base_url.rstrip("/")
         if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
             raise ValueError(f"Unsupported URL scheme for coordinator client: {base_url}")
         self.base_url = clean_url
+        self.transport_config = transport_config or TransportSecurityConfig.from_environment(
+            expected_peer_identity="coordinator"
+        )
+        if self.transport_config.is_mtls:
+            self.transport_config.validate_files()
+            if self.base_url.startswith("http://"):
+                raise ConsortiumSecurityError(
+                    f"Protocol downgrade rejected: HARDENED_MTLS profile forbids plaintext HTTP coordinator URL '{self.base_url}'."
+                )
+
+    def _open_request(self, req: urllib.request.Request, timeout: float) -> Any:
+        if not self.transport_config.is_mtls:
+            return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
+        if req.full_url.startswith("http://"):
+            raise ConsortiumSecurityError(
+                f"Protocol downgrade rejected: HARDENED_MTLS profile forbids plaintext HTTP request '{req.full_url}'."
+            )
+        expected_peer = self.transport_config.expected_peer_identity or "coordinator"
+        handler = _VerifiedInstitutionalHTTPSHandler(
+            transport_config=self.transport_config,
+            expected_peer_identity=expected_peer,
+        )
+        opener = urllib.request.build_opener(handler)
+        try:
+            return opener.open(req, timeout=timeout)
+        except ConsortiumSecurityError:
+            raise
+        except ssl.SSLError as ssl_err:
+            raise ConsortiumSecurityError(
+                f"Mutual TLS handshake or certificate verification failed for coordinator '{self.base_url}': {ssl_err}"
+            ) from ssl_err
+        except urllib.error.URLError as url_err:
+            reason = getattr(url_err, "reason", None)
+            if isinstance(reason, ConsortiumSecurityError):
+                raise reason from url_err
+            if isinstance(reason, ssl.SSLError):
+                raise ConsortiumSecurityError(
+                    f"Mutual TLS handshake or certificate verification failed for coordinator '{self.base_url}': {reason}"
+                ) from url_err
+            raise
 
     def health_check(self, timeout: float | None = None) -> dict[str, Any]:
         url = f"{self.base_url}/health"
         req = urllib.request.Request(url, method="GET")
         probe_timeout = 5.0 if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=probe_timeout) as resp:  # nosec B310
+            with self._open_request(req, timeout=probe_timeout) as resp:
                 body = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
                 f"Coordinator probe timed out: {type(exc).__name__}"
@@ -3193,8 +3599,10 @@ class InstitutionalCoordinatorClient:
         url = f"{self.base_url}/coordinator/health"
         req = urllib.request.Request(url, method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+            with self._open_request(req, timeout=5.0) as resp:
                 body = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
                 f"Coordinator topology probe timed out on '{self.base_url}': {exc}"
@@ -3263,8 +3671,10 @@ class InstitutionalCoordinatorClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=effective_timeout) as resp:  # nosec B310
+            with self._open_request(request, timeout=effective_timeout) as resp:
                 resp_bytes = resp.read()
+        except ConsortiumSecurityError:
+            raise
         except urllib.error.HTTPError as http_err:
             try:
                 err_body = json.loads(http_err.read().decode())

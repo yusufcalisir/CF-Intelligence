@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from './client';
+import { apiClient, advanceInstitutionalSessionEpoch } from './client';
 import type {
   Alert,
   AlertDeduplicationStatsResponse,
@@ -657,6 +657,7 @@ export function useCase(id: string | undefined) {
       return data;
     },
     enabled: !!id,
+    retry: false,
   });
 }
 
@@ -2531,6 +2532,7 @@ export function useLoginMutation() {
   return useMutation<LoginResponse, Error, LoginRequest>({
     mutationFn: async (credentials) => {
       const { data } = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials);
+      await advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: false });
       if (typeof window !== 'undefined' && data.access_token) {
         localStorage.setItem('cfi_token', data.access_token);
         if (data.tenant_id) {
@@ -2563,12 +2565,7 @@ export function useLogoutMutation() {
   return useMutation<LogoutResponse, Error, { token?: string } | void>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<LogoutResponse>('/api/v1/auth/logout', payload ?? {});
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('cfi_token');
-        sessionStorage.removeItem('cfi_token');
-        localStorage.removeItem('cfi_tenant_id');
-        sessionStorage.removeItem('cfi_tenant_id');
-      }
+      await advanceInstitutionalSessionEpoch(queryClient, { preserveAuthCredentials: false });
       return data;
     },
     onSuccess: () => {
@@ -3548,6 +3545,7 @@ export function useCaseEligibleEntities(caseId: string | undefined) {
     },
     enabled: !!caseId,
     staleTime: 30_000,
+    retry: false,
   });
 }
 
@@ -3562,6 +3560,7 @@ export function useCaseIntelligenceEvidence(caseId: string | undefined) {
     },
     enabled: !!caseId,
     refetchInterval: 10_000,
+    retry: false,
   });
 }
 

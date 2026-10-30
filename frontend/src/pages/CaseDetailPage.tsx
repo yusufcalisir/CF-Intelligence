@@ -16,7 +16,7 @@ import {
 import { CrossBankIntelligenceWorkspace } from '../components/cases/CrossBankIntelligenceWorkspace';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
-import { formatApiError } from '../api/client';
+import { formatApiError, getActiveTenantId } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ExplainabilityPanel } from './AlertsPage';
 import { Bot, Sparkles, Copy, Check, FileText, ShieldAlert } from 'lucide-react';
@@ -67,9 +67,19 @@ export const getCopilotCaseStorageKey = (caseId: string) => `cfi_copilot_case_${
 export function loadCachedCopilotData(caseId: string | undefined): CopilotQueryResponse | null {
   if (!caseId || typeof window === 'undefined') return null;
   try {
-    const raw = window.sessionStorage.getItem(getCopilotCaseStorageKey(caseId));
+    const key = getCopilotCaseStorageKey(caseId);
+    const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as CopilotQueryResponse;
+    const parsed = JSON.parse(raw) as CopilotQueryResponse & { __cached_tenant_id?: string };
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      parsed.__cached_tenant_id &&
+      parsed.__cached_tenant_id !== getActiveTenantId()
+    ) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
     if (parsed && typeof parsed === 'object' && (parsed.fincen_sar_narrative || parsed.four_eyes_briefing)) {
       return parsed;
     }
@@ -85,7 +95,11 @@ export function saveCachedCopilotData(caseId: string | undefined, data: CopilotQ
   try {
     const key = getCopilotCaseStorageKey(caseId);
     if (data) {
-      window.sessionStorage.setItem(key, JSON.stringify(data));
+      const payload = {
+        ...data,
+        __cached_tenant_id: getActiveTenantId(),
+      };
+      window.sessionStorage.setItem(key, JSON.stringify(payload));
     } else {
       window.sessionStorage.removeItem(key);
     }
@@ -148,11 +162,21 @@ export default function CaseDetailPage() {
     return !!loadCachedCopilotData(caseId);
   });
 
-  // Keep Copilot state synchronized when caseId route parameter changes
+  // Keep Copilot state synchronized when caseId route parameter or institutional session changes
   useEffect(() => {
-    const cached = loadCachedCopilotData(caseId);
-    setCopilotData(cached);
-    setIsCopilotCached(!!cached);
+    const syncSessionState = () => {
+      const cached = loadCachedCopilotData(caseId);
+      setCopilotData(cached);
+      setIsCopilotCached(!!cached);
+      setPartialWarning(loadCaseWarning(caseId));
+    };
+    syncSessionState();
+    window.addEventListener('cfi-auth-changed', syncSessionState);
+    window.addEventListener('storage', syncSessionState);
+    return () => {
+      window.removeEventListener('cfi-auth-changed', syncSessionState);
+      window.removeEventListener('storage', syncSessionState);
+    };
   }, [caseId]);
 
   const generateCopilotNarrative = useGenerateCopilotNarrative();
@@ -387,19 +411,28 @@ export default function CaseDetailPage() {
 
   if (!caseData) {
     const errMsg = caseError ? formatApiError(caseError, '') : '';
+    const errStatus = (caseError as { response?: { status?: number } } | null)?.response?.status;
     const isForbidden =
+      errStatus === 403 ||
       errMsg.toLowerCase().includes('not authorized') ||
       errMsg.toLowerCase().includes('broken access control') ||
       errMsg.toLowerCase().includes('forbidden');
+    const isUnauthorized =
+      errStatus === 401 ||
+      errMsg.toLowerCase().includes('authentication required') ||
+      errMsg.toLowerCase().includes('unauthorized');
+    const isAccessDenied = isForbidden || isUnauthorized;
     return (
       <div
-        data-testid={isForbidden ? 'case-access-denied' : 'case-not-found'}
+        data-testid={isAccessDenied ? 'case-access-denied' : 'case-not-found'}
         className="glass-card p-8 text-center text-[var(--color-text-muted)] space-y-2"
       >
         <div className="font-semibold text-[var(--color-text-primary)]">
           {isForbidden
             ? 'Institutional Access Denied (HTTP 403) — Case not found in your institution'
-            : 'Case not found'}
+            : isUnauthorized
+              ? 'Institutional Session Required (HTTP 401) — Sign in to view institutional case resources'
+              : 'Case not found'}
         </div>
         {errMsg && (
           <div data-testid="case-error-detail" className="text-xs text-red-400">

@@ -1,4 +1,4 @@
-import { useState, useId, FC, ChangeEvent } from 'react';
+import { useState, useEffect, useId, FC, ChangeEvent } from 'react';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -61,6 +61,28 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   const [queryResponse, setQueryResponse] = useState<MultiCounterpartyIntelligenceQueryResponse | null>(null);
   const [attachResponse, setAttachResponse] = useState<CrossBankMultiEvidenceAttachResponse | null>(null);
+
+  useEffect(() => {
+    const resetWorkspaceOnSessionChange = () => {
+      setSelectedEntityId('');
+      setSelectedConsortium('');
+      setSelectedTargets(null);
+      setPurpose('');
+      setAnalystNotes('');
+      setQueryError(null);
+      setAttachError(null);
+      setQueryResponse(null);
+      setAttachResponse(null);
+      setQueryIdempotencyKey(`query_${crypto.randomUUID()}`);
+      setAttachIdempotencyKey(`attach_${crypto.randomUUID()}`);
+    };
+    window.addEventListener('cfi-auth-changed', resetWorkspaceOnSessionChange);
+    window.addEventListener('storage', resetWorkspaceOnSessionChange);
+    return () => {
+      window.removeEventListener('cfi-auth-changed', resetWorkspaceOnSessionChange);
+      window.removeEventListener('storage', resetWorkspaceOnSessionChange);
+    };
+  }, []);
 
   // Queries & Mutations
   const {

@@ -97,33 +97,54 @@ class PilotOperationsService:
 
         Supports both consortium-wide `operational_data_sharing_grant` and
         bilateral `pairwise_operational_grants`.
+        Enforces strict grant identity and institution-pair binding:
+        - When `grant_id` is explicitly supplied, never substitutes a different grant
+          based only on participating institutions or default consortium grant.
+        - Verifies that any resolved grant covers the requested `participating_institutions`.
         """
         c_meta = getattr(consortium, "metadata", {}) or {}
         clean_gid = (grant_id or "").strip()
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
-        if (
-            isinstance(op_grant, dict)
-            and op_grant
-            and (not clean_gid or str(op_grant.get("grant_id") or "").strip() == clean_gid)
-        ):
-            return op_grant
+        req_set = {b.lower().strip() for b in (participating_institutions or []) if b}
 
+        def _covers_institutions(grant_dict: dict[str, Any]) -> bool:
+            if not req_set:
+                return True
+            raw_banks = grant_dict.get("participating_banks") or []
+            if not raw_banks:
+                return True
+            grant_banks = {str(b).lower().strip() for b in raw_banks if b}
+            return req_set.issubset(grant_banks)
+
+        op_grant = c_meta.get("operational_data_sharing_grant") or {}
         pairwise_grants = c_meta.get("pairwise_operational_grants") or {}
-        if isinstance(pairwise_grants, dict):
-            if clean_gid and clean_gid in pairwise_grants:
+
+        if clean_gid:
+            if (
+                isinstance(op_grant, dict)
+                and op_grant
+                and str(op_grant.get("grant_id") or "").strip() == clean_gid
+            ):
+                return op_grant if _covers_institutions(op_grant) else {}
+
+            if isinstance(pairwise_grants, dict) and clean_gid in pairwise_grants:
                 pw = pairwise_grants[clean_gid]
                 if isinstance(pw, dict):
-                    return pw
-            if participating_institutions:
-                req_set = {b.lower().strip() for b in participating_institutions if b}
-                for pw in pairwise_grants.values():
-                    if not isinstance(pw, dict):
-                        continue
-                    pw_banks = {b.lower().strip() for b in pw.get("participating_banks", [])}
-                    if req_set and req_set == pw_banks:
-                        return pw
+                    return pw if _covers_institutions(pw) else {}
 
-        return op_grant if isinstance(op_grant, dict) else {}
+            return {}
+
+        if isinstance(op_grant, dict) and op_grant and _covers_institutions(op_grant):
+            return op_grant
+
+        if isinstance(pairwise_grants, dict) and req_set:
+            for pw in pairwise_grants.values():
+                if not isinstance(pw, dict):
+                    continue
+                pw_banks = {str(b).lower().strip() for b in pw.get("participating_banks", []) if b}
+                if req_set == pw_banks:
+                    return pw
+
+        return {}
 
     def _resolve_topology_endpoints(self, entity: PilotEntity) -> tuple[str, str, str, list[str]]:
         """Resolves approved topology endpoints strictly from the immutable pilot configuration.
@@ -606,8 +627,13 @@ class PilotOperationsService:
             grant_id=entity.config.operational_grant_id,
             participating_institutions=insts,
         )
+        req_gid = (entity.config.operational_grant_id or "").strip()
+        resolved_gid = str(op_grant.get("grant_id") or "").strip() if op_grant else ""
+        grant_banks = {str(b).lower().strip() for b in (op_grant.get("participating_banks") or []) if b} if op_grant else set()
         grant_ok = bool(
             op_grant
+            and (not req_gid or resolved_gid == req_gid)
+            and (not grant_banks or {b.lower().strip() for b in insts}.issubset(grant_banks))
             and op_grant.get("is_active", True)
             and int(op_grant.get("revision", 0)) >= 1
             and not set(op_grant.get("revoked_by_institutions", [])) & set(insts)

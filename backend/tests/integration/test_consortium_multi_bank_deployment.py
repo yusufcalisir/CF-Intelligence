@@ -485,3 +485,66 @@ def test_consortium_deployment_frontend_reverse_proxy_reachability(require_conso
                     assert host_ip == "127.0.0.1", (
                         f"Container '{name}' port {port_key} bound to '{host_ip}' instead of '127.0.0.1'"
                     )
+
+
+def test_consortium_deployment_operational_recovery(require_consortium_deployment: None) -> None:
+    """Verify Gate 5: Redis outage degrades gracefully and auto-reconnects, and worker restart preserves keys."""
+    # 1. Baseline healthy state
+    code, health_baseline = _http_get(f"{BACKEND_URL}/api/v1/health")
+    assert code == 200 and isinstance(health_baseline, dict)
+    assert health_baseline.get("status") == "healthy"
+    assert health_baseline.get("storage_backend") == "redis"
+    assert health_baseline.get("durability") == "durable"
+
+    # 2. Capture Bank A worker public key before restart
+    code_a, body_a = _http_get(f"{WORKER_A_URL}/worker/health")
+    assert code_a == 200 and isinstance(body_a, dict)
+    pub_a_initial = body_a.get("public_key_hex") or body_a.get("signing_public_key_hex")
+    assert pub_a_initial is not None
+
+    # 3. Simulate transient Redis outage
+    subprocess.run(["docker", "stop", "cfi-consortium-redis"], capture_output=True, text=True, check=True)
+    try:
+        # After outage, health endpoint truthfully reflects fallback state without process crash
+        time.sleep(2.0)
+        code_deg, health_deg = _http_get(f"{BACKEND_URL}/api/v1/health")
+        assert code_deg == 200 and isinstance(health_deg, dict)
+        assert health_deg.get("storage_backend") == "in_memory"
+        assert health_deg.get("durability") == "ephemeral"
+    finally:
+        # 4. Recover Redis service
+        subprocess.run(["docker", "start", "cfi-consortium-redis"], capture_output=True, text=True, check=True)
+        # Wait for auto-reconnect cooldown and reconnection
+        reconnected = False
+        for _ in range(25):
+            time.sleep(1.0)
+            try:
+                code_rec, health_rec = _http_get(f"{BACKEND_URL}/api/v1/health", timeout=2.0)
+                if (
+                    code_rec == 200
+                    and isinstance(health_rec, dict)
+                    and health_rec.get("storage_backend") == "redis"
+                    and health_rec.get("durability") == "durable"
+                ):
+                    assert health_rec.get("status") == "healthy"
+                    reconnected = True
+                    break
+            except Exception:
+                pass
+        assert reconnected, "Backend failed to auto-reconnect to Redis after transient outage."
+
+    # 5. Worker restart preserves durable sovereign key custody
+    subprocess.run(["docker", "restart", "cfi-worker-bank-a"], capture_output=True, text=True, check=True)
+    worker_ready = False
+    for _ in range(25):
+        try:
+            code_w, body_w = _http_get(f"{WORKER_A_URL}/worker/health", timeout=2.0)
+            if code_w == 200 and isinstance(body_w, dict) and body_w.get("status") == "ONLINE":
+                pub_a_after = body_w.get("public_key_hex") or body_w.get("signing_public_key_hex")
+                assert pub_a_after == pub_a_initial, "Worker public key changed after container restart!"
+                worker_ready = True
+                break
+        except Exception:
+            pass
+        time.sleep(1.0)
+    assert worker_ready, "Worker Bank A failed to become ready after container restart."

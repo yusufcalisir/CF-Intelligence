@@ -297,18 +297,38 @@ def canonical_evaluated_result_digest(
 class InstitutionalSigningIdentity:
     """Authentic Ed25519 signing identity held strictly by an isolated bank worker."""
 
-    def __init__(self, bank_id: str, private_key: ed25519.Ed25519PrivateKey) -> None:
+    def __init__(
+        self,
+        bank_id: str,
+        private_key: ed25519.Ed25519PrivateKey,
+        custody_mode: str = "LOCAL_SANDBOX_ENV",
+    ) -> None:
         clean_bank_id = bank_id.lower().strip()
         if not clean_bank_id:
             raise ValueError("InstitutionalSigningIdentity requires a non-empty bank_id.")
         self.bank_id = clean_bank_id
         self._private_key = private_key
         self._public_key = private_key.public_key()
+        self.custody_mode = custody_mode
         raw_pub = self._public_key.public_bytes(
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
         )
         self.public_key_hex = raw_pub.hex()
+
+    def custody_descriptor(self) -> dict[str, Any]:
+        """Return truthful key-custody metadata distinguishing local sandbox vs isolated file custody."""
+        return {
+            "bank_id": self.bank_id,
+            "public_key_hex": self.public_key_hex,
+            "custody_mode": self.custody_mode,
+            "is_hardware_backed": False,
+            "custody_classification": (
+                "ISOLATED_FILE_CUSTODY"
+                if self.custody_mode == "ISOLATED_FILE_MOUNT"
+                else "SINGLE_HOST_DEVELOPMENT_SANDBOX"
+            ),
+        }
 
     @property
     def private_key_hex(self) -> str:
@@ -348,7 +368,12 @@ class InstitutionalSigningIdentity:
         )
 
     @classmethod
-    def from_private_hex(cls, bank_id: str, hex_key: str) -> InstitutionalSigningIdentity:
+    def from_private_hex(
+        cls,
+        bank_id: str,
+        hex_key: str,
+        custody_mode: str = "LOCAL_SANDBOX_ENV",
+    ) -> InstitutionalSigningIdentity:
         """Load an Ed25519 signing identity from a 64-char hex string (32 raw bytes)."""
         clean_hex = hex_key.strip()
         if len(clean_hex) != 64:
@@ -357,17 +382,22 @@ class InstitutionalSigningIdentity:
             )
         raw_bytes = bytes.fromhex(clean_hex)
         priv = ed25519.Ed25519PrivateKey.from_private_bytes(raw_bytes)
-        return cls(bank_id=bank_id, private_key=priv)
+        return cls(bank_id=bank_id, private_key=priv, custody_mode=custody_mode)
 
     @classmethod
-    def from_private_bytes(cls, bank_id: str, raw_bytes: bytes) -> InstitutionalSigningIdentity:
+    def from_private_bytes(
+        cls,
+        bank_id: str,
+        raw_bytes: bytes,
+        custody_mode: str = "LOCAL_SANDBOX_ENV",
+    ) -> InstitutionalSigningIdentity:
         """Load an Ed25519 signing identity from 32 raw private bytes."""
         if len(raw_bytes) != 32:
             raise ValueError(
                 f"Invalid private key byte length: {len(raw_bytes)}. Expected exactly 32 bytes."
             )
         priv = ed25519.Ed25519PrivateKey.from_private_bytes(raw_bytes)
-        return cls(bank_id=bank_id, private_key=priv)
+        return cls(bank_id=bank_id, private_key=priv, custody_mode=custody_mode)
 
     @classmethod
     def from_private_key_file(cls, bank_id: str, file_path: str) -> InstitutionalSigningIdentity:
@@ -378,9 +408,9 @@ class InstitutionalSigningIdentity:
         with open(file_path, "rb") as f:
             content = f.read().strip()
         if len(content) == 32:
-            return cls.from_private_bytes(bank_id, content)
+            return cls.from_private_bytes(bank_id, content, custody_mode="ISOLATED_FILE_MOUNT")
         content_str = content.decode("utf-8").strip()
-        return cls.from_private_hex(bank_id, content_str)
+        return cls.from_private_hex(bank_id, content_str, custody_mode="ISOLATED_FILE_MOUNT")
 
     def save_private_key_file(self, file_path: str) -> None:
         """Save the raw private key hex securely to a file."""
@@ -393,7 +423,7 @@ class InstitutionalSigningIdentity:
     def generate(cls, bank_id: str) -> InstitutionalSigningIdentity:
         """Generate a fresh cryptographically random Ed25519 keypair."""
         priv = ed25519.Ed25519PrivateKey.generate()
-        return cls(bank_id=bank_id, private_key=priv)
+        return cls(bank_id=bank_id, private_key=priv, custody_mode="EPHEMERAL_GENERATED")
 
 
 class EnrolledInstitutionalPublicKey:
@@ -648,16 +678,13 @@ class InstitutionalVerificationRegistry:
         if env_key and len(env_key.strip()) == 64:
             clean_env = env_key.strip()
             current = self._enrolled_keys.get(clean_bank_id)
-            if current is None or (
-                current.trust_source == "ENVIRONMENT_BOOTSTRAP"
-                and current.public_key_hex.lower() != clean_env.lower()
-            ):
+            if current is None:
                 with contextlib.suppress(Exception):
                     self.register_public_key(
                         clean_bank_id,
                         clean_env,
                         trust_source="ENVIRONMENT_BOOTSTRAP",
-                        allow_overwrite=True,
+                        allow_overwrite=False,
                     )
 
         enrolled = self._enrolled_keys.get(clean_bank_id)

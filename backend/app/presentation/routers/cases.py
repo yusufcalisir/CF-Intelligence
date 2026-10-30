@@ -78,9 +78,18 @@ def get_evidence_service() -> EvidenceRegistryService:
 
 def _enforce_case_tenant(case: Any, caller_tenant: str | None) -> None:
     """Enforce tenant isolation on a case and all linked alerts."""
-    if not caller_tenant:
-        return
     case_bank = getattr(case, "bank_id", None)
+    if not caller_tenant:
+        from app.config import get_settings
+
+        settings = get_settings()
+        if getattr(settings, "is_production", False) and case_bank:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required to access institutional case resources.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return
     if case_bank:
         enforce_tenant_isolation(caller_tenant, case_bank)
     if getattr(case, "alert_ids", None):
@@ -127,6 +136,11 @@ async def list_cases(
             for c in cases
             if not getattr(c, "bank_id", None) or c.bank_id == caller_tenant
         ]
+    else:
+        from app.config import get_settings
+
+        if getattr(get_settings(), "is_production", False):
+            cases = [c for c in cases if not getattr(c, "bank_id", None)]
     return [
         CaseSummaryResponse(
             id=c.id,
