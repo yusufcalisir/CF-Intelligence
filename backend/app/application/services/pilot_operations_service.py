@@ -105,10 +105,14 @@ class PilotOperationsService:
         c_meta = getattr(consortium, "metadata", {}) or {}
         clean_gid = (grant_id or "").strip()
         req_set = {b.lower().strip() for b in (participating_institutions or []) if b}
+        if not req_set:
+            # Cross-institution operational grant resolution strictly requires a non-empty participant set.
+            # Bypassing participant coverage by omitting institutions fails closed.
+            return {}
 
         def _covers_institutions(grant_dict: dict[str, Any]) -> bool:
             if not req_set:
-                return True
+                return False
             raw_banks = grant_dict.get("participating_banks") or []
             if not raw_banks:
                 return False

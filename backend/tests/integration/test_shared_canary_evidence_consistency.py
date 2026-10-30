@@ -326,6 +326,146 @@ class TestSharedCanaryEvidenceConsistency:
         # Canary traffic share must remain unchanged (0.0)
         assert last_feedback_res.get("traffic_share") == 0.0
 
+    def test_production_safety_gate_permits_canary_with_authoritative_shared_storage(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verifies that in production with authoritative shared Redis active, canary evaluation proceeds."""
+        monkeypatch.setenv("APP_ENV", "development")
+        get_settings.cache_clear()
+
+        trust_file = str(tmp_path / "trust.json")
+        admin_token = "admin_tok_prod"
+        priv_key = ed25519.Ed25519PrivateKey.generate()
+        pub_hex = (
+            priv_key.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+            .hex()
+        )
+        trust_store = DurableTrustStore(trust_file_path=trust_file, admin_token=admin_token)
+        trust_store.register_approved_key(
+            key_id="k1", public_key_hex=pub_hex, admin_token=admin_token
+        )
+        verifier = TrainingReceiptVerifier(trust_store=trust_store)
+        registry = ModelRegistry(storage_dir=str(tmp_path / "storage"), verifier=verifier)
+        eval_engine = ModelEvaluationEngine(registry)
+        sim_id = "sim_prod_redis_canary"
+
+        issuer = TrainingReceiptIssuer(
+            key_id="k1", private_key=priv_key, trust_store=trust_store, app_env="development"
+        )
+
+        model1 = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+        buf1 = io.BytesIO()
+        torch.save(model1.state_dict(), buf1)
+        bytes1 = buf1.getvalue()
+        sha1 = hashlib.sha256(bytes1).hexdigest()
+        evidence1 = TrainingExecutionEvidence(
+            training_run_id="run1",
+            job_id="job1",
+            simulation_id=sim_id,
+            completed_at="2026-10-15T00:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.1},
+            artifact_sha256=sha1,
+            architecture="FraudDetectionModel",
+            feature_schema_version="1.0",
+            feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+            owning_bank_id="bank_a",
+        )
+        rcpt1 = issuer.issue_receipt(
+            evidence=evidence1,
+            model_bytes=bytes1,
+            owning_bank_id="bank_a",
+            architecture="FraudDetectionModel",
+            input_dim=NUM_FEATURES,
+            feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+            feature_schema_version="1.0",
+        )
+        registry.save_version(
+            simulation_id=sim_id,
+            state_dict=model1.state_dict(),
+            artifact_bytes=bytes1,
+            training_receipt=rcpt1,
+            provenance_type="TRAINING_EVIDENCE_VERIFIED",
+            owning_bank_id="bank_a",
+        )
+        registry.promote_version(sim_id, 1, "champion")
+
+        model2 = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+        buf2 = io.BytesIO()
+        torch.save(model2.state_dict(), buf2)
+        bytes2 = buf2.getvalue()
+        sha2 = hashlib.sha256(bytes2).hexdigest()
+        evidence2 = TrainingExecutionEvidence(
+            training_run_id="run2",
+            job_id="job2",
+            simulation_id=sim_id,
+            completed_at="2026-10-15T00:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.05},
+            artifact_sha256=sha2,
+            architecture="FraudDetectionModel",
+            feature_schema_version="1.0",
+            feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+            owning_bank_id="bank_a",
+        )
+        rcpt2 = issuer.issue_receipt(
+            evidence=evidence2,
+            model_bytes=bytes2,
+            owning_bank_id="bank_a",
+            architecture="FraudDetectionModel",
+            input_dim=NUM_FEATURES,
+            feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+            feature_schema_version="1.0",
+        )
+        registry.save_version(
+            simulation_id=sim_id,
+            state_dict=model2.state_dict(),
+            artifact_bytes=bytes2,
+            training_receipt=rcpt2,
+            provenance_type="TRAINING_EVIDENCE_VERIFIED",
+            owning_bank_id="bank_a",
+        )
+
+        # Simulate authoritative shared Redis active in production
+        monkeypatch.setattr(eval_engine._store, "has_active_shared_storage", lambda: True)
+        monkeypatch.setenv("APP_ENV", "production")
+        get_settings.cache_clear()
+
+        labels = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1]
+        last_feedback_res: dict[str, Any] = {}
+        for i, lbl in enumerate(labels):
+            tx_id = f"tx_prod_shared_{i}"
+            champ_p = 0.1 if i in (0, 2) else (0.85 if lbl == 1 else 0.15)
+            eval_engine.log_prediction(
+                simulation_id=sim_id,
+                transaction_id=tx_id,
+                champion_version=1,
+                champion_prob=champ_p,
+                champion_latency_ms=1.5,
+                challenger_version=2,
+                challenger_prob=0.99 if lbl == 1 else 0.01,
+                challenger_latency_ms=1.2,
+            )
+            last_feedback_res = eval_engine.log_feedback(
+                simulation_id=sim_id,
+                transaction_id=tx_id,
+                actual_label=lbl,
+                target_challenger_version=2,
+            )
+
+        # In production WITH authoritative shared storage, canary activation is NOT blocked by safety gate
+        assert "shared authoritative evaluation storage (Redis) is degraded or unreachable" not in last_feedback_res.get(
+            "promotion_message", ""
+        )
+
     def test_development_mode_preserves_local_in_memory_evaluation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

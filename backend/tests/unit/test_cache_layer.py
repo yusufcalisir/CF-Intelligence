@@ -47,10 +47,14 @@ async def test_graceful_degradation_when_redis_unavailable(
     cache_service: CacheService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """When Redis is unavailable or unconfigured, all methods must return None/default without raising exceptions."""
-    # Force unavailable state
+    import time
+
+    # Force unavailable state with explicit monotonic timestamp within cooldown window
+    now = time.monotonic()
     CacheService._unavailable = True
+    CacheService._last_unavailable_at = now
     CacheService._client = None
-    monkeypatch.setattr(CacheService, "client", property(lambda self: None))
+    monkeypatch.setattr(time, "monotonic", lambda: now + 0.1)
 
     # Reads should return None
     assert await cache_service.get_alert("alert-123") is None
@@ -94,10 +98,14 @@ async def test_cache_miss_falls_back_to_db(
     async def get_alert_from_db(self, alert_id: str):
         return await mock_db_func(alert_id)
 
-    # Force cache miss
+    import time
+
+    # Force cache miss via unavailable state within cooldown window
+    now = time.monotonic()
     CacheService._unavailable = True
+    CacheService._last_unavailable_at = now
     CacheService._client = None
-    monkeypatch.setattr(CacheService, "client", property(lambda self: None))
+    monkeypatch.setattr(time, "monotonic", lambda: now + 0.1)
 
     res = await get_alert_from_db(None, "alert-999")
     assert res == {"id": "alert-999", "status": "new"}
@@ -185,3 +193,27 @@ async def test_cache_service_operation_level_reconnection_and_cooldown_transitio
     assert CacheService._unavailable is False
     assert CacheService._client is mock_recovered_client
     mock_recovered_client.get.assert_called_once_with("test:transient:key")
+
+
+@pytest.mark.asyncio
+async def test_non_connection_errors_do_not_mark_cache_unavailable(
+    cache_service: CacheService,
+) -> None:
+    """Non-connection errors (e.g. ResponseError or command syntax) do not trigger connection cooldown."""
+    import redis.asyncio as aioredis
+
+    mock_client = AsyncMock()
+    mock_client.get.side_effect = aioredis.ResponseError(
+        "WRONGTYPE Operation against a key holding the wrong kind of value"
+    )
+
+    CacheService._client = mock_client
+    CacheService._unavailable = False
+    CacheService._last_unavailable_at = 0.0
+
+    res = await cache_service._get("test:key")
+    assert res is None
+    # Client must NOT be invalidated and service must NOT be marked unavailable
+    assert CacheService._unavailable is False
+    assert CacheService._last_unavailable_at == 0.0
+    assert CacheService._client is mock_client

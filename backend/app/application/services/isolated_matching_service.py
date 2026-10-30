@@ -114,17 +114,31 @@ def _normalize_peer_identity_token(raw_token: str) -> set[str]:
         if last_seg:
             tokens.add(last_seg)
             tokens.add(last_seg.replace("-", "_"))
+            for prefix in ("cfi-worker-", "cfi_worker_", "worker-", "worker_", "cfi-"):
+                if last_seg.startswith(prefix):
+                    stripped = last_seg[len(prefix) :]
+                    tokens.add(stripped)
+                    tokens.add(stripped.replace("-", "_"))
     return tokens
 
 
 def _extract_x509_peer_identities(der_cert_bytes: bytes | None) -> set[str]:
-    """Extract all verifiable Subject CN and SAN identities from a DER-encoded X.509 peer certificate."""
+    """Extract verifiable SAN identities from a DER-encoded X.509 peer certificate.
+
+    Fail-closed identity policy:
+    - Institutional peer identity must be established exclusively through an approved SAN identity.
+    - Supported identity forms: DNS SAN (DNSName) and approved SPIFFE URI formats (UniformResourceIdentifier).
+    - Common Name (CN) is NEVER used as a fallback when SAN is missing or invalid.
+    - If the SAN extension is absent, verification fails closed immediately.
+    - If the SAN extension exists but contains no supported identities, verification fails closed.
+    - A matching CN must never compensate for a missing or mismatching SAN.
+    """
     if not der_cert_bytes:
         raise ConsortiumSecurityError(
             "Mutual TLS verification failed: peer did not present an X.509 certificate."
         )
     from cryptography import x509
-    from cryptography.x509.oid import ExtensionOID, NameOID
+    from cryptography.x509.oid import ExtensionOID
 
     try:
         cert = x509.load_der_x509_certificate(der_cert_bytes)
@@ -139,25 +153,37 @@ def _extract_x509_peer_identities(der_cert_bytes: bytes | None) -> set[str]:
             "Mutual TLS verification failed: peer X.509 certificate is outside its validity window."
         )
 
-    san_identities: set[str] = set()
-    with contextlib.suppress(x509.ExtensionNotFound):
+    try:
         san_ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-        for dns_name in san_ext.value.get_values_for_type(x509.DNSName):
-            san_identities.update(_normalize_peer_identity_token(dns_name))
-        for uri_name in san_ext.value.get_values_for_type(x509.UniformResourceIdentifier):
-            san_identities.update(_normalize_peer_identity_token(uri_name))
+    except x509.ExtensionNotFound as exc:
+        raise ConsortiumSecurityError(
+            "Mutual TLS verification failed: peer X.509 certificate lacks required "
+            "Subject Alternative Name (SAN) extension. Common Name fallback is prohibited."
+        ) from exc
 
-    # Standard X.509 (RFC 5280 / RFC 6125): When SAN is present, SAN is authoritative; CN is ignored.
-    if san_identities:
-        return san_identities
+    san_identities: set[str] = set()
 
-    # Fall back to Subject CN if and only if no SAN entries are present.
-    cn_identities: set[str] = set()
-    for attr in cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
-        val = attr.value if isinstance(attr.value, str) else attr.value.decode("utf-8", errors="ignore")
-        cn_identities.update(_normalize_peer_identity_token(val))
+    # 1. DNS SANs
+    for dns_name in san_ext.value.get_values_for_type(x509.DNSName):
+        tokens = _normalize_peer_identity_token(dns_name)
+        san_identities.update(tokens)
 
-    return cn_identities
+    # 2. Approved SPIFFE URIs (format: spiffe://<trust-domain>/<path>)
+    for uri_name in san_ext.value.get_values_for_type(x509.UniformResourceIdentifier):
+        clean_uri = uri_name.strip()
+        if clean_uri.lower().startswith("spiffe://"):
+            remainder = clean_uri[len("spiffe://") :].strip("/")
+            if remainder:
+                tokens = _normalize_peer_identity_token(clean_uri)
+                san_identities.update(tokens)
+
+    if not san_identities:
+        raise ConsortiumSecurityError(
+            "Mutual TLS verification failed: peer X.509 certificate Subject Alternative Name (SAN) "
+            "contains no supported identities (DNSName or approved SPIFFE URI). Common Name fallback is prohibited."
+        )
+
+    return san_identities
 
 
 @dataclass(frozen=True)
@@ -554,12 +580,12 @@ class IsolatedBankWorkerNode:
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{self.bank_id.upper()}")
             or os.environ.get("WORKER_SIGNING_KEY")
         )
-        if isinstance(signing_key, InstitutionalSigningIdentity):
+        if key_file and os.path.exists(key_file):
+            self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
+        elif isinstance(signing_key, InstitutionalSigningIdentity):
             self._signing_identity: InstitutionalSigningIdentity | None = signing_key
         elif isinstance(signing_key, str) and len(signing_key.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key)
-        elif key_file and os.path.exists(key_file):
-            self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
         else:

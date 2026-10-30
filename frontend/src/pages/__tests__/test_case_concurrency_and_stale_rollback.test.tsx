@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CaseDetailPage from '../CaseDetailPage';
 import SecurityPage from '../SecurityPage';
-import { switchActiveTenant, getActiveTenantId, setClientTenant } from '../../api/client';
+import { switchActiveTenant, getActiveTenantId, setClientTenant, getSessionEpoch } from '../../api/client';
 import * as queries from '../../api/queries';
 import type { Case } from '../../api/types';
 
@@ -316,6 +316,80 @@ describe('Frontend Behavioral Correctness & Contract Verification', () => {
 
       setClientTenant(null);
       expect(getActiveTenantId()).toBe('default');
+    });
+
+    it('prevents deferred in-flight requests from prior tenant from repopulating cache after switchActiveTenant', async () => {
+      const queryClient = createTestQueryClient();
+      setClientTenant('bank_alpha');
+      expect(getActiveTenantId()).toBe('bank_alpha');
+
+      // 1. Start a deferred in-flight request under tenant A
+      let resolveTenantARequest!: (data: any) => void;
+      const tenantAPromise = new Promise((resolve) => {
+        resolveTenantARequest = resolve;
+      });
+
+      const initialEpoch = getSessionEpoch();
+
+      // Trigger query fetch in queryClient with the deferred promise
+      const fetchPromise = queryClient.fetchQuery({
+        queryKey: ['case', 'case_alpha_sensitive'],
+        queryFn: async () => {
+          const res = await tenantAPromise;
+          // In real apiClient, late response from superseded epoch is rejected.
+          // Emulate epoch check contract:
+          if (getSessionEpoch() !== initialEpoch) {
+            throw new Error('Discarded response from superseded institutional session epoch.');
+          }
+          return res;
+        },
+      });
+
+      // Populate some immediate data for Tenant A
+      queryClient.setQueryData(['case', 'case_alpha_immediate'], {
+        id: 'case_alpha_immediate',
+        title: 'Tenant Alpha Direct Data',
+      });
+      expect(queryClient.getQueryData(['case', 'case_alpha_immediate'])).toBeDefined();
+
+      // 2. Switch to tenant B before the request resolves
+      switchActiveTenant(queryClient, 'bank_beta');
+      expect(getActiveTenantId()).toBe('bank_beta');
+
+      // 3. Assert that the sensitive query cache is cleared synchronously
+      expect(queryClient.getQueryData(['case', 'case_alpha_immediate'])).toBeUndefined();
+      expect(queryClient.getQueryData(['case', 'case_alpha_sensitive'])).toBeUndefined();
+
+      // 4. Resolve the old tenant A request after the switch
+      resolveTenantARequest({
+        id: 'case_alpha_sensitive',
+        title: 'Tenant Alpha Stale In-Flight Data',
+      });
+
+      // Await promise completion (it must be cancelled by session epoch transition or discarded)
+      await expect(fetchPromise).rejects.toThrow(/CancelledError|superseded/);
+
+      // 5. Assert that tenant A data CANNOT repopulate the active cache
+      expect(queryClient.getQueryData(['case', 'case_alpha_sensitive'])).toBeUndefined();
+      expect(queryClient.getQueryData(['case', 'case_alpha_immediate'])).toBeUndefined();
+
+      // 6. Confirm that tenant B can load its own data normally
+      const tenantBData = await queryClient.fetchQuery({
+        queryKey: ['case', 'case_beta_01'],
+        queryFn: async () => ({
+          id: 'case_beta_01',
+          title: 'Tenant Beta Authorized Case',
+          tenant: getActiveTenantId(),
+        }),
+      });
+
+      expect(tenantBData.tenant).toBe('bank_beta');
+      expect(queryClient.getQueryData(['case', 'case_beta_01'])).toEqual({
+        id: 'case_beta_01',
+        title: 'Tenant Beta Authorized Case',
+        tenant: 'bank_beta',
+      });
+      expect(queryClient.getQueryData(['case', 'case_alpha_sensitive'])).toBeUndefined();
     });
   });
 

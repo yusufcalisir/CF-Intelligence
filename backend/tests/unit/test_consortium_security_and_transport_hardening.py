@@ -27,9 +27,11 @@ Verifies:
 # ruff: noqa: E402
 from __future__ import annotations
 
+import concurrent.futures
 import datetime
 import ipaddress
 import json
+import socket
 import ssl
 import sys
 import time
@@ -190,6 +192,8 @@ def _generate_test_certificate(
     ca_cert: x509.Certificate,
     common_name: str,
     san_dns_names: list[str] | None = None,
+    san_uri_names: list[str] | None = None,
+    san_raw_entries: list[x509.GeneralName] | None = None,
 ) -> bytes:
     """Generate a DER-encoded certificate for unit testing SAN vs CN precedence."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -204,9 +208,21 @@ def _generate_test_certificate(
         .not_valid_before(now - datetime.timedelta(minutes=5))
         .not_valid_after(now + datetime.timedelta(days=1))
     )
+    general_names: list[x509.GeneralName] = []
     if san_dns_names is not None:
+        general_names.extend(x509.DNSName(name) for name in san_dns_names)
+    if san_uri_names is not None:
+        general_names.extend(x509.UniformResourceIdentifier(uri) for uri in san_uri_names)
+    if san_raw_entries is not None:
+        general_names.extend(san_raw_entries)
+
+    if (
+        san_dns_names is not None
+        or san_uri_names is not None
+        or san_raw_entries is not None
+    ):
         builder = builder.add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(name) for name in san_dns_names]),
+            x509.SubjectAlternativeName(general_names),
             critical=False,
         )
     cert = builder.sign(ca_key, hashes.SHA256())
@@ -273,6 +289,17 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
         health = worker.get_health()
         assert health["key_custody_mode"] == "ISOLATED_FILE_MOUNT"
         assert health["signing_public_key_hex"] == expected_pub_hex
+
+        # Confirm that file-mounted key takes precedence over any environment-based private-key configuration
+        worker_with_env_override = IsolatedBankWorkerNode(
+            bank_id="bank_a",
+            storage_root=str(tmp_path / "bank_a_vault_2"),
+            signing_key="aa" * 32,  # Conflicting candidate key from environment/CLI
+            signing_key_file=str(bank_a_key_file),
+        )
+        assert worker_with_env_override._signing_identity is not None
+        assert worker_with_env_override._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
+        assert worker_with_env_override._signing_identity.public_key_hex == expected_pub_hex
 
     def test_consortium_deployment_key_custody_isolation_and_boundary_checks(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -684,7 +711,7 @@ class TestAuthenticatedServiceTransportBoundaries:
             daemon_a.stop()
 
     def test_hardened_mtls_enforces_tls13_minimum_version(self, tmp_path: Path) -> None:
-        """Verify HARDENED_MTLS SSL contexts configure TLS 1.3 minimum version."""
+        """Verify HARDENED_MTLS enforces TLS 1.3 minimum version via actual TLS handshakes."""
         ca_key, ca_cert = _generate_ca_certificate("Test CA")
         ca_file = tmp_path / "ca.crt"
         ca_file.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
@@ -701,7 +728,8 @@ class TestAuthenticatedServiceTransportBoundaries:
             ca_cert_path=str(ca_file),
             cert_path=str(cert_file),
             key_path=str(key_file),
-            allowed_client_identities=("client_a",),
+            allowed_client_identities=("test_node",),
+            expected_peer_identity="test_node",
         )
         server_ctx = cfg.create_server_ssl_context()
         assert server_ctx.minimum_version == ssl.TLSVersion.TLSv1_3
@@ -711,8 +739,86 @@ class TestAuthenticatedServiceTransportBoundaries:
         assert client_ctx.minimum_version == ssl.TLSVersion.TLSv1_3
         assert client_ctx.verify_mode == ssl.CERT_REQUIRED
 
-    def test_authoritative_san_precedence_and_cn_fallback(self, tmp_path: Path) -> None:
-        """Verify SAN precedence (RFC 5280 / RFC 6125) and CN fallback when SAN is absent."""
+        # Perform actual TLS 1.3 handshake over connected loopback sockets
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        port = listener.getsockname()[1]
+
+        def run_server_tls13() -> ssl.SSLSocket:
+            raw_sock, _ = listener.accept()
+            return server_ctx.wrap_socket(raw_sock, server_side=True)
+
+        def run_client_tls13() -> ssl.SSLSocket:
+            raw_sock = socket.create_connection(("127.0.0.1", port), timeout=5.0)
+            return client_ctx.wrap_socket(raw_sock, server_side=False, server_hostname="test_node")
+
+        ssl_server: ssl.SSLSocket | None = None
+        ssl_client: ssl.SSLSocket | None = None
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                f_server = executor.submit(run_server_tls13)
+                f_client = executor.submit(run_client_tls13)
+                ssl_server = f_server.result(timeout=5.0)
+                ssl_client = f_client.result(timeout=5.0)
+
+            # Record negotiated protocol version and demonstrate TLS 1.3
+            server_ver = ssl_server.version()
+            client_ver = ssl_client.version()
+            assert server_ver == "TLSv1.3", f"Expected TLSv1.3, got {server_ver}"
+            assert client_ver == "TLSv1.3", f"Expected TLSv1.3, got {client_ver}"
+        finally:
+            if ssl_server:
+                ssl_server.close()
+            if ssl_client:
+                ssl_client.close()
+            listener.close()
+
+        # Demonstrate that a TLS 1.2-only peer cannot complete the hardened handshake
+        tls12_client_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        tls12_client_ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+        tls12_client_ctx.check_hostname = False
+        tls12_client_ctx.verify_mode = ssl.CERT_REQUIRED
+        tls12_client_ctx.load_verify_locations(cafile=str(ca_file))
+        tls12_client_ctx.load_cert_chain(certfile=str(cert_file), keyfile=str(key_file))
+
+        listener2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener2.bind(("127.0.0.1", 0))
+        listener2.listen(1)
+        port2 = listener2.getsockname()[1]
+
+        def run_server_reject_tls12() -> Any:
+            raw_sock, _ = listener2.accept()
+            try:
+                return server_ctx.wrap_socket(raw_sock, server_side=True)
+            except Exception as exc:
+                return exc
+
+        def run_client_attempt_tls12() -> Any:
+            raw_sock = socket.create_connection(("127.0.0.1", port2), timeout=5.0)
+            try:
+                return tls12_client_ctx.wrap_socket(raw_sock, server_side=False, server_hostname="test_node")
+            except Exception as exc:
+                return exc
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                f_server2 = executor.submit(run_server_reject_tls12)
+                f_client2 = executor.submit(run_client_attempt_tls12)
+                res_c = f_client2.result(timeout=5.0)
+                res_s = f_server2.result(timeout=5.0)
+
+                # Both or either side must reject with SSLError/ConnectionError
+                assert isinstance(res_c, (ssl.SSLError, OSError)) or isinstance(res_s, (ssl.SSLError, OSError)), (
+                    f"Expected TLS 1.2 handshake rejection, got client={res_c}, server={res_s}"
+                )
+        finally:
+            listener2.close()
+
+    def test_strict_san_identity_verification_and_cn_fallback_prohibition(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify strict fail-closed SAN identity verification and absolute prohibition of CN fallback."""
         ca_key, ca_cert = _generate_ca_certificate("SAN Authority CA")
         ca_file = tmp_path / "ca.crt"
         ca_file.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
@@ -731,40 +837,69 @@ class TestAuthenticatedServiceTransportBoundaries:
             key_path=str(key_file),
         )
 
-        # 1. Certificate with malicious/conflicting CN ("coordinator") but legitimate SAN ("bank_a")
+        # 1. Expected SAN matches while CN conflicts: accept based on the SAN
         cert_malicious_cn = _generate_test_certificate(
             ca_key=ca_key,
             ca_cert=ca_cert,
             common_name="coordinator",
             san_dns_names=["bank_a"],
         )
-        # Accepted based solely on SAN for target "bank_a"
         idents_a = cfg.verify_peer_cert_bytes(cert_malicious_cn, expected_identity="bank_a")
         assert "bank_a" in idents_a
-        # Rejected for target "coordinator" because CN is completely ignored when SAN is present
+        # CN "coordinator" is completely ignored; verifying for coordinator must fail
         with pytest.raises(ConsortiumSecurityError, match="peer identity mismatch"):
             cfg.verify_peer_cert_bytes(cert_malicious_cn, expected_identity="coordinator")
 
-        # 2. Certificate with legitimate CN ("bank_a") but mismatched SAN ("attacker_node")
+        # 2. SAN does not match while CN matches: reject
         cert_mismatched_san = _generate_test_certificate(
             ca_key=ca_key,
             ca_cert=ca_cert,
             common_name="bank_a",
             san_dns_names=["attacker_node"],
         )
-        # Rejected for target "bank_a" because SAN is authoritative and CN is ignored
         with pytest.raises(ConsortiumSecurityError, match="peer identity mismatch"):
             cfg.verify_peer_cert_bytes(cert_mismatched_san, expected_identity="bank_a")
 
-        # 3. Certificate with legitimate CN ("bank_a") and NO SAN -> Accepted via CN fallback
+        # 3. SAN extension is absent while CN matches: reject (prohibit CN fallback)
         cert_cn_only = _generate_test_certificate(
             ca_key=ca_key,
             ca_cert=ca_cert,
             common_name="bank_a",
             san_dns_names=None,
         )
-        idents_cn = cfg.verify_peer_cert_bytes(cert_cn_only, expected_identity="bank_a")
-        assert "bank_a" in idents_cn
+        with pytest.raises(ConsortiumSecurityError, match="lacks required Subject Alternative Name"):
+            cfg.verify_peer_cert_bytes(cert_cn_only, expected_identity="bank_a")
+
+        # 4. SAN exists but contains only unsupported identity types: reject
+        cert_unsupported_san = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="bank_a",
+            san_raw_entries=[x509.IPAddress(ipaddress.IPv4Address("192.168.1.100"))],
+        )
+        with pytest.raises(ConsortiumSecurityError, match="contains no supported identities"):
+            cfg.verify_peer_cert_bytes(cert_unsupported_san, expected_identity="bank_a")
+
+        # 5. SAN matches expected institutional identity: accept
+        # 5a. DNSName match
+        cert_valid_dns = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="irrelevant_cn",
+            san_dns_names=["bank_a.consortium.local"],
+        )
+        idents_dns = cfg.verify_peer_cert_bytes(cert_valid_dns, expected_identity="bank_a")
+        assert "bank_a" in idents_dns
+
+        # 5b. Approved SPIFFE URI match
+        cert_valid_spiffe = _generate_test_certificate(
+            ca_key=ca_key,
+            ca_cert=ca_cert,
+            common_name="irrelevant_cn",
+            san_uri_names=["spiffe://consortium.local/worker-bank-a"],
+        )
+        idents_spiffe = cfg.verify_peer_cert_bytes(cert_valid_spiffe, expected_identity="bank_a")
+        assert "bank_a" in idents_spiffe
 
 
 class TestGovernanceAndCryptographicBoundaryRegression:
@@ -945,6 +1080,33 @@ class TestGovernanceAndCryptographicBoundaryRegression:
         # 6. Nonexistent grant_id rejected even if institutions match default grant
         assert pilot_svc._resolve_consortium_grant(
             c_exact, grant_id="nonexistent_id", participating_institutions=["bank_a", "bank_b"]
+        ) == {}
+
+        # 7. Explicit grant ID that does not match the requested pair rejected
+        grant_mismatched_pair = {
+            "grant_id": "g_mismatched",
+            "participating_banks": ["bank_a", "bank_c"],
+        }
+        c_mismatched = DummyConsortium({
+            "operational_data_sharing_grant": grant_mismatched_pair,
+            "pairwise_operational_grants": {"g_mismatched": grant_mismatched_pair},
+        })
+        assert pilot_svc._resolve_consortium_grant(
+            c_mismatched, grant_id="g_mismatched", participating_institutions=["bank_a", "bank_b"]
+        ) == {}
+
+        # 8. Request with omitted or empty participants strictly rejected (fail closed, no bypass)
+        assert pilot_svc._resolve_consortium_grant(
+            c_exact, grant_id="g_exact", participating_institutions=[]
+        ) == {}
+        assert pilot_svc._resolve_consortium_grant(
+            c_exact, grant_id="g_exact", participating_institutions=None
+        ) == {}
+        assert pilot_svc._resolve_consortium_grant(
+            c_exact, participating_institutions=[]
+        ) == {}
+        assert pilot_svc._resolve_consortium_grant(
+            c_exact, participating_institutions=None
         ) == {}
 
 
