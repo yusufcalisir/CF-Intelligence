@@ -115,21 +115,64 @@ def wait_for_service(name: str, url: str, max_retries: int = 15, delay: float = 
     return False
 
 
-def run_docker_exec(container_name: str, cmd: list[str]) -> str:
-    """Run command inside a Docker container via docker exec."""
-    full_cmd = ["docker", "exec", container_name] + cmd
-    res = subprocess.run(full_cmd, capture_output=True, text=True, check=False)
+def run_docker_exec(
+    container_name: str,
+    cmd: list[str],
+    stdin_input: str | None = None,
+) -> str:
+    """Run command inside a Docker container via docker exec without leaking sensitive inputs."""
+    exec_flags = ["docker", "exec", "-i"] if stdin_input is not None else ["docker", "exec"]
+    full_cmd = exec_flags + [container_name] + cmd
+    res = subprocess.run(
+        full_cmd,
+        input=stdin_input,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if res.returncode != 0:
         raise RuntimeError(
-            f"docker exec failed on '{container_name}' (exit {res.returncode}): {res.stderr.strip()}"
+            f"docker exec failed on '{container_name}' (exit {res.returncode})"
         )
     return res.stdout.strip()
+
+
+def _validate_analyst_credentials(env: dict[str, str]) -> dict[str, str]:
+    """Validate that independent, non-predictable analyst credentials are supplied."""
+    required_keys = (
+        "ANALYST_BANK_A_PASSWORD",
+        "ANALYST_BANK_B_PASSWORD",
+        "ANALYST_BANK_C_PASSWORD",
+    )
+    resolved: dict[str, str] = {}
+    forbidden_prefixes = (
+        "replace_with_",
+        "analyst",
+        "admin",
+        "auditor",
+        "password",
+        "changeme",
+        "default",
+    )
+    for key in required_keys:
+        val = (env.get(key) or os.environ.get(key) or "").strip()
+        if not val or len(val) < 16 or val.lower().startswith(forbidden_prefixes):
+            raise ValueError(
+                f"Invalid or missing '{key}': bootstrap requires a non-predictable generated credential (>= 16 chars)."
+            )
+        resolved[key] = val
+
+    if len(set(resolved.values())) != len(required_keys):
+        raise ValueError(
+            "Analyst credentials across Bank A, Bank B, and Bank C must be mutually independent."
+        )
+    return resolved
 
 
 def compute_deterministic_privacy_id(raw_id: str, entity_type: str = "customer") -> str:
     """Derive SHA256 HMAC-style privacy ID for test fixtures."""
     import hashlib
-    canonical = f"{entity_type.lower()}:{raw_id.strip()}".encode("utf-8")
+    canonical = f"{entity_type.lower()}:{raw_id.strip()}".encode()
     return hashlib.sha256(canonical).hexdigest()[:32]
 
 
@@ -147,6 +190,8 @@ def bootstrap_consortium(
     env = load_env_file(env_file)
     if not env:
         raise FileNotFoundError(f"Environment secrets file '{env_file}' not found.")
+
+    analyst_creds = _validate_analyst_credentials(env)
 
     logger.info("--- Phase 1: Service Readiness Verifications ---")
     services = [
@@ -233,33 +278,38 @@ def bootstrap_consortium(
     logger.info("--- Phase 3: Provisioning Users & Governed Consortium ---")
     py_bootstrap_script = f"""
 import json
+import sys
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.domain.consortium_governance import MemberRole
 
+creds = json.loads(sys.stdin.read())
 auth_svc = AuthenticationService.get_instance()
-# Register institutional analysts
-u_a = auth_svc.get_user("analyst_bank_a") or auth_svc.register_user(
+
+# Register or update institutional analysts with least-privilege institutional roles
+u_a = auth_svc.register_user(
     username="analyst_bank_a",
-    plain_password="AnalystBankA2026!",
+    plain_password=creds["ANALYST_BANK_A_PASSWORD"],
     bank_id="bank_a",
-    roles=["admin", "compliance", "investigator", "ml_lead"],
-    clearance_level=3
+    roles=["compliance", "investigator"],
+    clearance_level=2,
 )
-u_b = auth_svc.get_user("analyst_bank_b") or auth_svc.register_user(
+u_b = auth_svc.register_user(
     username="analyst_bank_b",
-    plain_password="AnalystBankB2026!",
+    plain_password=creds["ANALYST_BANK_B_PASSWORD"],
     bank_id="bank_b",
-    roles=["admin", "compliance", "investigator", "ml_lead"],
-    clearance_level=3
+    roles=["compliance", "investigator"],
+    clearance_level=2,
 )
-u_c = auth_svc.get_user("analyst_bank_c") or auth_svc.register_user(
+u_c = auth_svc.register_user(
     username="analyst_bank_c",
-    plain_password="AnalystBankC2026!",
+    plain_password=creds["ANALYST_BANK_C_PASSWORD"],
     bank_id="bank_c",
-    roles=["admin", "compliance", "investigator", "ml_lead"],
-    clearance_level=3
+    roles=["compliance", "investigator"],
+    clearance_level=2,
 )
+for uname in ("analyst_bank_a", "analyst_bank_b", "analyst_bank_c"):
+    auth_svc.lockout_manager.reset(uname)
 
 token_a = auth_svc.create_token_bundle(u_a).access_token
 token_b = auth_svc.create_token_bundle(u_b).access_token
@@ -354,7 +404,11 @@ result = {{
 print(json.dumps(result))
 """
 
-    stdout = run_docker_exec("cfi-api-server", ["python", "-c", py_bootstrap_script])
+    stdout = run_docker_exec(
+        "cfi-api-server",
+        ["python", "-c", py_bootstrap_script],
+        stdin_input=json.dumps(analyst_creds),
+    )
     # Extract the last line which contains JSON output
     last_line = [ln for ln in stdout.splitlines() if ln.strip().startswith("{")][-1]
     gov_meta = json.loads(last_line)

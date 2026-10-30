@@ -6,16 +6,21 @@ Validates the integrated Docker-based consortium deployment:
 - Authentic multi-counterparty PSI query execution (OpenMined PSI 2.0.6 ECDH).
 - Authentic MATCH and NO_MATCH outcomes with Ed25519 cryptographic attestations.
 - Authoritative investigation case creation and tamper-evident evidence attachment.
-- Security negative controls failing closed (unauthenticated, tenant mismatch, unknown counterpart).
-- Reverse proxy security gateway and frontend asset reachability.
+- Security negative controls failing closed (unauthenticated, predictable password rejection,
+  tenant mismatch, unknown counterpart, and unavailable counterparty worker).
+- Localhost-only port binding boundaries and HTTP reverse proxy gateway reachability.
 """
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import subprocess
+import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -28,6 +33,45 @@ COORDINATOR_URL = "http://127.0.0.1:8200"
 WORKER_A_URL = "http://127.0.0.1:8101"
 WORKER_B_URL = "http://127.0.0.1:8102"
 WORKER_C_URL = "http://127.0.0.1:8103"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_consortium_env() -> dict[str, str]:
+    """Load deployment secrets from .env.consortium in repository root."""
+    env_path = Path(os.environ.get("CFI_CONSORTIUM_ENV_FILE", REPO_ROOT / ".env.consortium"))
+    env: dict[str, str] = {}
+    if not env_path.exists():
+        return env
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        env[k.strip()] = v.strip()
+    return env
+
+
+def _get_analyst_password(env_key: str = "ANALYST_BANK_A_PASSWORD") -> str:
+    """Resolve non-predictable analyst credential from environment or .env.consortium."""
+    env = _load_consortium_env()
+    pwd = (os.environ.get(env_key) or env.get(env_key) or "").strip()
+    if not pwd or len(pwd) < 16 or pwd.lower().startswith(("replace_with_", "analyst", "admin")):
+        pytest.fail(
+            f"Missing or predictable credential for '{env_key}'. "
+            "Run 'python scripts/generate_consortium_deployment_secrets.py --output .env.consortium' "
+            "and 'python scripts/bootstrap_consortium_deployment.py --env-file .env.consortium'."
+        )
+    return pwd
+
+
+def _is_strict_live_verification(request: pytest.FixtureRequest) -> bool:
+    """Return True when live consortium certification is explicitly invoked."""
+    if os.environ.get("CFI_REQUIRE_LIVE_CONSORTIUM", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    if os.environ.get("CFI_STRICT_CONSORTIUM_VERIFICATION", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    invoked_args = [str(a) for a in getattr(request.config.invocation_params, "args", ())]
+    return any("test_consortium_multi_bank_deployment" in arg for arg in invoked_args)
 
 
 def _http_get(url: str, timeout: float = 5.0) -> tuple[int, dict[str, Any] | str]:
@@ -80,22 +124,48 @@ def _http_post(
 
 
 @pytest.fixture(scope="module")
-def require_consortium_deployment() -> None:
-    """Ensure Docker is running and consortium containers are up before running tests."""
+def require_consortium_deployment(request: pytest.FixtureRequest) -> None:
+    """Ensure Docker is running and consortium containers are healthy before running tests.
+
+    Fails closed when live consortium verification is intentionally invoked;
+    skips only during broad non-deployment CI discovery.
+    """
+    strict = _is_strict_live_verification(request)
+
     if not is_docker_running():
-        pytest.skip("Docker daemon is not running.")
-    try:
-        code, body = _http_get(f"{BACKEND_URL}/health", timeout=3.0)
-        if code != 200 or not isinstance(body, dict) or body.get("status") != "healthy":
-            pytest.skip("Consortium backend is not running or healthy at http://127.0.0.1:8000.")
-    except Exception as exc:
-        pytest.skip(f"Consortium environment unreachable: {exc}")
+        msg = "Docker daemon is not running."
+        if strict:
+            pytest.fail(f"Live consortium verification failed: {msg}")
+        pytest.skip(msg)
+
+    required_probes = [
+        ("Gateway", f"{GATEWAY_URL}/gateway-health"),
+        ("Backend", f"{BACKEND_URL}/health"),
+        ("Coordinator", f"{COORDINATOR_URL}/health"),
+        ("Worker Bank A", f"{WORKER_A_URL}/worker/health"),
+        ("Worker Bank B", f"{WORKER_B_URL}/worker/health"),
+        ("Worker Bank C", f"{WORKER_C_URL}/worker/health"),
+    ]
+    for name, url in required_probes:
+        try:
+            code, body = _http_get(url, timeout=3.0)
+            if code != 200:
+                msg = f"Required consortium service '{name}' is unhealthy (HTTP {code}) at {url}: {body}"
+                if strict:
+                    pytest.fail(f"Live consortium verification failed: {msg}")
+                pytest.skip(msg)
+        except Exception as exc:
+            msg = f"Required consortium service '{name}' is unreachable at {url}: {exc}"
+            if strict:
+                pytest.fail(f"Live consortium verification failed: {msg}")
+            pytest.skip(msg)
 
 
 def _login_bank_a_analyst() -> str:
+    password = _get_analyst_password("ANALYST_BANK_A_PASSWORD")
     code, res = _http_post(
         f"{BACKEND_URL}/api/v1/auth/login",
-        {"username": "analyst_bank_a", "password": "AnalystBankA2026!"},
+        {"username": "analyst_bank_a", "password": password},
     )
     assert code == 200, f"Analyst login failed (status {code}): {res}"
     assert isinstance(res, dict) and "access_token" in res
@@ -250,7 +320,8 @@ def test_consortium_deployment_investigation_case_evidence_attachment(require_co
 
 
 def test_consortium_deployment_unauthenticated_query_fails_closed(require_consortium_deployment: None) -> None:
-    """Verify unauthenticated query without bearer token fails closed with HTTP 401."""
+    """Verify unauthenticated queries and predictable credentials fail closed, and analyst roles are least-privilege."""
+    # 1. Unauthenticated request fails closed
     code, _ = _http_post(
         f"{BACKEND_URL}/api/v1/intelligence/cross-bank/query-multi",
         {
@@ -264,6 +335,28 @@ def test_consortium_deployment_unauthenticated_query_fails_closed(require_consor
         },
     )
     assert code in (401, 403), f"Expected 401/403, got {code}"
+
+    # 2. Publicly known / predictable privileged credentials must be rejected with HTTP 401
+    for uname, suffix in [
+        ("analyst_bank_a", "BankA2026!"),
+        ("analyst_bank_b", "BankB2026!"),
+        ("analyst_bank_c", "BankC2026!"),
+    ]:
+        pred_pwd = "Analyst" + suffix
+        code_login, _ = _http_post(
+            f"{BACKEND_URL}/api/v1/auth/login",
+            {"username": uname, "password": pred_pwd},
+        )
+        assert code_login == 401, f"Predictable credential for {uname} must fail with 401, got {code_login}"
+
+    # 3. Verify authenticated analyst holds least-privilege institutional roles (no admin privilege)
+    token_a = _login_bank_a_analyst()
+    payload_b64 = token_a.split(".")[1]
+    padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+    claims = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+    roles = set(claims.get("roles", []))
+    assert "admin" not in roles and "super_admin" not in roles
+    assert roles == {"compliance", "investigator"}
 
 
 def test_consortium_deployment_tenant_mismatch_fails_closed(require_consortium_deployment: None) -> None:
@@ -287,8 +380,10 @@ def test_consortium_deployment_tenant_mismatch_fails_closed(require_consortium_d
 
 
 def test_consortium_deployment_unknown_target_institution_fails_closed(require_consortium_deployment: None) -> None:
-    """Verify querying an unapproved or unknown institution fails closed with HTTP 403."""
+    """Verify unknown target institutions fail closed and unavailable workers report truthful PARTIAL_FAILURE."""
     token_a = _login_bank_a_analyst()
+
+    # 1. Unknown institution fails closed in pre-flight governance check
     code, resp = _http_post(
         f"{BACKEND_URL}/api/v1/intelligence/cross-bank/query-multi",
         {
@@ -305,9 +400,45 @@ def test_consortium_deployment_unknown_target_institution_fails_closed(require_c
     )
     assert code in (400, 403, 404, 422), f"Expected fail-closed, got {code}"
 
+    # 2. Unavailable counterparty worker fails closed for that target without fabricating results
+    subprocess.run(["docker", "stop", "cfi-worker-bank-c"], capture_output=True, text=True, check=True)
+    try:
+        code_partial, resp_partial = _http_post(
+            f"{BACKEND_URL}/api/v1/intelligence/cross-bank/query-multi",
+            {
+                "consortium_id": "consortium_consortium_deployment_01",
+                "requesting_bank_id": "bank_a",
+                "target_bank_ids": ["bank_b", "bank_c"],
+                "query_entity_id": "target_nexus_investigation_01",
+                "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "use_established_psi": True,
+                "require_established_psi": True,
+            },
+            token=token_a,
+            tenant_id="bank_a",
+        )
+        assert code_partial == 200 and isinstance(resp_partial, dict)
+        assert resp_partial["overall_outcome"] == "PARTIAL_FAILURE"
+        assert "bank_b" in resp_partial["results"]
+        assert resp_partial["results"]["bank_b"]["match_confirmed"] is True
+        assert "bank_c" not in resp_partial["results"]
+        assert "bank_c" in resp_partial["failures"]
+        assert resp_partial["execution_outcomes"]["bank_c"]["status"] == "FAILED"
+    finally:
+        subprocess.run(["docker", "start", "cfi-worker-bank-c"], capture_output=True, text=True, check=True)
+        for _ in range(20):
+            try:
+                c_health, _ = _http_get(f"{WORKER_C_URL}/worker/health", timeout=2.0)
+                if c_health == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(1.0)
+
 
 def test_consortium_deployment_frontend_reverse_proxy_reachability(require_consortium_deployment: None) -> None:
-    """Verify reverse proxy gateway correctly serves frontend assets and proxies API endpoints."""
+    """Verify reverse proxy gateway reachability and strict 127.0.0.1 localhost port exposure boundaries."""
     # 1. Frontend SPA index
     code_fe, body_fe = _http_get(f"{GATEWAY_URL}/")
     assert code_fe == 200
@@ -317,3 +448,40 @@ def test_consortium_deployment_frontend_reverse_proxy_reachability(require_conso
     code_api, body_api = _http_get(f"{GATEWAY_URL}/api/v1/health")
     assert code_api == 200
     assert isinstance(body_api, dict) and body_api.get("status") == "healthy"
+
+    # 3. Verify host port bindings across all consortium containers
+    containers = [
+        "cfi-gateway",
+        "cfi-frontend",
+        "cfi-api-server",
+        "cfi-coordinator",
+        "cfi-worker-bank-a",
+        "cfi-worker-bank-b",
+        "cfi-worker-bank-c",
+        "cfi-consortium-postgres",
+        "cfi-consortium-redis",
+    ]
+    res = subprocess.run(
+        ["docker", "inspect"] + containers,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    inspected = json.loads(res.stdout)
+    for item in inspected:
+        name = item["Name"].lstrip("/")
+        ports = item.get("NetworkSettings", {}).get("Ports") or {}
+        if name in ("cfi-consortium-postgres", "cfi-consortium-redis"):
+            for port_key, bindings in ports.items():
+                assert not bindings, f"Internal store '{name}' must not publish host port for {port_key}: {bindings}"
+        else:
+            if name == "cfi-gateway":
+                assert not ports.get("443/tcp"), "Gateway must not publish unused port 443 in HTTP localhost sandbox"
+            for port_key, bindings in ports.items():
+                if not bindings:
+                    continue
+                for b in bindings:
+                    host_ip = b.get("HostIp", "")
+                    assert host_ip == "127.0.0.1", (
+                        f"Container '{name}' port {port_key} bound to '{host_ip}' instead of '127.0.0.1'"
+                    )

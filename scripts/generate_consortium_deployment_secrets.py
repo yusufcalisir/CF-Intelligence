@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
 """Consortium Deployment Secret and Institutional Identity Generator.
 
-Generates cryptographically authoritative parameters for the multi-bank
-consortium deployment environment:
+Generates cryptographically random parameters for the local multi-bank
+consortium sandbox deployment environment:
 1. Sovereign Ed25519 institutional keypairs for Bank A, Bank B, and Bank C.
-2. Scoped institutional bearer tokens (matching, ingestion, admin).
-3. Peer verification key registries for worker nodes.
-4. Backend verification registry mapping for admission verification.
+2. Scoped institutional worker bearer tokens (matching, ingestion, admin).
+3. Independent non-predictable analyst credentials for Bank A, Bank B, and Bank C.
+4. Peer verification key registries for worker nodes and backend admission.
 5. Durable storage, cache, and platform signing secrets.
 
-Outputs the generated configuration to '.env.consortium' by default.
+Usage:
+    python scripts/generate_consortium_deployment_secrets.py --output .env.consortium
+
+Protects the generated output file with restrictive filesystem permissions (0600 / user-only ACL).
 Ensures zero hardcoded or test-shaped magic values.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import secrets
+import stat
+import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -63,18 +68,15 @@ def generate_consortium_deployment_secrets() -> dict[str, str]:
         # Environment & logging
         "APP_ENV": "production",
         "LOG_LEVEL": "INFO",
-        # Port bindings
+        # Localhost-only sandbox port bindings (127.0.0.1)
         "CFI_PORT_HTTP": "80",
-        "CFI_PORT_HTTPS": "443",
         "CFI_PORT_BACKEND": "8000",
         "CFI_PORT_FRONTEND": "3000",
         "CFI_PORT_COORDINATOR": "8200",
         "CFI_PORT_WORKER_A": "8101",
         "CFI_PORT_WORKER_B": "8102",
         "CFI_PORT_WORKER_C": "8103",
-        "CFI_PORT_PG": "5432",
-        "CFI_PORT_REDIS": "6379",
-        # Storage & infrastructure
+        # Storage & infrastructure (internal to consortium-core-net)
         "POSTGRES_USER": "cfi_admin",
         "POSTGRES_PASSWORD": secrets.token_urlsafe(24),
         "POSTGRES_DB": "cfi_fraud_db",
@@ -92,6 +94,10 @@ def generate_consortium_deployment_secrets() -> dict[str, str]:
         "CFI_COORDINATOR_SECRET": secrets.token_hex(24),
         "TRAINING_COORDINATOR_TOKEN": secrets.token_hex(32),
         "TRAINING_WORKER_TOKEN": secrets.token_hex(32),
+        # Independent non-predictable institutional analyst credentials (sandbox bootstrap)
+        "ANALYST_BANK_A_PASSWORD": secrets.token_urlsafe(24),
+        "ANALYST_BANK_B_PASSWORD": secrets.token_urlsafe(24),
+        "ANALYST_BANK_C_PASSWORD": secrets.token_urlsafe(24),
         # Bank A worker
         "WORKER_BANK_A_SIGNING_KEY": priv_a,
         "WORKER_BANK_A_AUTH_SECRET": secrets.token_hex(32),
@@ -120,11 +126,33 @@ def generate_consortium_deployment_secrets() -> dict[str, str]:
     return env_vars
 
 
+def _restrict_file_permissions(target_path: Path) -> None:
+    """Apply restrictive owner-only permissions (0600 / Windows user ACL) where supported."""
+    with contextlib.suppress(OSError):
+        os.chmod(target_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    if os.name == "nt":
+        username = os.environ.get("USERNAME")
+        if username:
+            subprocess.run(
+                [
+                    "icacls",
+                    str(target_path),
+                    "/inheritance:r",
+                    "/grant:r",
+                    f"{username}:(R,W)",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+
 def write_env_file(env_vars: dict[str, str], target_path: Path) -> None:
-    """Format and write environment dictionary to file."""
+    """Format and write environment dictionary to file with restrictive permissions."""
     lines = [
         "# ==============================================================================",
-        "# Cross-Bank Federated Intelligence (CFI) — Active Consortium Secrets",
+        "# Cross-Bank Federated Intelligence (CFI) — Local Consortium Sandbox Secrets",
         "# Generated automatically. DO NOT COMMIT OR LEAK THIS FILE.",
         "# ==============================================================================",
         "",
@@ -133,7 +161,12 @@ def write_env_file(env_vars: dict[str, str], target_path: Path) -> None:
         lines.append(f"{key}={val}")
     lines.append("")
 
-    target_path.write_text("\n".join(lines), encoding="utf-8")
+    content = "\n".join(lines)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(str(target_path), flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    _restrict_file_permissions(target_path)
 
 
 def main() -> None:
