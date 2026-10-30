@@ -121,10 +121,18 @@ class TestEvidenceCenteredReadmeIntegrity:
             or "Software Correctness" in content
         ), "README missing explicit Software Correctness heading"
         assert (
-            "5,617" in content or "4,370" in content or "3,982" in content
+            "6,108" in content
+            or "6,100" in content
+            or "5,617" in content
+            or "4,370" in content
+            or "3,982" in content
         ), "README missing updated Backend Pytest count"
         assert (
-            "6,444" in content or "5,195" in content or "4,835" in content
+            "6,960" in content
+            or "6,952" in content
+            or "6,444" in content
+            or "5,195" in content
+            or "4,835" in content
         ), "README missing updated total system test count"
 
     def test_research_prototypes_tier2_delineation(self) -> None:
