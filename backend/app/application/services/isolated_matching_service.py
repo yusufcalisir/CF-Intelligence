@@ -161,6 +161,12 @@ def _extract_x509_peer_identities(der_cert_bytes: bytes | None) -> set[str]:
             "Subject Alternative Name (SAN) extension. Common Name fallback is prohibited."
         ) from exc
 
+    if not isinstance(san_ext.value, x509.SubjectAlternativeName):
+        raise ConsortiumSecurityError(
+            "Mutual TLS verification failed: peer X.509 certificate Subject Alternative Name (SAN) "
+            "extension is malformed or invalid."
+        )
+
     san_identities: set[str] = set()
 
     # 1. DNS SANs
@@ -570,6 +576,7 @@ class IsolatedBankWorkerNode:
         self._auth_secret = auth_secret or secrets.token_hex(32)
 
         # Asymmetric institutional signing identity (strictly tenant-sovereign)
+        self._signing_identity: InstitutionalSigningIdentity | None = None
         key_file = (
             signing_key_file
             or os.environ.get("WORKER_SIGNING_KEY_FILE")
@@ -583,13 +590,11 @@ class IsolatedBankWorkerNode:
         if key_file and os.path.exists(key_file):
             self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
         elif isinstance(signing_key, InstitutionalSigningIdentity):
-            self._signing_identity: InstitutionalSigningIdentity | None = signing_key
+            self._signing_identity = signing_key
         elif isinstance(signing_key, str) and len(signing_key.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key)
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
-        else:
-            self._signing_identity = None
 
         # Scoped RPC authorization credentials (least-privilege separation)
         self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
