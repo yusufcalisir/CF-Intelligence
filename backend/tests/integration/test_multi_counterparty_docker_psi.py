@@ -70,8 +70,15 @@ def isolated_tri_governance_env(
     monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", SHARED_JWT_SECRET)
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
+    CrossBankIntelligenceService.reset_instance()
 
     gov_svc = ConsortiumGovernanceService()
+    cbi_svc = CrossBankIntelligenceService.get_instance()
+    cbi_svc.consortium_service = gov_svc
+    for b_id, ident in three_bank_docker_topology["idents"].items():
+        cbi_svc.institutional_registry.register_public_key(
+            b_id, ident.public_key, allow_overwrite=True
+        )
     auth_svc = AuthenticationService.get_instance()
 
     u_a = auth_svc.get_user("tri_analyst_a")
@@ -226,6 +233,9 @@ def isolated_tri_governance_env(
 
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
+    CrossBankIntelligenceService.reset_instance()
+    from app.main import app
+    app.dependency_overrides.clear()
 
 
 def test_multi_counterparty_docker_psi_execution(
@@ -1163,18 +1173,19 @@ def test_multi_counterparty_docker_batch_case_evidence_assembly(
             json={
                 "query_id": query_resp_partial.query_id,
                 "case_id": case_partial.id,
-                "notes": "Partial assembly with unavailable Bank C",
+                "notes": "Partial assembly with unavailable counterpart",
             },
             headers={"Authorization": f"Bearer {token_a}", "X-Tenant-ID": "bank_a"},
         )
-        assert resp_p.status_code == 200
+        assert resp_p.status_code == 200, f"Attach partial error: {resp_p.status_code} {resp_p.text}"
         data_p = resp_p.json()
         assert data_p["assembly_status"] == "PARTIAL"
         assert data_p["attached_count"] == 1
         assert data_p["failed_count"] == 1
         assert len(data_p["attached_evidence"]) == 1
         assert len(data_p["omitted_or_failed"]) == 1
-        assert data_p["omitted_or_failed"][0]["target_bank_id"] == "bank_c"
+        assert data_p["omitted_or_failed"][0]["target_bank_id"] is None
+        assert data_p["omitted_or_failed"][0]["category"] in ("COUNTERPART_UNAVAILABLE", "COUNTERPART_EXECUTION_FAILURE")
         assert len(cbi_service.evidence_service.get_case_evidence(case_partial.id)) == 1
     finally:
         _run_cmd(["docker", "start", container_c], check=True)

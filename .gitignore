@@ -111,6 +111,7 @@ frontend/coverage/
 .coverage.*
 coverage.xml
 coverage*.json
+*-verification.xml
 *.cover
 .pytest_cache/
 .mypy_cache/

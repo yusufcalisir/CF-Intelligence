@@ -77,6 +77,7 @@ def pilot_test_env(
 
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
+    CrossBankIntelligenceService.reset_instance()
     DurablePilotStore._instance = None
     PilotOperationsService._instance = None
 
@@ -237,6 +238,8 @@ def pilot_test_env(
             "test_topology": test_topology,
         }
     finally:
+        CrossBankIntelligenceService.reset_instance()
+        app.dependency_overrides.clear()
         daemon_a.stop()
         daemon_b.stop()
         coord_daemon.stop()
@@ -682,6 +685,9 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
 
     # Register local institution-owned entity in local entity service
     cbi_svc = CrossBankIntelligenceService(consortium_service=gov_svc)
+    CrossBankIntelligenceService._instance = cbi_svc
+    cbi_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    cbi_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
     ent_obj = Entity(
         id=ent_a_id,
         entity_type=EntityType.CUSTOMER,
@@ -698,6 +704,7 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
     from app.presentation.routers import cross_bank_intelligence as cbi_router_mod
 
     monkeypatch.setattr(cbi_router_mod, "get_cross_bank_intelligence_service", lambda: cbi_svc)
+    app.dependency_overrides[cbi_router_mod.get_cross_bank_intelligence_service] = lambda: cbi_svc
 
     with TestClient(app) as test_client:
         auth_headers = {"Authorization": f"Bearer {token_analyst_a}"}

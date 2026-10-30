@@ -597,6 +597,12 @@ class InstitutionalVerificationRegistry:
         )
         self._enrolled_keys[clean_bank_id] = revoked_item
 
+    def clear(self) -> None:
+        """Clear all enrolled keys (for testing and session isolation)."""
+        self._enrolled_keys.clear()
+        self._public_keys.clear()
+        self._key_versions.clear()
+
     def get_public_key(self, bank_id: str) -> ed25519.Ed25519PublicKey:
         """Retrieve the trusted public verification key for an institution.
 
@@ -606,14 +612,18 @@ class InstitutionalVerificationRegistry:
         clean_bank_id = bank_id.lower().strip()
         import os
 
-        if clean_bank_id not in self._enrolled_keys:
-            env_key = (
-                os.getenv(f"CFI_INSTITUTION_PUBLIC_KEY_{clean_bank_id.upper()}")
-                or os.getenv(f"CFI_PEER_PUBLIC_KEY_{clean_bank_id.upper()}")
-                or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
-            )
-            if env_key and len(env_key.strip()) == 64:
-                clean_env = env_key.strip()
+        env_key = (
+            os.getenv(f"CFI_INSTITUTION_PUBLIC_KEY_{clean_bank_id.upper()}")
+            or os.getenv(f"CFI_PEER_PUBLIC_KEY_{clean_bank_id.upper()}")
+            or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
+        )
+        if env_key and len(env_key.strip()) == 64:
+            clean_env = env_key.strip()
+            current = self._enrolled_keys.get(clean_bank_id)
+            if current is None or (
+                current.trust_source == "ENVIRONMENT_BOOTSTRAP"
+                and current.public_key_hex.lower() != clean_env.lower()
+            ):
                 with contextlib.suppress(Exception):
                     self.register_public_key(
                         clean_bank_id,
