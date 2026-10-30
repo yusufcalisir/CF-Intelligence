@@ -30,7 +30,7 @@ def _is_redis_live(host: str = "127.0.0.1", port: int = 6379, timeout: float = 0
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
-    except (OSError, ConnectionRefusedError):
+    except OSError:
         return False
 
 
