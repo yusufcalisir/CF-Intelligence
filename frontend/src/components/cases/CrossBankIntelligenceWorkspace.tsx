@@ -590,14 +590,19 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     const failure = queryResponse.failures ? queryResponse.failures[bankKey] : null;
 
                     // Gate B: Strictly enforce anonymous masking (null target bank) under ANONYMIZED_SUMMARY
+                    const resolvedTargetBankId =
+                      signal?.target_bank_id ||
+                      (signal?.disclosure_mode === 'ATTRIBUTED_INSTITUTIONS'
+                        ? signal.contributing_institutions?.[0] || bankKey
+                        : null);
                     const isAnonymized =
                       signal?.disclosure_mode === 'ANONYMIZED_SUMMARY' ||
                       signal?.disclosure_mode === 'ANONYMOUS_FLAG' ||
-                      !signal?.target_bank_id;
+                      !resolvedTargetBankId;
 
                     const displayCounterpart = isAnonymized
                       ? 'Anonymous Counterparty'
-                      : (signal?.target_bank_id || bankKey).toUpperCase();
+                      : (resolvedTargetBankId || bankKey).toUpperCase();
 
                     return (
                       <div

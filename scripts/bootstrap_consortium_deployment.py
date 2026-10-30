@@ -138,11 +138,12 @@ def run_docker_exec(
 
 
 def _validate_analyst_credentials(env: dict[str, str]) -> dict[str, str]:
-    """Validate that independent, non-predictable analyst credentials are supplied."""
+    """Validate that independent, non-predictable analyst and operator credentials are supplied."""
     required_keys = (
         "ANALYST_BANK_A_PASSWORD",
         "ANALYST_BANK_B_PASSWORD",
         "ANALYST_BANK_C_PASSWORD",
+        "CONSORTIUM_OPERATOR_PASSWORD",
     )
     resolved: dict[str, str] = {}
     forbidden_prefixes = (
@@ -150,6 +151,7 @@ def _validate_analyst_credentials(env: dict[str, str]) -> dict[str, str]:
         "analyst",
         "admin",
         "auditor",
+        "operator",
         "password",
         "changeme",
         "default",
@@ -164,7 +166,7 @@ def _validate_analyst_credentials(env: dict[str, str]) -> dict[str, str]:
 
     if len(set(resolved.values())) != len(required_keys):
         raise ValueError(
-            "Analyst credentials across Bank A, Bank B, and Bank C must be mutually independent."
+            "Credentials across Bank A, Bank B, Bank C, and Consortium Operator must be mutually independent."
         )
     return resolved
 
@@ -308,7 +310,14 @@ u_c = auth_svc.register_user(
     roles=["compliance", "investigator"],
     clearance_level=2,
 )
-for uname in ("analyst_bank_a", "analyst_bank_b", "analyst_bank_c"):
+u_op = auth_svc.register_user(
+    username="operator_consortium",
+    plain_password=creds["CONSORTIUM_OPERATOR_PASSWORD"],
+    bank_id="consortium",
+    roles=["operator", "compliance"],
+    clearance_level=3,
+)
+for uname in ("analyst_bank_a", "analyst_bank_b", "analyst_bank_c", "operator_consortium"):
     auth_svc.lockout_manager.reset(uname)
 
 token_a = auth_svc.create_token_bundle(u_a).access_token
@@ -317,7 +326,10 @@ token_c = auth_svc.create_token_bundle(u_c).access_token
 
 # Register local entity in Bank A entity service
 from app.application.services.entity_resolution import EntityResolutionService, _entity_to_dict
-from app.domain.investigation_entities import Entity, EntityType, RiskLevel
+from app.application.services.alert_service import AlertIntelligenceService, _alert_to_dict
+from app.application.services.case_service import CaseManagementService, _case_to_dict
+from app.domain.enums import AlertSeverity, AlertStatus, CasePriority, CaseStatus
+from app.domain.investigation_entities import Alert, Case, CaseEvent, Entity, EntityType, RiskLevel
 
 ent_svc = EntityResolutionService()
 ent = Entity(
@@ -331,6 +343,49 @@ ent = Entity(
     alert_count=3,
 )
 ent_svc._entities.set(ent.id, _entity_to_dict(ent))
+
+# Seed authoritative Bank A alert referencing target_nexus_investigation_01
+alert_svc = AlertIntelligenceService()
+alert_a = Alert(
+    id="alert_consortium_nexus_bank_a_01",
+    bank_id="bank_a",
+    transaction_id="tx_nexus_cross_bank_01",
+    risk_score=880.0,
+    severity=AlertSeverity.CRITICAL,
+    status=AlertStatus.NEW,
+    reason_codes=["CROSS_BANK_SYNDICATE_VELOCITY", "HIGH_RISK_CORRIDOR"],
+    confidence=0.94,
+    involved_entity_ids=["target_nexus_investigation_01"],
+)
+alert_svc._alert_store.set(alert_a.id, _alert_to_dict(alert_a))
+
+# Seed authoritative Bank A case and isolated Bank B case for cross-tenant negative verification
+case_svc = CaseManagementService()
+if not case_svc.get_case("case_consortium_nexus_bank_a_01"):
+    case_a = Case(
+        id="case_consortium_nexus_bank_a_01",
+        bank_id="bank_a",
+        title="Bank A Cross-Border Syndicate Nexus Investigation",
+        status=CaseStatus.OPEN,
+        priority=CasePriority.P1_CRITICAL,
+        assigned_to="analyst_bank_a",
+        alert_ids=["alert_consortium_nexus_bank_a_01"],
+        total_risk_score=880.0,
+    )
+    case_svc._cases.set(case_a.id, _case_to_dict(case_a))
+
+if not case_svc.get_case("case_consortium_bank_b_isolated_01"):
+    case_b = Case(
+        id="case_consortium_bank_b_isolated_01",
+        bank_id="bank_b",
+        title="Bank B Confidential Counterparty Treasury Review",
+        status=CaseStatus.OPEN,
+        priority=CasePriority.P2_HIGH,
+        assigned_to="analyst_bank_b",
+        alert_ids=[],
+        total_risk_score=640.0,
+    )
+    case_svc._cases.set(case_b.id, _case_to_dict(case_b))
 
 gov_svc = ConsortiumGovernanceService()
 c_id = "{consortium_id}"

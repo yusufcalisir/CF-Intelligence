@@ -46,6 +46,9 @@ services:
 
   # ── 2. Frontend Web Container (React 19 SPA) ────────────────────────────────
   frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
     image: cfi-intelligence/frontend:latest
     container_name: cfi-frontend
     restart: unless-stopped
@@ -84,6 +87,9 @@ services:
 
   # ── 4. Operational FastAPI Backend & Federation Engine ──────────────────────
   backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
     image: cfi-intelligence/backend:latest
     container_name: cfi-api-server
     restart: unless-stopped

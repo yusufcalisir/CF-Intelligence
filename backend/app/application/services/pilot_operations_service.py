@@ -87,6 +87,44 @@ class PilotOperationsService:
         self._audit_chain = ImmutableAuditChain.get_instance()
         self._lock = threading.RLock()
 
+    def _resolve_consortium_grant(
+        self,
+        consortium: Any,
+        grant_id: str | None = None,
+        participating_institutions: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Resolve the authoritative operational grant from consortium metadata.
+
+        Supports both consortium-wide `operational_data_sharing_grant` and
+        bilateral `pairwise_operational_grants`.
+        """
+        c_meta = getattr(consortium, "metadata", {}) or {}
+        clean_gid = (grant_id or "").strip()
+        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        if (
+            isinstance(op_grant, dict)
+            and op_grant
+            and (not clean_gid or str(op_grant.get("grant_id") or "").strip() == clean_gid)
+        ):
+            return op_grant
+
+        pairwise_grants = c_meta.get("pairwise_operational_grants") or {}
+        if isinstance(pairwise_grants, dict):
+            if clean_gid and clean_gid in pairwise_grants:
+                pw = pairwise_grants[clean_gid]
+                if isinstance(pw, dict):
+                    return pw
+            if participating_institutions:
+                req_set = {b.lower().strip() for b in participating_institutions if b}
+                for pw in pairwise_grants.values():
+                    if not isinstance(pw, dict):
+                        continue
+                    pw_banks = {b.lower().strip() for b in pw.get("participating_banks", [])}
+                    if req_set and req_set == pw_banks:
+                        return pw
+
+        return op_grant if isinstance(op_grant, dict) else {}
+
     def _resolve_topology_endpoints(self, entity: PilotEntity) -> tuple[str, str, str, list[str]]:
         """Resolves approved topology endpoints strictly from the immutable pilot configuration.
 
@@ -431,8 +469,11 @@ class PilotOperationsService:
                 )
 
         # Bind operational grant from consortium metadata if not specified
-        c_meta = getattr(consortium, "metadata", {}) or {}
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        op_grant = self._resolve_consortium_grant(
+            consortium,
+            grant_id=req.operational_grant_id,
+            participating_institutions=clean_insts,
+        )
         grant_id = req.operational_grant_id or str(op_grant.get("grant_id") or "")
         grant_revision = int(op_grant.get("revision", 1)) if op_grant else 1
         grant_scope_digest = str(op_grant.get("scope_digest", "")) if op_grant else ""
@@ -560,8 +601,11 @@ class PilotOperationsService:
         ))
 
         # 3. Operational Data-Sharing Grant
-        c_meta = getattr(consortium, "metadata", {}) or {}
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        op_grant = self._resolve_consortium_grant(
+            consortium,
+            grant_id=entity.config.operational_grant_id,
+            participating_institutions=insts,
+        )
         grant_ok = bool(
             op_grant
             and op_grant.get("is_active", True)
@@ -1036,8 +1080,11 @@ class PilotOperationsService:
         if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
             raise PilotAuthorizationError("Underlying consortium is no longer active.")
 
-        c_meta = getattr(consortium, "metadata", {}) or {}
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        op_grant = self._resolve_consortium_grant(
+            consortium,
+            grant_id=entity.config.operational_grant_id,
+            participating_institutions=entity.config.participating_institutions,
+        )
         if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational grant is no longer active.")
 
@@ -1214,8 +1261,11 @@ class PilotOperationsService:
             raise PilotAuthorizationError(
                 f"Underlying consortium '{entity.config.consortium_id}' is not ACTIVE. Query rejected."
             )
-        c_meta = getattr(consortium, "metadata", {}) or {}
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        op_grant = self._resolve_consortium_grant(
+            consortium,
+            grant_id=entity.config.operational_grant_id,
+            participating_institutions=entity.config.participating_institutions,
+        )
         if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational data sharing grant is inactive or revoked.")
 
@@ -1357,8 +1407,11 @@ class PilotOperationsService:
             raise PilotAuthorizationError(
                 f"Underlying consortium '{entity.config.consortium_id}' is not ACTIVE. Admission rejected."
             )
-        c_meta = getattr(consortium, "metadata", {}) or {}
-        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        op_grant = self._resolve_consortium_grant(
+            consortium,
+            grant_id=entity.config.operational_grant_id,
+            participating_institutions=entity.config.participating_institutions,
+        )
         if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational data sharing grant is inactive or revoked.")
 

@@ -106,7 +106,7 @@ export function clearCachedCopilotData(caseId: string | undefined): void {
 export default function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const location = useLocation();
-  const { data: caseData, isLoading } = useCase(caseId);
+  const { data: caseData, isLoading, error: caseError } = useCase(caseId);
   const addNote = useAddCaseNote();
   const updateStatus = useUpdateCaseStatus();
   const resolveCase = useResolveCase();
@@ -386,9 +386,26 @@ export default function CaseDetailPage() {
   }
 
   if (!caseData) {
+    const errMsg = caseError ? formatApiError(caseError, '') : '';
+    const isForbidden =
+      errMsg.toLowerCase().includes('not authorized') ||
+      errMsg.toLowerCase().includes('broken access control') ||
+      errMsg.toLowerCase().includes('forbidden');
     return (
-      <div className="glass-card p-8 text-center text-[var(--color-text-muted)]">
-        Case not found
+      <div
+        data-testid={isForbidden ? 'case-access-denied' : 'case-not-found'}
+        className="glass-card p-8 text-center text-[var(--color-text-muted)] space-y-2"
+      >
+        <div className="font-semibold text-[var(--color-text-primary)]">
+          {isForbidden
+            ? 'Institutional Access Denied (HTTP 403) — Case not found in your institution'
+            : 'Case not found'}
+        </div>
+        {errMsg && (
+          <div data-testid="case-error-detail" className="text-xs text-red-400">
+            {errMsg}
+          </div>
+        )}
       </div>
     );
   }

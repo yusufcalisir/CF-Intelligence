@@ -390,6 +390,7 @@ def get_cross_bank_query_capabilities(
     consortia_res: list[CrossBankConsortiumCapability] = []
 
     STANDARD_PURPOSES = [
+        "AML_COLLABORATIVE_INVESTIGATION",
         "FRAUD_INVESTIGATION",
         "AML_HIGH_RISK_MATCHING",
         "SANCTIONS_SCREENING",
@@ -402,7 +403,18 @@ def get_cross_bank_query_capabilities(
         if eff_bank not in c.members or eff_bank in c.removed_members:
             continue
 
+        p_grants_all = consortium_svc.list_pairwise_operational_grants(c.consortium_id, eff_bank)
+        candidate_purposes: list[str] = []
+        for g in p_grants_all:
+            for purp in g.get("allowed_purposes", []) or []:
+                if isinstance(purp, str) and purp.strip() and purp.strip() not in candidate_purposes:
+                    candidate_purposes.append(purp.strip())
+        for purp in STANDARD_PURPOSES:
+            if purp not in candidate_purposes:
+                candidate_purposes.append(purp)
+
         counterparts_list: list[CrossBankCounterpartCapability] = []
+        consortium_authorized_purposes: list[str] = []
         for target_bank in sorted(c.members.keys()):
             if target_bank.lower() == eff_bank:
                 continue
@@ -410,7 +422,7 @@ def get_cross_bank_query_capabilities(
                 continue
 
             authorized_purposes: list[str] = []
-            for purp in STANDARD_PURPOSES:
+            for purp in candidate_purposes:
                 is_auth, _, _ = consortium_svc.resolve_pairwise_authorization(
                     consortium_id=c.consortium_id,
                     requesting_bank_id=eff_bank,
@@ -419,6 +431,8 @@ def get_cross_bank_query_capabilities(
                 )
                 if is_auth:
                     authorized_purposes.append(purp)
+                    if purp not in consortium_authorized_purposes:
+                        consortium_authorized_purposes.append(purp)
 
             gov_status: Literal["ACTIVE", "REVOKED", "MISSING_GRANT", "EVICTED"]
             readiness: Literal["OPERATIONAL", "DEGRADED", "UNAVAILABLE", "UNVERIFIED", "UNKNOWN"]
@@ -474,13 +488,18 @@ def get_cross_bank_query_capabilities(
                 )
             )
 
+        effective_consortium_purposes = list(consortium_authorized_purposes)
+        for purp in STANDARD_PURPOSES:
+            if purp not in effective_consortium_purposes:
+                effective_consortium_purposes.append(purp)
+
         consortia_res.append(
             CrossBankConsortiumCapability(
                 consortium_id=c.consortium_id,
                 name=c.name,
                 status=c.status.value,
                 counterparts=counterparts_list,
-                permitted_purposes=STANDARD_PURPOSES,
+                permitted_purposes=effective_consortium_purposes,
             )
         )
 

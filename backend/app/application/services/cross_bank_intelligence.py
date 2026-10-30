@@ -3271,9 +3271,12 @@ class CrossBankIntelligenceService:
                     raise ConsortiumSecurityError(
                         f"Underlying consortium '{governing_pilot.config.consortium_id}' is not ACTIVE. Evidence attachment rejected."
                     )
-                c_meta = getattr(consortium, "metadata", {}) or {}
-                op_grant = c_meta.get("operational_data_sharing_grant") or {}
-                if not op_grant.get("is_active", True):
+                op_grant = pilot_svc._resolve_consortium_grant(
+                    consortium,
+                    grant_id=governing_pilot.config.operational_grant_id,
+                    participating_institutions=governing_pilot.config.participating_institutions,
+                )
+                if not op_grant or not op_grant.get("is_active", True):
                     raise ConsortiumSecurityError("Operational data sharing grant is inactive or revoked. Evidence attachment rejected.")
                 revoked = set(op_grant.get("revoked_by_institutions", []))
                 if req_b in revoked or tgt_b in revoked:

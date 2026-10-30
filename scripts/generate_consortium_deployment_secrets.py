@@ -94,10 +94,11 @@ def generate_consortium_deployment_secrets() -> dict[str, str]:
         "CFI_COORDINATOR_SECRET": secrets.token_hex(24),
         "TRAINING_COORDINATOR_TOKEN": secrets.token_hex(32),
         "TRAINING_WORKER_TOKEN": secrets.token_hex(32),
-        # Independent non-predictable institutional analyst credentials (sandbox bootstrap)
+        # Independent non-predictable institutional analyst & operator credentials (sandbox bootstrap)
         "ANALYST_BANK_A_PASSWORD": secrets.token_urlsafe(24),
         "ANALYST_BANK_B_PASSWORD": secrets.token_urlsafe(24),
         "ANALYST_BANK_C_PASSWORD": secrets.token_urlsafe(24),
+        "CONSORTIUM_OPERATOR_PASSWORD": secrets.token_urlsafe(24),
         # Bank A worker
         "WORKER_BANK_A_SIGNING_KEY": priv_a,
         "WORKER_BANK_A_AUTH_SECRET": secrets.token_hex(32),
