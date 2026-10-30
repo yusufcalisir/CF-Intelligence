@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-%E2%89%A50.115-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%E2%89%A52.4-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Tests Collected](https://img.shields.io/badge/tests-6444_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Tests Collected](https://img.shields.io/badge/tests-6952_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -122,6 +122,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
 | **SHAP Model Explainability** | Tier 1 (Production Core) | **Implemented** | `shap.KernelExplainer` in `explainability_service.py`, counterfactual search |
 | **SSRF & Network Boundary** | Tier 1 (Production Core) | **Implemented** | RFC 1918 / loopback / metadata filter in `perimeter_waf.py` & `webhook_dispatcher.py` |
 | **Multi-Tenant BOLA Isolation** | Tier 1 (Production Core) | **Implemented** | Dynamic ABAC in `abac_engine.py`, schema isolation in `database/__init__.py` |
+| **Governed Pilot Operations Console** | Tier 1 (Production Core) | **Implemented** | Explicit 7-stage lifecycle & kill switch in `pilot_operations_service.py`, `pilot_operations.py`, `006_pilot_operations_table.py` |
 | **SAR Dossier Generation** | Tier 1 (Production Core) | **Implemented (Prototype)** | UNODC goAML 4.0 XML & EU AMLA JSON in `fiu_regulatory_service.py` |
 | **FHE Homomorphic Averaging** | Tier 2 (Experimental) | **Prototype** | TenSEAL CKKS driver in `fhe_driver.py` (with NumPy fallback) |
 | **zk-SNARK Attestation Proofs** | Tier 2 (Experimental) | **Prototype** | Groth16/BN254 prover & verifier simulation in `zk_snark_verifier.py` |
@@ -158,7 +159,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (5,617 collected tests; 6,444 total across all suites), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (6,100 collected tests; 6,952 total across all suites), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
@@ -520,7 +521,7 @@ To neutralize subtle backdoor triggers that evade distance-based Krum filtering,
 - Evaluates the top singular vector and projects updates onto the principal direction.
 - Detects anomalous clustering and cosine angle deviations characteristic of semantic backdoor poisoning, isolating malicious updates before aggregation.
 
-### 7.3 Measured Byzantine Resilience (`byzantine_adversarial_suite.json`)
+### 7.3 Measured Byzantine Resilience (`byzantine_federated_canonical.json`)
 Evaluated on real Credit Card fraud benchmarks ($n=12$ clients, $f=2$ Byzantine attackers, Dirichlet $\alpha=0.5$):
 - Coordinate-wise Trimmed Mean achieved mean PR-AUC $0.7141 \pm 0.0129$, retaining **$99.7\%$ of clean PR-AUC under evaluated 20% sign-inversion attack** (`CLM-BYZ-TRIMMED`).
 
@@ -635,10 +636,19 @@ Alerts scoring above the threshold trigger investigation workflows through a 6-s
 
 ---
 
+### 11.5 Governed Bilateral Pilot Operations Console (`pilot_operations_service.py`, `pilot_operations.py`)
+Provides an end-to-end governed operations console for controlled two-bank pilot deployments:
+- **Durable Finite-State Machine:** Governed through explicit state transitions: `DRAFT` $\to$ `PREFLIGHT` $\to$ `AWAITING_APPROVAL` $\to$ `AUTHORIZED` $\to$ `ACTIVE` $\to$ `PAUSED` $\to$ `COMPLETED` (terminal outcomes: `ABORTED`, `FAILED`).
+- **Dual Authority & Bilateral Approval Gating:** Independent bilateral approvals (Bank Alpha and Bank Beta) combined with server-authoritative operator sign-off (`approve_pilot_operation`) prior to transition into `AUTHORIZED` state (`006_pilot_operations_table.py`).
+- **Operational Kill Switch:** Server-authoritative kill switch (`POST /api/v1/pilots/{id}/kill-switch`) supporting immediate emergency actions (`PAUSE`, `RESUME`, `ABORT`) with full operator identity audit binding.
+- **Preflight Attestation & Live Telemetry:** Automated preflight checks (network latency, protocol version, dataset checksum, and mutual TLS attestation) with real-time pilot telemetry streams.
+
+---
+
 ## 12. Database Architecture, High Availability & Disaster Recovery Operations
 
 ### 12.1 Persistence & Connection Management
-- **One-Shot Migration Container (`migrations`):** Managed via Alembic (`001_initial` $\to$ `002_add_fraud_cases` $\to$ `003_alerts_unique_constraint`). In Docker Compose, a dedicated one-shot service executes `alembic upgrade head` before the backend API initializes (`condition: service_completed_successfully`), guaranteeing table and index parity prior to traffic serving.
+- **One-Shot Migration Container (`migrations`):** Managed via Alembic (`001_production_domain_tables` $\to$ `002_core_and_aml_tables` $\to$ `003_alerts_unique_constraint` $\to$ `004_training_execution_authority_tables` $\to$ `005_case_institutional_ownership` $\to$ `006_pilot_operations_table`). In Docker Compose, a dedicated one-shot service executes `alembic upgrade head` before the backend API initializes (`condition: service_completed_successfully`), guaranteeing table and index parity prior to traffic serving.
 - **Dual Connection Pool Architecture:** High-concurrency FastAPI request handling operates over asynchronous PostgreSQL connection pooling via `asyncpg` (`DATABASE_URL`). Concurrently, background training provenance authorities execute over synchronous connection pools via `psycopg` / `psycopg_pool` (`TRAINING_JOB_DB_URL`), enforcing transactional row locks (`SELECT ... FOR UPDATE`) without event loop interference.
 
 ### 12.2 Redis Architecture, Sentinel HA & Cache Invalidation
@@ -706,9 +716,9 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 5,617 backend Pytest    │ Evaluated across 8 canonical datasets│
-│ tests, 410 verif, 11 SDK, 375 Vitest,│ via benchmarks/runners/ & harness.   │
-│ 31 Hardhat (6,444 tests collected).  │ (6,444 total tests collected)        │
+│ Validated by 6,100 backend Pytest    │ Evaluated across 8 canonical datasets│
+│ tests, 410 verif, 11 SDK, 400 Vitest,│ via benchmarks/runners/ & harness.   │
+│ 31 Hardhat (6,952 tests collected).  │ (6,952 total tests collected)        │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -751,15 +761,15 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-HTTP-SERVICE-THROUGHPUT`** | Local HTTP Service Peak Throughput (Class B1) | `50.0 req/s` (Target) | `543.0 req/s` @ C=50 (Post-BaseHTTP=0 Canonical Peak; C=10: 452.8 req/s; C=500: 401.7 req/s; Baseline: 89.0 req/s) | [`latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED_TARGET_MET` |
 | **`CLM-HTTP-SERVICE-LATENCY-P50`** | Local HTTP Service Median Latency (Class B1) | `10.0 ms` (Target) | `7.12 ms` @ C=1 (Post-BaseHTTP=0; pooled p99: 10.85 ms; Baseline: 11.39 ms) | [`latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED` |
 | **`CLM-ABAC-THROUGHPUT`** | ABAC Authorization Engine Throughput | `> 5,000 req/s` | `132,942 req/s` (mean) | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `python scripts/run_abac_benchmark.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
+| **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_p2p_secagg_driver.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `6,444 Tests` | `6,444 Collected Tests` (5,617 Collected Backend + 410 Verification + 11 SDK, 375 Vitest, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `6,952 Tests` | `6,952 Collected Tests` (6,100 Collected Backend + 410 Verification + 11 SDK, 400 Vitest across 91 files, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-AMLSIM-GRAPHSAGE-PRAUC`** | IBM AMLSim Multi-Hop GraphSAGE PR-AUC | `—` (Agent Simulation) | `0.6527` (Inductive GraphSAGE 2-Layer) | [`results.json`](experiments/amlsim/results.json) | `python experiments/amlsim/evaluate_patterns.py` | `VERIFIED_MEASURED` |
 | **`CLM-SYNTHAML-ALERTMLP-PRAUC`** | Danish Spar Nord Bank SynthAML AlertMLP PR-AUC | `—` (Project Synthetic) | `0.9924` (FedAvg) / `0.9341` (Centralized) | [`fraud_benchmark_synthaml.json`](benchmarks/results/raw/fraud_benchmark_synthaml.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml` | `VERIFIED_MEASURED` |
 | **`CLM-AMLNET-FEDAVG-PRAUC`** | AUSTRAC AMLNet Structuring Detection PR-AUC | `—` (Project Synthetic) | `1.0000` (Synthetic Structuring Separability) | [`results.json`](experiments/amlnet/results.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet` | `VERIFIED_MEASURED` |
-| **`CLM-CROSSBANK-DETECTION-RATE`** | CFI-CrossBank 7-Scenario Consortium Multi-Bank Detection Rate | `100.0%` (Target) | `100.0%` (2/2 synthetic incidents in Scen 7; 100% consortium) | [`fraud_benchmark_crossbank.json`](benchmarks/results/raw/fraud_benchmark_crossbank.json) | `python experiments/cross_bank/evaluate_cross_bank_intelligence.py` | `VERIFIED_MEASURED` |
-| **`CLM-FL-NONIID-ALPHA05`** | Non-IID Dirichlet $\alpha=0.5$ Optimization Comparison | `0.2331` (FedAvg) | `0.2331` (FedAvg) / `0.2285` (FedProx) / `0.2196` (SCAFFOLD) | [`fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json) | `python benchmarks/runners/run_fl_comparison.py --alpha 0.5` | `VERIFIED_MEASURED` |
+| **`CLM-CROSSBANK-DETECTION-RATE`** | CFI-CrossBank 7-Scenario Consortium Multi-Bank Detection Rate | `100.0%` (Target) | `100.0%` (2/2 synthetic incidents in Scen 7; 100% consortium) | [`fraud_benchmark_crossbank.json`](benchmarks/results/raw/fraud_benchmark_crossbank.json) | `python experiments/cross_bank/run_consortium_benchmark.py` | `VERIFIED_MEASURED` |
+| **`CLM-FL-NONIID-ALPHA05`** | Non-IID Dirichlet $\alpha=0.5$ Optimization Comparison | `0.2331` (FedAvg) | `0.2331` (FedAvg) / `0.2285` (FedProx) / `0.2196` (SCAFFOLD) | [`fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json) | `python benchmarks/runners/run_fl_benchmark.py --alpha 0.5` | `VERIFIED_MEASURED` |
 
 ---
 
@@ -782,7 +792,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Unit & Integration Test Inventory** | **6,444 Collected Tests** | **6,444 Collected Tests** (5,617 Collected Backend + 410 Scientific Verification + 11 Python SDK + 375 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
+| **Unit & Integration Test Inventory** | **6,952 Collected Tests** | **6,952 Collected Tests** (6,100 Collected Backend + 410 Scientific Verification + 11 Python SDK + 400 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
 
 ---
 
@@ -1149,7 +1159,7 @@ python scripts/verify_reproducibility.py --all
   3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
-  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 5,617 Collected Backend Pytest tests, 375 Frontend Vitest tests, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (6,444 total collected tests) and clean static analysis (0 Ruff errors).
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 6,100 Collected Backend Pytest tests, 400 Frontend Vitest tests across 91 test files, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (6,952 total collected tests) and clean static analysis (0 Ruff errors).
 - **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
 
 ---
@@ -1182,7 +1192,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **5,617 collected Pytest backend tests** (baseline: 4,370), **375 Vitest frontend tests**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 22 verification modules (totaling **6,444 collected tests** across all suites). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **6,100 collected Pytest backend tests** (baseline: 4,370), **400 Vitest frontend tests across 91 test files**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 22 verification modules (totaling **6,952 collected tests** across all suites). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -1216,10 +1226,10 @@ The reports below document the internal scientific verification suites validatin
 ## 18. API Endpoint Blueprints & Core Specification
 
 > **Complete API Reference Specification:**  
-> Exhaustive request/response JSON schemas, field-level Pydantic validation rules, curl execution examples, RFC 7807 error formats, and WebSocket streaming telemetry contracts for all 20 production endpoints are documented in [**`docs/api_reference.md` ↗**](docs/api_reference.md).  
+> Exhaustive request/response JSON schemas, field-level Pydantic validation rules, curl execution examples, RFC 7807 error formats, and WebSocket streaming telemetry contracts across all core production endpoints are documented in [**`docs/api_reference.md` ↗**](docs/api_reference.md).  
 > Interactive OpenAPI 3.1.0 explorers are accessible locally at **`/docs`** (Swagger UI), **`/redoc`** (ReDoc), and **`/developer`** (Scalar API Portal).
 
-### 18.1 Master Production API Registry (20 Endpoints)
+### 18.1 Master Production API Registry (Representative Core Endpoints)
 
 | Category | HTTP Method & Path | Subsystem & Contract | Target SLA / Guarantees | Complete Spec Reference |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1499,7 +1509,7 @@ Open `http://localhost` in your corporate browser to access the unified platform
 cd backend
 pip install -r requirements.txt
 
-# Run Alembic schema migrations (upgrade to latest head: 003_alerts_unique_constraint)
+# Run Alembic schema migrations (upgrade to latest head: 006_pilot_operations_table)
 alembic upgrade head
 
 # Run backend test suite (from backend/ directory)
@@ -1524,16 +1534,16 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (5,617 Collected Backend / 6,444 Total Collected Tests)
+### Step 5: Master Test Suites Execution (6,100 Collected Backend / 6,952 Total Collected Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (5,617 collected tests)
+# 1. Run full backend pytest suite (6,100 collected tests)
 pytest backend/tests/ -v
 
 # 2. Run Python SDK test suite (11 tests)
 pytest sdk/ -v
 
-# 3. Run full frontend vitest suite (375 tests across 87 test files)
+# 3. Run full frontend vitest suite (400 tests across 91 test files)
 npm --prefix frontend test
 
 # 4. Run Playwright real-browser multi-device E2E suite (10 browser tests)
