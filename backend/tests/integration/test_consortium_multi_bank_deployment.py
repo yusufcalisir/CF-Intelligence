@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import json
 import subprocess
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Any
 
 import pytest
 
 from tests.integration.conftest import is_docker_running
-
 
 GATEWAY_URL = "http://127.0.0.1:80"
 BACKEND_URL = "http://127.0.0.1:8000"
