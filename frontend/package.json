@@ -29,7 +29,7 @@
     "@testing-library/react": "^16.3.3",
     "@types/three": "^0.185.4",
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.38.3",
+    "@upstash/redis": "^1.38.4",
     "@xyflow/react": "^12.11.5",
     "axios": "^1.20.0",
     "cytoscape": "^3.34.3",
