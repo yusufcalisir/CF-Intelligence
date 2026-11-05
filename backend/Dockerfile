@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     libpq-dev \
+    && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv
@@ -38,17 +39,26 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq5 \
+    && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1000 user \
     && useradd -u 1000 -g user -m -d /home/user -s /bin/sh user \
     && mkdir -p /home/user /app/storage /app/logs /tmp/cfi_storage \
-    && chmod -R 777 /home/user /app /tmp/cfi_storage \
-    && chown -R user:user /home/user /app /tmp/cfi_storage
+    && chown -R user:user /home/user /app/storage /app/logs /tmp/cfi_storage \
+    && chmod 0750 /home/user /app/storage /app/logs /tmp/cfi_storage
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --chown=user:user . /app
+RUN chown -R root:root /opt/venv && chmod -R go-w /opt/venv
+COPY --chown=root:root . /app
 
-RUN chmod -R 777 /home/user /app/storage /app/logs /tmp/cfi_storage
+# Enforce least-privilege: read-only application code (dirs 0755, files 0644),
+# writable permissions strictly restricted to isolated storage and logging directories
+RUN find /app -type d -exec chmod 0755 {} + \
+    && find /app -type f -exec chmod 0644 {} + \
+    && find /app/scripts -type f -name "*.sh" -exec chmod 0755 {} + 2>/dev/null || true \
+    && find /app/scripts -type f -name "*.py" -exec chmod 0755 {} + 2>/dev/null || true \
+    && chown -R user:user /app/storage /app/logs /tmp/cfi_storage \
+    && chmod -R 0750 /app/storage /app/logs /tmp/cfi_storage
 
 USER user
 

@@ -55,6 +55,7 @@ from app.application.services.isolated_matching_service import (
 from app.application.services.model_registry import create_trusted_internal_context
 from app.config import get_settings
 from app.domain.consortium_governance import ConsortiumSecurityError
+from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.domain.psi_service import (
     PSI_GENERATOR,
@@ -335,17 +336,22 @@ class TestIndependentOSProcessExecutionAndIsolation:
         secret_a = security_test_context["secret_a"]
         secret_b = security_test_context["secret_b"]
 
+        signing_a = InstitutionalSigningIdentity.generate("bank_a")
+        signing_b = InstitutionalSigningIdentity.generate("bank_b")
+
         worker_a = IsolatedBankWorkerNode(
             bank_id="bank_a",
             storage_root=storage_root,
             auth_secret=secret_a,
-            trusted_peer_keys={"bank_b": secret_b},
+            signing_key=signing_a,
+            trusted_peer_keys={"bank_b": signing_b.public_key_hex},
         )
         worker_b = IsolatedBankWorkerNode(
             bank_id="bank_b",
             storage_root=storage_root,
             auth_secret=secret_b,
-            trusted_peer_keys={"bank_a": secret_a},
+            signing_key=signing_b,
+            trusted_peer_keys={"bank_a": signing_a.public_key_hex},
         )
 
         port_a = _get_free_port()

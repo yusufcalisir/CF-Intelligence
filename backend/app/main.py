@@ -33,7 +33,7 @@ print(">>> Python main.py loaded successfully! <<<", flush=True)
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -775,6 +775,94 @@ class ContentTypeMiddleware:
 
 
 app.add_middleware(ContentTypeMiddleware)
+
+
+# ── Request Body Size Limit Middleware ─────────────────────────────────────────
+class RequestBodySizeLimitMiddleware:
+    """Enforce strict upper bound on request payload size (Pure ASGI).
+
+    Mitigates resource exhaustion and parser denial-of-service from oversized
+    or malicious streaming/multipart bodies before unbounded allocation occurs.
+    """
+
+    DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+    def __init__(self, app: ASGIApp, max_bytes: int | None = None) -> None:
+        self.app = app
+        if max_bytes is not None:
+            self.max_bytes = max_bytes
+        else:
+            try:
+                self.max_bytes = int(os.getenv("CFI_MAX_REQUEST_BODY_SIZE", str(self.DEFAULT_MAX_BYTES)))
+            except ValueError:
+                self.max_bytes = self.DEFAULT_MAX_BYTES
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        # Check upfront Content-Length header
+        content_length: int | None = None
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"content-length":
+                try:
+                    content_length = int(value.decode("latin-1"))
+                except (ValueError, UnicodeDecodeError):
+                    content_length = None
+                break
+
+        if content_length is not None and content_length > self.max_bytes:
+            response = JSONResponse(
+                status_code=413,
+                content={
+                    "type": "https://cfi-platform.org/errors/PayloadTooLarge",
+                    "title": "Payload Too Large",
+                    "status": 413,
+                    "detail": f"Request body size ({content_length} bytes) exceeds maximum allowed limit of {self.max_bytes} bytes.",
+                    "instance": path,
+                },
+            )
+            await response(scope, receive, send)
+            return
+
+        # Wrap receive stream to defend against chunked / streaming bodies exceeding limit
+        received_bytes = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                chunk = message.get("body", b"")
+                received_bytes += len(chunk)
+                if received_bytes > self.max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Streaming payload exceeded maximum allowed limit of {self.max_bytes} bytes.",
+                    )
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except HTTPException as exc:
+            if exc.status_code == 413:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "type": "https://cfi-platform.org/errors/PayloadTooLarge",
+                        "title": "Payload Too Large",
+                        "status": 413,
+                        "detail": exc.detail,
+                        "instance": path,
+                    },
+                )
+                await response(scope, receive, send)
+            else:
+                raise
+
+
+app.add_middleware(RequestBodySizeLimitMiddleware)
 
 
 # ── W3C Distributed Trace Context Middleware ─────────────────────────────────
