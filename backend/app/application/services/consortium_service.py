@@ -2068,11 +2068,10 @@ class ConsortiumGovernanceService:
                 raise PermissionError(
                     f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for add_member."
                 )
-        elif is_prod:
-            if not auth_token:
-                raise PermissionError(
-                    "Authentication required: Direct service operation 'add_member' requires a valid Bearer auth_token or trusted internal context."
-                )
+        elif is_prod and not auth_token:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'add_member' requires a valid Bearer auth_token or trusted internal context."
+            )
 
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, MembershipProposal]) -> ConsortiumMember:
             if clean_id not in consortia:

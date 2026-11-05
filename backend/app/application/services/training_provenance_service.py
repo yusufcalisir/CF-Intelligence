@@ -1937,11 +1937,12 @@ class DurableTrustStore:
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
                 )
-        elif self._admin_token is not None:
-            if not token or not hmac.compare_digest(token, self._admin_token):
-                raise TrainingProvenanceSecurityError(
-                    "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
-                )
+        elif self._admin_token is not None and (
+            not token or not hmac.compare_digest(token, self._admin_token)
+        ):
+            raise TrainingProvenanceSecurityError(
+                "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
+            )
 
         if operator_token:
             from app.infrastructure.security.auth_service import AuthenticationService
