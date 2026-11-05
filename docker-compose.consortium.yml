@@ -263,8 +263,10 @@ services:
       - consortium-mesh-net
     healthcheck:
       test:
-        - "CMD-SHELL"
-        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request, json, sys; res = json.loads(urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2).read()); sys.exit(0 if res.get('status') == 'ONLINE' and res.get('ready') is True and bool(str(res.get('signature') or '').strip()) else 1)"
       interval: 5s
       timeout: 3s
       retries: 5
@@ -315,8 +317,10 @@ services:
       - consortium-mesh-net
     healthcheck:
       test:
-        - "CMD-SHELL"
-        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request, json, sys; res = json.loads(urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2).read()); sys.exit(0 if res.get('status') == 'ONLINE' and res.get('ready') is True and bool(str(res.get('signature') or '').strip()) else 1)"
       interval: 5s
       timeout: 3s
       retries: 5
@@ -367,8 +371,10 @@ services:
       - consortium-mesh-net
     healthcheck:
       test:
-        - "CMD-SHELL"
-        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request, json, sys; res = json.loads(urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2).read()); sys.exit(0 if res.get('status') == 'ONLINE' and res.get('ready') is True and bool(str(res.get('signature') or '').strip()) else 1)"
       interval: 5s
       timeout: 3s
       retries: 5

@@ -617,20 +617,24 @@ class IsolatedBankWorkerNode:
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
 
-        is_production_worker = (
-            require_signing_identity is True
-            or (
-                require_signing_identity is None
-                and (
-                    os.environ.get("APP_ENV", "").lower().strip() in ("production", "staging")
-                    or os.environ.get("CFI_WORKER_REQUIRE_SIGNING_KEY", "").strip() in ("1", "true", "yes")
-                )
-            )
+        # Mandatory deployment security invariant:
+        # Production/staging environments and explicit environment flags ALWAYS require an authoritative signing identity.
+        # An explicit constructor argument (e.g. require_signing_identity=False) must NEVER weaken an environment requirement.
+        app_env = os.environ.get("APP_ENV", "").lower().strip()
+        worker_req_flag = os.environ.get("CFI_WORKER_REQUIRE_SIGNING_KEY", "").lower().strip()
+        env_requires_signing = (
+            app_env in ("production", "staging")
+            or worker_req_flag in ("1", "true", "yes", "on", "enabled")
         )
-        if is_production_worker and self._signing_identity is None:
+        must_require_signing = env_requires_signing or (require_signing_identity is True)
+
+        if must_require_signing and self._signing_identity is None:
+            trigger_reason = f"APP_ENV='{app_env}'" if app_env in ("production", "staging") else (
+                f"CFI_WORKER_REQUIRE_SIGNING_KEY='{worker_req_flag}'" if worker_req_flag in ("1", "true", "yes", "on", "enabled") else "require_signing_identity=True"
+            )
             raise ConsortiumSecurityError(
-                f"Production worker '{self.bank_id}' cannot start without an authoritative institutional signing identity "
-                f"(APP_ENV={os.environ.get('APP_ENV')}). Fail-closed."
+                f"Worker '{self.bank_id}' cannot start without an authoritative institutional signing identity "
+                f"({trigger_reason}). Fail-closed."
             )
 
         # Scoped RPC authorization credentials (least-privilege separation)

@@ -31,6 +31,7 @@ import concurrent.futures
 import datetime
 import ipaddress
 import json
+import os
 import socket
 import ssl
 import sys
@@ -323,48 +324,37 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
         valid_identity = InstitutionalSigningIdentity.generate("bank_a")
         valid_key_path.write_text(valid_identity.private_key_hex, encoding="utf-8")
 
-        # 1. Valid mounted key loads successfully
-        worker_valid = IsolatedBankWorkerNode(
-            bank_id="bank_a",
-            storage_root=str(vault_dir / "valid"),
-            signing_key_file=str(valid_key_path),
-        )
-        assert worker_valid._signing_identity is not None
-        assert worker_valid._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
-        assert worker_valid._signing_identity.public_key_hex == valid_identity.public_key_hex
-
-        # 2. Mounted file takes precedence over a conflicting environment key
-        conflicting_env_key = "11" * 32
-        worker_precedence = IsolatedBankWorkerNode(
-            bank_id="bank_a",
-            storage_root=str(vault_dir / "precedence"),
-            signing_key=conflicting_env_key,
-            signing_key_file=str(valid_key_path),
-        )
-        assert worker_precedence._signing_identity is not None
-        assert worker_precedence._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
-        assert worker_precedence._signing_identity.public_key_hex == valid_identity.public_key_hex
-
-        # 3. Configured key path is missing while an environment key is present:
-        # startup must fail; environment fallback must not occur.
-        missing_key_path = tmp_path / "nonexistent_signing_key.pem"
-        with pytest.raises(ConsortiumSecurityError, match="not found. Fail-closed"):
+        # 1. Configured key path points to a directory rather than a regular file: startup fails
+        dir_key_path = tmp_path / "key_directory_path"
+        dir_key_path.mkdir(exist_ok=True)
+        with pytest.raises(ConsortiumSecurityError, match="is not a regular file. Fail-closed"):
             IsolatedBankWorkerNode(
                 bank_id="bank_a",
-                storage_root=str(vault_dir / "missing_with_env"),
-                signing_key=conflicting_env_key,
-                signing_key_file=str(missing_key_path),
+                storage_root=str(vault_dir / "dir_key"),
+                signing_key_file=str(dir_key_path),
             )
 
-        # 4. Configured key path is missing and no fallback exists: startup must fail.
-        with pytest.raises(ConsortiumSecurityError, match="not found. Fail-closed"):
+        # 2. Configured key file raises an actual PermissionError during reading:
+        # inject real PermissionError at file-loading boundary and verify application wraps it
+        unreadable_key_path = tmp_path / "unreadable_signing_key.pem"
+        unreadable_key_path.write_text(valid_identity.private_key_hex, encoding="utf-8")
+        orig_from_file = InstitutionalSigningIdentity.from_private_key_file
+
+        def _mock_permission_denied(bank_id: str, file_path: str) -> InstitutionalSigningIdentity:
+            if os.path.abspath(file_path) == os.path.abspath(str(unreadable_key_path)):
+                raise PermissionError(f"Permission denied: simulated OS ACL restriction on '{file_path}'")
+            return orig_from_file(bank_id, file_path)
+
+        monkeypatch.setattr(InstitutionalSigningIdentity, "from_private_key_file", _mock_permission_denied)
+        with pytest.raises(ConsortiumSecurityError, match="Failed to load configured institutional signing key file.*Permission denied"):
             IsolatedBankWorkerNode(
                 bank_id="bank_a",
-                storage_root=str(vault_dir / "missing_no_env"),
-                signing_key_file=str(missing_key_path),
+                storage_root=str(vault_dir / "unreadable"),
+                signing_key_file=str(unreadable_key_path),
             )
+        monkeypatch.setattr(InstitutionalSigningIdentity, "from_private_key_file", orig_from_file)
 
-        # 5. Mounted file is unreadable or malformed: startup must fail.
+        # 3. Mounted file is malformed (corrupted data): startup fails
         malformed_key_path = tmp_path / "malformed_signing_key.pem"
         malformed_key_path.write_text("corrupted_key_data_too_short", encoding="utf-8")
         with pytest.raises(ConsortiumSecurityError, match="Failed to load configured institutional signing key file"):
@@ -374,8 +364,89 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
                 signing_key_file=str(malformed_key_path),
             )
 
-        # 6. No signing identity loaded: health/readiness must not report healthy/ONLINE.
-        # (Preserving non-production sandbox execution when require_signing_identity=False)
+        # 4. Configured key path is missing while WORKER_SIGNING_KEY contains valid candidate:
+        # startup must fail closed without fallback to environment candidate
+        missing_key_path = tmp_path / "nonexistent_signing_key.pem"
+        monkeypatch.setenv("WORKER_SIGNING_KEY", "aa" * 32)
+        with pytest.raises(ConsortiumSecurityError, match="not found. Fail-closed"):
+            IsolatedBankWorkerNode(
+                bank_id="bank_a",
+                storage_root=str(vault_dir / "missing_with_env"),
+                signing_key_file=str(missing_key_path),
+            )
+        monkeypatch.delenv("WORKER_SIGNING_KEY", raising=False)
+
+        # 5. Configured key path is missing while bank-specific environment candidate exists:
+        # startup must fail closed without fallback
+        monkeypatch.setenv("CFI_WORKER_SIGNING_KEY_BANK_A", "bb" * 32)
+        with pytest.raises(ConsortiumSecurityError, match="not found. Fail-closed"):
+            IsolatedBankWorkerNode(
+                bank_id="bank_a",
+                storage_root=str(vault_dir / "missing_with_bank_env"),
+                signing_key_file=str(missing_key_path),
+            )
+        monkeypatch.delenv("CFI_WORKER_SIGNING_KEY_BANK_A", raising=False)
+
+        # 6. APP_ENV=production combined with require_signing_identity=False and no key:
+        # monotonic invariant: explicit False must NOT weaken environment requirement; startup fails
+        monkeypatch.setenv("APP_ENV", "production")
+        with pytest.raises(ConsortiumSecurityError, match="cannot start without an authoritative institutional signing identity.*APP_ENV='production'"):
+            IsolatedBankWorkerNode(
+                bank_id="bank_a",
+                storage_root=str(vault_dir / "prod_override_attempt"),
+                require_signing_identity=False,
+            )
+        monkeypatch.delenv("APP_ENV", raising=False)
+
+        # 7. CFI_WORKER_REQUIRE_SIGNING_KEY=1 combined with require_signing_identity=False:
+        # startup must still fail closed
+        monkeypatch.setenv("CFI_WORKER_REQUIRE_SIGNING_KEY", "1")
+        with pytest.raises(ConsortiumSecurityError, match="cannot start without an authoritative institutional signing identity.*CFI_WORKER_REQUIRE_SIGNING_KEY='1'"):
+            IsolatedBankWorkerNode(
+                bank_id="bank_a",
+                storage_root=str(vault_dir / "flag_override_attempt"),
+                require_signing_identity=False,
+            )
+        monkeypatch.delenv("CFI_WORKER_REQUIRE_SIGNING_KEY", raising=False)
+
+        # 8. Valid file-mounted signing identity under APP_ENV=production:
+        # startup succeeds, health reports ONLINE, ready=True, and non-empty signature
+        monkeypatch.setenv("APP_ENV", "production")
+        worker_prod = IsolatedBankWorkerNode(
+            bank_id="bank_a",
+            storage_root=str(vault_dir / "prod_valid"),
+            signing_key_file=str(valid_key_path),
+        )
+        assert worker_prod._signing_identity is not None
+        assert worker_prod._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
+        prod_health = worker_prod.get_health()
+        assert prod_health["status"] == "ONLINE"
+        assert prod_health["ready"] is True
+        assert prod_health["key_custody_mode"] == "ISOLATED_FILE_MOUNT"
+        assert bool(prod_health["signature"].strip())
+        assert prod_health["signing_public_key_hex"] == valid_identity.public_key_hex
+        monkeypatch.delenv("APP_ENV", raising=False)
+
+        # 9. Valid file-mounted signing identity under APP_ENV=staging:
+        # startup succeeds, health reports ONLINE and ready=True
+        monkeypatch.setenv("APP_ENV", "staging")
+        worker_staging = IsolatedBankWorkerNode(
+            bank_id="bank_a",
+            storage_root=str(vault_dir / "staging_valid"),
+            signing_key_file=str(valid_key_path),
+        )
+        assert worker_staging._signing_identity is not None
+        assert worker_staging._signing_identity.custody_mode == "ISOLATED_FILE_MOUNT"
+        staging_health = worker_staging.get_health()
+        assert staging_health["status"] == "ONLINE"
+        assert staging_health["ready"] is True
+        assert bool(staging_health["signature"].strip())
+        monkeypatch.delenv("APP_ENV", raising=False)
+
+        # 10. Non-production identity-less worker constructed only when explicitly permitted,
+        # but must never report healthy or ready (status=UNHEALTHY, ready=False, HTTP 503)
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("CFI_WORKER_REQUIRE_SIGNING_KEY", raising=False)
         worker_no_identity = IsolatedBankWorkerNode(
             bank_id="bank_a",
             storage_root=str(vault_dir / "no_identity"),
@@ -388,7 +459,7 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
         assert health["key_custody_mode"] == "NO_IDENTITY"
         assert "signature" not in health
 
-        # Also verify HTTP daemon /health returns 503 Service Unavailable when no identity is loaded
+        # Verify HTTP daemon /health returns 503 Service Unavailable when no identity is loaded
         daemon = InstitutionalWorkerDaemon(
             node=worker_no_identity,
             host="127.0.0.1",
@@ -403,25 +474,6 @@ class TestInstitutionalKeyAndSecretCustodyHardening:
             assert http_err.value.code == 503
         finally:
             daemon.stop()
-
-        # 7. Valid production worker reports ISOLATED_FILE_MOUNT, and production worker
-        # refuses to start without an authoritative signing identity.
-        prod_health = worker_valid.get_health()
-        assert prod_health["status"] == "ONLINE"
-        assert prod_health["ready"] is True
-        assert prod_health["key_custody_mode"] == "ISOLATED_FILE_MOUNT"
-        assert prod_health["signature"] != ""
-        assert prod_health["signing_public_key_hex"] == valid_identity.public_key_hex
-
-        # Production worker fails closed at startup if no signing identity is loaded
-        monkeypatch.setenv("APP_ENV", "production")
-        with pytest.raises(ConsortiumSecurityError, match="cannot start without an authoritative institutional signing identity"):
-            IsolatedBankWorkerNode(
-                bank_id="bank_a",
-                storage_root=str(vault_dir / "prod_missing"),
-                signing_key=None,
-                signing_key_file=None,
-            )
 
     def test_consortium_deployment_key_custody_isolation_and_boundary_checks(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
