@@ -25,7 +25,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
@@ -227,11 +226,12 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
@@ -245,14 +245,4 @@ jobs:
 
       - name: Run Full Pytest Suite across Security, Governance & Compliance
         run: |
-          set +e
           pytest tests/unit/ -v --cov=app --cov-report=xml
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            exit 0
-          elif [ -f coverage.xml ]; then
-            echo "⚠️ Tests completed with exit code $EXIT_CODE during PyTorch/Ray C++ teardown; coverage.xml generated successfully. Ignoring teardown exit code."
-            exit 0
-          else
-            exit $EXIT_CODE
-          fi

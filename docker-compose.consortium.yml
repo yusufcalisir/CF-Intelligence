@@ -262,7 +262,9 @@ services:
     networks:
       - consortium-mesh-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      test:
+        - "CMD-SHELL"
+        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
       interval: 5s
       timeout: 3s
       retries: 5
@@ -312,7 +314,9 @@ services:
     networks:
       - consortium-mesh-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      test:
+        - "CMD-SHELL"
+        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
       interval: 5s
       timeout: 3s
       retries: 5
@@ -362,7 +366,9 @@ services:
     networks:
       - consortium-mesh-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8100/health"]
+      test:
+        - "CMD-SHELL"
+        - "curl -sf http://127.0.0.1:8100/health | grep -q '\"status\": \"ONLINE\"' && curl -sf http://127.0.0.1:8100/health | grep -q '\"ready\": true' && curl -sf http://127.0.0.1:8100/health | grep -q '\"signature\"'"
       interval: 5s
       timeout: 3s
       retries: 5

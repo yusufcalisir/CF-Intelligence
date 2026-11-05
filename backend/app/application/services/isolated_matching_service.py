@@ -563,6 +563,7 @@ class IsolatedBankWorkerNode:
         consortium_service: Any | None = None,
         signing_key: InstitutionalSigningIdentity | str | None = None,
         signing_key_file: str | None = None,
+        require_signing_identity: bool | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -577,24 +578,60 @@ class IsolatedBankWorkerNode:
 
         # Asymmetric institutional signing identity (strictly tenant-sovereign)
         self._signing_identity: InstitutionalSigningIdentity | None = None
-        key_file = (
+        key_file_raw = (
             signing_key_file
             or os.environ.get("WORKER_SIGNING_KEY_FILE")
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_FILE_{self.bank_id.upper()}")
         )
+        key_file = key_file_raw.strip() if key_file_raw and key_file_raw.strip() else None
         signing_key_candidate = (
             signing_key
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{self.bank_id.upper()}")
             or os.environ.get("WORKER_SIGNING_KEY")
         )
-        if key_file and os.path.exists(key_file):
-            self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
+
+        if key_file:
+            # Explicit key file configured: fail closed if missing, not a regular file, or unreadable.
+            # Fallback to environment or candidate keys is strictly prohibited.
+            if not os.path.exists(key_file):
+                raise ConsortiumSecurityError(
+                    f"Configured signing key file '{key_file}' for worker '{self.bank_id}' not found. "
+                    f"Fail-closed: fallback to environment-based signing key candidates is strictly prohibited."
+                )
+            if not os.path.isfile(key_file):
+                raise ConsortiumSecurityError(
+                    f"Configured signing key path '{key_file}' for worker '{self.bank_id}' is not a regular file. "
+                    f"Fail-closed."
+                )
+            try:
+                self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
+            except Exception as exc:
+                raise ConsortiumSecurityError(
+                    f"Failed to load configured institutional signing key file '{key_file}' for worker '{self.bank_id}': {exc}. "
+                    f"Fail-closed."
+                ) from exc
         elif isinstance(signing_key, InstitutionalSigningIdentity):
             self._signing_identity = signing_key
         elif isinstance(signing_key, str) and len(signing_key.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key)
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
+
+        is_production_worker = (
+            require_signing_identity is True
+            or (
+                require_signing_identity is None
+                and (
+                    os.environ.get("APP_ENV", "").lower().strip() in ("production", "staging")
+                    or os.environ.get("CFI_WORKER_REQUIRE_SIGNING_KEY", "").strip() in ("1", "true", "yes")
+                )
+            )
+        )
+        if is_production_worker and self._signing_identity is None:
+            raise ConsortiumSecurityError(
+                f"Production worker '{self.bank_id}' cannot start without an authoritative institutional signing identity "
+                f"(APP_ENV={os.environ.get('APP_ENV')}). Fail-closed."
+            )
 
         # Scoped RPC authorization credentials (least-privilege separation)
         self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
@@ -675,7 +712,29 @@ class IsolatedBankWorkerNode:
         """Return truthful node health and key custody metadata."""
         now_iso = datetime.datetime.now(UTC).isoformat()
         protocol = "OPENMINED-PSI-2.0.6-ECDH"
-        resp_data: dict[str, Any] = {
+        signing_id = self._signing_identity
+        if signing_id is None:
+            return {
+                "status": "UNHEALTHY",
+                "bank_id": self.bank_id,
+                "role": "worker",
+                "protocol": protocol,
+                "pid": os.getpid(),
+                "timestamp": now_iso,
+                "nonce": nonce,
+                "ready": False,
+                "error": "No institutional signing identity loaded",
+                "key_custody_mode": "NO_IDENTITY",
+            }
+
+        canonical_stmt = canonical_worker_readiness_bytes(
+            bank_id=self.bank_id,
+            nonce=nonce,
+            timestamp=now_iso,
+            protocol=protocol,
+        )
+        sig_hex = signing_id.sign(canonical_stmt)
+        return {
             "status": "ONLINE",
             "bank_id": self.bank_id,
             "role": "worker",
@@ -683,24 +742,15 @@ class IsolatedBankWorkerNode:
             "pid": os.getpid(),
             "timestamp": now_iso,
             "nonce": nonce,
-        }
-        signing_id = self._signing_identity
-        if signing_id is not None:
-            canonical_stmt = canonical_worker_readiness_bytes(
-                bank_id=self.bank_id,
-                nonce=nonce,
-                timestamp=now_iso,
-                protocol=protocol,
-            )
-            sig_hex = signing_id.sign(canonical_stmt)
-            resp_data["signature"] = sig_hex
-            resp_data["public_key_hex"] = signing_id.public_key_hex
-            resp_data["signing_public_key_hex"] = signing_id.public_key_hex
-            resp_data["key_version"] = 1
-            resp_data["key_custody_mode"] = getattr(
+            "ready": True,
+            "signature": sig_hex,
+            "public_key_hex": signing_id.public_key_hex,
+            "signing_public_key_hex": signing_id.public_key_hex,
+            "key_version": 1,
+            "key_custody_mode": getattr(
                 signing_id, "custody_mode", "LOCAL_SANDBOX_ENV"
-            )
-        return resp_data
+            ),
+        }
 
     @property
     def matching_token(self) -> str:
@@ -2145,11 +2195,13 @@ class InstitutionalWorkerDaemon:
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 nonce = query_params.get("nonce", [""])[0]
 
-                if parsed_url.path in ("/health", "/worker/health"):
+                if parsed_url.path in ("/health", "/worker/health", "/ready", "/worker/ready"):
                     resp_data = node.get_health(nonce=nonce)
                     resp_data["transport_profile"] = daemon_transport.profile
 
-                    self.send_response(200)
+                    is_ready = resp_data.get("status") == "ONLINE" and resp_data.get("ready", False)
+                    status_code = 200 if is_ready else 503
+                    self.send_response(status_code)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps(resp_data).encode())
