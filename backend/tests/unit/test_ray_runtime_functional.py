@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import zipfile
+from typing import Any
 
 import pytest
 
@@ -16,17 +17,22 @@ except ImportError:
 @pytest.mark.skipif(ray is None, reason="Ray not installed in environment")
 def test_ray_python_runtime_task_and_object_store() -> None:
     """Verify that Python Ray initializes, executes remote tasks, and exchanges objects."""
+    if ray is None:
+        pytest.skip("Ray not installed in environment")
+        return
+
+    ray_env: Any = ray
     try:
-        if not ray.is_initialized():
-            ray.init(num_cpus=1, ignore_reinit_error=True)
+        if not ray_env.is_initialized():
+            ray_env.init(num_cpus=1, ignore_reinit_error=True)
     except (RuntimeError, ValueError) as exc:
         pytest.skip(f"Ray cluster initialization skipped due to host OS resource constraints: {exc}")
 
-    @ray.remote
+    @ray_env.remote
     def compute_sum(a: int, b: int) -> int:
         return a + b
 
-    @ray.remote
+    @ray_env.remote
     class Counter:
         def __init__(self) -> None:
             self.val = 0
@@ -37,29 +43,31 @@ def test_ray_python_runtime_task_and_object_store() -> None:
 
     # 1. Test remote task execution
     task_future = compute_sum.remote(20, 22)
-    result = ray.get(task_future)
+    result = ray_env.get(task_future)
     assert result == 42, f"Expected 42, got {result}"
 
     # 2. Test stateful remote actor
-    actor = Counter.remote()  # type: ignore[attr-defined]
-    val1 = ray.get(actor.increment.remote())
-    val2 = ray.get(actor.increment.remote())
+    counter_actor: Any = Counter
+    actor = counter_actor.remote()
+    val1 = ray_env.get(actor.increment.remote())
+    val2 = ray_env.get(actor.increment.remote())
     assert val1 == 1
     assert val2 == 2
 
     # 3. Test Object Store put/get
     data = {"model_weights": [0.1, 0.2, 0.3], "bank_id": "bank_a"}
-    obj_ref = ray.put(data)
-    recovered = ray.get(obj_ref)
+    obj_ref = ray_env.put(data)
+    recovered = ray_env.get(obj_ref)
     assert recovered == data
 
-    ray.shutdown()
+    ray_env.shutdown()
 
 
 def test_ray_jar_artifact_structure_and_absence_of_unshaded_dependencies() -> None:
     """Inspect ray_dist.jar structure, shading prefix, and absence of active JVM."""
     if ray is None:
         pytest.skip("Ray not installed")
+        return
 
     ray_dir = os.path.dirname(ray.__file__)
     jars_dir = os.path.join(ray_dir, "jars")
