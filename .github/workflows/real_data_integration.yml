@@ -36,12 +36,12 @@ jobs:
     if: github.repository == 'yusufcalisir/CF-Intelligence'
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -57,7 +57,7 @@ jobs:
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
 
       - name: Restore Dataset Cache (if available)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/storage/datasets
           key: ${{ runner.os }}-datasets-${{ github.sha }}
