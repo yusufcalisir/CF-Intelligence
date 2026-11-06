@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir uv
 COPY requirements.txt ./
 RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
-    uv pip install --no-cache -r requirements.txt
+    uv pip install --no-cache -r requirements.txt && \
+    rm -rf /opt/venv/lib/python3.12/site-packages/ray/jars
 
 # Stage 2: Hardened, non-root production runtime
 FROM python:3.12-slim-bookworm AS runtime
