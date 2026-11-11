@@ -466,10 +466,10 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     routeDataset: 'paysim',
     rows: [
       { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
-      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
+      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
       { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
       { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
-      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
+      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
     ],
   },
   creditcard: {
@@ -488,8 +488,8 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8248 ± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
       { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8219 ± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
-      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
       { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
     ],
   },
@@ -528,7 +528,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     routeDataset: 'ieee_cis',
     rows: [
       { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
-      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
+      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
       { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
     ],
   },
@@ -548,7 +548,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
       { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
-      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
       { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
@@ -568,7 +568,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
       { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
-      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
+      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
     ],
   },
   synthaml: {
@@ -808,9 +808,9 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
   ];
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-[#070718] w-full max-w-full min-w-0">
+    <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-slate-50 w-full max-w-full min-w-0">
       {/* Browser Chrome Header */}
-      <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-[#0b0b20] border-b border-white/8 min-w-0">
+      <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-slate-100 border-b border-slate-200 min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <div className="flex gap-1 shrink-0">
             <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
@@ -821,10 +821,10 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             type="button"
             onClick={() => navigate(`/${tabUrlPaths[activeTab]}`)}
             title={`Click to open https://cf-intelligence.vercel.app/${tabUrlPaths[activeTab]}`}
-            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1 border border-white/5 truncate cursor-pointer hover:bg-white/10 hover:border-indigo-500/40 transition-all text-left"
+            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-500 flex items-center gap-1 border border-white/5 truncate cursor-pointer hover:bg-white/10 hover:border-indigo-500/40 transition-all text-left"
           >
             <span className="text-emerald-400 text-[10px] shrink-0">🔒</span>
-            <span className="text-slate-400 truncate">https://cf-intelligence.vercel.app/</span>
+            <span className="text-slate-500 truncate">https://cf-intelligence.vercel.app/</span>
             <span className="text-indigo-400 font-bold bg-indigo-500/15 px-1 py-0.5 rounded group-hover:text-indigo-300 shrink-0">
               {tabUrlPaths[activeTab]}
             </span>
@@ -839,7 +839,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
       {/* Main Body */}
       <div className="flex min-h-[340px] sm:min-h-[360px] w-full min-w-0">
         {/* INTERACTIVE SIDEBAR NAV */}
-        <div className="w-9 sm:w-11 shrink-0 border-r border-white/6 bg-[#08081b] py-2.5 flex flex-col items-center gap-3">
+        <div className="w-9 sm:w-11 shrink-0 border-r border-slate-200 bg-slate-50 py-2.5 flex flex-col items-center gap-3">
           {sidebarButtons.map(btn => (
             <button
               key={btn.id}
@@ -848,7 +848,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeTab === btn.id
                   ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
               }`}
             >
               {btn.icon}
@@ -864,30 +864,30 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Active FL Round</div>
                     <div className="text-xs sm:text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Global Accuracy</div>
                     <div className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Privacy Budget</div>
                     <div className="text-xs sm:text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Stream Speed</div>
                     <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-400">
+                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-500">
                   <span>* Illustrative simulation preview</span>
                   <span className="text-indigo-300 font-medium">Synthetic Convergence Ticker</span>
                 </div>
 
-                <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2 min-w-0">
+                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white/2 min-w-0">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-white/5 bg-white/3">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Risk Alert Feed</span>
                     <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-400">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
                     </span>
@@ -896,17 +896,17 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     {alerts.map((a) => (
                       <div key={`${a.id}-${alertTick}`} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 text-[8.5px] sm:text-[9px] font-mono min-w-0">
                         <span className={`w-1 h-3 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <span className="text-slate-400 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
-                        <span className="text-slate-300 flex-1 truncate">${a.amount}</span>
+                        <span className="text-slate-500 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
+                        <span className="text-slate-600 flex-1 truncate">${a.amount}</span>
                         <span className={`font-bold shrink-0 ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/6 bg-white/2 p-1.5 sm:p-2 min-w-0">
+                <div className="rounded-xl border border-slate-200 bg-white/2 p-1.5 sm:p-2 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Consortium Topology</span>
                     <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
                   </div>
                   <HighEndConsortiumSVG />
@@ -918,28 +918,28 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-0.5">
                   <div className="text-purple-300 font-bold">GNN Subgraph Inspection</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Total Alerts</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Total Alerts</div>
                     <div className="text-amber-400 font-bold mt-0.5">48 (12 Critical)</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Open Cases</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Open Cases</div>
                     <div className="text-indigo-400 font-bold mt-0.5">8 Active Cases</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Entities</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Entities</div>
                     <div className="text-teal-400 font-bold mt-0.5">142 Network Nodes</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Graph Clusters</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Graph Clusters</div>
                     <div className="text-pink-400 font-bold mt-0.5">5 High-Risk Subgraphs</div>
                   </div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/6 space-y-1">
-                  <div className="text-slate-400 font-semibold">Detected Circular Smurfing Path:</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-white/3 border border-slate-200 space-y-1">
+                  <div className="text-slate-500 font-semibold">Detected Circular Smurfing Path:</div>
                   <div className="text-rose-400 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
                 </div>
               </motion.div>
@@ -949,23 +949,23 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-0.5">
                   <div className="text-emerald-300 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
-                    <span className="text-slate-400">Deep Leakage Audit (DLG)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-slate-500">Deep Leakage Audit (DLG)</span>
                     <span className="text-emerald-400 font-bold">🟢 Safe (0.021)</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
-                    <span className="text-slate-400">Membership Inference (MIA)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-slate-500">Membership Inference (MIA)</span>
                     <span className="text-emerald-400 font-bold">🟢 Safe (0.048)</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
-                    <span className="text-slate-400">Model Inversion Attack</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-slate-500">Model Inversion Attack</span>
                     <span className="text-emerald-400 font-bold">🟢 Safe (0.015)</span>
                   </div>
                 </div>
-                <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[8.5px] sm:text-[9px] text-slate-500 truncate">
                   Privacy Accountant: ε = 1.0, δ = 1e-5 (Opacus RDP Bounded)
                 </div>
               </motion.div>
@@ -975,15 +975,15 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-0.5">
                   <div className="text-cyan-300 font-bold">Byzantine Resilience Monitor</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Live FL Round</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Live FL Round</div>
                     <div className="text-cyan-400 font-bold mt-0.5">Round #5 / 10</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Champion Model AUC</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Champion Model AUC</div>
                     <div className="text-emerald-400 font-bold mt-0.5">0.885 ROC-AUC</div>
                   </div>
                 </div>
@@ -1004,22 +1004,22 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-0.5">
                   <div className="text-amber-300 font-bold">FinCEN SAR Automated Compliance</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6 space-y-0.5">
-                    <div className="flex items-center justify-between text-slate-200 font-bold">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-800 font-bold">
                       <span>CASE-2026-004</span>
                       <span className="text-rose-400">P1 Critical</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
+                    <div className="text-slate-500 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6 space-y-0.5">
-                    <div className="flex items-center justify-between text-slate-200 font-bold">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-800 font-bold">
                       <span>CASE-2026-001</span>
                       <span className="text-emerald-400">SAR Filed</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
+                    <div className="text-slate-500 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
                   </div>
                 </div>
               </motion.div>
@@ -1032,15 +1032,15 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="text-rose-300 font-bold">Interactive Chaos & Attack Simulator</span>
                     <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
                   </div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-rose-500/20">
-                    <div className="text-slate-400">Byzantine Vector</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-rose-500/20">
+                    <div className="text-slate-500">Byzantine Vector</div>
                     <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-emerald-500/20">
-                    <div className="text-slate-400">Defense Filter</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-emerald-500/20">
+                    <div className="text-slate-500">Defense Filter</div>
                     <div className="text-emerald-400 font-bold mt-0.5">Krum (Score=48.2)</div>
                   </div>
                 </div>
@@ -1061,15 +1061,15 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="text-indigo-300 font-bold">Real Dataset Ingestion Studio</span>
                     <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
                   </div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Luhn Algorithm PAN</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Luhn Algorithm PAN</div>
                     <div className="text-emerald-400 font-bold mt-0.5">100% Sanitized</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-400">Data Contract Audit</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500">Data Contract Audit</div>
                     <div className="text-emerald-400 font-bold mt-0.5">12 / 12 Passed</div>
                   </div>
                 </div>
@@ -1081,7 +1081,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             )}
           </AnimatePresence>
 
-          <div className="text-[8px] sm:text-[9px] font-mono text-slate-400 text-center border-t border-white/5 pt-1.5">
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-1.5">
             Click sidebar icons ({sidebarButtons.map(b => b.label).join(' · ')}) to inspect live platform modules
           </div>
         </div>
@@ -1149,14 +1149,14 @@ const ArrowRight = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 );
 const ChevronDown = () => (
-  <svg className="w-3 h-3 text-slate-400 group-hover:text-slate-300 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-600 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
 const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; className?: string }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-400'} ${className}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-500'} ${className}`}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1171,27 +1171,27 @@ const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; classNa
 // Helper for Workflow Step Detail Card
 const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { step: typeof PRESENTATION_WORKFLOW[0] }) {
   return (
-    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
-      <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2 min-w-0">
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 sm:pb-4 gap-2 min-w-0">
         <div className="min-w-0">
           <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
             {step.badge} of 08
           </span>
-          <h3 className="text-base sm:text-xl font-bold text-slate-100 mt-0.5 truncate">{step.label}</h3>
+          <h3 className="text-base sm:text-xl font-bold text-slate-900 mt-0.5 truncate">{step.label}</h3>
         </div>
         <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 shrink-0">
           Production Pipeline
         </span>
       </div>
 
-      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-sans">
         {step.summary}
       </p>
 
       {/* Highlights Bullet List */}
       <div className="space-y-2 pt-1 min-w-0">
-        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400">Key Engineering & Privacy Highlights</div>
-        <div className="space-y-1.5 font-sans text-xs text-slate-300 min-w-0">
+        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
+        <div className="space-y-1.5 font-sans text-xs text-slate-600 min-w-0">
           {step.highlights.map(hl => (
             <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/5 min-w-0">
               <span className="text-indigo-400 font-bold shrink-0">✓</span>
@@ -1203,12 +1203,12 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 
       {/* Data Input/Output Specifications */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
-        <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Input</div>
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
           <div className="text-indigo-300 font-semibold truncate">{step.input}</div>
         </div>
-        <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Output</div>
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
           <div className="text-emerald-400 font-semibold truncate">{step.output}</div>
         </div>
       </div>
@@ -1220,9 +1220,9 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { mod: Module; onNavigate: (path: string) => void }) {
   const currentExtra = MODULE_SPECS_EXTRA[mod.id];
   return (
-    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 shadow-2xl">
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 shadow-2xl">
       {/* Card Header & Action */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-white/8 pb-4 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-200 pb-4 min-w-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
@@ -1236,8 +1236,8 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
               {currentExtra?.statusBadge ?? 'VERIFIED'}
             </span>
           </div>
-          <h3 className="text-base sm:text-xl font-bold text-slate-100">{mod.name}</h3>
-          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
+          <h3 className="text-base sm:text-xl font-bold text-slate-900">{mod.name}</h3>
+          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
         </div>
 
         {currentExtra && (
@@ -1260,8 +1260,8 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
           { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-500/20 bg-emerald-950/15' },
         ].map(row => (
           <div key={row.label} className={`p-3 sm:p-3.5 rounded-xl border ${row.color} min-w-0`}>
-            <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
-            <div className="text-slate-200 text-xs break-words leading-relaxed">{row.value}</div>
+            <div className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
+            <div className="text-slate-800 text-xs break-words leading-relaxed">{row.value}</div>
           </div>
         ))}
       </div>
@@ -1269,27 +1269,27 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       {/* Engineering Guarantees & Real-Time SLAs */}
       {currentExtra && (
         <div className="space-y-3 pt-2">
-          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-semibold">
             Engineering Invariants & Operational SLA
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
-            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-400 uppercase">Target Execution SLA</div>
-              <div className="text-slate-200 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
+            <div className="p-2.5 rounded-xl bg-white/3 border border-slate-200">
+              <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
+              <div className="text-slate-800 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-400 uppercase">Cryptographic Invariant</div>
+            <div className="p-2.5 rounded-xl bg-white/3 border border-slate-200">
+              <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
               <div className="text-indigo-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-400 uppercase">Compliance Standard</div>
+            <div className="p-2.5 rounded-xl bg-white/3 border border-slate-200">
+              <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
               <div className="text-emerald-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
             </div>
           </div>
 
           {/* Tensor Transformation & Contract Blueprint */}
-          <div className="p-3 rounded-xl bg-[#03030c] border border-white/8 font-mono">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>Dataflow Transformation Blueprint</span>
               <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
             </div>
@@ -1306,11 +1306,11 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
 // Helper for Arch Node Detail Card
 const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: ArchNode }) {
   return (
-    <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
-      <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
+    <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
+      <div className="border-b border-slate-200 pb-3 sm:pb-4 min-w-0">
         <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
-        <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{node.label}</h3>
-        <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{node.description}</p>
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5 truncate">{node.label}</h3>
+        <p className="text-xs text-slate-500 leading-relaxed mt-1.5 font-sans">{node.description}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
         {[
@@ -1319,10 +1319,10 @@ const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: Ar
           { label: 'Technology',       items: node.tech,            dot: 'text-cyan-400' },
         ].map(col => (
           <div key={col.label} className="min-w-0">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1.5">{col.label}</div>
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
             <ul className="space-y-1">
               {col.items.map(it => (
-                <li key={it} className="text-slate-300 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
+                <li key={it} className="text-slate-600 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
               ))}
             </ul>
           </div>
@@ -1407,33 +1407,33 @@ export default function LandingPage() {
   const currentWorkflowStep = PRESENTATION_WORKFLOW.find(s => s.id === activeWorkflowStep)!;
 
   return (
-    <div className="min-h-screen bg-[#05050f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white w-full max-w-full overflow-x-hidden min-w-0">
+    <div className="min-h-screen bg-white text-slate-700 font-sans antialiased selection:bg-indigo-600 selection:text-white w-full max-w-full overflow-x-hidden min-w-0">
 
       {/* 2026 Ambient Fluid Glow background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-600/15 blur-[140px]" />
-        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[150px]" />
-        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-600/10 blur-[130px]" />
-        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
+        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-500/8 blur-[140px]" />
+        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-500/6 blur-[150px]" />
+        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-500/5 blur-[130px]" />
+        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-full min-w-0">
 
         {/* ── HEADER NAVBAR ────────────────────────────────────────── */}
-        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-white/6 bg-[#05050f]/80 backdrop-blur-2xl w-full max-w-full">
+        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-slate-200 bg-white/90 backdrop-blur-2xl shadow-sm w-full max-w-full">
           <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 flex items-center justify-between min-w-0">
             {/* Brand Logo & Clean Name */}
             <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => navigate('/')}>
               <BrandLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0" />
-              <span className="font-bold text-sm sm:text-base text-slate-100 tracking-tight truncate">CF-Intelligence</span>
+              <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight truncate">CF-Intelligence</span>
             </div>
 
             {/* Desktop Navigation with Contextual Dropdowns */}
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-500">
               <a
                 href="#hero"
                 onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
-                className="hover:text-slate-100 transition-colors py-2"
+                className="hover:text-slate-900 transition-colors py-2"
               >
                 Overview
               </a>
@@ -1446,16 +1446,16 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('problem-solution')}
-                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
                 >
                   <span>Platform & Engine</span>
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Core Platform Suite
                   </div>
                   {[
@@ -1468,13 +1468,13 @@ export default function LandingPage() {
                       key={sub.target}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1488,7 +1488,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('architecture')}
-                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
                 >
                   <span>Architecture & Security</span>
                   <ChevronDown />
@@ -1496,11 +1496,11 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'arch'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Security & Topology
                   </div>
                   {[
@@ -1512,13 +1512,13 @@ export default function LandingPage() {
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1532,7 +1532,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('benchmarks')}
-                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
                 >
                   <span>Benchmarks & Proof</span>
                   <ChevronDown />
@@ -1540,11 +1540,11 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'bench'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Empirical Proof Suite
                   </div>
                   {[
@@ -1556,13 +1556,13 @@ export default function LandingPage() {
                       key={sub.label}
                       type="button"
                       onClick={sub.action}
-                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item text-left cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item text-left cursor-pointer"
                     >
                       <div>
-                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-400 text-xs">→</span>
                     </button>
                   ))}
                 </div>
@@ -1576,7 +1576,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('api')}
-                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
                 >
                   <span>Developers & Legal</span>
                   <ChevronDown />
@@ -1584,11 +1584,11 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'dev'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Integration & Contracts
                   </div>
                   {[
@@ -1600,13 +1600,13 @@ export default function LandingPage() {
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1615,7 +1615,7 @@ export default function LandingPage() {
               <a
                 href="#contact"
                 onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }}
-                className="hover:text-slate-100 transition-colors py-2"
+                className="hover:text-slate-900 transition-colors py-2"
               >
                 Enterprise Setup
               </a>
@@ -1625,7 +1625,7 @@ export default function LandingPage() {
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white cursor-pointer transition-colors active:scale-95"
+                className="lg:hidden p-2 rounded-xl bg-white/5 border border-slate-200 text-slate-600 hover:text-white cursor-pointer transition-colors active:scale-95"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
@@ -1648,21 +1648,21 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="lg:hidden fixed inset-0 z-[100] bg-[#03030c] min-h-[100dvh] flex flex-col justify-between p-6 overflow-y-auto"
+              className="lg:hidden fixed inset-0 z-[100] bg-white min-h-[100dvh] flex flex-col justify-between p-6 overflow-y-auto"
             >
               {/* Top Header Bar inside Full-Screen Menu */}
-              <div className="flex items-center justify-between pb-6 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between pb-6 border-b border-slate-200 shrink-0">
                 <div className="flex items-center gap-3">
                   <BrandLogo className="w-8 h-8 shrink-0" />
                   <div>
                     <div className="font-bold text-sm text-white tracking-tight">CF-Intelligence</div>
-                    <div className="text-[10px] font-mono text-slate-400">Consortium Fraud Network</div>
+                    <div className="text-[10px] font-mono text-slate-500">Consortium Fraud Network</div>
                   </div>
                 </div>
                 <button
                   aria-label="Close Navigation Menu"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
                 >
                   <CloseIcon />
                 </button>
@@ -1687,17 +1687,17 @@ export default function LandingPage() {
                       setIsMobileMenuOpen(false);
                       handleNavClick(item.targetId);
                     }}
-                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/6 hover:border-indigo-500/40 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
+                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-500/40 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       <span className="text-xs font-mono font-bold text-indigo-400 group-hover:text-indigo-300 shrink-0">
                         {item.num}
                       </span>
-                      <span className="text-base font-semibold text-slate-200 group-hover:text-white truncate">
+                      <span className="text-base font-semibold text-slate-800 group-hover:text-white truncate">
                         {item.label}
                       </span>
                     </div>
-                    <span className="text-slate-400 group-hover:text-indigo-400 transition-colors shrink-0">
+                    <span className="text-slate-500 group-hover:text-indigo-400 transition-colors shrink-0">
                       <ArrowRight />
                     </span>
                   </motion.button>
@@ -1705,7 +1705,7 @@ export default function LandingPage() {
               </div>
 
               {/* Bottom Action Area */}
-              <div className="pt-6 border-t border-white/10 space-y-3 shrink-0">
+              <div className="pt-6 border-t border-slate-200 space-y-3 shrink-0">
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
@@ -1717,7 +1717,7 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1 pt-1">
                   <span>CF-Intelligence Network</span>
                   <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1751,27 +1751,27 @@ export default function LandingPage() {
                     Fraud Detection Platform
                   </span>
                 </h1>
-                <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
+                <p className="text-slate-500 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
                   CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies to detect multi-bank money laundering networks without raw customer data exposure.
                 </p>
               </div>
 
               {/* High impact feature highlights */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-slate-200 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">+55.59%</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
+                  <div className="text-[11px] text-slate-500 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
                 </div>
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-slate-200 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε ≤ 1.0</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
+                  <div className="text-[11px] text-slate-500 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
                 </div>
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-slate-200 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.70 ms</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
+                  <div className="text-[11px] text-slate-500 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
                 </div>
               </div>
 
@@ -1787,7 +1787,7 @@ export default function LandingPage() {
                 <a
                   href="#architecture"
                   onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
-                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-200 hover:text-white bg-[#0a0c24]/90 hover:bg-[#12163b] border border-white/10 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
+                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-800 hover:text-white bg-[#0a0c24]/90 hover:bg-[#12163b] border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
                 >
                   <span>Explore System Design</span>
                 </a>
@@ -1804,17 +1804,17 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 - PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
-        <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Problem Statement
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
                 The Cross-Bank Blindspot in Money Laundering
               </h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation-missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
               </p>
             </div>
@@ -1842,14 +1842,14 @@ export default function LandingPage() {
               ].map((card) => (
                 <div
                   key={card.label}
-                  className="p-5 sm:p-7 rounded-2xl bg-white/2 border border-white/8 hover:border-indigo-500/30 transition-all space-y-3 min-w-0"
+                  className="p-5 sm:p-7 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-3 min-w-0"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-400">{card.stat}</span>
-                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 bg-white/4 px-2 py-0.5 rounded border border-white/6">{card.tag}</span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 bg-white/4 px-2 py-0.5 rounded border border-slate-200">{card.tag}</span>
                   </div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-200">{card.label}</h3>
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans">{card.desc}</p>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-800">{card.label}</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-sans">{card.desc}</p>
                 </div>
               ))}
             </div>
@@ -1859,15 +1859,15 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 3 - WORKFLOW / EXECUTION PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Execution Pipeline
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Architecture</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">8-Stage Federated Training Architecture</h2>
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any pipeline stage below to view the architectural overview, data input/output specifications, and cryptographic guarantees.
               </p>
             </div>
@@ -1883,13 +1883,13 @@ export default function LandingPage() {
                         onClick={() => setActiveWorkflowStep(step.id)}
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                           isActive
-                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                            : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                            : 'bg-white/2 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white/5 hover:border-white/12'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
-                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white/5 text-slate-400'
+                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white/5 text-slate-500'
                           }`}>
                             {step.id}
                           </span>
@@ -1899,7 +1899,7 @@ export default function LandingPage() {
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isActive} />
                           </span>
-                          <span className="hidden lg:inline text-xs font-mono text-slate-400 group-hover:text-slate-200">
+                          <span className="hidden lg:inline text-xs font-mono text-slate-500 group-hover:text-slate-800">
                             {isActive ? '→' : ''}
                           </span>
                         </div>
@@ -1937,7 +1937,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 - ENGINE CAPABILITIES (#product)
         ══════════════════════════════════════════════════════════ */}
-        <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 min-w-0">
               <div className="max-w-3xl min-w-0">
@@ -1945,14 +1945,14 @@ export default function LandingPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
                   Engine Specifications & Architecture
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Platform Engineering Capabilities</h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Platform Engineering Capabilities</h2>
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   Inspect platform component specifications, mathematical algorithms, tensor input/output contracts, and real-time execution invariants.
                 </p>
               </div>
 
               {/* Category Filter Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-white/8 shrink-0 self-start md:self-end">
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-slate-200 shrink-0 self-start md:self-end">
                 {[
                   { id: 'ALL', label: `All (${PLATFORM_MODULES.length})` },
                   { id: 'CORE', label: `Core Engine (${PLATFORM_MODULES.filter(m => m.category.includes('Core')).length})` },
@@ -1980,7 +1980,7 @@ export default function LandingPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
                       moduleFilter === tab.id
                         ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
                     }`}
                   >
                     {tab.label}
@@ -2009,8 +2009,8 @@ export default function LandingPage() {
                         onClick={() => setActiveModule(mod)}
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
                           isSelected
-                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
-                            : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
+                            : 'bg-white/2 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white/5 hover:border-white/12'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
@@ -2018,14 +2018,14 @@ export default function LandingPage() {
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
                             <span className="truncate">{mod.name}</span>
                           </div>
-                          <div className="text-[9.5px] font-mono text-slate-400 truncate mt-0.5 ml-3.5">{mod.category}</div>
+                          <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isSelected} />
                           </span>
                           <span className="hidden lg:inline">
-                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-400 group-hover:text-slate-300'}`} />
+                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-500 group-hover:text-slate-600'}`} />
                           </span>
                         </div>
                       </button>
@@ -2063,15 +2063,15 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 - PLATFORM / NODE INSPECTOR (#platform)
         ══════════════════════════════════════════════════════════ */}
-        <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Architecture
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Simulated Consortium Node Inspector</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Simulated Consortium Node Inspector</h2>
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Inspect simulated node hardware configurations, PyTorch execution runtimes, and synthetic ISO 20022 message streams across reference bank profiles.
               </p>
             </div>
@@ -2083,17 +2083,17 @@ export default function LandingPage() {
                   initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} transition={{delay:i*0.08}}
                   whileHover={{y:-4}}
                   onClick={() => setActiveBankDrawer(bank)}
-                  className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 hover:border-indigo-500/40 hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0 active:scale-[0.99]"
+                  className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-500/40 hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0 active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between">
                     <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
-                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400">{bank.latency}</span>
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-500">{bank.latency}</span>
                   </div>
                   <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-200 truncate">{bank.name}</h3>
-                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 mt-0.5 truncate">{bank.ticker}</div>
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 truncate">{bank.name}</h3>
+                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 mt-0.5 truncate">{bank.ticker}</div>
                   </div>
-                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-400 border-t border-white/6 pt-2 leading-snug break-words">
+                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-500 border-t border-slate-200 pt-2 leading-snug break-words">
                     {bank.hardware}
                   </div>
                 </motion.div>
@@ -2105,15 +2105,15 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 - ARCHITECTURE (#architecture)
         ══════════════════════════════════════════════════════════ */}
-        <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Service Mesh Design
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">System Service Topology</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">System Service Topology</h2>
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any service layer node to inspect internal responsibilities, communication protocols, and technology stack.
               </p>
             </div>
@@ -2128,13 +2128,13 @@ export default function LandingPage() {
                       onClick={() => setActiveArchNode(node)}
                       className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                          : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                          : 'bg-white/2 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white/5 hover:border-white/12'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold mb-0.5 truncate">{node.label}</div>
-                        <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                        <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                       </div>
                       <AccordionChevron isOpen={isSelected} />
                     </button>
@@ -2166,12 +2166,12 @@ export default function LandingPage() {
                     onClick={() => setActiveArchNode(node)}
                     className={`p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeArchNode?.id === node.id
-                        ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                        : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                        ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-900 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                        : 'bg-white/2 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white/5 hover:border-white/12'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
-                    <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                    <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                   </button>
                 ))}
               </div>
@@ -2186,17 +2186,17 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 - SECURITY & PRIVACY (#security)
         ══════════════════════════════════════════════════════════ */}
-        <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Cryptographic Boundaries
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Privacy & Trust Boundary Model</h2>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Privacy & Trust Boundary Model</h2>
             </div>
 
-            <div className="flex gap-1 p-1 bg-white/3 border border-white/8 rounded-xl w-full sm:w-fit mb-6 sm:mb-8 overflow-x-auto min-w-0">
+            <div className="flex gap-1 p-1 bg-white/3 border border-slate-200 rounded-xl w-full sm:w-fit mb-6 sm:mb-8 overflow-x-auto min-w-0">
               {[{id:'flow',label:'Data Flow'},{id:'threat',label:'Threat Model'},{id:'compliance',label:'Compliance'}].map(tab=>(
                 <button
                   key={tab.id}
@@ -2204,7 +2204,7 @@ export default function LandingPage() {
                   className={`px-4 sm:px-5 py-1.5 sm:py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer shrink-0 ${
                     activePrivacyTab === tab.id
                       ? 'bg-indigo-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.5)]'
-                      : 'text-slate-400 hover:text-slate-200'
+                      : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   {tab.label}
@@ -2221,11 +2221,11 @@ export default function LandingPage() {
                       {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=1.0, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
                       {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-400'},
                     ].map(col => (
-                      <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-white/2 border border-white/8 space-y-3 sm:space-y-4 min-w-0">
-                        <div className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider truncate">{col.title}</div>
-                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-400 min-w-0">
+                      <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-white/2 border border-slate-200 space-y-3 sm:space-y-4 min-w-0">
+                        <div className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider truncate">{col.title}</div>
+                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-500 min-w-0">
                           {col.items.map(item => (
-                            <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 break-words">{item}</div>
+                            <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200 break-words">{item}</div>
                           ))}
                         </div>
                         <div className={`text-[10px] font-mono ${col.noteColor} truncate`}>{col.note}</div>
@@ -2246,12 +2246,12 @@ export default function LandingPage() {
                       {threat:'Membership Inference (MIA)',  mitigation:'Dynamic RDP Auto-Scaler bounds cumulative privacy expenditure, halting unlearning and training if ε limit is reached.'},
                       {threat:'Cross-Ledger Settlement Desync',mitigation:'Chainlink CCIP EVM2AnyMessage and LayerZero V2 enforce atomic, programmable multi-ledger liquidity routing.'},
                     ].map(row => (
-                      <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 w-full min-w-0">
+                      <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 w-full min-w-0">
                         <div className="w-full sm:w-48 shrink-0">
                           <div className="text-xs font-bold text-rose-400 break-words">{row.threat}</div>
                           <div className="text-[9.5px] font-mono text-emerald-400 mt-0.5">Mitigated</div>
                         </div>
-                        <div className="text-xs text-slate-400 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
+                        <div className="text-xs text-slate-500 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
                       </div>
                     ))}
                   </div>
@@ -2268,12 +2268,12 @@ export default function LandingPage() {
                       {standard:'ISO 20022 SCT Inst',     status:'Native Schema XSD',  detail:'Parses pacs.008, camt.056, pacs.004, and camt.029 XML messages natively with sub-second hold triggers.'},
                       {standard:'SOC 2 Type II',          status:'Audit-Ready',        detail:'Automated SHA-256 tamper-evident audit trail logging and evidence export pipeline.'},
                     ].map(row => (
-                      <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 space-y-2 min-w-0">
+                      <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 space-y-2 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-mono font-bold text-slate-200 truncate">{row.standard}</span>
+                          <span className="text-xs font-mono font-bold text-slate-800 truncate">{row.standard}</span>
                           <span className="text-[9.5px] font-mono font-bold text-emerald-400 shrink-0">{row.status}</span>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed font-sans">{row.detail}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed font-sans">{row.detail}</p>
                       </div>
                     ))}
                   </div>
@@ -2286,7 +2286,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.5 - EMPIRICAL BENCHMARKS & PRODUCTION VALIDATION (#benchmarks)
         ══════════════════════════════════════════════════════════ */}
-        <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             {/* Header & Quick Action Buttons */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12">
@@ -2295,10 +2295,10 @@ export default function LandingPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   Empirical Proof-of-Value &amp; 2026 Production Validation
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
                   Beyond Synthetic Data: In-the-Wild Financial Benchmarks
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   While marketing claims often cite synthetic lab AUC targets (0.950+), production banking faces extreme 0.01%–0.1% class imbalance, 
                   concept drift, and severe alert fatigue. We evaluate collaborative federated learning against canonical open benchmark standards across 150k+ transactions.
                 </p>
@@ -2340,21 +2340,21 @@ export default function LandingPage() {
                     className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
                       isActive
                         ? 'bg-gradient-to-b from-[#131338] to-[#0a0a24] border-indigo-500/60 shadow-[0_0_20px_rgba(99,102,241,0.25)]'
-                        : 'bg-[#060614]/80 border-white/8 hover:border-white/20 hover:bg-[#0c0c28]/60 text-slate-400'
+                        : 'bg-[#060614]/80 border-slate-200 hover:border-white/20 hover:bg-[#0c0c28]/60 text-slate-500'
                     }`}
                   >
                     <div className="flex items-center justify-between text-[8.5px] font-mono mb-1">
-                      <span className={isActive ? 'text-indigo-400 font-bold' : 'text-slate-400'}>
+                      <span className={isActive ? 'text-indigo-400 font-bold' : 'text-slate-500'}>
                         {ds.datasetTag.split(' ')[0]}
                       </span>
                       {isActive && (
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                       )}
                     </div>
-                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-200'}`}>
+                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
                       {ds.name.split('(')[0]?.trim()}
                     </div>
-                    <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">
+                    <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">
                       {ds.scope.split('·')[0]?.trim()}
                     </div>
                   </button>
@@ -2377,7 +2377,7 @@ export default function LandingPage() {
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.uplift}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Against isolated institutional silos
                       </div>
                     </div>
@@ -2389,7 +2389,7 @@ export default function LandingPage() {
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.fpReduction}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Eliminates compliance triage burnout
                       </div>
                     </div>
@@ -2401,7 +2401,7 @@ export default function LandingPage() {
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.latency}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         SLA &lt; 15ms payment rail authorization
                       </div>
                     </div>
@@ -2413,15 +2413,15 @@ export default function LandingPage() {
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.roi}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Chargeback recovery &amp; operational savings
                       </div>
                     </div>
                   </div>
 
                   {/* Comprehensive Multi-Paradigm Comparison Table */}
-                  <div className="rounded-3xl border border-white/10 bg-[#07071b]/95 p-4 sm:p-6 backdrop-blur-xl shadow-2xl space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/6 pb-3">
+                  <div className="rounded-3xl border border-slate-200 bg-[#07071b]/95 p-4 sm:p-6 backdrop-blur-xl shadow-2xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
                       <div>
                         <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                           <span>{activeDs.name}</span>
@@ -2429,19 +2429,19 @@ export default function LandingPage() {
                             {activeDs.scope}
                           </span>
                         </h3>
-                        <p className="text-xs text-slate-300 mt-1">
+                        <p className="text-xs text-slate-600 mt-1">
                           {activeDs.description}
                         </p>
                       </div>
-                      <div className="text-xs font-mono text-slate-400 shrink-0">
-                        Prevalence: <strong className="text-slate-200">{activeDs.prevalence}</strong>
+                      <div className="text-xs font-mono text-slate-500 shrink-0">
+                        Prevalence: <strong className="text-slate-800">{activeDs.prevalence}</strong>
                       </div>
                     </div>
 
                     <div className="overflow-x-auto -mx-2 sm:mx-0">
                       <table className="w-full text-left text-xs font-mono">
                         <thead>
-                          <tr className="border-b border-white/8 text-[11px] text-slate-400">
+                          <tr className="border-b border-slate-200 text-[11px] text-slate-500">
                             <th className="py-2.5 px-3">Evaluation Paradigm</th>
                             <th className="py-2.5 px-3">PR-AUC</th>
                             <th className="py-2.5 px-3">ROC-AUC</th>
@@ -2462,7 +2462,7 @@ export default function LandingPage() {
                               }`}
                             >
                               <td className="py-3 px-3">
-                                <div className="font-semibold text-slate-100 flex items-center gap-2">
+                                <div className="font-semibold text-slate-900 flex items-center gap-2">
                                   <span>{r.paradigm}</span>
                                   <span className={`text-[9px] px-1.5 py-0.5 rounded border ${r.badgeColor}`}>
                                     {r.badge}
@@ -2472,25 +2472,25 @@ export default function LandingPage() {
                               <td className="py-3 px-3 font-bold text-white">
                                 {r.prauc}
                               </td>
-                              <td className="py-3 px-3 text-slate-200">
+                              <td className="py-3 px-3 text-slate-800">
                                 {r.rocauc}
                               </td>
                               <td className="py-3 px-3">
-                                <span className={r.compliant ? 'text-emerald-300 font-bold' : 'text-slate-300'}>
+                                <span className={r.compliant ? 'text-emerald-300 font-bold' : 'text-slate-600'}>
                                   {r.recall01}
                                 </span>
                               </td>
-                              <td className="py-3 px-3 text-slate-300">
+                              <td className="py-3 px-3 text-slate-600">
                                 {r.brier}
                               </td>
-                              <td className="py-3 px-3 text-slate-300">
+                              <td className="py-3 px-3 text-slate-600">
                                 {r.latency}
                               </td>
                               <td className="py-3 px-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans ${
                                   r.compliant
                                     ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold'
-                                    : 'bg-slate-800 text-slate-400'
+                                    : 'bg-slate-800 text-slate-500'
                                 }`}>
                                   {r.compliance}
                                 </span>
@@ -2502,9 +2502,9 @@ export default function LandingPage() {
                     </div>
 
                     {/* Confusion Matrix & Calibration Summary Box */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-white/6">
-                      <div className="p-3.5 rounded-2xl bg-black/40 border border-white/6 font-mono text-xs">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-slate-200">
+                      <div className="p-3.5 rounded-2xl bg-black/40 border border-slate-200 font-mono text-xs">
+                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
                           <span>Empirical Confusion Matrix @ τ=0.50 Threshold</span>
                           <span className="text-emerald-400 font-normal">Holistic Holdout</span>
                         </div>
@@ -2512,52 +2512,52 @@ export default function LandingPage() {
                           <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/20">
                             <div className="text-[10px] text-emerald-400">True Positives (TP)</div>
                             <div className="text-base font-bold text-white mt-0.5">{activeDs.cm.tp}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Caught Frauds</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Caught Frauds</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20">
                             <div className="text-[10px] text-rose-400">False Positives (FP)</div>
-                            <div className="text-base font-bold text-slate-200 mt-0.5">{activeDs.cm.fp}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Benign Alarms</div>
+                            <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fp}</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Benign Alarms</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20">
                             <div className="text-[10px] text-amber-400">False Negatives (FN)</div>
-                            <div className="text-base font-bold text-slate-200 mt-0.5">{activeDs.cm.fn}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Escaped Frauds</div>
+                            <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fn}</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Escaped Frauds</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-slate-900 border border-white/6">
-                            <div className="text-[10px] text-slate-400">True Negatives (TN)</div>
-                            <div className="text-base font-bold text-slate-300 mt-0.5">{activeDs.cm.tn}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Valid Clearances</div>
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-200">
+                            <div className="text-[10px] text-slate-500">True Negatives (TN)</div>
+                            <div className="text-base font-bold text-slate-600 mt-0.5">{activeDs.cm.tn}</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Valid Clearances</div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-3.5 rounded-2xl bg-black/40 border border-white/6 flex flex-col justify-between space-y-3">
+                      <div className="p-3.5 rounded-2xl bg-black/40 border border-slate-200 flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 font-bold">
+                          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2 font-bold">
                             Operational Calibration Quality
                           </div>
                           <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
                             <div className="p-2 rounded-xl bg-white/3 border border-white/4">
-                              <div className="text-[9px] text-slate-400">Precision</div>
+                              <div className="text-[9px] text-slate-500">Precision</div>
                               <div className="font-bold text-white mt-0.5">{activeDs.cm.precision}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-white/3 border border-white/4">
-                              <div className="text-[9px] text-slate-400">Recall</div>
+                              <div className="text-[9px] text-slate-500">Recall</div>
                               <div className="font-bold text-emerald-300 mt-0.5">{activeDs.cm.recall}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-white/3 border border-white/4">
-                              <div className="text-[9px] text-slate-400">F1 Score</div>
+                              <div className="text-[9px] text-slate-500">F1 Score</div>
                               <div className="font-bold text-cyan-300 mt-0.5">{activeDs.cm.f1}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-white/3 border border-white/4">
-                              <div className="text-[9px] text-slate-400">Specificity</div>
-                              <div className="font-bold text-slate-200 mt-0.5">{activeDs.cm.specificity}</div>
+                              <div className="text-[9px] text-slate-500">Specificity</div>
+                              <div className="font-bold text-slate-800 mt-0.5">{activeDs.cm.specificity}</div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 text-xs pt-2 border-t border-white/6">
+                        <div className="flex items-center justify-between gap-3 text-xs pt-2 border-t border-slate-200">
                           <button
                             type="button"
                             onClick={() => setIsReportOpen(true)}
@@ -2591,7 +2591,7 @@ export default function LandingPage() {
                 <h3 className="text-xl sm:text-2xl font-bold text-white">
                   Pilot on Your Anonymized Institutional Data with Zero Raw PII Risk
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Join our Tier-1 Banking Design Partner sandbox. Deploy lightweight edge containers inside your private VPC/DMZ, 
                   validate ISO 20022 schemas, apply type-salted HMAC-SHA256 hashing, and benchmark collaborative FL gains against your baseline.
                 </p>
@@ -2609,7 +2609,7 @@ export default function LandingPage() {
                 </button>
                 <a
                   href="mailto:ysfcals@gmail.com?subject=Design%20Partner%20Pilot%20Inquiry"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-200 hover:text-white bg-[#0a0c24]/90 hover:bg-[#12163b] border border-white/10 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-800 hover:text-white bg-[#0a0c24]/90 hover:bg-[#12163b] border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
                 >
                   <span>Request Pilot Agreement</span>
                 </a>
@@ -2621,7 +2621,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.6 - TARGET CUSTOMER PROFILES (#solutions)
         ══════════════════════════════════════════════════════════ */}
-        <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             {/* Part 1: Target Customer Segments */}
             <div className="max-w-3xl mb-8 sm:mb-12 min-w-0">
@@ -2629,10 +2629,10 @@ export default function LandingPage() {
                 <span className="w-2 h-2 rounded-full bg-indigo-400" />
                 Tailored Institutional Solutions
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
                 Designed for Banking Tiers & Compliance Mandates
               </h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Different financial institutions face radically different regulatory overheads and technical constraints. 
                 CF-Intelligence delivers tailored in-perimeter architectures for each institutional tier.
               </p>
@@ -2679,23 +2679,23 @@ export default function LandingPage() {
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${card.badgeColor}`}>
                       {card.badge}
                     </span>
-                    <h3 className="text-lg font-bold text-slate-100">{card.segment}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{card.segment}</h3>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Core Pain Point:</span>
-                        <p className="text-slate-300 font-sans leading-relaxed">{card.pain}</p>
+                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Core Pain Point:</span>
+                        <p className="text-slate-600 font-sans leading-relaxed">{card.pain}</p>
                       </div>
                       <div>
-                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Compliance Profile:</span>
+                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Compliance Profile:</span>
                         <p className="text-indigo-300 font-mono text-[11px]">{card.compliance}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-white/6 space-y-2">
-                    <span className="text-slate-400 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
-                    <p className="text-slate-300 text-xs leading-relaxed">{card.solution}</p>
-                    <div className="p-2 rounded-xl bg-white/3 border border-white/8 text-[11px] font-mono font-bold text-emerald-400 text-center">
+                  <div className="pt-4 border-t border-slate-200 space-y-2">
+                    <span className="text-slate-500 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
+                    <p className="text-slate-600 text-xs leading-relaxed">{card.solution}</p>
+                    <div className="p-2 rounded-xl bg-white/3 border border-slate-200 text-[11px] font-mono font-bold text-emerald-400 text-center">
                       {card.roi}
                     </div>
                   </div>
@@ -2708,15 +2708,15 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.7 - INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
         ══════════════════════════════════════════════════════════ */}
-        <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-[#060614] border border-white/8 space-y-6 shadow-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/8 pb-5">
+            <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-[#060614] border border-slate-200 space-y-6 shadow-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
                 <div>
                   <div className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
                     Standardized Institutional Contracts
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-100 mt-0.5">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
                     Institutional Legal Framework & Agreement Suite
                   </h3>
                 </div>
@@ -2758,13 +2758,13 @@ export default function LandingPage() {
                     desc: 'Formal mathematical privacy guarantees, unlearning erasure workflows, and PKCS#11 HSM key isolation.',
                   },
                 ].map((item) => (
-                  <div key={item.title} className="p-4 rounded-2xl bg-white/2 border border-white/6 flex flex-col justify-between space-y-3">
+                  <div key={item.title} className="p-4 rounded-2xl bg-white/2 border border-slate-200 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <span className="text-[9.5px] font-mono text-indigo-400 uppercase">{item.standard}</span>
-                      <h4 className="text-xs font-bold text-slate-100">{item.title}</h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{item.desc}</p>
+                      <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-sans">{item.desc}</p>
                     </div>
-                    <div className="text-[9px] font-mono text-slate-400 truncate pt-2 border-t border-white/5">
+                    <div className="text-[9px] font-mono text-slate-500 truncate pt-2 border-t border-white/5">
                       Ref: {item.ref}
                     </div>
                   </div>
@@ -2777,13 +2777,13 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 8 - EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
-        <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <div id="docs" className="w-full min-w-0">
             <FadeSection>
               <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
                 <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise REST API & SDK Specs</h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Enterprise REST API & SDK Specs</h2>
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.1 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-4">
@@ -2798,10 +2798,10 @@ export default function LandingPage() {
                     href="/scalar"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-mono text-xs font-semibold transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-800 font-mono text-xs font-semibold transition-all"
                   >
                     <span>📖 Open Scalar Reference</span>
-                    <span className="text-slate-400">↗</span>
+                    <span className="text-slate-500">↗</span>
                   </a>
                 </div>
               </div>
@@ -2811,26 +2811,26 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8 w-full min-w-0">
                 <div className="p-4 sm:p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-indigo-400 uppercase mb-1">mTLS & API Keys</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
                 </div>
                 <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-purple-400 uppercase mb-1">WebSocket Telemetry</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
                 </div>
                 <div className="p-4 sm:p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-cyan-400 uppercase mb-1">SDK & WebHooks</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
                 </div>
               </div>
 
               {/* Interactive Code Console Tabs */}
-              <div className="flex gap-1 p-1 bg-white/3 border border-white/8 rounded-xl w-full sm:w-fit mb-4 overflow-x-auto min-w-0">
+              <div className="flex gap-1 p-1 bg-white/3 border border-slate-200 rounded-xl w-full sm:w-fit mb-4 overflow-x-auto min-w-0">
                 {[{id:'curl',label:'cURL'},{id:'python',label:'Python SDK'},{id:'ts',label:'TypeScript SDK'}].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveApiTab(tab.id as 'curl'|'python'|'ts')}
                     className={`px-3.5 sm:px-4 py-1.5 text-xs font-mono rounded-lg transition-all cursor-pointer shrink-0 ${
-                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'text-slate-400 hover:text-slate-200'
+                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     {tab.label}
@@ -2839,7 +2839,7 @@ export default function LandingPage() {
               </div>
 
               {/* Code Display Window */}
-              <div className="rounded-2xl sm:rounded-3xl bg-[#03030c] border border-white/8 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
+              <div className="rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
                 <pre className="text-[11px] sm:text-xs font-mono text-indigo-200/90 leading-relaxed whitespace-pre min-w-0">
                   {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium bank nodes
 curl -X POST https://cf-intelligence.vercel.app/api/v1/simulations \\
@@ -2900,9 +2900,9 @@ telemetry.on('round.stage', (evt) => {
               </div>
 
               {/* Endpoint Detailed Table */}
-              <div className="rounded-2xl sm:rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl w-full min-w-0">
-                <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-white/3 border-b border-white/6 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
+              <div className="rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden backdrop-blur-xl w-full min-w-0">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-white/3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-mono text-slate-600 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
                   <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.1 Spec</span>
                 </div>
                 <div className="divide-y divide-white/5 font-mono text-xs min-w-0">
@@ -2938,12 +2938,12 @@ telemetry.on('round.stage', (evt) => {
                           </span>
                           <span className="text-indigo-300 font-bold text-xs sm:text-sm break-all">{row.path}</span>
                         </div>
-                        <span className="text-[9.5px] text-slate-400 font-mono shrink-0">v1 endpoint</span>
+                        <span className="text-[9.5px] text-slate-500 font-mono shrink-0">v1 endpoint</span>
                       </div>
-                      <p className="text-xs text-slate-400 font-sans leading-relaxed break-words">{row.desc}</p>
-                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-400 pt-1.5 border-t border-white/4 min-w-0">
-                        <div className="truncate"><span className="text-slate-400">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
-                        <div className="truncate"><span className="text-slate-400">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
+                      <p className="text-xs text-slate-500 font-sans leading-relaxed break-words">{row.desc}</p>
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-500 pt-1.5 border-t border-white/4 min-w-0">
+                        <div className="truncate"><span className="text-slate-500">Payload Request:</span> <span className="text-slate-600">{row.req}</span></div>
+                        <div className="truncate"><span className="text-slate-500">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
                       </div>
                     </div>
                   ))}
@@ -2956,15 +2956,15 @@ telemetry.on('round.stage', (evt) => {
         {/* ══════════════════════════════════════════════════════════
             SECTION 9 - ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
         ══════════════════════════════════════════════════════════ */}
-        <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Onboarding & Deployment
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise Setup & Integration Services</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Enterprise Setup & Integration Services</h2>
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 The live platform demo showcases an active 3-bank federated learning environment with SGX TEE hardware aggregation. For custom banking institution deployment, node hardware configuration, and core ledger integration, contact our engineering team.
               </p>
             </div>
@@ -2976,20 +2976,20 @@ telemetry.on('round.stage', (evt) => {
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
                     DIRECT ENGINEERING CONTACT
                   </span>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-100">Institutional Integration Lead</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Institutional Integration Lead</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed font-sans">
                     Reach out directly for custom ISO 20022 connector setup, local HSM key configuration, and production node deployment assistance.
                   </p>
                 </div>
 
                 {/* Email Address Display Box */}
-                <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/8 space-y-2.5 font-mono min-w-0">
-                  <div className="text-[9px] text-slate-400 uppercase tracking-wider">Official Inquiries & Support</div>
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 font-mono min-w-0">
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">Official Inquiries & Support</div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <span className="text-indigo-300 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
                       onClick={handleCopyEmail}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors border border-white/10 shrink-0 cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-white/5 hover:bg-white/10 text-slate-600 hover:text-white transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
                     >
                       {isCopied ? 'Copied!' : 'Copy Email'}
                     </button>
@@ -3005,7 +3005,7 @@ telemetry.on('round.stage', (evt) => {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </a>
 
-                <div className="text-[10px] font-mono text-slate-400 text-center">
+                <div className="text-[10px] font-mono text-slate-500 text-center">
                   Guaranteed response within 24 hours for banking inquiries & architecture reviews.
                 </div>
               </div>
@@ -3032,19 +3032,19 @@ telemetry.on('round.stage', (evt) => {
                     badge: 'Onboarding & Deployment'
                   },
                 ].map(s => (
-                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 hover:border-indigo-500/30 transition-all space-y-2 min-w-0">
+                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
                           {s.step}
                         </span>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-200 truncate">{s.title}</h4>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">{s.title}</h4>
                       </div>
                       <span className="text-[9px] font-mono font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md shrink-0">
                         {s.badge}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
                   </div>
                 ))}
               </div>
@@ -3053,14 +3053,14 @@ telemetry.on('round.stage', (evt) => {
         </section>
 
         {/* ── FOOTER ──────────────────────────────────────────────── */}
-        <footer className="border-t border-white/6 py-10 sm:py-12 px-3.5 sm:px-6 w-full min-w-0">
+        <footer className="border-t border-slate-200 py-10 sm:py-12 px-3.5 sm:px-6 w-full min-w-0">
           <div className="max-w-7xl mx-auto flex flex-col gap-5 min-w-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
               <div className="flex items-center gap-3 min-w-0">
                 <BrandLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
                 <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-bold text-slate-200 truncate">Federated Intelligence Network</div>
-                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-400 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
+                  <div className="text-xs sm:text-sm font-bold text-slate-800 truncate">Federated Intelligence Network</div>
+                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-500 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
                 </div>
               </div>
 
@@ -3073,11 +3073,11 @@ telemetry.on('round.stage', (evt) => {
               </button>
             </div>
 
-            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-400 break-words text-center">
+            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-500 break-words text-center">
               PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
-            <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 text-center">
+            <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 text-center">
               © 2026 Yusuf Çalışır · Collaborative Fraud Intelligence Platform
             </div>
           </div>
@@ -3152,24 +3152,24 @@ function BankDetailsDrawerModal({
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 200 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-[#070714] border-l border-white/10 p-5 sm:p-7 overflow-y-auto space-y-6 max-w-full focus:outline-none"
+        className="w-full max-w-lg bg-[#070714] border-l border-slate-200 p-5 sm:p-7 overflow-y-auto space-y-6 max-w-full focus:outline-none"
       >
-        <div className="flex items-start justify-between border-b border-white/6 pb-4 sm:pb-5 gap-2">
+        <div className="flex items-start justify-between border-b border-slate-200 pb-4 sm:pb-5 gap-2">
           <div className="min-w-0">
             <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
               Institution Node Detail
             </span>
-            <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">
+            <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-900 mt-0.5 truncate">
               {bank.name}
             </h3>
-            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-400 mt-0.5 truncate">
+            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-500 mt-0.5 truncate">
               {bank.location}
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close node detail drawer"
-            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             Close
           </button>
@@ -3184,20 +3184,20 @@ function BankDetailsDrawerModal({
             { k: 'PyTorch', v: bank.pytorch },
             { k: 'Status', v: 'READY (Simulated Local Agent)' },
           ].map((row) => (
-            <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
-              <div className="text-slate-400 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
+            <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-slate-200 min-w-0">
+              <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
                 {row.k}
               </div>
-              <div className="text-slate-200 truncate">{row.v}</div>
+              <div className="text-slate-800 truncate">{row.v}</div>
             </div>
           ))}
         </div>
 
         <div className="min-w-0">
-          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2.5">
+          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">
             ISO 20022 Stream Log
           </div>
-          <div className="rounded-2xl bg-[#03030c] border border-white/8 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
+          <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-500 overflow-x-auto max-w-full">
             {bank.xmlLogs.map((log, i) => (
               <div key={i} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0 min-w-0">
                 <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
