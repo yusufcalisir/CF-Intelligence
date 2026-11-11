@@ -564,7 +564,7 @@ export default function CoordinatorPage() {
                     onClick={() => setSelectedBankId(c.bank_id)}
                     className={`p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 cursor-pointer min-w-0 flex flex-col justify-center border ${
                       isSelected
-                        ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                        ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-500 text-indigo-700 shadow-lg shadow-indigo-600/20'
                         : 'bg-white/[0.02] hover:bg-white/[0.06] border-slate-200 text-slate-500'
                     }`}
                   >

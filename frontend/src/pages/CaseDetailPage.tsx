@@ -1179,7 +1179,7 @@ export default function CaseDetailPage() {
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-700 hover:text-white border border-indigo-200 transition"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-100 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-700 border border-indigo-200 transition"
                           title={`Trace 2-hop ego network for ${getEvidenceEntityId(ev)}`}
                         >
                           <span>🕸️ 2-Hop Graph</span>
@@ -1187,7 +1187,7 @@ export default function CaseDetailPage() {
                         </Link>
                         <Link
                           to={`/psi?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&auto_match=true`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-700 hover:text-white border border-emerald-500/30 transition"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-emerald-100 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-700 border border-emerald-300 transition"
                           title={`Check PSI Consortium Intersection for ${getEvidenceEntityId(ev)}`}
                         >
                           <span>🔍 Check PSI</span>

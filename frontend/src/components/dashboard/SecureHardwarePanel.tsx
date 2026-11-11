@@ -211,11 +211,11 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
                     <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="round" stroke="#64748b" fontSize={11} tickLine={false} />
                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px' }}
                   labelStyle={{ color: '#94a3b8', fontSize: '11px', fontWeight: 'bold' }}
                 />
                 <Area type="monotone" dataKey="Plaintext" stroke="#6366f1" fillOpacity={1} fill="url(#colorPlaintext)" name="Plaintext (Plain FedAvg)" />

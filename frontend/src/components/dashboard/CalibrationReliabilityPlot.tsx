@@ -332,7 +332,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
               name="Empirical Fraud Rate"
               stroke="#10b981"
               strokeWidth={2.5}
-              dot={{ r: 4, fill: '#10b981', stroke: '#064e3b', strokeWidth: 1.5 }}
+              dot={{ r: 4, fill: '#10b981', stroke: '#ffffff', strokeWidth: 1.5 }}
               activeDot={{ r: 6 }}
             />
 

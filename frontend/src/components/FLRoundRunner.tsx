@@ -184,10 +184,10 @@ export const FLRoundRunner: React.FC = () => {
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="round" stroke="#64748B" fontSize={11} />
                     <YAxis stroke="#64748B" fontSize={11} domain={[0, 0.7]} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', fontSize: '11px' }} />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Line type="monotone" dataKey="GlobalLoss" stroke="#00F2FE" strokeWidth={3} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="BankA" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="4 4" />

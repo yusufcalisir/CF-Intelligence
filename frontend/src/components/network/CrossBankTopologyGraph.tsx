@@ -609,23 +609,23 @@ export default function CrossBankTopologyGraph({
 
             {/* Pod Radial Background Gradients */}
             <radialGradient id="alphaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#0369a1" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#0f172a" stopOpacity="0.6" />
+              <stop offset="0%" stopColor="#0369a1" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
             </radialGradient>
 
             <radialGradient id="betaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#4338ca" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#0f172a" stopOpacity="0.6" />
+              <stop offset="0%" stopColor="#4338ca" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
             </radialGradient>
 
             <radialGradient id="gammaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#047857" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#0f172a" stopOpacity="0.6" />
+              <stop offset="0%" stopColor="#047857" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
             </radialGradient>
 
             {/* Subtle Cyber Grid Pattern */}
             <pattern id="cyber-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1e293b" strokeWidth="0.5" strokeOpacity="0.3" />
+              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#cbd5e1" strokeWidth="0.5" strokeOpacity="0.5" />
             </pattern>
 
             {/* Markers */}
@@ -651,7 +651,7 @@ export default function CrossBankTopologyGraph({
             </filter>
 
             <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.7" />
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.18" />
             </filter>
           </defs>
 
@@ -677,13 +677,13 @@ export default function CrossBankTopologyGraph({
               strokeOpacity={horizon === 'bank_a' ? "0.9" : "0.4"}
             />
             {/* Header Badge */}
-            <rect x="37" y="47" width="256" height="42" rx="10" fill="#082f49" fillOpacity="0.4" stroke="#0284c7" strokeWidth="0.8" strokeOpacity="0.3" />
+            <rect x="37" y="47" width="256" height="42" rx="10" fill="#e0f2fe" fillOpacity="1" stroke="#0284c7" strokeWidth="0.8" strokeOpacity="0.3" />
             <circle cx="56" cy="68" r="10" fill="#0284c7" fillOpacity="0.2" stroke="#38bdf8" strokeWidth="1" />
             <path d="M 52 72 L 52 66 L 56 63 L 60 66 L 60 72 Z" fill="#38bdf8" />
-            <text x="73" y="64" fill="#f8fafc" fontSize="12" fontWeight="700" fontFamily="monospace">BANK ALPHA</text>
-            <text x="73" y="78" fill="#38bdf8" fontSize="9" fontWeight="600">RETAIL BANKING POD</text>
-            <rect x="220" y="58" width="62" height="20" rx="5" fill="#0c4a6e" fillOpacity="0.6" stroke="#0284c7" strokeWidth="0.6" />
-            <text x="251" y="72" fill="#7dd3fc" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">8.4k ACCTS</text>
+            <text x="73" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK ALPHA</text>
+            <text x="73" y="78" fill="#0369a1" fontSize="9" fontWeight="600">RETAIL BANKING POD</text>
+            <rect x="220" y="58" width="62" height="20" rx="5" fill="#bae6fd" fillOpacity="1" stroke="#0284c7" strokeWidth="0.6" />
+            <text x="251" y="72" fill="#075985" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">8.4k ACCTS</text>
           </g>
 
           {/* --- Pod 2: Bank Beta (Commercial B2B) --- */}
@@ -701,13 +701,13 @@ export default function CrossBankTopologyGraph({
               strokeOpacity={horizon === 'bank_b' ? "0.9" : "0.4"}
             />
             {/* Header Badge */}
-            <rect x="352" y="47" width="256" height="42" rx="10" fill="#1e1b4b" fillOpacity="0.4" stroke="#6366f1" strokeWidth="0.8" strokeOpacity="0.3" />
+            <rect x="352" y="47" width="256" height="42" rx="10" fill="#e0e7ff" fillOpacity="1" stroke="#6366f1" strokeWidth="0.8" strokeOpacity="0.3" />
             <circle cx="371" cy="68" r="10" fill="#4338ca" fillOpacity="0.2" stroke="#818cf8" strokeWidth="1" />
             <path d="M 367 72 L 367 65 L 375 65 L 375 72 Z" fill="#818cf8" />
-            <text x="388" y="64" fill="#f8fafc" fontSize="12" fontWeight="700" fontFamily="monospace">BANK BETA</text>
-            <text x="388" y="78" fill="#818cf8" fontSize="9" fontWeight="600">COMMERCIAL B2B POD</text>
-            <rect x="535" y="58" width="62" height="20" rx="5" fill="#312e81" fillOpacity="0.6" stroke="#6366f1" strokeWidth="0.6" />
-            <text x="566" y="72" fill="#a5b4fc" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">4.2k ACCTS</text>
+            <text x="388" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK BETA</text>
+            <text x="388" y="78" fill="#4338ca" fontSize="9" fontWeight="600">COMMERCIAL B2B POD</text>
+            <rect x="535" y="58" width="62" height="20" rx="5" fill="#c7d2fe" fillOpacity="1" stroke="#6366f1" strokeWidth="0.6" />
+            <text x="566" y="72" fill="#3730a3" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">4.2k ACCTS</text>
           </g>
 
           {/* --- Pod 3: Bank Gamma (Cross-Border FX) --- */}
@@ -725,13 +725,13 @@ export default function CrossBankTopologyGraph({
               strokeOpacity={horizon === 'bank_c' ? "0.9" : "0.4"}
             />
             {/* Header Badge */}
-            <rect x="667" y="47" width="256" height="42" rx="10" fill="#064e3b" fillOpacity="0.4" stroke="#059669" strokeWidth="0.8" strokeOpacity="0.3" />
+            <rect x="667" y="47" width="256" height="42" rx="10" fill="#d1fae5" fillOpacity="1" stroke="#059669" strokeWidth="0.8" strokeOpacity="0.3" />
             <circle cx="686" cy="68" r="10" fill="#047857" fillOpacity="0.2" stroke="#34d399" strokeWidth="1" />
             <circle cx="686" cy="68" r="5" fill="none" stroke="#34d399" strokeWidth="1" />
-            <text x="703" y="64" fill="#f8fafc" fontSize="12" fontWeight="700" fontFamily="monospace">BANK GAMMA</text>
-            <text x="703" y="78" fill="#34d399" fontSize="9" fontWeight="600">CROSS-BORDER FX POD</text>
-            <rect x="850" y="58" width="62" height="20" rx="5" fill="#065f46" fillOpacity="0.6" stroke="#059669" strokeWidth="0.6" />
-            <text x="881" y="72" fill="#6ee7b7" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">1.9k ACCTS</text>
+            <text x="703" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK GAMMA</text>
+            <text x="703" y="78" fill="#047857" fontSize="9" fontWeight="600">CROSS-BORDER FX POD</text>
+            <rect x="850" y="58" width="62" height="20" rx="5" fill="#a7f3d0" fillOpacity="1" stroke="#059669" strokeWidth="0.6" />
+            <text x="881" y="72" fill="#065f46" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">1.9k ACCTS</text>
           </g>
 
           {/* ======================================================== */}
@@ -827,13 +827,13 @@ export default function CrossBankTopologyGraph({
                       width={labelWidth}
                       height={21}
                       rx={10.5}
-                      fill={isBlindSpot ? "#0f172a" : edge.isLaundering ? "#18080f" : "#0a0e1a"}
+                      fill={isBlindSpot ? "#f1f5f9" : edge.isLaundering ? "#fff1f2" : "#ffffff"}
                       stroke={
                         isBlindSpot 
-                          ? "#475569" 
+                          ? "#94a3b8" 
                           : edge.isLaundering 
                           ? "#f43f5e" 
-                          : "#334155"
+                          : "#cbd5e1"
                       }
                       strokeWidth={edge.isLaundering && !isBlindSpot ? 1.4 : 1}
                       filter="url(#nodeShadow)"
@@ -842,10 +842,10 @@ export default function CrossBankTopologyGraph({
                       y={3.5}
                       fill={
                         isBlindSpot 
-                          ? "#94a3b8" 
+                          ? "#475569" 
                           : edge.isLaundering 
-                          ? "#fecdd3" 
-                          : "#cbd5e1"
+                          ? "#be123c" 
+                          : "#334155"
                       }
                       fontSize={isBlindSpot ? 9.5 : 9}
                       fontWeight="700"
@@ -900,7 +900,7 @@ export default function CrossBankTopologyGraph({
                     {/* Core Hub Body */}
                     <circle
                       r={20}
-                      fill="#0f172a"
+                      fill="#ffffff"
                       stroke={hubColor}
                       strokeWidth={isSelected ? 3.5 : 2.5}
                     />
@@ -915,10 +915,10 @@ export default function CrossBankTopologyGraph({
                       r={14}
                       fill={
                         node.type === 'mule' 
-                          ? '#881337' 
+                          ? '#ffe4e6' 
                           : node.type === 'exit' 
-                          ? '#78350f' 
-                          : '#1e1b4b'
+                          ? '#fef3c7' 
+                          : '#e0e7ff'
                       }
                       stroke={
                         node.type === 'mule' 
@@ -950,14 +950,14 @@ export default function CrossBankTopologyGraph({
                     width={node.name.length * 6.6 + 24}
                     height={18}
                     rx={6}
-                    fill="#030712"
-                    fillOpacity="0.85"
-                    stroke={isSelected ? "#38bdf8" : "#1e293b"}
+                    fill="#ffffff"
+                    fillOpacity="0.95"
+                    stroke={isSelected ? "#0284c7" : "#cbd5e1"}
                     strokeWidth={isSelected ? 1 : 0.6}
                   />
                   <text
                     y={3.5}
-                    fill="#f1f5f9"
+                    fill="#0f172a"
                     fontSize={isBankHub ? 10.5 : 9.5}
                     fontWeight={isBankHub ? "700" : "600"}
                     textAnchor="middle"
@@ -969,7 +969,7 @@ export default function CrossBankTopologyGraph({
                 {/* Role / Type Subtitle */}
                 <text
                   y={isBankHub ? 52 : 44}
-                  fill={isBankHub ? hubColor : "#94a3b8"}
+                  fill={isBankHub ? hubColor : "#64748b"}
                   fontSize={8.5}
                   fontFamily="monospace"
                   textAnchor="middle"

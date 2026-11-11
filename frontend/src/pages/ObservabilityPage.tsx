@@ -332,7 +332,7 @@ export default function ObservabilityPage() {
                       onClick={() => toggleFeature(fd.feature_name)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-2 border cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-sm'
+                          ? 'bg-indigo-100 border-indigo-500 text-indigo-700 shadow-sm'
                           : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                       }`}
                     >
@@ -784,7 +784,7 @@ export default function ObservabilityPage() {
                     </button>
                     <button
                       onClick={() => downloadSiemPayload(exportSiem.data!.payload, exportSiem.data!.format)}
-                      className="px-2.5 py-1 rounded text-xs font-mono bg-cyan-600/30 hover:bg-cyan-600/50 text-white border border-cyan-500/40 transition-colors"
+                      className="px-2.5 py-1 rounded text-xs font-mono bg-cyan-100 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 transition-colors"
                     >
                       💾 Download .{exportSiem.data.format === 'cef' ? 'log' : 'json'}
                     </button>

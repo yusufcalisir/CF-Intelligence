@@ -215,7 +215,7 @@ export default function FlagshipConsortiumWidget() {
                 {sc.delta > 0 && (
                   <span
                     className={`hidden xl:inline text-[9px] px-1 py-0.2 rounded font-bold ${
-                      isSelected ? 'bg-slate-50 text-white' : 'bg-emerald-500/20 text-emerald-600'
+                      isSelected ? 'bg-slate-50 text-emerald-700' : 'bg-emerald-100 text-emerald-600'
                     }`}
                   >
                     +{sc.delta.toFixed(0)}%

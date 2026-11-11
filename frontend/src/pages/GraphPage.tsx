@@ -188,7 +188,7 @@ export default function GraphPage() {
                 <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
                   Deep-Linked Ego Focus:
                 </span>
-                <span className="text-xs font-mono font-bold text-white bg-indigo-600/40 px-2.5 py-0.5 rounded-lg border border-indigo-400/40">
+                <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-lg border border-indigo-300">
                   {selectedEntityId}
                 </span>
                 {focusedEntity && (
@@ -357,7 +357,7 @@ export default function GraphPage() {
                   onClick={() => updateSelection(entity.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-indigo-600/30 border-indigo-500/60 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      ? 'bg-indigo-100 border-indigo-300 text-indigo-700 shadow-sm'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
@@ -516,7 +516,7 @@ export default function GraphPage() {
                 <Controls
                   showInteractive={false}
                   style={{
-                    background: '#090a1f',
+                    background: '#ffffff',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '12px',
                     boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
@@ -524,7 +524,7 @@ export default function GraphPage() {
                 />
                 <MiniMap
                   style={{
-                    background: '#090a1f',
+                    background: '#ffffff',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '12px',
                   }}

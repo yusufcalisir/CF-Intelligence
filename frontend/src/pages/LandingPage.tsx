@@ -659,7 +659,7 @@ const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
           const offset = ((pulseTick * 2.2) + i * 35) % 110;
           return (
             <g key={`beam-${i}`}>
-              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#171738" strokeWidth="2.5" />
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#e2e8f0" strokeWidth="2.5" />
               <line
                 x1={from.x} y1={from.y} x2={to.x} y2={to.y}
                 stroke={from.color} strokeWidth="1.5"

@@ -1116,7 +1116,7 @@ export default function PrivacyDefensePage() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-1.5 py-2 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer min-w-0 w-full flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 border ${
                 isActive
-                  ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500/60 text-white shadow-md shadow-indigo-600/15'
+                  ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-300 text-indigo-700 shadow-md shadow-indigo-600/15'
                   : 'bg-white/[0.02] hover:bg-white/[0.05] border-slate-200 text-slate-500 hover:text-slate-700'
               }`}
             >
