@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCases, useCreateCase, useUpdateAlertStatus } from '../api/queries';
@@ -331,7 +331,7 @@ export default function CasesPage() {
                 type="button"
                 id="clear-all-case-filters-btn"
                 onClick={handleClearAllFilters}
-                className="text-[11px] sm:text-xs text-indigo-600 hover:text-indigo-300 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-50 hover:bg-indigo-500/20 border border-indigo-200 transition-all shrink-0 cursor-pointer"
+                className="text-[11px] sm:text-xs text-indigo-600 hover:text-indigo-600 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all shrink-0 cursor-pointer"
               >
                 Clear Filters
               </button>
@@ -356,7 +356,7 @@ export default function CasesPage() {
       ) : !filteredCases || filteredCases.length === 0 ? (
         <div className="glass-card p-12 text-center text-[var(--color-text-muted)] space-y-3">
           <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 inline-block">
-            <span className="text-3xl">📁</span>
+            <span className="text-3xl">ğŸ“</span>
           </div>
           {statusFilter || priorityFilter || searchQuery ? (
             <div>
@@ -431,13 +431,13 @@ export default function CasesPage() {
 
       {/* Inbound Alert Escalation Banner */}
       {fromAlertId && !showCreateModal && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-950/80 via-purple-950/70 to-slate-900/80 rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-900/80 rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2">
-            <span className="text-base">⚡</span>
+            <span className="text-base">âš¡</span>
             <span className="text-slate-800">
-              Inbound alert escalation pending for Alert <span className="font-mono font-bold text-indigo-300">{fromAlertId}</span>
+              Inbound alert escalation pending for Alert <span className="font-mono font-bold text-indigo-600">{fromAlertId}</span>
               {initialRiskScore !== undefined && (
-                <span className="ml-2 font-mono text-amber-300">
+                <span className="ml-2 font-mono text-amber-600">
                   (Score: {initialRiskScore.toFixed(1)})
                 </span>
               )}
@@ -517,7 +517,7 @@ function CreateCaseModal({
       >
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
           <div className="flex items-center gap-2">
-            <span className="text-indigo-600 text-lg">⚡</span>
+            <span className="text-indigo-600 text-lg">âš¡</span>
             <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
           </div>
           <button
@@ -525,18 +525,18 @@ function CreateCaseModal({
             aria-label="Close dialog"
             className="text-[var(--color-text-muted)] hover:text-slate-900 p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
-            ✕
+            âœ•
           </button>
         </div>
 
         {fromAlertId && (
-          <div className="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 rounded-lg border border-indigo-200 text-xs space-y-1">
-            <div className="flex items-center justify-between font-semibold text-indigo-300">
+          <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-900/80 rounded-lg border border-indigo-200 text-xs space-y-1">
+            <div className="flex items-center justify-between font-semibold text-indigo-600">
               <span className="flex items-center gap-1.5">
-                <span>⚡</span> Escalating from Inbound Alert
+                <span>âš¡</span> Escalating from Inbound Alert
               </span>
               {riskScore !== undefined && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-200">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-600 border border-rose-200">
                   Risk: {riskScore.toFixed(1)} / 1000
                 </span>
               )}
@@ -614,3 +614,4 @@ function CreateCaseModal({
     </div>
   );
 }
+

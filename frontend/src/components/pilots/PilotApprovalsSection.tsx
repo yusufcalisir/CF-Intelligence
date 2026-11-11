@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import type { PilotStatusResponse } from '../../api/types';
 import { useApprovePilot } from '../../api/pilots';
 import { formatApiError } from '../../api/client';
@@ -82,7 +82,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
           </div>
           <p className="text-xs text-slate-500 max-w-2xl">
             Controlled two-bank pilots require independent cryptographic authorization from each participating bank and the consortium operator.
-            Approvals are strictly bound to current scope digest <code className="text-indigo-300 font-mono text-[11px]">{currentDigest ? currentDigest.slice(0, 12) + '...' : ''}</code>.
+            Approvals are strictly bound to current scope digest <code className="text-indigo-600 font-mono text-[11px]">{currentDigest ? currentDigest.slice(0, 12) + '...' : ''}</code>.
           </p>
         </div>
 
@@ -91,8 +91,8 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
           <span
             className={`px-3 py-1 rounded-full font-semibold border ${
               pilot.is_fully_approved
-                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-600/50'
-                : 'bg-amber-950/60 text-amber-300 border-amber-600/50'
+                ? 'bg-emerald-50/60 text-emerald-600 border-emerald-600/50'
+                : 'bg-amber-950/60 text-amber-600 border-amber-600/50'
             }`}
           >
             {pilot.is_fully_approved ? 'FULLY AUTHORIZED' : 'APPROVALS PENDING'}
@@ -101,7 +101,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       </div>
 
       {submitError && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-300 text-xs flex items-start gap-2.5">
+        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Approval Submission Failed</div>
@@ -122,7 +122,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               key={entityId}
               className={`p-4 rounded-xl border transition-all ${
                 isApproved && !isStale
-                  ? 'border-emerald-500/40 bg-emerald-950/10'
+                  ? 'border-emerald-500/40 bg-emerald-50/10'
                   : isStale
                   ? 'border-amber-500/40 bg-amber-950/10'
                   : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
@@ -157,7 +157,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Role:</span>
-                    <span className="text-indigo-300">{approval.approver_role}</span>
+                    <span className="text-indigo-600">{approval.approver_role}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Approved At:</span>
@@ -237,7 +237,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               <label className="block text-xs font-medium text-slate-500">
                 Canonical Signing Challenge
               </label>
-              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-200 text-[11px] font-mono break-all text-cyan-300 select-all">
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] font-mono break-all text-cyan-600 select-all">
                 {activeChallenge}
               </div>
               <span className="text-[10px] text-slate-500 block">
@@ -284,3 +284,4 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
     </div>
   );
 }
+

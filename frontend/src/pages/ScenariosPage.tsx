@@ -190,7 +190,7 @@ export default function ScenariosPage() {
                 <button
                   onClick={handleStop}
                   disabled={stopScenario.isPending}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-100 text-rose-600 hover:bg-rose-500/30 border border-rose-500/40 transition-all cursor-pointer"
                 >
                   {stopScenario.isPending ? 'Stopping...' : '⏹ Stop'}
                 </button>

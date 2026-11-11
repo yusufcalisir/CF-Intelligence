@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+﻿import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -128,32 +128,32 @@ export default function GraphPage() {
 
   const statsData = graphStats
     ? [
-        { key: 'nodes',    label: 'Total Nodes',    value: graphStats.total_nodes,  icon: '◉', color: '#6366f1', glow: 'rgba(99,102,241,0.2)' },
-        { key: 'edges',    label: 'Connections',    value: graphStats.total_edges,  icon: '⟶', color: '#22d3ee', glow: 'rgba(34,211,238,0.2)' },
-        { key: 'clusters', label: 'Fraud Clusters', value: graphStats.cluster_count, icon: '⬡', color: '#f59e0b', glow: 'rgba(245,158,11,0.2)' },
-        { key: 'types',    label: 'Entity Types',   value: Object.keys(graphStats.nodes_by_type).length, icon: '◈', color: '#10b981', glow: 'rgba(16,185,129,0.2)' },
+        { key: 'nodes',    label: 'Total Nodes',    value: graphStats.total_nodes,  icon: 'â—‰', color: '#6366f1', glow: 'rgba(99,102,241,0.2)' },
+        { key: 'edges',    label: 'Connections',    value: graphStats.total_edges,  icon: 'âŸ¶', color: '#22d3ee', glow: 'rgba(34,211,238,0.2)' },
+        { key: 'clusters', label: 'Fraud Clusters', value: graphStats.cluster_count, icon: 'â¬¡', color: '#f59e0b', glow: 'rgba(245,158,11,0.2)' },
+        { key: 'types',    label: 'Entity Types',   value: Object.keys(graphStats.nodes_by_type).length, icon: 'â—ˆ', color: '#10b981', glow: 'rgba(16,185,129,0.2)' },
       ]
     : [];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0">
-      {/* ── HEADER ────────────────────────────────────────── */}
+      {/* â”€â”€ HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="p-5 sm:p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-100 border border-indigo-200 text-indigo-600 shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
-            🕸️
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-100 border border-indigo-200 text-indigo-600 shrink-0 shadow-indigo-100">
+            ğŸ•¸ï¸
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 Entity Relationship Graph
               </h1>
-              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-300 font-semibold">
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 font-semibold">
                 Federated Identity Mesh
               </span>
             </div>
@@ -172,20 +172,20 @@ export default function GraphPage() {
         )}
       </motion.div>
 
-      {/* ── DEEP LINK FOCUS NODE BANNER ────────────────────── */}
+      {/* â”€â”€ DEEP LINK FOCUS NODE BANNER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {selectedEntityId && (
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 sm:p-5 rounded-2xl bg-indigo-950/40 border border-indigo-200 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          className="p-4 sm:p-5 rounded-2xl bg-indigo-50/40 border border-indigo-200 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
           <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-300 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-              🎯
+            <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-600 shrink-0 shadow-indigo-100">
+              ğŸ¯
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
                   Deep-Linked Ego Focus:
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-900 bg-indigo-600/40 px-2.5 py-0.5 rounded-lg border border-indigo-400/40">
@@ -193,7 +193,7 @@ export default function GraphPage() {
                 </span>
                 {focusedEntity && (
                   <span className="text-xs font-medium text-slate-600">
-                    ({focusedEntity.display_label} • {BANK_NAMES[focusedEntity.bank_id] || focusedEntity.bank_id})
+                    ({focusedEntity.display_label} â€¢ {BANK_NAMES[focusedEntity.bank_id] || focusedEntity.bank_id})
                   </span>
                 )}
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
@@ -233,7 +233,7 @@ export default function GraphPage() {
         </motion.div>
       )}
 
-      {/* ── STATS ROW ─────────────────────────────────────── */}
+      {/* â”€â”€ STATS ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {graphStats
           ? statsData.map((stat, i) => (
@@ -244,7 +244,7 @@ export default function GraphPage() {
                 transition={{ delay: i * 0.06 }}
                 onMouseEnter={() => setHoveredStat(stat.key)}
                 onMouseLeave={() => setHoveredStat(null)}
-                className="relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl transition-all duration-300 group hover:border-indigo-500/40"
+                className="relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-white border border-slate-200 backdrop-blur-xl transition-all duration-300 group hover:border-indigo-500/40"
                 style={{
                   boxShadow: hoveredStat === stat.key ? `0 0 25px ${stat.glow}` : 'none',
                 }}
@@ -265,26 +265,26 @@ export default function GraphPage() {
               </motion.div>
             ))
           : Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-2xl h-24 animate-pulse bg-[#090a1f]/80 border border-slate-200" />
+              <div key={i} className="rounded-2xl h-24 animate-pulse bg-white border border-slate-200" />
             ))}
       </div>
 
-      {/* ── CONTROLS ROW ──────────────────────────────────── */}
+      {/* â”€â”€ CONTROLS ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Traversal Depth Control */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.15 }}
-          className="lg:col-span-4 p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl flex flex-col justify-between"
+          className="lg:col-span-4 p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                <span>🎯</span>
+                <span>ğŸ¯</span>
                 <span>Traversal Hops</span>
               </h3>
-              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-100 text-indigo-300 border border-indigo-200">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-100 text-indigo-600 border border-indigo-200">
                 Depth {depth}
               </span>
             </div>
@@ -300,7 +300,7 @@ export default function GraphPage() {
                 onClick={() => handleDepthChange(hop)}
                 className={`py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 active:scale-95 ${
                   depth === hop
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-900 shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/40'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-900 shadow-indigo-100 border border-indigo-400/40'
                     : 'bg-white/4 border border-white/8 text-slate-600 hover:text-slate-900 hover:bg-white/8'
                 }`}
               >
@@ -318,11 +318,11 @@ export default function GraphPage() {
           initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="lg:col-span-8 p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl flex flex-col justify-between"
+          className="lg:col-span-8 p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl flex flex-col justify-between"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
-              <span>🔎</span>
+              <span>ğŸ”</span>
               <span>Entity Directory & Resolver</span>
             </h3>
             {filteredEntities.length > 0 && (
@@ -335,7 +335,7 @@ export default function GraphPage() {
           {/* Search Input */}
           <div className="relative mb-3">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">
-              🔍
+              ğŸ”
             </span>
             <input
               type="text"
@@ -357,7 +357,7 @@ export default function GraphPage() {
                   onClick={() => updateSelection(entity.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-indigo-600/30 border-indigo-500/60 text-slate-900 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      ? 'bg-indigo-600/30 border-indigo-500/60 text-slate-900 shadow-indigo-100'
                       : 'bg-white/4 border-white/8 text-slate-600 hover:text-slate-900 hover:bg-white/8'
                   }`}
                 >
@@ -372,7 +372,7 @@ export default function GraphPage() {
                     {BANK_NAMES[entity.bank_id] || entity.bank_id}
                   </span>
                   {entity.alert_count > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500/20 border border-rose-200 text-rose-300">
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 border border-rose-200 text-rose-600">
                       {entity.alert_count}
                     </span>
                   )}
@@ -388,12 +388,12 @@ export default function GraphPage() {
         </motion.div>
       </div>
 
-      {/* ── LEGEND BAR ────────────────────────────────────── */}
+      {/* â”€â”€ LEGEND BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <motion.div
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="p-4 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+        className="p-4 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono shrink-0">
@@ -425,12 +425,12 @@ export default function GraphPage() {
         </div>
       </motion.div>
 
-      {/* ── GRAPH CANVAS ──────────────────────────────────── */}
+      {/* â”€â”€ GRAPH CANVAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <motion.div
         initial={{ opacity: 0, scale: 0.99 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="rounded-2xl overflow-hidden bg-[#050514]/90 border border-slate-200 shadow-2xl relative h-[450px] sm:h-[600px] w-full"
+        className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-2xl relative h-[450px] sm:h-[600px] w-full"
       >
         <AnimatePresence mode="wait">
           {!selectedEntityId ? (
@@ -448,7 +448,7 @@ export default function GraphPage() {
                   <div className="absolute inset-0 rounded-full border border-indigo-200 animate-ping" />
                   <div className="absolute inset-2 rounded-full border border-cyan-500/30 animate-pulse" />
                   <div className="absolute inset-0 flex items-center justify-center text-3xl">
-                    🕸️
+                    ğŸ•¸ï¸
                   </div>
                 </div>
 
@@ -469,7 +469,7 @@ export default function GraphPage() {
                       <button
                         key={e.id}
                         onClick={() => updateSelection(e.id)}
-                        className="px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-slate-50 hover:bg-white/10 border border-slate-200 text-indigo-300 hover:text-slate-900 transition-all cursor-pointer active:scale-95"
+                        className="px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-slate-50 hover:bg-white/10 border border-slate-200 text-indigo-600 hover:text-slate-900 transition-all cursor-pointer active:scale-95"
                       >
                         {e.display_label}
                       </button>
@@ -487,7 +487,7 @@ export default function GraphPage() {
               className="flex items-center justify-center h-full p-6 text-center"
             >
               <div className="max-w-md space-y-3">
-                <div className="text-4xl">📊</div>
+                <div className="text-4xl">ğŸ“Š</div>
                 <h3 className="text-base font-bold text-slate-900">No Direct Relationships at Depth {depth}</h3>
                 <p className="text-xs text-slate-500">
                   This entity has no cross-bank connections within {depth} hops. Try increasing traversal hops to 3 or 4.
@@ -542,3 +542,5 @@ export default function GraphPage() {
     </div>
   );
 }
+
+

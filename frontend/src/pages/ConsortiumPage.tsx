@@ -49,11 +49,11 @@ export default function ConsortiumPage() {
           <button
             type="button"
             onClick={() => setIsReportOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-slate-800 to-slate-850 px-3.5 py-2 text-xs font-semibold text-cyan-300 hover:border-cyan-400 hover:text-slate-900 hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-slate-800 to-slate-850 px-3.5 py-2 text-xs font-semibold text-cyan-600 hover:border-cyan-400 hover:text-slate-900 hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
           >
             <FileText className="h-3.5 w-3.5 text-cyan-600 group-hover:scale-110 transition-transform" />
             <span>Technical Report</span>
-            <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-mono font-medium text-cyan-300 border border-cyan-500/20">
+            <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-mono font-medium text-cyan-600 border border-cyan-500/20">
               Interactive
             </span>
           </button>
@@ -144,7 +144,7 @@ export default function ConsortiumPage() {
           <div className="text-3xl font-extrabold font-mono text-indigo-600 tracking-tight">
             0 LEAKS
           </div>
-          <div className="text-xs text-indigo-300 flex items-center gap-1 mt-1 font-medium">
+          <div className="text-xs text-indigo-600 flex items-center gap-1 mt-1 font-medium">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Zero Raw PII Transmitted
           </div>
           <span className="text-[11px] text-slate-500 mt-2 block">
@@ -192,7 +192,7 @@ export default function ConsortiumPage() {
 
         <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
           <table className="w-full text-left text-xs min-w-[700px]">
-            <thead className="border-b border-slate-200 bg-slate-950/60 text-slate-500 uppercase font-mono">
+            <thead className="border-b border-slate-200 bg-white/60 text-slate-500 uppercase font-mono">
               <tr>
                 <th className="py-3 px-4 whitespace-nowrap">Scenario</th>
                 <th className="py-3 px-4 whitespace-nowrap">Typology</th>

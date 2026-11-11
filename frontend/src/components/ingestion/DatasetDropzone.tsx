@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -183,7 +183,7 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
         onClick={() => fileInputRef.current?.click()}
         className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-7 text-center transition-all duration-300 ${
           isDragOver
-            ? 'border-indigo-400 bg-indigo-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] scale-[1.01]'
+            ? 'border-indigo-400 bg-indigo-100 shadow-indigo-100 scale-[1.01]'
             : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/60 hover:border-indigo-500/50 hover:bg-white/[0.02]'
         }`}
       >
@@ -229,15 +229,15 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
         </div>
 
         {selectedFileMeta && (
-          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-semibold">
+          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-100 border border-indigo-500/40 text-indigo-600 text-xs font-semibold">
             <CheckCircle2 size={14} className="text-emerald-600" />
-            <span>Loaded: {selectedFileMeta.name} ({selectedFileMeta.size} • {selectedFileMeta.format})</span>
+            <span>Loaded: {selectedFileMeta.name} ({selectedFileMeta.size} â€¢ {selectedFileMeta.format})</span>
           </div>
         )}
       </div>
 
       {errorMessage && (
-        <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-rose-100 border border-rose-500/40 text-rose-600 text-xs flex items-center gap-2">
           <AlertTriangle size={15} className="shrink-0" />
           <span>{errorMessage}</span>
         </div>
@@ -278,7 +278,7 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
             onClick={() => handleSelectTemplate('malformed_csv')}
             className="p-2.5 rounded-xl bg-slate-50 hover:bg-white/[0.07] border border-rose-200 text-left transition-all group"
           >
-            <div className="flex items-center justify-between text-xs font-bold text-rose-300 group-hover:text-rose-600">
+            <div className="flex items-center justify-between text-xs font-bold text-rose-600 group-hover:text-rose-600">
               <span>Malformed CSV</span>
               <span className="text-[10px] font-mono text-rose-600">Quarantine</span>
             </div>
@@ -289,3 +289,4 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
     </div>
   );
 };
+

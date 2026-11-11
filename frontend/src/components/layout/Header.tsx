@@ -159,18 +159,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   Live Connector WS ({latencyMs}ms)
                 </span>
               ) : streamSource === 'SIMULATED' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-600 border border-indigo-200" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
                   <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                   Simulated Feed ({latencyMs}ms)
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-300 border border-amber-200" title="WebSocket connected, but no live telemetry provider is currently configured.">
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-600 border border-amber-200" title="WebSocket connected, but no live telemetry provider is currently configured.">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   Telemetry Standby ({latencyMs}ms)
                 </span>
               )
             ) : status === 'mock_active' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-600 border border-indigo-200" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
                 <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                 Simulated Stream (Offline)
               </span>
@@ -198,7 +198,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-2">
               <span
                 data-testid="active-institutional-session"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-300 border border-emerald-200"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{sessionUser.username}</span>

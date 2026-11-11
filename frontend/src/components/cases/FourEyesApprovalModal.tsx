@@ -1,4 +1,4 @@
-import { useState, useMemo, FC, FormEvent } from 'react';
+﻿import { useState, useMemo, FC, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, ShieldAlert, AlertTriangle, UserCheck, Lock, CheckCircle2 } from 'lucide-react';
 
@@ -114,7 +114,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="w-full max-w-xl rounded-2xl bg-gradient-to-br from-[#0c0e29]/95 via-[#0e1138]/90 to-[#0c0e29]/95 border border-indigo-200 shadow-[0_0_50px_rgba(99,102,241,0.2)] p-6 space-y-5 text-slate-800 relative overflow-hidden"
+          className="w-full max-w-xl rounded-2xl bg-gradient-to-br from-white via-slate-50 to-white border border-indigo-200 shadow-indigo-100 p-6 space-y-5 text-slate-800 relative overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-start justify-between border-b border-indigo-200 pb-4">
@@ -125,7 +125,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
               <div>
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   Four-Eyes Dual Control Signoff
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-500/40">
                     Art. 14 High-Risk AI
                   </span>
                 </h2>
@@ -139,7 +139,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
               disabled={isSubmitting}
               className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50/60 transition-colors"
             >
-              ✕
+              âœ•
             </button>
           </div>
 
@@ -147,7 +147,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
           <div className="p-3 rounded-xl bg-white/60 border border-slate-200 text-xs space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Case ID:</span>
-              <span className="font-mono text-indigo-300 font-semibold">{caseId}</span>
+              <span className="font-mono text-indigo-600 font-semibold">{caseId}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Title:</span>
@@ -155,7 +155,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Assigned Investigator:</span>
-              <span className="font-medium text-amber-300 flex items-center gap-1">
+              <span className="font-medium text-amber-600 flex items-center gap-1">
                 <UserCheck className="w-3.5 h-3.5" />
                 {assignedInvestigator || 'Unassigned'}
               </span>
@@ -174,7 +174,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   onClick={() => setResolution('CONFIRMED_FRAUD')}
                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium ${
                     resolution === 'CONFIRMED_FRAUD'
-                      ? 'bg-rose-100 border-rose-500/50 text-rose-300 shadow-[0_0_20px_rgba(244,63,94,0.2)]'
+                      ? 'bg-rose-100 border-rose-500/50 text-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.2)]'
                       : 'bg-white/40 border-slate-200 text-slate-500 hover:bg-slate-50/40'
                   }`}
                 >
@@ -188,7 +188,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   onClick={() => setResolution('FALSE_POSITIVE')}
                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium ${
                     resolution === 'FALSE_POSITIVE'
-                      ? 'bg-emerald-100 border-emerald-500/50 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                      ? 'bg-emerald-100 border-emerald-500/50 text-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
                       : 'bg-white/40 border-slate-200 text-slate-500 hover:bg-slate-50/40'
                   }`}
                 >
@@ -303,7 +303,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 disabled={!isValid || isSubmitting}
                 className={`px-4 py-2 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all ${
                   isValid && !isSubmitting
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-slate-900 shadow-[0_0_20px_rgba(99,102,241,0.35)]'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-slate-900 shadow-indigo-100'
                     : 'bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed'
                 }`}
               >
@@ -319,3 +319,5 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
 };
 
 export default FourEyesApprovalModal;
+
+

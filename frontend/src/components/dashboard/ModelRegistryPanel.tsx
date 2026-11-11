@@ -590,10 +590,10 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               <div
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-all ${
                   feedbackMessage.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-300'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
                     : feedbackMessage.type === 'info'
-                    ? 'bg-blue-50 border-blue-500/30 text-blue-300'
-                    : 'bg-rose-50 border-rose-200 text-rose-300'
+                    ? 'bg-blue-50 border-blue-500/30 text-blue-600'
+                    : 'bg-rose-50 border-rose-200 text-rose-600'
                 }`}
               >
                 <span>{feedbackMessage.text}</span>

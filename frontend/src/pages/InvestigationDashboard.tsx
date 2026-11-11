@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   useDashboardStats,
@@ -24,7 +24,7 @@ export default function InvestigationDashboard() {
       title: 'Total Alerts',
       value: stats.total_alerts,
       badge: 'LIVE INGESTION',
-      trend: '↑ Real-time Stream',
+      trend: 'â†‘ Real-time Stream',
       subtext: 'Cross-bank 9-signal risk scoring feeds',
       gradient: 'from-amber-500/20 via-amber-500/5 to-transparent',
       borderColor: 'border-amber-200 hover:border-amber-400/60',
@@ -45,7 +45,7 @@ export default function InvestigationDashboard() {
       title: 'Critical Alerts',
       value: stats.critical_alerts,
       badge: 'SEV1-P1 CRITICAL',
-      trend: 'Risk Score ≥ 700',
+      trend: 'Risk Score â‰¥ 700',
       subtext: 'Immediate block & supervisor triage',
       gradient: 'from-rose-500/20 via-rose-500/5 to-transparent',
       borderColor: 'border-rose-200 hover:border-rose-400/60',
@@ -107,7 +107,7 @@ export default function InvestigationDashboard() {
       title: 'Intelligence Items',
       value: stats.shared_intelligence_items,
       badge: 'FL CONSORTIUM',
-      trend: '(ε, δ)-DP Bounded',
+      trend: '(Îµ, Î´)-DP Bounded',
       subtext: 'Privacy-preserving threat indicators',
       gradient: 'from-violet-500/20 via-violet-500/5 to-transparent',
       borderColor: 'border-violet-500/30 hover:border-violet-400/60',
@@ -215,22 +215,22 @@ export default function InvestigationDashboard() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             to="/scenarios"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-indigo-600 hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-indigo-600 hover:bg-indigo-500 transition-all shadow-indigo-100"
           >
-            ▶ Run Scenario
+            â–¶ Run Scenario
           </Link>
           <Link
             to="/cases"
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 hover:bg-white/10 transition-all"
           >
-            📋 Workbench
+            ğŸ“‹ Workbench
           </Link>
         </div>
       </motion.div>
 
       {/* High-Impact Stat Cards */}
       {isLoading ? (
-        <div className="p-12 text-center text-slate-500 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl">
+        <div className="p-12 text-center text-slate-500 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl">
           <div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2" />
           <div className="text-xs font-mono">Synchronizing consortium intelligence metrics...</div>
         </div>
@@ -245,7 +245,7 @@ export default function InvestigationDashboard() {
             >
               <Link
                 to={card.href}
-                className={`relative overflow-hidden rounded-2xl bg-[#090a1f]/80 border ${card.borderColor} p-4 sm:p-5 shadow-[0_0_40px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 block group min-w-0`}
+                className={`relative overflow-hidden rounded-2xl bg-white border ${card.borderColor} p-4 sm:p-5 shadow-[0_0_40px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 block group min-w-0`}
                 style={{ boxShadow: `0 0 35px ${card.glow}` }}
               >
                 {/* Ambient Top Radial Gradient Glow */}
@@ -298,7 +298,7 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
@@ -358,7 +358,7 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
@@ -413,7 +413,7 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
@@ -434,7 +434,7 @@ export default function InvestigationDashboard() {
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 overflow-hidden">
-                  <div className="text-lg sm:text-xl font-black font-mono text-emerald-300 truncate">
+                  <div className="text-lg sm:text-xl font-black font-mono text-emerald-600 truncate">
                     {(intelStats.avg_risk_indicator * 100).toFixed(1)}%
                   </div>
                   <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">Avg Risk Indicator</div>
@@ -457,7 +457,7 @@ export default function InvestigationDashboard() {
             </div>
           ) : (
             <div className="text-center py-6 space-y-2">
-              <div className="text-3xl">🔗</div>
+              <div className="text-3xl">ğŸ”—</div>
               <p className="text-xs text-slate-500 font-mono">
                 No shared intelligence yet. Trigger a scenario to generate cross-bank threat objects.
               </p>
@@ -471,19 +471,19 @@ export default function InvestigationDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl"
+        className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl"
       >
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3.5 flex items-center gap-2">
-          ⚡ Operational Quick Shortcuts
+          âš¡ Operational Quick Shortcuts
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full">
           {[
-            { label: 'Run Fraud Ring Scenario', icon: '▶', href: '/scenarios', color: '#6366f1' },
-            { label: 'View Ingestion Alerts',   icon: '🔍', href: '/alerts', color: '#f59e0b' },
-            { label: 'Open Case Workbench',     icon: '📋', href: '/cases', color: '#14b8a6' },
-            { label: 'Explore Identity Graph',  icon: '🕸️', href: '/graph', color: '#ec4899' },
-            { label: 'Consortium Benchmark',    icon: '🏛️', href: '/consortium', color: '#10b981' },
-            { label: 'Return to Simulator',     icon: '🌐', href: '/', color: '#3b82f6' },
+            { label: 'Run Fraud Ring Scenario', icon: 'â–¶', href: '/scenarios', color: '#6366f1' },
+            { label: 'View Ingestion Alerts',   icon: 'ğŸ”', href: '/alerts', color: '#f59e0b' },
+            { label: 'Open Case Workbench',     icon: 'ğŸ“‹', href: '/cases', color: '#14b8a6' },
+            { label: 'Explore Identity Graph',  icon: 'ğŸ•¸ï¸', href: '/graph', color: '#ec4899' },
+            { label: 'Consortium Benchmark',    icon: 'ğŸ›ï¸', href: '/consortium', color: '#10b981' },
+            { label: 'Return to Simulator',     icon: 'ğŸŒ', href: '/', color: '#3b82f6' },
           ].map((link) => (
             <Link
               key={link.label}
@@ -509,11 +509,11 @@ export default function InvestigationDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl mt-6"
+        className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl mt-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-3 mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 flex-wrap min-w-0">
-            <span>🕵️</span>
+            <span>ğŸ•µï¸</span>
             <span>Investigator Activity Audit Trail</span>
             <span className="text-slate-500 text-[10px] font-normal font-mono">(Immutable Log Chain)</span>
           </h3>
@@ -537,7 +537,7 @@ export default function InvestigationDashboard() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-indigo-600">{log.investigator}</span>
-                  <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-300 text-[10px] font-bold uppercase">
+                  <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-600 text-[10px] font-bold uppercase">
                     {log.action.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -601,3 +601,5 @@ export default function InvestigationDashboard() {
     </div>
   );
 }
+
+

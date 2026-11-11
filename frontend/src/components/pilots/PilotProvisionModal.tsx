@@ -119,12 +119,12 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
         </div>
 
         <p className="text-xs text-slate-500">
-          Provisions an authorized bilateral pilot in <code className="text-indigo-300 font-mono">DRAFT</code> state.
+          Provisions an authorized bilateral pilot in <code className="text-indigo-600 font-mono">DRAFT</code> state.
           Calculates the initial immutable scope digest and establishes durable reservation quotas.
         </p>
 
         {formError && (
-          <div className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-300 text-xs flex items-start gap-2.5">
+          <div className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>{formError}</div>
           </div>
@@ -319,7 +319,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               <span className="text-[10px] text-slate-500">Optional during initial DRAFT</span>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
+            <div className="p-2.5 rounded-lg bg-white/60 border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
               <Info className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
               <span>
                 Provide explicit operational hostnames or URLs. If endpoints are not yet configured, the pilot will remain in truthful DRAFT state and preflight will require verified endpoints before approval.
@@ -334,7 +334,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={coordUrl}
                   onChange={(e) => setCoordUrl(e.target.value)}
                   placeholder="https://coordinator.consortium..."
-                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
               <div>
@@ -344,7 +344,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankAUrl}
                   onChange={(e) => setBankAUrl(e.target.value)}
                   placeholder="https://worker-a.bank..."
-                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
               <div>
@@ -354,7 +354,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankBUrl}
                   onChange={(e) => setBankBUrl(e.target.value)}
                   placeholder="https://worker-b.bank..."
-                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
             </div>

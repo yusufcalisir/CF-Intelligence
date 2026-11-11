@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Lock } from 'lucide-react';
 import {
@@ -28,30 +28,30 @@ interface SecurityTabItem {
 }
 
 const SECURITY_CATEGORIES = [
-  { id: 'all', label: 'All Modules', count: 12, icon: '🛡️' },
-  { id: 'identity', label: 'Identity & PKI', count: 4, icon: '🔑' },
-  { id: 'crypto', label: 'Crypto Proofs', count: 3, icon: '⚡' },
-  { id: 'governance', label: 'Audit & Governance', count: 5, icon: '⛓️' },
+  { id: 'all', label: 'All Modules', count: 12, icon: 'ğŸ›¡ï¸' },
+  { id: 'identity', label: 'Identity & PKI', count: 4, icon: 'ğŸ”‘' },
+  { id: 'crypto', label: 'Crypto Proofs', count: 3, icon: 'âš¡' },
+  { id: 'governance', label: 'Audit & Governance', count: 5, icon: 'â›“ï¸' },
 ] as const;
 
 const SECURITY_TABS: SecurityTabItem[] = [
   // Identity & PKI
-  { id: 'mtls', icon: '🔑', label: 'mTLS & Cert PKI', category: 'identity' },
-  { id: 'oidc', icon: '🆔', label: 'OIDC & IAM', category: 'identity' },
-  { id: 'abac', icon: '🛡️', label: 'Dynamic ABAC Rules', category: 'identity' },
-  { id: 'vault', icon: '🔐', label: 'HashiCorp Vault HSM', category: 'identity' },
+  { id: 'mtls', icon: 'ğŸ”‘', label: 'mTLS & Cert PKI', category: 'identity' },
+  { id: 'oidc', icon: 'ğŸ†”', label: 'OIDC & IAM', category: 'identity' },
+  { id: 'abac', icon: 'ğŸ›¡ï¸', label: 'Dynamic ABAC Rules', category: 'identity' },
+  { id: 'vault', icon: 'ğŸ”', label: 'HashiCorp Vault HSM', category: 'identity' },
   
   // Crypto Engines
-  { id: 'secagg', icon: '🔗', label: 'P2P Curve25519 SecAgg', category: 'crypto' },
-  { id: 'zkp', icon: '⚡', label: 'zk-SNARK Attestation', category: 'crypto' },
-  { id: 'pqc', icon: '🛡️', label: 'PQC SecAgg & Kyber-768', category: 'crypto' },
+  { id: 'secagg', icon: 'ğŸ”—', label: 'P2P Curve25519 SecAgg', category: 'crypto' },
+  { id: 'zkp', icon: 'âš¡', label: 'zk-SNARK Attestation', category: 'crypto' },
+  { id: 'pqc', icon: 'ğŸ›¡ï¸', label: 'PQC SecAgg & Kyber-768', category: 'crypto' },
   
   // Governance
-  { id: 'audit', icon: '⛓️', label: 'Cryptographic Audit Chain', category: 'governance' },
-  { id: 'unlearning', icon: '♻️', label: 'Confidential Unlearning', category: 'governance' },
-  { id: 'bridge', icon: '🌉', label: 'Cross-Chain Settlement', category: 'governance' },
-  { id: 'rdp', icon: '📈', label: 'Adaptive DP Auto-Scaler', category: 'governance' },
-  { id: 'webhooks', icon: '📡', label: 'Webhook Gateway & SSRF Security', category: 'governance' },
+  { id: 'audit', icon: 'â›“ï¸', label: 'Cryptographic Audit Chain', category: 'governance' },
+  { id: 'unlearning', icon: 'â™»ï¸', label: 'Confidential Unlearning', category: 'governance' },
+  { id: 'bridge', icon: 'ğŸŒ‰', label: 'Cross-Chain Settlement', category: 'governance' },
+  { id: 'rdp', icon: 'ğŸ“ˆ', label: 'Adaptive DP Auto-Scaler', category: 'governance' },
+  { id: 'webhooks', icon: 'ğŸ“¡', label: 'Webhook Gateway & SSRF Security', category: 'governance' },
 ];
 
 export default function SecurityPage() {
@@ -230,11 +230,11 @@ export default function SecurityPage() {
         target_url: webhookUrl.trim(),
         events: webhookEvents,
       });
-      setWebhookRegSuccess(`✅ Webhook registered! ID: ${res.subscription_id}. Secret: ${res.secret_key.slice(0, 8)}...`);
+      setWebhookRegSuccess(`âœ… Webhook registered! ID: ${res.subscription_id}. Secret: ${res.secret_key.slice(0, 8)}...`);
       setWebhookUrl('');
     } catch (err: unknown) {
       const detail = formatApiError(err, 'Failed to register webhook. SSRF validation or network rejection.');
-      setWebhookRegError(`❌ ${detail}`);
+      setWebhookRegError(`âŒ ${detail}`);
     }
   };
 
@@ -245,10 +245,10 @@ export default function SecurityPage() {
         tenant_id: webhookTenant,
         event_type: 'ALERT_CREATED',
       });
-      setTestDispatchStatus(`✅ Dispatched to ${res.dispatched_count} subscriber(s). Event: ${res.event_type}. Signature: ${res.sample_signature ? res.sample_signature.slice(0, 16) + '...' : 'N/A'}`);
+      setTestDispatchStatus(`âœ… Dispatched to ${res.dispatched_count} subscriber(s). Event: ${res.event_type}. Signature: ${res.sample_signature ? res.sample_signature.slice(0, 16) + '...' : 'N/A'}`);
     } catch (err: unknown) {
       const detail = formatApiError(err, 'Webhook test dispatch failed.');
-      setTestDispatchStatus(`❌ ${detail}`);
+      setTestDispatchStatus(`âŒ ${detail}`);
     }
   };
 
@@ -317,7 +317,7 @@ export default function SecurityPage() {
   return (
     <div className="space-y-6 min-w-0">
       {/* Page Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="space-y-2 min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
@@ -342,7 +342,7 @@ export default function SecurityPage() {
                 key={badge}
                 className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold border ${
                   badge.includes('Software Emulated')
-                    ? 'bg-amber-50 border-amber-500/25 text-amber-300'
+                    ? 'bg-amber-50 border-amber-500/25 text-amber-600'
                     : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
               >
@@ -385,7 +385,7 @@ export default function SecurityPage() {
           }`}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-2xl shrink-0">{verifyChain.data.is_valid ? '✓' : '⚠️'}</span>
+            <span className="text-2xl shrink-0">{verifyChain.data.is_valid ? 'âœ“' : 'âš ï¸'}</span>
             <div className="min-w-0">
               <div className="font-bold text-sm truncate">
                 {verifyChain.data.is_valid
@@ -440,7 +440,7 @@ export default function SecurityPage() {
                 className={`p-2.5 sm:p-3 rounded-xl transition-all flex flex-col justify-between text-left border min-h-[58px] cursor-pointer relative overflow-hidden group ${
                   isActive
                     ? 'bg-indigo-100 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-200'
-                    : 'bg-[#090b1e]/70 border-white/5 text-slate-500 hover:text-slate-800 hover:border-white/15 hover:bg-[#0d102b]'
+                    : 'bg-white border-white/5 text-slate-500 hover:text-slate-800 hover:border-white/15 hover:bg-white'
                 }`}
               >
                 {isActive && (
@@ -677,7 +677,7 @@ export default function SecurityPage() {
                     </>
                   ) : (
                     <>
-                      <span className="text-sm">🛡️</span>
+                      <span className="text-sm">ğŸ›¡ï¸</span>
                       <span>Execute ABAC Policy Check</span>
                     </>
                   )}
@@ -691,7 +691,7 @@ export default function SecurityPage() {
                         : 'bg-red-50 border-red-200 text-red-600'
                     }`}
                   >
-                    <div className="font-bold">{evaluateABAC.data.allowed ? '✓ ACCESS GRANTED' : '⛔ ACCESS DENIED'}</div>
+                    <div className="font-bold">{evaluateABAC.data.allowed ? 'âœ“ ACCESS GRANTED' : 'â›” ACCESS DENIED'}</div>
                     <div className="font-mono text-[10px] mt-1">{evaluateABAC.data.policy_name}</div>
                     <div className="mt-1 opacity-90">{evaluateABAC.data.reason}</div>
                   </div>
@@ -730,7 +730,7 @@ export default function SecurityPage() {
                           : 'bg-rose-100 text-rose-600 border-rose-200'
                       }`}
                     >
-                      {vaultStatus.sealed ? 'SEALED' : '✓ UNSEALED & HEALTHY'} (HA: {vaultStatus.ha_enabled ? 'ACTIVE' : 'STANDALONE'})
+                      {vaultStatus.sealed ? 'SEALED' : 'âœ“ UNSEALED & HEALTHY'} (HA: {vaultStatus.ha_enabled ? 'ACTIVE' : 'STANDALONE'})
                     </span>
                   )}
                 </div>
@@ -754,41 +754,41 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                    <span>🛡️ Vault PKI Root CA - PKCS#11 Hardware HSM Interface</span>
+                    <span>ğŸ›¡ï¸ Vault PKI Root CA - PKCS#11 Hardware HSM Interface</span>
                   </h3>
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                       isHsmHw
                         ? 'bg-emerald-100 text-emerald-600 border-emerald-200'
-                        : 'bg-amber-100 text-amber-300 border-amber-200'
+                        : 'bg-amber-100 text-amber-600 border-amber-200'
                     }`}
                   >
                     {isHsmHw
-                      ? '✓ PHYSICAL HSM ACTIVE (FIPS 140-2 L3)'
-                      : '⚠️ SOFTWARE EMULATED (SoftHSM2 Sandbox)'}
+                      ? 'âœ“ PHYSICAL HSM ACTIVE (FIPS 140-2 L3)'
+                      : 'âš ï¸ SOFTWARE EMULATED (SoftHSM2 Sandbox)'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">HSM Slot & Driver</div>
-                    <div className="font-mono font-bold text-indigo-300">
+                    <div className="font-mono font-bold text-indigo-600">
                       {status?.hsm?.driver || 'Slot #0 (PKCS#11 / SoftHSM2 Dev)'}
                     </div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Private Key Guarantee</div>
                     <div className="font-mono font-bold text-emerald-600">
-                      {isHsmHw ? '🔒 Hardware Non-Exportable (Zero-Disk)' : '🔒 Process Memory Sandbox (Emulated)'}
+                      {isHsmHw ? 'ğŸ”’ Hardware Non-Exportable (Zero-Disk)' : 'ğŸ”’ Process Memory Sandbox (Emulated)'}
                     </div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Root CA Algorithm</div>
-                    <div className="font-mono font-bold text-purple-300">RSA-4096 / SHA256-PSS</div>
+                    <div className="font-mono font-bold text-purple-600">RSA-4096 / SHA256-PSS</div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Hardware Target</div>
-                    <div className="font-mono font-bold text-amber-300">
+                    <div className="font-mono font-bold text-amber-600">
                       {status?.hsm?.compliance_level || (isHsmHw ? 'FIPS 140-2 Level 3 (Physical HSM)' : 'Software Emulated (Zero Physical HSM)')}
                     </div>
                   </div>
@@ -808,9 +808,9 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 border border-purple-200 bg-purple-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                    <span>⚡ On-Chain Governance - Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
+                    <span>âš¡ On-Chain Governance - Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-300 border border-purple-200">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-600 border border-purple-200">
                     2/3 THRESHOLD GOVERNANCE
                   </span>
                 </div>
@@ -822,11 +822,11 @@ export default function SecurityPage() {
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #2 (Consortium Trustee Alpha)</div>
-                    <div className="font-mono text-[10px] font-bold text-indigo-300 truncate">0x70997970C51812dc3A010C7d01b50e0d17dc79C8</div>
+                    <div className="font-mono text-[10px] font-bold text-indigo-600 truncate">0x70997970C51812dc3A010C7d01b50e0d17dc79C8</div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #3 (Consortium Trustee Beta)</div>
-                    <div className="font-mono text-[10px] font-bold text-purple-300 truncate">0x3C44CdD160573615659514930278505963E8A155</div>
+                    <div className="font-mono text-[10px] font-bold text-purple-600 truncate">0x3C44CdD160573615659514930278505963E8A155</div>
                   </div>
                 </div>
 
@@ -892,7 +892,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
-                    🔗 X25519 Key Exchange Topology - Round #{secaggRound}
+                    ğŸ”— X25519 Key Exchange Topology - Round #{secaggRound}
                   </h3>
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -901,7 +901,7 @@ export default function SecurityPage() {
                         : 'bg-amber-100 text-amber-600 border border-amber-200'
                     }`}
                   >
-                    {quorumReady ? `✓ QUORUM MET (${broadcastCount}/4)` : `⏳ AWAITING QUORUM (${broadcastCount}/4)`}
+                    {quorumReady ? `âœ“ QUORUM MET (${broadcastCount}/4)` : `â³ AWAITING QUORUM (${broadcastCount}/4)`}
                   </span>
                 </div>
 
@@ -920,7 +920,7 @@ export default function SecurityPage() {
                       strokeWidth="1"
                       strokeDasharray="3 3"
                     />
-                    <text x="160" y="164" textAnchor="middle" fontSize="11" fill="#818cf8" opacity="0.7">⚡</text>
+                    <text x="160" y="164" textAnchor="middle" fontSize="11" fill="#818cf8" opacity="0.7">âš¡</text>
                     <text x="160" y="186" textAnchor="middle" fontSize="7.5" fill="#64748b" fontWeight="bold">COORDINATOR</text>
 
                     {/* ECDH edges between broadcast nodes */}
@@ -951,7 +951,7 @@ export default function SecurityPage() {
                         />
                         {/* Key icon */}
                         <text x="40" y="37" textAnchor="middle" fontSize="18">
-                          {node.broadcast ? '🔑' : '⏳'}
+                          {node.broadcast ? 'ğŸ”‘' : 'â³'}
                         </text>
                         {/* Node label */}
                         <text
@@ -965,7 +965,7 @@ export default function SecurityPage() {
                         {node.broadcast && (
                           <>
                             <circle cx="64" cy="16" r="8" fill="#10b981" />
-                            <text x="64" y="20" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">✓</text>
+                            <text x="64" y="20" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">âœ“</text>
                           </>
                         )}
                       </g>
@@ -996,7 +996,7 @@ export default function SecurityPage() {
                             : 'bg-slate-50/40 border-slate-200/30'
                         }`}
                       >
-                        <span className="text-lg shrink-0 mt-0.5">{node.broadcast ? '🔑' : '⏳'}</span>
+                        <span className="text-lg shrink-0 mt-0.5">{node.broadcast ? 'ğŸ”‘' : 'â³'}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-bold text-[var(--color-text-primary)] truncate">{node.label}</span>
@@ -1031,9 +1031,9 @@ export default function SecurityPage() {
                       { label: 'Modular Ring',     value: 'Z_{2^32} (32-bit unsigned)' },
                       { label: 'Prime Field',      value: 'Z_p (p = 2^256 - 189)' },
                       { label: 'Threshold Scheme', value: `Shamir (${shamirThreshold}, 4) Galois Polynomial` },
-                      { label: 'Authentication',   value: 'HMAC-SHA256 over (bank_id ∥ round_id ∥ pk)' },
-                      { label: 'Zero-Sum Proof',   value: 'Σ y_u ≡ Σ w_u (mod 2^32)' },
-                      { label: 'Server Knowledge', value: 'None - pure relay, ε=0 information' },
+                      { label: 'Authentication',   value: 'HMAC-SHA256 over (bank_id âˆ¥ round_id âˆ¥ pk)' },
+                      { label: 'Zero-Sum Proof',   value: 'Î£ y_u â‰¡ Î£ w_u (mod 2^32)' },
+                      { label: 'Server Knowledge', value: 'None - pure relay, Îµ=0 information' },
                       { label: 'Protocol Ver.',    value: '2.0.0' },
                     ].map((item) => (
                       <div key={item.label} className="flex justify-between gap-2 p-2 rounded bg-[var(--color-surface-alt)]">
@@ -1048,7 +1048,7 @@ export default function SecurityPage() {
                 <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                      <span>🧮 Shamir (t, n) Dropout Reconstruction</span>
+                      <span>ğŸ§® Shamir (t, n) Dropout Reconstruction</span>
                     </h3>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-[var(--color-text-muted)]">Threshold (t):</span>
@@ -1089,7 +1089,7 @@ export default function SecurityPage() {
                           >
                             <span>{bank.label}</span>
                             <span className="text-[10px] font-bold uppercase">
-                              {isDropped ? '❌ DROPPED' : '✓ ACTIVE'}
+                              {isDropped ? 'âŒ DROPPED' : 'âœ“ ACTIVE'}
                             </span>
                           </button>
                         );
@@ -1101,15 +1101,15 @@ export default function SecurityPage() {
                   <div
                     className={`p-3 rounded-lg border text-xs space-y-1 ${
                       quorumReady
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-300'
-                        : 'bg-rose-50 border-rose-200 text-rose-300'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                        : 'bg-rose-50 border-rose-200 text-rose-600'
                     }`}
                   >
                     <div className="flex items-center justify-between font-bold">
                       <span>
                         {quorumReady
-                          ? `✓ RECONSTRUCTION SUCCESSFUL (${broadcastCount}/${shamirThreshold} shares collected)`
-                          : `⚠️ RECONSTRUCTION BLOCKED (${broadcastCount}/${shamirThreshold} shares collected)`}
+                          ? `âœ“ RECONSTRUCTION SUCCESSFUL (${broadcastCount}/${shamirThreshold} shares collected)`
+                          : `âš ï¸ RECONSTRUCTION BLOCKED (${broadcastCount}/${shamirThreshold} shares collected)`}
                       </span>
                       <span className="font-mono text-[10px]">
                         {quorumReady ? 'MAE = 0.000000' : 'INSUFFICIENT SHARES'}
@@ -1134,7 +1134,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] flex items-center gap-2">
-                    <span>⚡ Groth16 zk-SNARK Model Weight Attestation</span>
+                    <span>âš¡ Groth16 zk-SNARK Model Weight Attestation</span>
                   </h3>
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 font-mono">
                     {zkStatus?.curve ?? 'BN254'} ELLIPTIC CURVE
@@ -1142,7 +1142,7 @@ export default function SecurityPage() {
                 </div>
 
                 <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                  Proves that participating bank weight updates <code className="font-mono text-indigo-300">w_local</code> are correctly computed from local data, meet Poseidon commitments <code className="font-mono text-indigo-300">H_w</code>, and satisfy <code className="font-mono text-indigo-300">||w||_2 ≤ C_max</code> bounds in <strong>O(1) constant time</strong> without revealing raw model weights.
+                  Proves that participating bank weight updates <code className="font-mono text-indigo-600">w_local</code> are correctly computed from local data, meet Poseidon commitments <code className="font-mono text-indigo-600">H_w</code>, and satisfy <code className="font-mono text-indigo-600">||w||_2 â‰¤ C_max</code> bounds in <strong>O(1) constant time</strong> without revealing raw model weights.
                 </p>
 
                 <div className="space-y-2.5 text-xs">
@@ -1160,13 +1160,13 @@ export default function SecurityPage() {
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Verified Proofs Count</span>
-                    <span className="font-mono font-bold text-purple-300">
+                    <span className="font-mono font-bold text-purple-600">
                       {zkStatus?.total_proofs_verified ?? 0} Proofs (100% Valid)
                     </span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Typical Verification Latency</span>
-                    <span className="font-mono font-bold text-indigo-300">
+                    <span className="font-mono font-bold text-indigo-600">
                       {zkStatus?.average_verification_time_ms ? `${zkStatus.average_verification_time_ms.toFixed(2)} ms` : '2.14 ms'} (&lt; 5.00 ms SLA)
                     </span>
                   </div>
@@ -1199,7 +1199,7 @@ export default function SecurityPage() {
                     </>
                   ) : (
                     <>
-                      <span>⚡</span>
+                      <span>âš¡</span>
                       <span>Execute Live Groth16 Attestation Check</span>
                     </>
                   )}
@@ -1209,7 +1209,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 flex flex-col justify-between">
                 <div>
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] mb-3">
-                    Proof Elements (π = (A, B, C)) & Verification Status
+                    Proof Elements (Ï€ = (A, B, C)) & Verification Status
                   </h3>
 
                   {verifyZKProof.data ? (
@@ -1223,8 +1223,8 @@ export default function SecurityPage() {
                       <div className="flex justify-between font-bold text-xs">
                         <span>
                           {verifyZKProof.data.is_valid
-                            ? '✓ BILINEAR PAIRING CHECK PASSED'
-                            : '⛔ PAIRING CHECK FAILED'}
+                            ? 'âœ“ BILINEAR PAIRING CHECK PASSED'
+                            : 'â›” PAIRING CHECK FAILED'}
                         </span>
                         <span className="font-mono text-[10px]">
                           Latency: {verifyZKProof.data.verification_time_ms !== undefined ? `${verifyZKProof.data.verification_time_ms.toFixed(2)} ms` : '2.14 ms'}
@@ -1237,8 +1237,8 @@ export default function SecurityPage() {
                   ) : (
                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 space-y-1 mb-4">
                       <div className="flex justify-between font-bold text-xs">
-                        <span>✓ BILINEAR PAIRING CHECK PASSED</span>
-                        <span className="font-mono text-[10px]">e(A, B) = e(α, β) · e(C, δ)</span>
+                        <span>âœ“ BILINEAR PAIRING CHECK PASSED</span>
+                        <span className="font-mono text-[10px]">e(A, B) = e(Î±, Î²) Â· e(C, Î´)</span>
                       </div>
                       <p className="text-[11px] opacity-80">
                         Zero-knowledge attestation verified on server. Zero gradient poisoning or free-riding updates detected.
@@ -1248,16 +1248,16 @@ export default function SecurityPage() {
 
                   <div className="space-y-2 text-[11px] font-mono">
                     <div className="p-2 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                      <span className="text-[var(--color-text-muted)]">π_A (G1):</span>
-                      <span className="text-indigo-300">0x1f92a4...810c9d</span>
+                      <span className="text-[var(--color-text-muted)]">Ï€_A (G1):</span>
+                      <span className="text-indigo-600">0x1f92a4...810c9d</span>
                     </div>
                     <div className="p-2 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                      <span className="text-[var(--color-text-muted)]">π_B (G2):</span>
-                      <span className="text-indigo-300">[[0x3e1..., 0x8a7...], [0x41f..., 0x9b2...]]</span>
+                      <span className="text-[var(--color-text-muted)]">Ï€_B (G2):</span>
+                      <span className="text-indigo-600">[[0x3e1..., 0x8a7...], [0x41f..., 0x9b2...]]</span>
                     </div>
                     <div className="p-2 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                      <span className="text-[var(--color-text-muted)]">π_C (G1):</span>
-                      <span className="text-indigo-300">0x7c45d2...19e34b</span>
+                      <span className="text-[var(--color-text-muted)]">Ï€_C (G1):</span>
+                      <span className="text-indigo-600">0x7c45d2...19e34b</span>
                     </div>
                   </div>
                 </div>
@@ -1276,7 +1276,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] flex items-center gap-2">
-                    <span>♻️ Bank Revocation & Gradient Erasure Console</span>
+                    <span>â™»ï¸ Bank Revocation & Gradient Erasure Console</span>
                   </h3>
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-600 border border-purple-200 font-mono">
                     EXACT RE-AGGREGATION
@@ -1321,14 +1321,14 @@ export default function SecurityPage() {
                     disabled={isUnlearningLoading}
                     className="w-full py-2 bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-slate-900 font-bold text-xs rounded-lg transition-all shadow-md shadow-red-600/20 cursor-pointer disabled:opacity-50"
                   >
-                    {isUnlearningLoading ? '⏳ Executing Weight Erasure...' : '⚡ Trigger Model Weight Erasure'}
+                    {isUnlearningLoading ? 'â³ Executing Weight Erasure...' : 'âš¡ Trigger Model Weight Erasure'}
                   </button>
                 </div>
 
                 <div className="space-y-2 text-xs pt-2">
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Unlearning Mechanism</span>
-                    <span className="font-mono font-bold text-indigo-300">Retained Consensus Re-aggregation</span>
+                    <span className="font-mono font-bold text-indigo-600">Retained Consensus Re-aggregation</span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Verification Guarantee</span>
@@ -1347,7 +1347,7 @@ export default function SecurityPage() {
                     <div className="space-y-3 text-xs font-mono">
                       <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 space-y-1">
                         <div className="flex justify-between font-bold">
-                          <span>✓ WEIGHT ERASURE VERIFIED</span>
+                          <span>âœ“ WEIGHT ERASURE VERIFIED</span>
                           <span>Latency: {unlearnResult.execution_time_ms.toFixed(2)} ms</span>
                         </div>
                         <p className="text-[11px] opacity-80 font-sans">
@@ -1357,15 +1357,15 @@ export default function SecurityPage() {
 
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Target Bank:</span>
-                        <span className="text-indigo-300 font-bold">{unlearnResult.target_bank_id}</span>
+                        <span className="text-indigo-600 font-bold">{unlearnResult.target_bank_id}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Parameter Drift Delta (||Δw||_2):</span>
+                        <span className="text-[var(--color-text-muted)]">Parameter Drift Delta (||Î”w||_2):</span>
                         <span className="text-amber-600 font-bold">{unlearnResult.parameter_drift_delta.toFixed(4)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Spectral Radius Bound (λ_max):</span>
-                        <span className="text-purple-300 font-bold">{unlearnResult.hessian_spectral_radius.toFixed(3)}</span>
+                        <span className="text-[var(--color-text-muted)]">Spectral Radius Bound (Î»_max):</span>
+                        <span className="text-purple-600 font-bold">{unlearnResult.hessian_spectral_radius.toFixed(3)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">MIA Empirical Risk:</span>
@@ -1397,7 +1397,7 @@ export default function SecurityPage() {
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <span>🛡️</span> NIST Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium)
+                    <span>ğŸ›¡ï¸</span> NIST Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium)
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
                     NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) & FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe SecAgg
@@ -1450,7 +1450,7 @@ export default function SecurityPage() {
                         </>
                       ) : (
                         <>
-                          <span>🔑</span>
+                          <span>ğŸ”‘</span>
                           <span>Generate Kyber-768 + Dilithium-3 Keypair</span>
                         </>
                       )}
@@ -1458,7 +1458,7 @@ export default function SecurityPage() {
                   </div>
 
                   <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-600 space-y-1.5">
-                    <div className="font-bold text-indigo-300">Quantum Security Guarantee:</div>
+                    <div className="font-bold text-indigo-600">Quantum Security Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Lattice-based Module Learning With Errors (M-LWE) provides 100% mathematical immunity against Shor&apos;s algorithm on future quantum supercomputers.
                     </p>
@@ -1472,7 +1472,7 @@ export default function SecurityPage() {
                     <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">KEM Algorithm:</span>
-                        <span className="text-indigo-300 font-bold">{pqcResult.kem_algorithm}</span>
+                        <span className="text-indigo-600 font-bold">{pqcResult.kem_algorithm}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Kyber Public Key:</span>
@@ -1480,7 +1480,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Signature Algorithm:</span>
-                        <span className="text-purple-300 font-bold">{pqcResult.signature_algorithm}</span>
+                        <span className="text-purple-600 font-bold">{pqcResult.signature_algorithm}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Dilithium Public Key:</span>
@@ -1488,12 +1488,12 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Quantum Security Level:</span>
-                        <span className="text-cyan-300 font-bold">{pqcResult.quantum_security_level}</span>
+                        <span className="text-cyan-600 font-bold">{pqcResult.quantum_security_level}</span>
                       </div>
                     </div>
                   ) : (
                     <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[220px] flex flex-col items-center justify-center space-y-2">
-                      <span className="text-lg">🛡️</span>
+                      <span className="text-lg">ğŸ›¡ï¸</span>
                       <div>
                         Click <strong>Generate Kyber-768 + Dilithium-3 Keypair</strong> to derive NIST lattice public keys.
                       </div>
@@ -1515,7 +1515,7 @@ export default function SecurityPage() {
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <span>🌉</span> Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge
+                    <span>ğŸŒ‰</span> Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
                     Chainlink CCIP & LayerZero V2 multi-ledger Shapley incentive routing for CBDC and Tokenized Deposits
@@ -1566,7 +1566,7 @@ export default function SecurityPage() {
                         </>
                       ) : (
                         <>
-                          <span>🚀</span>
+                          <span>ğŸš€</span>
                           <span>Execute CCIP Multi-Ledger Payout</span>
                         </>
                       )}
@@ -1574,7 +1574,7 @@ export default function SecurityPage() {
                   </div>
 
                   <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-slate-600 space-y-1.5">
-                    <div className="font-bold text-emerald-300">Cross-Ledger Coverage:</div>
+                    <div className="font-bold text-emerald-600">Cross-Ledger Coverage:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Routes funds simultaneously across Arbitrum, Optimism, Canton Private DLT, and Hyperledger Fabric with zero counterparty risk.
                     </p>
@@ -1597,7 +1597,7 @@ export default function SecurityPage() {
                         </div>
                         <div>
                           <span className="text-[var(--color-text-muted)]">Audit: </span>
-                          <span className="text-indigo-300 font-bold">{bridgeResult.bridge_audit_hash.slice(0, 10)}...</span>
+                          <span className="text-indigo-600 font-bold">{bridgeResult.bridge_audit_hash.slice(0, 10)}...</span>
                         </div>
                       </div>
 
@@ -1617,10 +1617,10 @@ export default function SecurityPage() {
                             {bridgeResult.routes.map((route, i) => (
                               <tr key={i} className="hover:bg-slate-50">
                                 <td className="p-2.5 font-bold text-slate-800">{route.bank_id}</td>
-                                <td className="p-2.5 text-indigo-300">{route.network}</td>
+                                <td className="p-2.5 text-indigo-600">{route.network}</td>
                                 <td className="p-2.5 text-[var(--color-text-muted)]">{route.protocol}</td>
                                 <td className="p-2.5 text-emerald-600 font-bold">{route.amount.toLocaleString()} {route.token_symbol}</td>
-                                <td className="p-2.5 text-amber-300 truncate max-w-[120px]">{route.message_id}</td>
+                                <td className="p-2.5 text-amber-600 truncate max-w-[120px]">{route.message_id}</td>
                                 <td className="p-2.5 text-emerald-600 font-bold">{route.status}</td>
                               </tr>
                             ))}
@@ -1630,7 +1630,7 @@ export default function SecurityPage() {
                     </div>
                   ) : (
                     <div className="p-8 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[180px] flex flex-col items-center justify-center space-y-2">
-                      <span className="text-lg">🌉</span>
+                      <span className="text-lg">ğŸŒ‰</span>
                       <div>
                         Click <strong>Execute CCIP Multi-Ledger Payout</strong> to trigger atomic cross-chain incentive disbursements across Arbitrum, Optimism, Canton, and Fabric.
                       </div>
@@ -1652,14 +1652,14 @@ export default function SecurityPage() {
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <span>📈</span> Adaptive Dynamic Differential Privacy Budget Auto-Scaler
+                    <span>ğŸ“ˆ</span> Adaptive Dynamic Differential Privacy Budget Auto-Scaler
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    Rényi Differential Privacy (RDP) & PRV numerical accountant with dynamic noise calibration (σ_t)
+                    RÃ©nyi Differential Privacy (RDP) & PRV numerical accountant with dynamic noise calibration (Ïƒ_t)
                   </p>
                 </div>
                 <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-cyan-50 text-cyan-600 border border-cyan-500/20">
-                  Rényi Divergence (16 Orders)
+                  RÃ©nyi Divergence (16 Orders)
                 </span>
               </div>
 
@@ -1670,8 +1670,8 @@ export default function SecurityPage() {
                   <div className="space-y-3 text-xs">
                     <div>
                       <div className="flex justify-between mb-1 text-[var(--color-text-muted)]">
-                        <span>Target Cumulative Budget (ε_target):</span>
-                        <span className="font-bold text-cyan-300">{rdpTargetEps.toFixed(1)}</span>
+                        <span>Target Cumulative Budget (Îµ_target):</span>
+                        <span className="font-bold text-cyan-600">{rdpTargetEps.toFixed(1)}</span>
                       </div>
                       <input
                         type="range"
@@ -1685,7 +1685,7 @@ export default function SecurityPage() {
                     </div>
 
                     <div>
-                      <label className="block text-[var(--color-text-muted)] mb-1">Instantaneous Round Loss (ℒ_t):</label>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Instantaneous Round Loss (â„’_t):</label>
                       <input
                         type="number"
                         step="0.01"
@@ -1717,15 +1717,15 @@ export default function SecurityPage() {
                         </>
                       ) : (
                         <>
-                          <span>⚡</span>
-                          <span>Auto-Scale Round Noise (σ_t)</span>
+                          <span>âš¡</span>
+                          <span>Auto-Scale Round Noise (Ïƒ_t)</span>
                         </>
                       )}
                     </button>
                   </div>
 
                   <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/15 text-[11px] text-slate-600 space-y-1.5">
-                    <div className="font-bold text-cyan-300">Anti-Overnoising Guarantee:</div>
+                    <div className="font-bold text-cyan-600">Anti-Overnoising Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Dynamically reduces noise as gradients converge, preserving fraud detection AUC-ROC (&gt;0.94) without early budget exhaustion.
                     </p>
@@ -1738,7 +1738,7 @@ export default function SecurityPage() {
                   {rdpResult ? (
                     <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Calibrated Noise Multiplier (σ_t):</span>
+                        <span className="text-[var(--color-text-muted)]">Calibrated Noise Multiplier (Ïƒ_t):</span>
                         <span className="text-cyan-600 font-bold">{rdpResult.calibrated_sigma.toFixed(3)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
@@ -1746,23 +1746,23 @@ export default function SecurityPage() {
                         <span className="text-amber-600 font-bold">{rdpResult.gradient_clip_c.toFixed(2)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Optimal RDP Order (α*):</span>
-                        <span className="text-purple-300 font-bold">{rdpResult.optimal_alpha.toFixed(1)}</span>
+                        <span className="text-[var(--color-text-muted)]">Optimal RDP Order (Î±*):</span>
+                        <span className="text-purple-600 font-bold">{rdpResult.optimal_alpha.toFixed(1)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Cumulative Privacy Loss (ε):</span>
+                        <span className="text-[var(--color-text-muted)]">Cumulative Privacy Loss (Îµ):</span>
                         <span className="text-emerald-600 font-bold">{rdpResult.cumulative_epsilon.toFixed(3)} / {rdpResult.target_epsilon.toFixed(1)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Budget Exhaustion:</span>
-                        <span className="text-indigo-300 font-bold">{rdpResult.budget_exhaustion_pct.toFixed(1)}%</span>
+                        <span className="text-indigo-600 font-bold">{rdpResult.budget_exhaustion_pct.toFixed(1)}%</span>
                       </div>
                     </div>
                   ) : (
                     <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[220px] flex flex-col items-center justify-center space-y-2">
-                      <span className="text-lg">📈</span>
+                      <span className="text-lg">ğŸ“ˆ</span>
                       <div>
-                        Click <strong>Auto-Scale Round Noise (σ_t)</strong> to compute the optimal convex dual Rényi privacy bound.
+                        Click <strong>Auto-Scale Round Noise (Ïƒ_t)</strong> to compute the optimal convex dual RÃ©nyi privacy bound.
                       </div>
                     </div>
                   )}
@@ -1770,7 +1770,7 @@ export default function SecurityPage() {
 
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-2">
                   <span>Driver: adaptive_dp_autoscaler.py</span>
-                  <span>Rényi DP & PRV Numerical Composition</span>
+                  <span>RÃ©nyi DP & PRV Numerical Composition</span>
                 </div>
               </div>
             </div>
@@ -1778,18 +1778,18 @@ export default function SecurityPage() {
 
           {activeTab === 'webhooks' && (
             <div className="space-y-6">
-              <div className="glass-card p-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-[#08091a]/95 via-[#0b0d26]/90 to-[#08091a]/95 space-y-6">
+              <div className="glass-card p-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-white via-slate-50 to-white space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">📡</span>
+                      <span className="text-xl">ğŸ“¡</span>
                       <h3 className="text-base font-bold text-slate-900">
                         Webhook Gateway & Real-Time Alert Dispatcher
                       </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-300 border border-emerald-200">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200">
                         HMAC-SHA256 Signed
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-600 border border-cyan-500/30">
                         SSRF Protected
                       </span>
                     </div>
@@ -1803,7 +1803,7 @@ export default function SecurityPage() {
                       disabled={testDispatch.isPending}
                       className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-slate-900 shadow-lg shadow-purple-600/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
-                      {testDispatch.isPending ? 'Dispatching...' : '🚀 Test Dispatch Event'}
+                      {testDispatch.isPending ? 'Dispatching...' : 'ğŸš€ Test Dispatch Event'}
                     </button>
                   </div>
                 </div>
@@ -1884,12 +1884,12 @@ export default function SecurityPage() {
                       </div>
 
                       {webhookRegError && (
-                        <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-300 text-xs">
+                        <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-600 text-xs">
                           {webhookRegError}
                         </div>
                       )}
                       {webhookRegSuccess && (
-                        <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-300 text-xs font-mono">
+                        <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-600 text-xs font-mono">
                           {webhookRegSuccess}
                         </div>
                       )}
@@ -1927,17 +1927,17 @@ export default function SecurityPage() {
                           {webhookSubs.subscriptions.map((sub) => (
                             <div key={sub.subscription_id} className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex items-start justify-between gap-2 text-xs">
                               <div className="min-w-0 flex-1">
-                                <div className="font-mono text-purple-300 truncate font-semibold">{sub.target_url}</div>
+                                <div className="font-mono text-purple-600 truncate font-semibold">{sub.target_url}</div>
                                 <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
                                   <span>ID: {sub.subscription_id.slice(0, 8)}...</span>
-                                  <span>•</span>
+                                  <span>â€¢</span>
                                   <span>Events: {sub.events.join(', ')}</span>
                                 </div>
                               </div>
                               <button
                                 onClick={() => deleteWebhook.mutate(sub.subscription_id)}
                                 disabled={deleteWebhook.isPending}
-                                className="px-2 py-1 text-[10px] text-rose-300 hover:bg-rose-500/20 rounded border border-rose-200 transition shrink-0"
+                                className="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-100 rounded border border-rose-200 transition shrink-0"
                               >
                                 Delete
                               </button>
@@ -1987,17 +1987,17 @@ export default function SecurityPage() {
                           {webhookLogs.deliveries.map((item) => (
                             <tr key={item.delivery_id} className="hover:bg-slate-50 transition-colors">
                               <td className="py-2 px-2 text-slate-600">{item.delivery_id.slice(0, 8)}...</td>
-                              <td className="py-2 px-2 text-purple-300">{item.event_type}</td>
+                              <td className="py-2 px-2 text-purple-600">{item.event_type}</td>
                               <td className="py-2 px-2 text-slate-500 max-w-[200px] truncate" title={item.target_url}>
                                 {item.target_url}
                               </td>
                               <td className="py-2 px-2">
                                 {item.success ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-200">
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-600 border border-emerald-200">
                                     {item.status_code || 200} DELIVERED
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-300 border border-rose-200">
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-600 border border-rose-200">
                                     {item.status_code || 'ERR'} FAILED
                                   </span>
                                 )}
@@ -2015,7 +2015,7 @@ export default function SecurityPage() {
                 </div>
 
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
-                  <span>Driver: webhook_service.py · webhook_gateway.py</span>
+                  <span>Driver: webhook_service.py Â· webhook_gateway.py</span>
                   <span>Constant-Time HMAC-SHA256 & RFC 1918 SSRF Gate</span>
                 </div>
               </div>
@@ -2026,3 +2026,4 @@ export default function SecurityPage() {
     </div>
   );
 }
+

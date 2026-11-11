@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+﻿import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -35,9 +35,9 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[280px] w-full p-6 rounded-2xl bg-[#090a1f]/90 border border-rose-200 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center text-center space-y-4 my-4">
+        <div className="min-h-[280px] w-full p-6 rounded-2xl bg-white border border-rose-200 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center text-center space-y-4 my-4">
           <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl shadow-[0_0_25px_rgba(244,63,94,0.2)]">
-            ⚠️
+            âš ï¸
           </div>
 
           <div className="max-w-md space-y-1.5">
@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={this.handleReset}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 transition-all cursor-pointer shadow-lg active:scale-95 border border-slate-200"
           >
-            🔄 Reload Component
+            ğŸ”„ Reload Component
           </button>
         </div>
       );
@@ -64,3 +64,4 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
+

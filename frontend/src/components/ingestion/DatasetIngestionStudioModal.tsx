@@ -192,7 +192,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-600">
+            <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
               <FileCheck size={20} />
             </div>
             <div>
@@ -240,7 +240,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         <div className="flex-1 overflow-y-auto p-6">
           {enrollSuccess ? (
             <div className="p-6 text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center border border-emerald-200">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200">
                 <CheckCircle2 size={32} />
               </div>
               <h4 className="text-lg font-bold text-slate-900">
@@ -248,7 +248,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
               </h4>
               <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
                 {enrollSuccess.records_enrolled} records partitioned into federated aggregation buffer{' '}
-                <strong className="text-indigo-300 font-mono">({enrollSuccess.partition_assigned})</strong>.
+                <strong className="text-indigo-600 font-mono">({enrollSuccess.partition_assigned})</strong>.
               </p>
               <div className="pt-3">
                 <button

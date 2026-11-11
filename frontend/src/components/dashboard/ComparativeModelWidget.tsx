@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useComparativeBaselines } from '../../api/queries';
 import { ComparativeModelItem } from '../../api/types';
@@ -9,7 +9,7 @@ export default function ComparativeModelWidget() {
 
   if (isLoading) {
     return (
-      <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl animate-pulse">
+      <div className="p-6 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl animate-pulse">
         <div className="h-6 w-72 bg-slate-50 rounded mb-4" />
         <div className="h-20 bg-white/60 rounded-xl mb-4" />
         <div className="h-48 bg-white/40 rounded-xl" />
@@ -29,7 +29,7 @@ export default function ComparativeModelWidget() {
   ) {
     if (isLoading) {
       return (
-        <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl animate-pulse">
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl animate-pulse">
           <div className="h-6 w-72 bg-slate-50 rounded mb-4" />
           <div className="h-20 bg-white/60 rounded-xl mb-4" />
           <div className="h-48 bg-white/40 rounded-xl" />
@@ -37,8 +37,8 @@ export default function ComparativeModelWidget() {
       );
     }
     return (
-      <div className="p-5 rounded-2xl bg-[#090a1f]/80 border border-rose-200 text-rose-600 font-mono text-xs">
-        ⚠️ Failed to load comparative benchmark baselines. Verify backend orchestrator is active.
+      <div className="p-5 rounded-2xl bg-white border border-rose-200 text-rose-600 font-mono text-xs">
+        âš ï¸ Failed to load comparative benchmark baselines. Verify backend orchestrator is active.
       </div>
     );
   }
@@ -67,20 +67,20 @@ export default function ComparativeModelWidget() {
         );
       case 'THEORETICAL_UPPER_BOUND':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-rose-50 text-rose-300 border border-rose-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-rose-50 text-rose-600 border border-rose-200">
             Upper Bound (Illegal)
           </span>
         );
       case 'ISOLATED_SILO':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-amber-50 text-amber-300 border border-amber-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-amber-50 text-amber-600 border border-amber-200">
             Isolated Silo
           </span>
         );
       case 'CLASSICAL_BASELINE':
       default:
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-blue-50 text-blue-300 border border-blue-500/20">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase bg-blue-50 text-blue-600 border border-blue-500/20">
             Classical Baseline
           </span>
         );
@@ -92,7 +92,7 @@ export default function ComparativeModelWidget() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl mt-6 relative overflow-hidden"
+      className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl mt-6 relative overflow-hidden"
     >
       {/* Background Decorative Glow */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -101,12 +101,12 @@ export default function ComparativeModelWidget() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/6 pb-4 mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-base">⚖️</span>
+            <span className="text-base">âš–ï¸</span>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
               Multi-Paradigm Benchmark Baselines & Comparative Analysis
             </h3>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-50 text-indigo-600 border border-indigo-200">
-              Benchmark Reference · {dataset_name}
+              Benchmark Reference Â· {dataset_name}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -143,7 +143,7 @@ export default function ComparativeModelWidget() {
             <span className="text-2xl font-bold font-mono text-emerald-600">
               +{(silo_deficit_analysis?.collaborative_uplift_pr_auc ?? 0.148).toFixed(4)}
             </span>
-            <span className="text-xs text-emerald-300 font-mono ml-1.5">Δ PR-AUC</span>
+            <span className="text-xs text-emerald-600 font-mono ml-1.5">Î” PR-AUC</span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
             Uplift over {silo_deficit_analysis?.silo_count ?? 3}-bank isolated silo average
@@ -156,7 +156,7 @@ export default function ComparativeModelWidget() {
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-bold font-mono text-indigo-300">
+            <span className="text-2xl font-bold font-mono text-indigo-600">
               {(centralization_gap_analysis?.federated_efficiency_pct ?? 97.34).toFixed(1)}%
             </span>
             <span className="text-xs text-slate-500 font-mono ml-1.5">of Upper Bound</span>
@@ -172,10 +172,10 @@ export default function ComparativeModelWidget() {
             <span className="w-2 h-2 rounded-full bg-amber-400" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-bold font-mono text-amber-300">
+            <span className="text-2xl font-bold font-mono text-amber-600">
               -{(centralization_gap_analysis?.centralization_gap_pr_auc ?? 0.023).toFixed(4)}
             </span>
-            <span className="text-xs text-amber-600/80 font-mono ml-1.5">Δ PR-AUC</span>
+            <span className="text-xs text-amber-600/80 font-mono ml-1.5">Î” PR-AUC</span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
             Privacy cost vs illegal data centralization
@@ -188,7 +188,7 @@ export default function ComparativeModelWidget() {
             <span className="w-2 h-2 rounded-full bg-cyan-400" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-bold font-mono text-cyan-300">
+            <span className="text-2xl font-bold font-mono text-cyan-600">
               {(((comparison_matrix.find((m) => m?.category === 'PRODUCTION_CHAMPION')?.recall_at_01_fpr ?? 0.624)) * 100).toFixed(1)}%
             </span>
             <span className="text-xs text-slate-500 font-mono ml-1.5">@ 0.1% FPR</span>
@@ -206,7 +206,7 @@ export default function ComparativeModelWidget() {
             key={idx}
             className={`p-3.5 rounded-xl border font-mono text-xs space-y-2 ${
               item.category === 'PRODUCTION_CHAMPION'
-                ? 'bg-emerald-950/20 border-emerald-500/40'
+                ? 'bg-emerald-50/20 border-emerald-500/40'
                 : 'bg-white/60 border-white/5'
             }`}
           >
@@ -247,7 +247,7 @@ export default function ComparativeModelWidget() {
               <th className="py-2.5 px-3 text-center">PR-AUC</th>
               <th className="py-2.5 px-3 text-center">ROC-AUC</th>
               <th className="py-2.5 px-3 text-center">Recall@0.1%</th>
-              <th className="py-2.5 px-3 text-center">Δ vs Fed</th>
+              <th className="py-2.5 px-3 text-center">Î” vs Fed</th>
               <th className="py-2.5 px-3 text-right">Inference Latency</th>
             </tr>
           </thead>
@@ -270,7 +270,7 @@ export default function ComparativeModelWidget() {
                     }`}
                   >
                     <td className="py-2.5 px-3">
-                      <span className={`font-semibold ${isChampion ? 'text-emerald-300' : 'text-slate-800'}`}>
+                      <span className={`font-semibold ${isChampion ? 'text-emerald-600' : 'text-slate-800'}`}>
                         {item.paradigm}
                       </span>
                       <span className="block text-[10px] text-slate-500 font-sans truncate max-w-xs">
@@ -324,3 +324,5 @@ export default function ComparativeModelWidget() {
     </motion.div>
   );
 }
+
+

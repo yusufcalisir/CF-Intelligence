@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import type { PilotStatusResponse } from '../../api/types';
 import {
   useActivatePilot,
@@ -85,12 +85,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
       <div
         className={`p-5 rounded-xl border flex items-start gap-3.5 ${
           isActive
-            ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-200'
+            ? 'border-emerald-500/40 bg-emerald-50/20 text-emerald-200'
             : isPaused
             ? 'border-amber-500/40 bg-amber-950/20 text-amber-200'
             : isTerminal
             ? 'border-slate-200 bg-white/50 text-slate-500'
-            : 'border-cyan-500/40 bg-cyan-950/20 text-cyan-200'
+            : 'border-cyan-500/40 bg-cyan-50/20 text-cyan-200'
         }`}
       >
         {isActive ? (
@@ -122,7 +122,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
       </div>
 
       {actionError && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-300 text-xs flex items-start gap-2.5">
+        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Action Execution Failed</div>
@@ -149,7 +149,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canActivate || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canActivate && !isAnyActionPending
-                ? 'border-cyan-500/50 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-cyan-500/50 bg-cyan-50/30 hover:bg-cyan-900/40 text-cyan-200 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -183,7 +183,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canResume || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canResume && !isAnyActionPending
-                ? 'border-emerald-500/50 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-emerald-500/50 bg-emerald-50/30 hover:bg-emerald-900/40 text-emerald-200 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -233,11 +233,11 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
         <div className="pt-2 text-[11px] text-slate-500 space-y-1">
           {pilot.missing_approvals && pilot.missing_approvals.length > 0 && !pilot.is_fully_approved && (
             <div className="text-amber-600">
-              • Activation blocked: Missing approvals from {pilot.missing_approvals.join(', ')}.
+              â€¢ Activation blocked: Missing approvals from {pilot.missing_approvals.join(', ')}.
             </div>
           )}
           {pilot.has_expired && (
-            <div className="text-rose-600">• Pilot operational window has expired. Transitions to active execution are forbidden.</div>
+            <div className="text-rose-600">â€¢ Pilot operational window has expired. Transitions to active execution are forbidden.</div>
           )}
         </div>
       </div>
@@ -254,3 +254,4 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
     </div>
   );
 }
+

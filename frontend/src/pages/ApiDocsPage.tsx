@@ -745,7 +745,7 @@ export default function ApiDocsPage() {
               <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 Developer & API Reference Portal
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-200 shrink-0 whitespace-nowrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-600 border border-indigo-200 shrink-0 whitespace-nowrap">
                 OpenAPI 3.1
               </span>
             </div>
@@ -818,10 +818,10 @@ export default function ApiDocsPage() {
                   <span
                     className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 mt-0.5 ${
                       endpoint.method === 'POST'
-                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                        ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                         : endpoint.method === 'GET'
-                        ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
-                        : 'bg-purple-500/20 text-purple-600 border border-purple-200'
+                        ? 'bg-blue-100 text-blue-600 border border-blue-500/30'
+                        : 'bg-purple-100 text-purple-600 border border-purple-200'
                     }`}
                   >
                     {endpoint.method}
@@ -845,10 +845,10 @@ export default function ApiDocsPage() {
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-mono font-black ${
                     selectedEndpoint.method === 'POST'
-                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                      ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                       : selectedEndpoint.method === 'GET'
-                      ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
-                      : 'bg-purple-500/20 text-purple-600 border border-purple-200'
+                      ? 'bg-blue-100 text-blue-600 border border-blue-500/30'
+                      : 'bg-purple-100 text-purple-600 border border-purple-200'
                   }`}
                 >
                   {selectedEndpoint.method}
@@ -860,7 +860,7 @@ export default function ApiDocsPage() {
 
               <div className="flex items-center gap-2">
                 {selectedEndpoint.authRequired && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-300 border border-amber-200">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-600 border border-amber-200">
                     <Lock className="w-2.5 h-2.5" /> Bearer Token
                   </span>
                 )}
@@ -876,7 +876,7 @@ export default function ApiDocsPage() {
           </div>
 
           {/* Multi-Language SDK Snippet Box */}
-          <div className="glass-card rounded-2xl border border-slate-200 bg-slate-950 overflow-hidden shadow-xl">
+          <div className="glass-card rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xl">
             {/* Language Selection Tabs */}
             <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-slate-200 bg-white/80 gap-2 min-w-0">
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
@@ -910,7 +910,7 @@ export default function ApiDocsPage() {
             </div>
 
             {/* Syntax Code Box */}
-            <pre className="p-4 font-mono text-xs text-indigo-300 overflow-x-auto leading-relaxed max-h-72">
+            <pre className="p-4 font-mono text-xs text-indigo-600 overflow-x-auto leading-relaxed max-h-72">
               <code>{generateSdkCode(selectedEndpoint, selectedLang)}</code>
             </pre>
           </div>
@@ -957,7 +957,7 @@ export default function ApiDocsPage() {
                           : ''
                       );
                     }}
-                    className="text-[10px] font-mono text-indigo-600 hover:text-indigo-300 transition-colors cursor-pointer"
+                    className="text-[10px] font-mono text-indigo-600 hover:text-indigo-600 transition-colors cursor-pointer"
                   >
                     Reset Payload
                   </button>
@@ -986,10 +986,10 @@ export default function ApiDocsPage() {
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                           executionResult.statusCode >= 200 && executionResult.statusCode < 300
-                            ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                            ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                             : executionResult.statusCode >= 400 && executionResult.statusCode < 500
-                            ? 'bg-amber-500/20 text-amber-600 border border-amber-200'
-                            : 'bg-rose-500/20 text-rose-600 border border-rose-200'
+                            ? 'bg-amber-100 text-amber-600 border border-amber-200'
+                            : 'bg-rose-100 text-rose-600 border border-rose-200'
                         }`}
                       >
                         HTTP {executionResult.statusCode}{' '}
@@ -1007,7 +1007,7 @@ export default function ApiDocsPage() {
                           ? 'UNPROCESSABLE'
                           : ''}
                       </span>
-                      <span className="text-xs font-mono text-cyan-300">
+                      <span className="text-xs font-mono text-cyan-600">
                         Latency: {executionResult.latencyMs} ms
                       </span>
                     </div>
@@ -1015,10 +1015,10 @@ export default function ApiDocsPage() {
                   <pre
                     className={`p-3 rounded-xl bg-black/80 border font-mono text-[11px] overflow-x-auto max-h-56 ${
                       executionResult.statusCode >= 200 && executionResult.statusCode < 300
-                        ? 'border-emerald-200 text-emerald-300'
+                        ? 'border-emerald-200 text-emerald-600'
                         : executionResult.statusCode >= 400 && executionResult.statusCode < 500
-                        ? 'border-amber-200 text-amber-300'
-                        : 'border-rose-200 text-rose-300'
+                        ? 'border-amber-200 text-amber-600'
+                        : 'border-rose-200 text-rose-600'
                     }`}
                   >
                     {JSON.stringify(executionResult.data, null, 2)}

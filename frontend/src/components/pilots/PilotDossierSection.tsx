@@ -47,7 +47,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
             </h3>
           </div>
           <p className="text-xs text-slate-500 max-w-2xl">
-            Immutable dossier compiled from durable pilot storage and <code className="text-indigo-300 font-mono text-[11px]">ImmutableAuditChain</code>.
+            Immutable dossier compiled from durable pilot storage and <code className="text-indigo-600 font-mono text-[11px]">ImmutableAuditChain</code>.
             Restricted to compliance officers, security authorities, and institutional auditors.
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
 
       {/* Role Restriction Banner if 403 */}
       {isForbidden && (
-        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-300 text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-600 text-xs flex items-start gap-3">
           <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="font-semibold">Access Restricted - Compliance / Auditor Authority Required</div>
@@ -89,7 +89,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
       )}
 
       {error && !isForbidden && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-300 text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-600 text-xs flex items-start gap-3">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Failed to Load Audit Dossier</div>
@@ -160,7 +160,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
             </span>
           </div>
 
-          <pre className="p-4 rounded-lg bg-slate-950 border border-slate-200 font-mono text-[11px] text-slate-600 max-h-96 overflow-y-auto leading-relaxed select-all">
+          <pre className="p-4 rounded-lg bg-white border border-slate-200 font-mono text-[11px] text-slate-600 max-h-96 overflow-y-auto leading-relaxed select-all">
             {JSON.stringify(dossier, null, 2)}
           </pre>
         </div>

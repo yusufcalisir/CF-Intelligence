@@ -276,14 +276,14 @@ export default function DriftMetricsCard({
             <button
               type="button"
               onClick={handleSelectAllDrifted}
-              className="text-xs text-indigo-600 hover:text-indigo-300 underline underline-offset-2 transition-colors"
+              className="text-xs text-indigo-600 hover:text-indigo-600 underline underline-offset-2 transition-colors"
             >
               Select All Drifted ({driftedFeatures.length})
             </button>
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-slate-950/40">
+        <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white/40">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/60 text-slate-500 font-mono uppercase text-[11px] border-b border-slate-200">
               <tr>
@@ -357,9 +357,9 @@ export default function DriftMetricsCard({
                         <span
                           className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
                             isFeatSevere
-                              ? 'bg-rose-500/20 text-rose-600 border border-rose-200'
+                              ? 'bg-rose-100 text-rose-600 border border-rose-200'
                               : isFeatModerate
-                              ? 'bg-amber-500/20 text-amber-600 border border-amber-200'
+                              ? 'bg-amber-100 text-amber-600 border border-amber-200'
                               : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                           }`}
                         >
@@ -430,7 +430,7 @@ export default function DriftMetricsCard({
       {triggerSuccessMsg && (
         <div
           data-testid="retrain-feedback-msg"
-          className="mt-3 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-300 text-xs font-mono"
+          className="mt-3 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs font-mono"
         >
           {triggerSuccessMsg}
         </div>

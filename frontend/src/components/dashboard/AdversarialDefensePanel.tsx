@@ -46,7 +46,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
           <div>
             <h3 className="font-bold text-slate-900 flex items-center gap-2">
               Active Defense & Adversarial ML Training
-              <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+              <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-cyan-100 text-cyan-600 border border-cyan-500/40">
                 L_inf Noise Bounds (ε = {epsilon})
               </span>
             </h3>
@@ -123,7 +123,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
       </div>
 
       {/* Info Banner */}
-      <div className="text-xs text-slate-500 bg-slate-950/40 rounded-lg p-3 border border-slate-200 flex items-start gap-2">
+      <div className="text-xs text-slate-500 bg-white/40 rounded-lg p-3 border border-slate-200 flex items-start gap-2">
         <svg className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>

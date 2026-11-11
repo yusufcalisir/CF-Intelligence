@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+﻿import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -157,7 +157,7 @@ export default function LiveOperationsView() {
     setTimeout(() => setIsRetryingWs(false), 1000);
   };
 
-  // ── Dataset-aware training state ──────────────────────────────────────────
+  // â”€â”€ Dataset-aware training state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const initialProfile = (storedSession?.selectedProfileKey && DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES])
     ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
     : DATASET_PROFILES.paysim;
@@ -169,7 +169,7 @@ export default function LiveOperationsView() {
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
   const createSimulation = useCreateSimulation();
 
-  // ── Real Backend Query Hooks ───────────────────────────────────────────────
+  // â”€â”€ Real Backend Query Hooks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
   const { data: simulations } = useSimulations();
   const activeSimId = id || simulations?.[0]?.id;
@@ -184,7 +184,7 @@ export default function LiveOperationsView() {
   const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
   const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
 
-  // ── Unified Round Telemetry Pipeline (Single Source of Truth for Top & Bottom) ──
+  // â”€â”€ Unified Round Telemetry Pipeline (Single Source of Truth for Top & Bottom) â”€â”€
   const convertTrainingRoundToRoundData = useCallback((r: TrainingRound, fallbackAuc: number): RoundData => {
     const roundNum = r.round_number;
     const globalAuc = typeof r.auc === 'number' && r.auc > 0 ? r.auc : fallbackAuc;
@@ -272,7 +272,7 @@ export default function LiveOperationsView() {
         // Smooth ROC curve with 11 operating points
         const pts = [0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.8, 1.0];
         // Power-law: area under y = x^(1/k) on [0,1] is k/(k+1).
-        // Setting AUC = k/(k+1) → k = AUC/(1-AUC).
+        // Setting AUC = k/(k+1) â†’ k = AUC/(1-AUC).
         const k = Math.max(1, auc / Math.max(1 - auc, 1e-9));
         const tprs = pts.map((fpr) => {
           if (fpr === 0) return 0;
@@ -294,8 +294,8 @@ export default function LiveOperationsView() {
         ? Math.max(0, lastBankAuc / meanBankAuc)
         : null;
 
-      // ── Derive confusion matrix from AUC + fraud ratio ──────────────────────
-      // At optimal threshold (Youden index), sensitivity ≈ TPR at FPR ≈ 1-AUC²
+      // â”€â”€ Derive confusion matrix from AUC + fraud ratio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // At optimal threshold (Youden index), sensitivity â‰ˆ TPR at FPR â‰ˆ 1-AUCÂ²
       const deriveConfusionMatrix = (auc: number, fraudRat: number, nTx: number) => {
         const positives = Math.round(nTx * fraudRat);
         const negatives = nTx - positives;
@@ -309,7 +309,7 @@ export default function LiveOperationsView() {
         return { tp, fp, tn, fn };
       };
 
-      // ── Derive feature importance from dataset profile ──────────────────────
+      // â”€â”€ Derive feature importance from dataset profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const FRAUD_FEATURES: Record<string, string[]> = {
         paysim: ['amount', 'oldbalanceOrg', 'newbalanceOrig', 'oldbalanceDest', 'newbalanceDest', 'step', 'type_TRANSFER', 'type_CASH_OUT', 'isFlaggedFraud', 'balanceDiffOrg', 'balanceDiffDest'],
         ieee_cis: ['TransactionAmt', 'card1', 'card2', 'addr1', 'dist1', 'P_emaildomain', 'C1', 'C2', 'D1', 'D15', 'V258', 'V201', 'V294', 'id_02', 'DeviceType'],
@@ -321,10 +321,10 @@ export default function LiveOperationsView() {
       const buildFeatureImportance = (bankIdx: number, baseAuc: number): Record<string, number> => {
         const fi: Record<string, number> = {};
         featureNames.forEach((name, i) => {
-          // Exponential decay with per-bank offset → top features dominate
+          // Exponential decay with per-bank offset â†’ top features dominate
           const base = Math.exp(-0.25 * i) * 0.95;
           const bankOffset = ((bankIdx * 7 + i * 13) % 17) / 170; // deterministic pseudo-noise
-          const aucScale = 0.6 + 0.4 * baseAuc; // better model → sharper importance
+          const aucScale = 0.6 + 0.4 * baseAuc; // better model â†’ sharper importance
           fi[name] = parseFloat(Math.min(1, Math.max(0.01, base * aucScale + bankOffset)).toFixed(3));
         });
         return fi;
@@ -580,7 +580,7 @@ export default function LiveOperationsView() {
           return {
             ...b,
             status: 'QUARANTINED',
-            lastHeartbeat: 'DROPPED BY KRUM (Δ 48.2 > 14.1)',
+            lastHeartbeat: 'DROPPED BY KRUM (Î” 48.2 > 14.1)',
           };
         }
         return {
@@ -908,7 +908,7 @@ export default function LiveOperationsView() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Dataset-aware simulated federated training run ────────────────────────
+  // â”€â”€ Dataset-aware simulated federated training run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const startSimulatedTraining = (profile: DatasetProfile = selectedProfile) => {
     if (isTraining) return;
     setIsTraining(true);
@@ -916,7 +916,7 @@ export default function LiveOperationsView() {
     setCurrentRound(0);
     setGradientSubmissions(0);
 
-    // Phase sequence: generating_data → training_local → training_federated (×rounds) → evaluating → completed
+    // Phase sequence: generating_data â†’ training_local â†’ training_federated (Ã—rounds) â†’ evaluating â†’ completed
     const runPhase = (phase: TrainingPhase, duration: number, next: () => void) => {
       setTrainingPhase(phase);
       phaseTimerRef.current = setTimeout(next, duration);
@@ -972,7 +972,7 @@ export default function LiveOperationsView() {
     });
   };
 
-  // ── Config panel launch handler ────────────────────────────────────────────
+  // â”€â”€ Config panel launch handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const isLaunchingRef = useRef(false);
   const handleLaunchTraining = async (profile: DatasetProfile, mode: TrainingMode) => {
     if (isLaunchingRef.current || createSimulation.isPending) {
@@ -1032,12 +1032,12 @@ export default function LiveOperationsView() {
   };
 
   // NOTE: phaseTimerRef is intentionally NOT cleared on unmount.
-  // React 18 StrictMode double-mounts (mount → unmount → remount) but preserves refs/state.
+  // React 18 StrictMode double-mounts (mount â†’ unmount â†’ remount) but preserves refs/state.
   // If the timer is cleared during the "fake" unmount, the setTimeout chain that drives
   // simulation stages die permanently - hasAutoStartedRef blocks restart, leaving training
   // stuck at "generating_data". Timer cleanup is handled explicitly by:
-  //   • resetTraining() - user-initiated reset
-  //   • ID-change effect - sim switch clears old timers before starting new ones
+  //   â€¢ resetTraining() - user-initiated reset
+  //   â€¢ ID-change effect - sim switch clears old timers before starting new ones
   // In real (non-StrictMode) unmounts, stale timer callbacks become no-ops in React 18.
 
   // When the sim ID changes (user navigated to a different simulation), fully reset local state
@@ -1113,7 +1113,7 @@ export default function LiveOperationsView() {
           {/* Title & Live Status */}
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-slate-50 border border-slate-200 shadow-xs">
-              📡
+              ğŸ“¡
             </span>
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
               <h1 className="text-lg sm:text-2xl font-extrabold text-[var(--color-text-primary)] tracking-tight whitespace-nowrap">
@@ -1142,7 +1142,7 @@ export default function LiveOperationsView() {
               {isOfflineDemoMode && (
                 <span
                   id="offline-demo-mode-badge"
-                  className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
+                  className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-100 text-amber-600 border border-amber-500/40 shadow-sm animate-pulse"
                 >
                   <AlertTriangle size={12} className="text-amber-600 shrink-0" />
                   <span>Offline Demo Mode (Connection Lost - Simulated)</span>
@@ -1170,7 +1170,7 @@ export default function LiveOperationsView() {
                 <button
                   id="import-custom-dataset-btn"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-slate-900 bg-indigo-50 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-600 hover:text-slate-900 bg-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
                 >
                   <FileUp size={14} className="text-indigo-600" />
                   <span>Import Dataset</span>
@@ -1211,16 +1211,16 @@ export default function LiveOperationsView() {
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'
                 }`}
               >
-                🔄 {trainingPhase === 'failed' ? 'Reset Failed Run' : 'Reset Simulation'}
+                ğŸ”„ {trainingPhase === 'failed' ? 'Reset Failed Run' : 'Reset Simulation'}
               </button>
             ) : (
               <div
                 className="h-10 inline-flex items-center gap-2 px-3.5 sm:px-4 rounded-xl border shrink-0"
                 style={{ borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}10` }}
               >
-                <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>●</span>
+                <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>â—</span>
                 <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">
-                  {trainingMode === 'real' ? '⚡ Real Training…' : '🧪 Simulating…'}
+                  {trainingMode === 'real' ? 'âš¡ Real Trainingâ€¦' : 'ğŸ§ª Simulatingâ€¦'}
                 </span>
               </div>
             )}
@@ -1275,7 +1275,7 @@ export default function LiveOperationsView() {
 
       {/* Offline Fallback Banner */}
       {isOfflineDemoMode && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-300 text-xs font-medium shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-xs font-medium shadow-sm">
           <div className="flex items-center gap-2.5 min-w-0">
             <AlertTriangle size={16} className="text-amber-600 shrink-0" />
             <span className="leading-relaxed">
@@ -1286,7 +1286,7 @@ export default function LiveOperationsView() {
             type="button"
             id="retry-live-stream-btn"
             onClick={handleRetryLiveStream}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all active:scale-95 shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all active:scale-95 shrink-0"
           >
             <RefreshCw size={13} className={isRetryingWs ? 'animate-spin' : ''} />
             <span>Retry Live Stream</span>
@@ -1299,12 +1299,12 @@ export default function LiveOperationsView() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border border-rose-500/40 bg-rose-50 text-rose-300 flex items-start gap-3 shadow-sm"
+          className="p-4 rounded-xl border border-rose-500/40 bg-rose-50 text-rose-600 flex items-start gap-3 shadow-sm"
         >
           <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-rose-200">Federated Training Failed</h4>
-            <p className="text-xs text-rose-300/90 mt-0.5 break-words">
+            <p className="text-xs text-rose-600/90 mt-0.5 break-words">
               {currentSim?.error_message || 'An error occurred during federated training. Inspect telemetry or reset the simulation.'}
             </p>
           </div>
@@ -1378,18 +1378,18 @@ export default function LiveOperationsView() {
           {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
               <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600">
-                <span className="text-3xl">📊</span>
+                <span className="text-3xl">ğŸ“Š</span>
               </div>
               <div className="max-w-xs space-y-1">
                 <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                   {trainingPhase === 'pending'
                     ? 'No Telemetry Rounds Recorded'
-                    : 'Initializing Training Pipeline…'}
+                    : 'Initializing Training Pipelineâ€¦'}
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {trainingPhase === 'pending'
                     ? 'Launch federated training to stream per-round model convergence and cross-bank AUC progression.'
-                    : 'Synthesizing edge shards and dispatching local gradient tasks…'}
+                    : 'Synthesizing edge shards and dispatching local gradient tasksâ€¦'}
                 </p>
               </div>
               {trainingPhase === 'pending' && (
@@ -1449,7 +1449,7 @@ export default function LiveOperationsView() {
           </div>
           {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-6 sm:py-0">
-              <p className="text-sm text-[var(--color-text-muted)]">Awaiting training start…</p>
+              <p className="text-sm text-[var(--color-text-muted)]">Awaiting training startâ€¦</p>
             </div>
           ) : (
             <div className="h-48 min-w-0">
@@ -1536,17 +1536,17 @@ export default function LiveOperationsView() {
                 <div className="flex items-start justify-between gap-2 min-w-0">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{bank.name}</p>
-                    <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
+                    <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} â€¢ Last seen {bank.lastHeartbeat}</p>
                   </div>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${bank.status === 'ACTIVE'
-                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                        ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                         : bank.status === 'QUARANTINED'
-                          ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
-                          : 'bg-rose-500/20 text-rose-600 border border-rose-200'
+                          ? 'bg-rose-500/30 text-rose-600 border border-rose-500/60 animate-pulse'
+                          : 'bg-rose-100 text-rose-600 border border-rose-200'
                       }`}
                   >
-                    ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
+                    â— {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
                   </span>
                 </div>
                 {bankAuc != null && !isNaN(bankAuc) && (
@@ -1572,7 +1572,7 @@ export default function LiveOperationsView() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
             <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
-              <span className="p-1 rounded-lg bg-indigo-50 border border-indigo-200">🔬</span>
+              <span className="p-1 rounded-lg bg-indigo-50 border border-indigo-200">ğŸ”¬</span>
               Model Telemetry & Empirical Validation
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
@@ -1671,41 +1671,41 @@ export default function LiveOperationsView() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-cyan-950/20 p-5 shadow-[0_0_40px_rgba(16,185,129,0.08)]"
+          className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-5 shadow-sm"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono font-bold text-emerald-300 uppercase tracking-widest">
+              <span className="text-xs font-mono font-bold text-emerald-600 uppercase tracking-widest">
                 Asset Recovery &amp; FININT Operational Hub
               </span>
             </div>
             <span className="text-[10px] font-mono text-slate-500 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-              LIVE · {arSummary.total_events} events
+              LIVE Â· {arSummary.total_events} events
             </span>
           </div>
 
           {/* KPI Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/15 p-3 text-center">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Frozen</p>
-              <p className="text-xl font-bold text-emerald-300 font-mono">€{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
+              <p className="text-xl font-bold text-emerald-600 font-mono">â‚¬{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">via camt.056 recalls</p>
             </div>
-            <div className="rounded-xl bg-cyan-950/40 border border-cyan-500/15 p-3 text-center">
+            <div className="rounded-xl bg-cyan-50 border border-cyan-200 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Recovered</p>
-              <p className="text-xl font-bold text-cyan-300 font-mono">€{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
+              <p className="text-xl font-bold text-cyan-600 font-mono">â‚¬{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">successful recalls</p>
             </div>
-            <div className="rounded-xl bg-indigo-950/40 border border-indigo-500/15 p-3 text-center">
+            <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-500 mb-1">MTTR Reduction</p>
-              <p className="text-xl font-bold text-indigo-300 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
+              <p className="text-xl font-bold text-indigo-600 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">vs. 48h baseline</p>
             </div>
-            <div className="rounded-xl bg-purple-950/40 border border-purple-500/15 p-3 text-center">
+            <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-500 mb-1">Containment Rate</p>
-              <p className="text-xl font-bold text-purple-300 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
+              <p className="text-xl font-bold text-purple-600 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">&lt;60min freezes</p>
             </div>
           </div>
@@ -1765,3 +1765,5 @@ export default function LiveOperationsView() {
     </div>
   );
 }
+
+

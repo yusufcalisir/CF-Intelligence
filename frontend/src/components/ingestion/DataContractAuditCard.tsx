@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   FileCheck2,
   CheckCircle2,
@@ -24,7 +24,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
       <div
         className={`p-4 rounded-2xl border transition-all ${
           isPassed
-            ? 'bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)]'
+            ? 'bg-emerald-50/20 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)]'
             : 'bg-amber-950/20 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)]'
         }`}
       >
@@ -32,7 +32,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
           <div className="flex items-center gap-3">
             <div
               className={`p-2.5 rounded-xl shrink-0 ${
-                isPassed ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'
+                isPassed ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
               }`}
             >
               {isPassed ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
@@ -45,8 +45,8 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
                 <span
                   className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                     isPassed
-                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'
-                      : 'bg-amber-500/20 text-amber-600 border border-amber-500/40'
+                      ? 'bg-emerald-100 text-emerald-600 border border-emerald-500/40'
+                      : 'bg-amber-100 text-amber-600 border border-amber-500/40'
                   }`}
                 >
                   {auditResult.status}
@@ -62,7 +62,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             <a
               href={auditResult.quarantine_csv_download_url}
               download="quarantine_records.csv"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 transition-all shrink-0 self-start sm:self-auto"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-amber-600 bg-amber-100 hover:bg-amber-500/30 border border-amber-500/40 transition-all shrink-0 self-start sm:self-auto"
             >
               <Download size={13} />
               <span>Download Quarantine CSV ({auditResult.quarantined_records} rows)</span>
@@ -97,10 +97,10 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
 
           <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-              <Gauge size={11} className="text-cyan-600" /> Dirichlet Non-IID (α)
+              <Gauge size={11} className="text-cyan-600" /> Dirichlet Non-IID (Î±)
             </span>
             <p className="text-base font-bold font-mono text-cyan-600 mt-0.5">
-              α = {auditResult.dirichlet_alpha_estimate.toFixed(2)}
+              Î± = {auditResult.dirichlet_alpha_estimate.toFixed(2)}
             </p>
           </div>
 
@@ -131,7 +131,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
                   <span className="font-mono font-bold text-slate-800">
                     {check.expectation_name}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 text-indigo-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 text-indigo-600">
                     col: {check.column}
                   </span>
                 </div>
@@ -141,8 +141,8 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                   check.status === 'passed'
-                    ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-600 border border-rose-500/40'
+                    ? 'bg-emerald-100 text-emerald-600 border border-emerald-500/40'
+                    : 'bg-rose-100 text-rose-600 border border-rose-500/40'
                 }`}
               >
                 {check.status.toUpperCase()}
@@ -154,3 +154,4 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
     </div>
   );
 };
+

@@ -85,7 +85,7 @@ export const DriftAnalytics: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-cyan-50 border border-cyan-500/20 text-cyan-300 p-3 rounded-lg text-xs">
+          <div className="bg-cyan-50 border border-cyan-500/20 text-cyan-600 p-3 rounded-lg text-xs">
             Model predictions are well-calibrated across all 3 consortium banks. Auto-rollback threshold set at PSI &gt; 0.25.
           </div>
         </div>

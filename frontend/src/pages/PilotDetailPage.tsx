@@ -102,7 +102,7 @@ export default function PilotDetailPage() {
       <div className="max-w-4xl mx-auto p-6 mt-8">
         <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-6 text-center">
           <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
-          <h2 className="text-base font-semibold text-rose-300">Consortium Pilot Not Accessible</h2>
+          <h2 className="text-base font-semibold text-rose-600">Consortium Pilot Not Accessible</h2>
           <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
             {error instanceof Error
               ? error.message
@@ -195,7 +195,7 @@ export default function PilotDetailPage() {
         <div className="rounded-xl border border-amber-200 bg-amber-950/20 p-4 text-xs text-amber-200 flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold text-amber-300">Pilot Execution Paused</div>
+            <div className="font-semibold text-amber-600">Pilot Execution Paused</div>
             <div className="text-amber-200/80 mt-0.5">
               Live operational queries between {pilot.participating_institutions?.join(' and ') || 'participants'} are temporarily halted.
               Authorized operators can resume once conditions are cleared.
@@ -208,7 +208,7 @@ export default function PilotDetailPage() {
         <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold text-rose-300">Pilot Permanently Aborted</div>
+            <div className="font-semibold text-rose-600">Pilot Permanently Aborted</div>
             <div className="text-rose-200/80 mt-0.5">
               This pilot was aborted via emergency intervention. No further queries, approvals or transitions are permitted.
             </div>
@@ -220,7 +220,7 @@ export default function PilotDetailPage() {
         <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
           <Clock className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold text-rose-300">Pilot Scope Expired</div>
+            <div className="font-semibold text-rose-600">Pilot Scope Expired</div>
             <div className="text-rose-200/80 mt-0.5">
               The operational validity window for this pilot has expired ({pilot.expires_at}). Query execution is prohibited.
             </div>

@@ -1,4 +1,4 @@
-import type { PilotStatusResponse } from '../../api/types';
+﻿import type { PilotStatusResponse } from '../../api/types';
 import { usePilotTelemetry } from '../../api/pilots';
 import { Activity, ShieldCheck, Database, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -26,7 +26,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
 
   if (error || !telemetry) {
     return (
-      <div className="p-5 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-300 text-xs space-y-2">
+      <div className="p-5 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-600 text-xs space-y-2">
         <div className="flex items-center gap-2 font-semibold">
           <AlertCircle className="w-4 h-4 text-rose-600" />
           Telemetry Unavailable
@@ -74,8 +74,8 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
               telemetry.bilateral_authorization_valid
-                ? 'bg-emerald-950/40 text-emerald-300 border-emerald-600/40'
-                : 'bg-rose-950/40 text-rose-300 border-rose-600/40'
+                ? 'bg-emerald-50/40 text-emerald-600 border-emerald-600/40'
+                : 'bg-rose-950/40 text-rose-600 border-rose-600/40'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -112,7 +112,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Mean Latency</div>
           {hasLatencySamples && telemetry.mean_latency_ms !== null ? (
-            <div className="text-2xl font-mono font-bold text-cyan-300">
+            <div className="text-2xl font-mono font-bold text-cyan-600">
               {telemetry.mean_latency_ms} <span className="text-xs font-normal text-slate-500">ms</span>
             </div>
           ) : (
@@ -129,7 +129,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">p95 Latency</div>
           {hasLatencySamples && telemetry.p95_latency_ms !== null ? (
-            <div className="text-2xl font-mono font-bold text-indigo-300">
+            <div className="text-2xl font-mono font-bold text-indigo-600">
               {telemetry.p95_latency_ms} <span className="text-xs font-normal text-slate-500">ms</span>
             </div>
           ) : (
@@ -181,7 +181,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
               className="p-3 rounded-lg border border-[var(--color-border)] bg-white/60 flex items-center justify-between text-xs font-mono"
             >
               <span className="text-slate-600 uppercase">{bank}</span>
-              <span className="text-cyan-300 font-bold">{count} queries</span>
+              <span className="text-cyan-600 font-bold">{count} queries</span>
             </div>
           ))}
           {Object.keys(telemetry.queries_by_institution || {}).length === 0 && (
@@ -203,3 +203,4 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
     </div>
   );
 }
+

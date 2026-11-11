@@ -356,10 +356,10 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                 <span>Dynamic GAT Attention ({currentProfile.label})</span>
               </h4>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-300 border border-indigo-200 whitespace-nowrap">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-600 border border-indigo-200 whitespace-nowrap">
                   4-HEAD GAT
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30 whitespace-nowrap">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 border border-teal-500/30 whitespace-nowrap">
                   {streaming_gnn_attention_weights ? 'BACKEND TELEMETRY' : 'ONLINE TOPOLOGY'}
                 </span>
               </div>

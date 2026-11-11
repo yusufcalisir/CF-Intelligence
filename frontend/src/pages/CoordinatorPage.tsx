@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRegisteredClients, useNegotiatedParams } from '../api/queries';
 import type { ClientCapabilityItem } from '../api/types';
@@ -18,13 +18,13 @@ import {
 // Consortium institutional metadata catalog
 export const BANK_DISPLAY_NAMES: Record<string, string> = {
   bank_alpha: 'Garanti BBVA',
-  bank_beta: 'İş Bankası',
+  bank_beta: 'Ä°ÅŸ BankasÄ±',
   bank_gamma: 'Akbank',
   bank_a: 'Meridian National',
   bank_meridian: 'Meridian National',
   bank_b: 'Nexus Digital',
   bank_nexus: 'Nexus Digital',
-  bank_delta: 'Yapı Kredi',
+  bank_delta: 'YapÄ± Kredi',
   bank_c: 'Heritage Regional',
 };
 
@@ -93,12 +93,12 @@ export default function CoordinatorPage() {
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-900 w-full min-w-0">
       {/* Top Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
-              <Server className="w-6 h-6 text-indigo-300" />
+            <div className="p-2.5 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-600 shadow-indigo-100 shrink-0">
+              <Server className="w-6 h-6 text-indigo-600" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -139,7 +139,7 @@ export default function CoordinatorPage() {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Zap className="w-3 h-3 text-purple-300" />
+              <Zap className="w-3 h-3 text-purple-600" />
               <span>CUDA ({gpuClients.length})</span>
             </button>
             <button
@@ -151,7 +151,7 @@ export default function CoordinatorPage() {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <HardDrive className="w-3 h-3 text-blue-300" />
+              <HardDrive className="w-3 h-3 text-blue-600" />
               <span>CPU ({cpuClients.length})</span>
             </button>
           </div>
@@ -182,7 +182,7 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
-          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300 min-w-0"
+          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-white relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300 min-w-0"
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Online Clients</span>
@@ -205,7 +205,7 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-rose-500/40 transition-all duration-300 min-w-0"
+          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-white relative overflow-hidden group hover:border-rose-500/40 transition-all duration-300 min-w-0"
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Offline / Timed Out</span>
@@ -227,7 +227,7 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300 min-w-0"
+          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-white relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300 min-w-0"
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">GPU Accelerated</span>
@@ -247,7 +247,7 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.2 }}
-          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300 min-w-0"
+          className="glass-card p-4 sm:p-5 border border-slate-200/80 rounded-2xl bg-white relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300 min-w-0"
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total RAM Pool</span>
@@ -268,9 +268,9 @@ export default function CoordinatorPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.25 }}
-        className="glass-card border border-indigo-200 rounded-2xl bg-[#080a21]/90 shadow-xl overflow-hidden min-w-0"
+        className="glass-card border border-indigo-200 rounded-2xl bg-white shadow-xl overflow-hidden min-w-0"
       >
-        <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[#03040d]/60">
+        <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white">
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -280,7 +280,7 @@ export default function CoordinatorPage() {
               Participating consortium banking nodes registered via REST handshake (/api/v1/coordinator/handshake) and gRPC daemon
             </p>
           </div>
-          <div className="text-[11px] text-indigo-300 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto font-mono">
+          <div className="text-[11px] text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto font-mono">
             Auto-ping interval: 5.0s
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function CoordinatorPage() {
                 No active banking nodes match the current filter or have registered with the coordinator yet. Launch an edge node agent via CLI or refresh the consortium registry.
               </p>
             </div>
-            <div className="max-w-xl mx-auto p-3 rounded-xl bg-black/60 border border-slate-200 font-mono text-left text-xs text-indigo-300 relative">
+            <div className="max-w-xl mx-auto p-3 rounded-xl bg-black/60 border border-slate-200 font-mono text-left text-xs text-indigo-600 relative">
               <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1 pb-1 border-b border-slate-200">
                 <span>Start Bank Edge Node CLI</span>
                 <button
@@ -345,19 +345,19 @@ export default function CoordinatorPage() {
                 className={`p-3.5 rounded-xl border transition-all space-y-3 ${
                   isSelected
                     ? 'bg-indigo-100 border-indigo-500/60 shadow-md shadow-indigo-600/10'
-                    : 'bg-[#03040d]/70 border-white/5'
+                    : 'bg-white border-white/5'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-indigo-500/20 border border-indigo-200 text-indigo-300 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-100 border border-indigo-200 text-indigo-600 flex items-center justify-center font-mono text-xs font-bold shrink-0">
                       {displayName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <div className="font-sans text-sm font-bold text-slate-900 truncate">{displayName}</div>
-                      <div className="text-[10px] text-indigo-300 font-mono flex items-center gap-1.5 truncate">
+                      <div className="text-[10px] text-indigo-600 font-mono flex items-center gap-1.5 truncate">
                         <span>{client.bank_id}</span>
-                        <span>·</span>
+                        <span>Â·</span>
                         <span className="text-slate-500">{client.last_heartbeat_ago_seconds.toFixed(1)}s ago</span>
                       </div>
                     </div>
@@ -390,8 +390,8 @@ export default function CoordinatorPage() {
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
                     <span className="text-slate-500">HW Engine:</span>
-                    <span className={isCuda ? 'text-purple-300 font-bold' : 'text-slate-600'}>
-                      {isCuda ? `⚡ CUDA (${client.device_count}x)` : '🖥️ CPU'}
+                    <span className={isCuda ? 'text-purple-600 font-bold' : 'text-slate-600'}>
+                      {isCuda ? `âš¡ CUDA (${client.device_count}x)` : 'ğŸ–¥ï¸ CPU'}
                     </span>
                   </div>
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
@@ -400,7 +400,7 @@ export default function CoordinatorPage() {
                   </div>
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
                     <span className="text-slate-500">PyTorch:</span>
-                    <span className="text-indigo-300">{client.pytorch_version.split('+')[0]}</span>
+                    <span className="text-indigo-600">{client.pytorch_version.split('+')[0]}</span>
                   </div>
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
                     <span className="text-slate-500">Python:</span>
@@ -416,7 +416,7 @@ export default function CoordinatorPage() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-950/60 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+              <tr className="bg-white/60 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                 <th className="py-3.5 px-4">Bank Node</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4">Hardware Type</th>
@@ -444,12 +444,12 @@ export default function CoordinatorPage() {
                   >
                     <td className="py-3.5 px-4 font-bold text-slate-900">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-indigo-500/20 border border-indigo-200 text-indigo-600 flex items-center justify-center font-mono text-xs font-bold">
+                        <div className="h-7 w-7 rounded-lg bg-indigo-100 border border-indigo-200 text-indigo-600 flex items-center justify-center font-mono text-xs font-bold">
                           {displayName.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
                           <div className="font-sans text-sm font-bold text-slate-900">{displayName}</div>
-                          <div className="font-mono text-[10px] text-indigo-300">{client.bank_id}</div>
+                          <div className="font-mono text-[10px] text-indigo-600">{client.bank_id}</div>
                         </div>
                       </div>
                     </td>
@@ -469,11 +469,11 @@ export default function CoordinatorPage() {
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-semibold ${
                           isCuda
-                            ? 'bg-purple-100 text-purple-300 border border-purple-200'
+                            ? 'bg-purple-100 text-purple-600 border border-purple-200'
                             : 'bg-slate-50 text-slate-600 border border-slate-200'
                         }`}
                       >
-                        {isCuda ? '⚡ CUDA' : '🖥️ CPU'}
+                        {isCuda ? 'âš¡ CUDA' : 'ğŸ–¥ï¸ CPU'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">{client.pytorch_version}</td>
@@ -518,7 +518,7 @@ export default function CoordinatorPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.3 }}
-        className="glass-card border border-indigo-500/25 rounded-2xl bg-gradient-to-b from-[#080a24]/95 via-[#06081c]/90 to-[#03040e]/95 p-4 sm:p-6 shadow-2xl relative overflow-hidden min-w-0"
+        className="glass-card border border-indigo-500/25 rounded-2xl bg-gradient-to-b from-white via-slate-50 to-white p-4 sm:p-6 shadow-2xl relative overflow-hidden min-w-0"
       >
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -528,11 +528,11 @@ export default function CoordinatorPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-200">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-100 text-indigo-600 border border-indigo-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
                   Active Playground
                 </span>
-                <span className="text-xs font-mono text-slate-500">· Dynamic Scaling Engine</span>
+                <span className="text-xs font-mono text-slate-500">Â· Dynamic Scaling Engine</span>
               </div>
               <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
                 Hardware-Aware Parameter Negotiator
@@ -544,7 +544,7 @@ export default function CoordinatorPage() {
 
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <span className="text-[11px] font-mono text-slate-500">Target Node:</span>
-              <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 text-indigo-300 border border-indigo-500/40">
+              <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 text-indigo-600 border border-indigo-500/40">
                 {activeClient ? `${getBankDisplayName(activeClient)} (${activeClient.bank_id})` : selectedBankId}
               </span>
             </div>
@@ -552,7 +552,7 @@ export default function CoordinatorPage() {
 
           {/* Bank Node Segmented Selector Bar (5 Consortium Banks) */}
           {displayClients.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-[#02030a]/80 p-1.5 rounded-xl border border-slate-200 min-w-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-white p-1.5 rounded-xl border border-slate-200 min-w-0">
               {displayClients.map((c) => {
                 const isSelected = selectedBankId === c.bank_id;
                 const isCuda = c.hardware_type === 'cuda';
@@ -574,11 +574,11 @@ export default function CoordinatorPage() {
                       </span>
                       {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
                     </div>
-                    <div className="text-[10px] font-mono text-indigo-300 truncate">
+                    <div className="text-[10px] font-mono text-indigo-600 truncate">
                       {c.bank_id}
                     </div>
                     <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate flex items-center justify-between">
-                      <span>{isCuda ? `⚡ ${c.device_count}x GPU` : `🖥️ CPU`}</span>
+                      <span>{isCuda ? `âš¡ ${c.device_count}x GPU` : `ğŸ–¥ï¸ CPU`}</span>
                       <span>{c.ram_gb.toFixed(0)} GB</span>
                     </div>
                   </button>
@@ -586,12 +586,12 @@ export default function CoordinatorPage() {
               })}
             </div>
           ) : (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-300 text-xs flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-xs flex items-center justify-between">
               <span>No live edge nodes connected for hyperparameter tuning.</span>
               <button
                 type="button"
                 onClick={handleRefresh}
-                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] cursor-pointer"
+                className="px-2.5 py-1 rounded bg-amber-100 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] cursor-pointer"
               >
                 Refresh Registry
               </button>
@@ -604,12 +604,12 @@ export default function CoordinatorPage() {
           {/* Left Column: Sliders & Preset Pills */}
           <div className="lg:col-span-5 space-y-4 min-w-0">
             {/* Batch Size Slider */}
-            <div className="p-3.5 rounded-xl bg-[#02030a]/60 border border-slate-200 space-y-3">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                   Base Batch Size
                 </label>
-                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-200">
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-indigo-100 text-indigo-600 border border-indigo-200">
                   {baseBatchSize} samples
                 </span>
               </div>
@@ -643,12 +643,12 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Local Epochs Slider */}
-            <div className="p-3.5 rounded-xl bg-[#02030a]/60 border border-slate-200 space-y-3">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                   Base Local Epochs
                 </label>
-                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-200">
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-100 text-purple-600 border border-purple-200">
                   {baseEpochs} epochs
                 </span>
               </div>
@@ -682,7 +682,7 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Target Hardware Summary */}
-            <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 space-y-2 min-w-0">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2 min-w-0">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
                 {activeClient ? `${getBankDisplayName(activeClient)} (${activeClient.bank_id}) Hardware Profile` : 'Hardware Profile'}
               </span>
@@ -690,7 +690,7 @@ export default function CoordinatorPage() {
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
                     <div className="text-[10px] text-slate-500">Compute</div>
-                    <div className="text-purple-300 font-bold uppercase truncate">{activeClient.hardware_type}</div>
+                    <div className="text-purple-600 font-bold uppercase truncate">{activeClient.hardware_type}</div>
                   </div>
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
                     <div className="text-[10px] text-slate-500">RAM Pool</div>
@@ -702,7 +702,7 @@ export default function CoordinatorPage() {
                   </div>
                   <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
                     <div className="text-[10px] text-slate-500">PyTorch Core</div>
-                    <div className="text-indigo-300 font-bold truncate">{activeClient.pytorch_version.split('+')[0]}</div>
+                    <div className="text-indigo-600 font-bold truncate">{activeClient.pytorch_version.split('+')[0]}</div>
                   </div>
                 </div>
               ) : (
@@ -716,12 +716,12 @@ export default function CoordinatorPage() {
           {/* Right Column: 4 Negotiated Telemetry Cards */}
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             {/* Metric 1: Scaled Batch Size */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-indigo-200 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-white border border-indigo-200 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scaled Batch Size</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-300 border border-indigo-200">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
                     VRAM Fit
                   </span>
                 </div>
@@ -737,12 +737,12 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Metric 2: Scaled Epochs */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-purple-200 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-white border border-purple-200 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-purple-500" />
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scaled Epochs</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-50 text-purple-300 border border-purple-200">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-200">
                     Anti-Straggler
                   </span>
                 </div>
@@ -758,7 +758,7 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Metric 3: Gradient Accumulation */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-emerald-200 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-white border border-emerald-200 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
               <div>
                 <div className="flex items-center justify-between">
@@ -778,7 +778,7 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Metric 4: Estimated Step Latency */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-blue-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-white border border-blue-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500" />
               <div>
                 <div className="flex items-center justify-between">
@@ -803,26 +803,26 @@ export default function CoordinatorPage() {
       {/* Architecture Highlights & REST API Reference */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
         {/* Architectural Pillars */}
-        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-white space-y-4 min-w-0">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Layers className="w-4 h-4 text-indigo-600" />
             <span>Coordinator Architectural Specifications</span>
           </h3>
 
           <div className="space-y-3">
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-200 transition-all">
+            <div className="p-3.5 rounded-xl bg-white border border-white/5 hover:border-indigo-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-base">🤝</span>
+                <span className="text-base">ğŸ¤</span>
                 <h4 className="text-xs font-bold text-slate-800">Dynamic Handshake & Compatibility</h4>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Bank nodes register dynamically via REST/gRPC handshake. Version compatibility checks (PyTorch ≥ 2.x, Python ≥ 3.10) are strictly enforced before client inclusion in global aggregation rounds.
+                Bank nodes register dynamically via REST/gRPC handshake. Version compatibility checks (PyTorch â‰¥ 2.x, Python â‰¥ 3.10) are strictly enforced before client inclusion in global aggregation rounds.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-emerald-200 transition-all">
+            <div className="p-3.5 rounded-xl bg-white border border-white/5 hover:border-emerald-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-base">💓</span>
+                <span className="text-base">ğŸ’“</span>
                 <h4 className="text-xs font-bold text-slate-800">Heartbeat Monitoring & SLA Isolation</h4>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -830,20 +830,20 @@ export default function CoordinatorPage() {
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-purple-200 transition-all">
+            <div className="p-3.5 rounded-xl bg-white border border-white/5 hover:border-purple-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-base">⚖️</span>
+                <span className="text-base">âš–ï¸</span>
                 <h4 className="text-xs font-bold text-slate-800">Heterogeneous Parameter Scaling</h4>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                CUDA nodes with ≥32GB VRAM receive full base parameters. Resource-constrained CPU nodes dynamically scale batch size and epochs to prevent straggler bottlenecks.
+                CUDA nodes with â‰¥32GB VRAM receive full base parameters. Resource-constrained CPU nodes dynamically scale batch size and epochs to prevent straggler bottlenecks.
               </p>
             </div>
           </div>
         </div>
 
         {/* REST API Reference Card */}
-        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-white space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-600" />
@@ -896,20 +896,20 @@ export default function CoordinatorPage() {
                 <div
                   key={path}
                   onClick={() => handleCopyCurl(path, method)}
-                  className="p-3 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-500/40 transition-all duration-200 cursor-pointer group flex items-center justify-between"
+                  className="p-3 rounded-xl bg-white border border-white/5 hover:border-indigo-500/40 transition-all duration-200 cursor-pointer group flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <span
                       className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider shrink-0 ${
                         method === 'POST'
-                          ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-200'
-                          : 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                          ? 'bg-indigo-100 text-indigo-600 border border-indigo-200'
+                          : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                       }`}
                     >
                       {method}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <code className="font-mono text-xs text-indigo-300 group-hover:text-indigo-200 transition-colors break-all sm:break-normal">
+                      <code className="font-mono text-xs text-indigo-600 group-hover:text-indigo-200 transition-colors break-all sm:break-normal">
                         {path}
                       </code>
                       <p className="text-[11px] text-slate-500 mt-0.5 truncate">{desc}</p>
@@ -936,3 +936,5 @@ export default function CoordinatorPage() {
     </div>
   );
 }
+
+

@@ -114,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
                 isActive
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-600 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'
               }`}
             >
@@ -159,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-medium text-left transition-all ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/30'
+                      ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-600 border border-cyan-500/30'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-white'
                   }`}
                 >

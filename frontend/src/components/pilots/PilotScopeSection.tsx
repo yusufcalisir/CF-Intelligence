@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import type { PilotStatusResponse } from '../../api/types';
 import { Copy, Check, Shield, Server, Calendar, Database, FileText } from 'lucide-react';
 
@@ -25,12 +25,12 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
   return (
     <div className="space-y-6">
       {/* Scope Digest Banner */}
-      <div className="rounded-xl border border-indigo-200 bg-indigo-950/20 p-4 md:p-5">
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Authoritative Scope Digest (SHA-256)
               </span>
             </div>
@@ -73,7 +73,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             {pilot.participating_institutions.map((bank) => (
               <span
                 key={bank}
-                className="px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-cyan-950/40 text-cyan-300 border border-cyan-800/50"
+                className="px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-cyan-50/40 text-cyan-600 border border-cyan-800/50"
               >
                 {bank.toUpperCase()}
               </span>
@@ -160,7 +160,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
               <div className="text-[11px] text-slate-500">Permitted Investigation Purposes</div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {pilot.allowed_purposes.map((purpose) => (
-                  <span key={purpose} className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950/40 text-purple-300 border border-purple-800/40">
+                  <span key={purpose} className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-50/40 text-purple-600 border border-purple-800/40">
                     {purpose}
                   </span>
                 ))}
@@ -190,13 +190,13 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             </p>
             <div className="bg-white/70 p-3 rounded-lg border border-slate-200 text-[11px] space-y-1.5 text-slate-500">
               <div className="text-slate-600 font-semibold">Boundary Contract:</div>
-              <div>• Queries are governed by pairwise Ed25519 bilateral operational grants.</div>
-              <div>• Independent of separately assembled multi-counterparty investigation dossiers.</div>
-              <div>• Strict SSRF protection and deterministic preflight health probes enforce container containment.</div>
+              <div>â€¢ Queries are governed by pairwise Ed25519 bilateral operational grants.</div>
+              <div>â€¢ Independent of separately assembled multi-counterparty investigation dossiers.</div>
+              <div>â€¢ Strict SSRF protection and deterministic preflight health probes enforce container containment.</div>
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 pt-1">
               <span>Configuration Revision:</span>
-              <span className="font-mono text-indigo-300 font-semibold">v{pilot.revision}</span>
+              <span className="font-mono text-indigo-600 font-semibold">v{pilot.revision}</span>
             </div>
           </div>
         </div>
@@ -204,3 +204,4 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
     </div>
   );
 }
+

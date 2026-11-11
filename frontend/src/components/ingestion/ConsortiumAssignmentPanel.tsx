@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Landmark,
   Layers,
@@ -60,8 +60,8 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               onClick={() => setSelectedBank(bank.id)}
               className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-indigo-500 bg-indigo-950/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                  : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/70 hover:border-white/20'
+                  ? 'border-indigo-500 bg-indigo-50/30 shadow-indigo-100'
+                  : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/70 hover:border-indigo-300'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -138,3 +138,4 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
     </div>
   );
 };
+

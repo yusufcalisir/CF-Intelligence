@@ -47,7 +47,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
       {/* Header & Status bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-600">
+          <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
             <SlidersHorizontal size={18} />
           </div>
           <div>
@@ -61,11 +61,11 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-xl bg-emerald-100 border border-emerald-500/40 text-emerald-600 text-xs font-mono font-bold flex items-center gap-1.5">
             <CheckCircle2 size={13} />
             <span>{mappedCanonicalCount}/9 Canonical Signals</span>
           </div>
-          <div className="px-3 py-1 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-mono font-bold flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-xl bg-indigo-100 border border-indigo-500/40 text-indigo-600 text-xs font-mono font-bold flex items-center gap-1.5">
             <ShieldCheck size={13} />
             <span>{piiMaskedReceipt}</span>
           </div>
@@ -124,7 +124,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
       </div>
 
       {piiViolationsCount > 0 && (
-        <div className="p-3 rounded-xl bg-amber-100 border border-amber-200 text-amber-300 text-xs flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-amber-100 border border-amber-200 text-amber-600 text-xs flex items-center gap-2">
           <HelpCircle size={15} className="shrink-0 text-amber-600" />
           <span>
             Notice: {piiViolationsCount} raw identifier patterns were detected and hashed client-side with bank type salt before transmission.

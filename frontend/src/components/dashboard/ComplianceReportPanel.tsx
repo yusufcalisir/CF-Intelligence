@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAIActComplianceReport } from '../../api/queries';
 import type { BankResult } from '../../api/types';
@@ -47,7 +47,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--color-border-subtle)] pb-4">
         <div>
           <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-            🛡️ AI Regulatory Compliance & Bias Audit
+            ğŸ›¡ï¸ AI Regulatory Compliance & Bias Audit
           </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
             EU AI Act Article 10 & 13 audit log mapped from decentralized client telemetry.
@@ -63,7 +63,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
               color: isCompliant ? 'var(--color-status-success)' : 'var(--color-status-error)',
             }}
           >
-            {isCompliant ? '● Compliant (Passed)' : '▲ Bias Risk Detected'}
+            {isCompliant ? 'â— Compliant (Passed)' : 'â–² Bias Risk Detected'}
           </span>
         </div>
       </div>
@@ -198,7 +198,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
               className="flex items-start gap-3 p-3 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/50"
             >
               <span className="text-lg leading-none mt-0.5">
-                {item.status ? '✅' : '⚠️'}
+                {item.status ? 'âœ…' : 'âš ï¸'}
               </span>
               <div>
                 <p className="font-semibold text-[var(--color-text-primary)]">{item.clause}</p>
@@ -219,7 +219,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
             onClick={() => setShowJson(!showJson)}
             className="text-xs font-semibold text-[var(--color-accent-indigo)] hover:underline flex items-center gap-1"
           >
-            {showJson ? 'Hide Audit Log ▴' : 'View Audit Log ▾'}
+            {showJson ? 'Hide Audit Log â–´' : 'View Audit Log â–¾'}
           </button>
         </div>
 
@@ -240,7 +240,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
                   Failed to load report: {(error as any)?.response?.data?.detail || error.message}
                 </div>
               ) : (
-                <pre className="p-4 rounded-lg bg-[#0d1117] text-slate-600 font-mono text-[10px] overflow-auto max-h-80 border border-slate-200">
+                <pre className="p-4 rounded-lg bg-white text-slate-600 font-mono text-[10px] overflow-auto max-h-80 border border-slate-200">
                   {JSON.stringify(report, null, 2)}
                 </pre>
               )}
@@ -251,3 +251,4 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
     </motion.div>
   );
 }
+

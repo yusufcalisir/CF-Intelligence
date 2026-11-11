@@ -216,7 +216,7 @@ export default function PilotOperationsPage() {
       ) : isError ? (
         <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-6 text-center">
           <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
-          <h3 className="text-sm font-semibold text-rose-300">Failed to Load Consortium Pilots</h3>
+          <h3 className="text-sm font-semibold text-rose-600">Failed to Load Consortium Pilots</h3>
           <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
             {error instanceof Error ? error.message : 'An unexpected error occurred while communicating with the pilot registry.'}
           </p>
@@ -262,7 +262,7 @@ export default function PilotOperationsPage() {
               setSearchQuery('');
               setStatusFilter('ALL');
             }}
-            className="mt-3 text-xs text-indigo-600 hover:text-indigo-300 underline"
+            className="mt-3 text-xs text-indigo-600 hover:text-indigo-600 underline"
           >
             Clear Filters
           </button>
@@ -286,7 +286,7 @@ export default function PilotOperationsPage() {
                   {/* Card Header: Pilot ID & Status */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-mono text-xs font-bold text-indigo-600 truncate group-hover:text-indigo-300">
+                      <div className="font-mono text-xs font-bold text-indigo-600 truncate group-hover:text-indigo-600">
                         {pilot.pilot_id}
                       </div>
                       <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 truncate">

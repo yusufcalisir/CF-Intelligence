@@ -169,10 +169,10 @@ export const Predictor: React.FC = () => {
                 </div>
                 <span className={`px-3 py-1 rounded-full font-bold uppercase text-[11px] ${
                   result.policy_action === 'HOLD_FOR_REVIEW'
-                    ? 'bg-amber-500/20 text-amber-600 border border-amber-200'
+                    ? 'bg-amber-100 text-amber-600 border border-amber-200'
                     : result.is_fraud_suspected
-                    ? 'bg-rose-500/20 text-rose-600 border border-rose-200'
-                    : 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                    ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                    : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                 }`}>
                   {result.policy_action}
                 </span>

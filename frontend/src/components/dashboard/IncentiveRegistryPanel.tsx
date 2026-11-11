@@ -148,7 +148,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
           <ShieldAlertIcon className="h-6 w-6 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <h3 className="text-sm font-bold text-rose-200">Security Alert: Client Isolation Triggered</h3>
-            <p className="text-xs text-rose-300/80 mt-1 leading-relaxed">
+            <p className="text-xs text-rose-600/80 mt-1 leading-relaxed">
               Automated contribution auditing has flagged adversarial or zero-variance training behavior. One or more clients have been isolated (quarantined) and excluded from the network to prevent gradient poisoning and free-riding.
             </p>
           </div>
@@ -247,7 +247,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
         </div>
 
         {/* Clearing House / Incentive Payouts */}
-        <div className="bg-slate-950/60 border border-slate-200/80 rounded-xl p-4 sm:p-5 flex flex-col justify-between min-w-0">
+        <div className="bg-white/60 border border-slate-200/80 rounded-xl p-4 sm:p-5 flex flex-col justify-between min-w-0">
           <div>
             <h3 className="text-xs font-bold text-[var(--color-text-secondary)] flex items-center gap-1.5 uppercase tracking-wider mb-3">
               <DollarSignIcon className="h-4 w-4 text-emerald-600 shrink-0" />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
@@ -366,7 +366,7 @@ export default function PoliciesPage() {
                 <Shield className="w-5 h-5 text-indigo-600" />
                 <span>Active Rules Registry</span>
               </h2>
-              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-950/60 text-indigo-300 border border-indigo-200 font-semibold">
+              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-50/60 text-indigo-600 border border-indigo-200 font-semibold">
                 {rules?.length ?? 0} Configured Rules
               </span>
             </div>
@@ -390,12 +390,12 @@ export default function PoliciesPage() {
                           <span
                             className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                               rule.action === 'BLOCK_TRANSACTION'
-                                ? 'bg-rose-100 text-rose-300 border-rose-200'
+                                ? 'bg-rose-100 text-rose-600 border-rose-200'
                                 : rule.action === 'ESCALATE_TO_SAR'
-                                ? 'bg-amber-100 text-amber-300 border-amber-200'
+                                ? 'bg-amber-100 text-amber-600 border-amber-200'
                                 : rule.action === 'HOLD_FOR_REVIEW'
-                                ? 'bg-purple-100 text-purple-300 border-purple-200'
-                                : 'bg-indigo-100 text-indigo-300 border-indigo-200'
+                                ? 'bg-purple-100 text-purple-600 border-purple-200'
+                                : 'bg-indigo-100 text-indigo-600 border-indigo-200'
                             }`}
                           >
                             Action: {rule.action}
@@ -426,7 +426,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleLoadRuleToTester(rule)}
                           aria-label={`Test Rule ${rule.rule_name} in engine`}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50/40 hover:bg-indigo-900/60 text-indigo-600 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Load this rule into the dynamic tester panel"
                         >
                           <Zap className="w-3.5 h-3.5" />
@@ -478,7 +478,7 @@ export default function PoliciesPage() {
                 <Zap className="w-5 h-5 text-amber-600" />
                 <span>Dynamic Rule Tester</span>
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-300 border border-amber-200 font-bold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200 font-bold uppercase">
                 Real-Time Sandbox
               </span>
             </div>
@@ -541,7 +541,7 @@ export default function PoliciesPage() {
                     type="button"
                     onClick={() => handleLoadAlertPayload()}
                     aria-label="Load Live Alert"
-                    className="text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                    className="text-xs font-semibold text-emerald-600 bg-emerald-50/60 hover:bg-emerald-900/80 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
                     title="Load highest-risk live alert from real-time ledger into test payload"
                   >
                     <Zap className="w-3.5 h-3.5 text-emerald-600" />
@@ -550,7 +550,7 @@ export default function PoliciesPage() {
                 </div>
 
                 {loadedAlertInfo && (
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-200 text-emerald-300 text-xs">
+                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-50/40 border border-emerald-200 text-emerald-600 text-xs">
                     <div className="flex items-center gap-2 truncate">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                       <span className="truncate">
@@ -563,7 +563,7 @@ export default function PoliciesPage() {
                       aria-label="Dismiss loaded alert banner"
                       className="text-slate-500 hover:text-slate-900 ml-2 text-xs cursor-pointer p-0.5"
                     >
-                      ✕
+                      âœ•
                     </button>
                   </div>
                 )}
@@ -626,12 +626,12 @@ export default function PoliciesPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`p-4 rounded-xl border flex items-start gap-3 ${
                     testResult.matches
-                      ? 'bg-rose-950/30 border-rose-200 text-rose-300'
-                      : 'bg-emerald-950/30 border-emerald-200 text-emerald-300'
+                      ? 'bg-rose-950/30 border-rose-200 text-rose-600'
+                      : 'bg-emerald-50/30 border-emerald-200 text-emerald-600'
                   }`}
                 >
                   <div className="text-xl shrink-0 mt-0.5">
-                    {testResult.matches ? '🚨' : '✅'}
+                    {testResult.matches ? 'ğŸš¨' : 'âœ…'}
                   </div>
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="font-bold text-sm">
@@ -646,7 +646,7 @@ export default function PoliciesPage() {
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
-                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-200 border border-rose-200 font-semibold"
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-200 border border-rose-200 font-semibold"
                           >
                             {f}
                           </span>
@@ -700,14 +700,14 @@ export default function PoliciesPage() {
                   aria-label="Close modal"
                   className="text-slate-500 hover:text-slate-900 text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
                 >
-                  ✕
+                  âœ•
                 </button>
               </div>
 
               {/* Pre-built AML Rule Templates Section */}
               <div className="space-y-2 bg-white/60 p-3.5 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Pre-built AML Rule Templates (1-Click Apply)</span>
                   </span>
@@ -720,9 +720,9 @@ export default function PoliciesPage() {
                       type="button"
                       aria-label={`Apply Template ${tpl.id}`}
                       onClick={() => handleApplyTemplateToModal(tpl)}
-                      className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-slate-950/60 hover:bg-indigo-950/20 transition-all text-xs cursor-pointer group"
+                      className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-white/60 hover:bg-indigo-50/20 transition-all text-xs cursor-pointer group"
                     >
-                      <div className="font-semibold text-slate-900 group-hover:text-indigo-300 flex items-center justify-between">
+                      <div className="font-semibold text-slate-900 group-hover:text-indigo-600 flex items-center justify-between">
                         <span className="truncate">{tpl.badge}</span>
                         <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-50 text-slate-500 uppercase">
                           {tpl.action.split('_')[0]}
@@ -827,3 +827,4 @@ export default function PoliciesPage() {
     </div>
   );
 }
+

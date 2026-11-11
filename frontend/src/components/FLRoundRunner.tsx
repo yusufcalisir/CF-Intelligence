@@ -81,7 +81,7 @@ export const FLRoundRunner: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center gap-3 text-rose-300 text-xs">
+        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center gap-3 text-rose-600 text-xs">
           <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
           <div className="flex-1">
             <span className="font-semibold text-rose-200">Simulation Error: </span>
@@ -213,7 +213,7 @@ export const FLRoundRunner: React.FC = () => {
               tabIndex={0}
               role="region"
               aria-label="Byzantine Defense & Execution Log stream"
-              className="bg-slate-950 p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+              className="bg-white p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400"
             >
               {results.map((r, i) => (
                 <div key={i} className="flex justify-between">

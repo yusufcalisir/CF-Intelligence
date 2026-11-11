@@ -162,7 +162,7 @@ export default function ChaosAttackInjectorPanel({
           <div
             className={`p-2 rounded-xl shrink-0 ${
               activeAttack
-                ? 'bg-rose-500/20 text-rose-600 animate-pulse'
+                ? 'bg-rose-100 text-rose-600 animate-pulse'
                 : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
             }`}
           >
@@ -177,7 +177,7 @@ export default function ChaosAttackInjectorPanel({
                 id="threat-level-badge"
                 className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   activeAttack
-                    ? 'bg-rose-500/20 text-rose-600 border border-rose-500/40 animate-pulse'
+                    ? 'bg-rose-100 text-rose-600 border border-rose-500/40 animate-pulse'
                     : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                 }`}
               >
@@ -208,7 +208,7 @@ export default function ChaosAttackInjectorPanel({
 
       {/* Real Error Notification Banner */}
       {errorMessage && (
-        <div className="mt-3.5 p-3 rounded-xl bg-rose-100 border border-rose-200 text-rose-300 text-xs flex items-center justify-between gap-3">
+        <div className="mt-3.5 p-3 rounded-xl bg-rose-100 border border-rose-200 text-rose-600 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertCircle size={15} className="shrink-0 text-rose-600" />
             <span className="font-mono">{errorMessage}</span>
@@ -244,7 +244,7 @@ export default function ChaosAttackInjectorPanel({
             {/* Defense Specification */}
             <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
               <span className="text-[10px] text-[var(--color-text-muted)] font-semibold shrink-0">Defense:</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-600 border border-amber-500/40 font-bold whitespace-nowrap">
                 LSH-PSI + GRAPHSAGE
               </span>
             </div>
@@ -300,7 +300,7 @@ export default function ChaosAttackInjectorPanel({
                     onClick={() => setSelectedDefense(def)}
                     className={`text-[9px] sm:text-[10px] font-mono py-1 px-1 rounded-lg text-center transition-all cursor-pointer truncate ${
                       selectedDefense === def
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm'
+                        ? 'bg-rose-100 text-rose-600 border border-rose-500/40 font-bold shadow-sm'
                         : 'text-[var(--color-text-muted)] bg-slate-50 hover:bg-white/10 border border-transparent'
                     }`}
                     title={def.toUpperCase()}
@@ -400,7 +400,7 @@ export default function ChaosAttackInjectorPanel({
                   <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
                     <ShieldAlert size={11} className="text-indigo-600" /> Model Accuracy
                   </span>
-                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-200 font-semibold">
+                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-600 border border-indigo-200 font-semibold">
                     Simulated
                   </span>
                 </div>
@@ -429,8 +429,8 @@ export default function ChaosAttackInjectorPanel({
           </div>
 
           {/* Simulation Disclaimer Banner */}
-          <div className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-950/20 border border-indigo-200 text-[10px] text-indigo-300/80 flex items-center gap-2">
-            <span className="font-bold text-indigo-600 shrink-0 uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 border border-indigo-200">
+          <div className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-50/20 border border-indigo-200 text-[10px] text-indigo-600/80 flex items-center gap-2">
+            <span className="font-bold text-indigo-600 shrink-0 uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 border border-indigo-200">
               Demo Notice
             </span>
             <span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Lock,
   Unlock,
@@ -100,7 +100,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               Counterfactual Explorer
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/40">
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-cyan-50/60 text-cyan-600 border border-cyan-800/40">
                 Domain Guardrails
               </span>
             </h3>
@@ -144,9 +144,9 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
         {/* Left Column: Immutable Attributes (4 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-slate-950/60 border border-amber-200 rounded-lg p-4">
+          <div className="bg-white/60 border border-amber-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-amber-600" />
                 Immutable Attribute Guardrails
               </span>
@@ -171,7 +171,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                       <div className="text-[10px] text-slate-500">{item.reason}</div>
                     </div>
                   </div>
-                  <span className="font-mono text-[11px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-200">
+                  <span className="font-mono text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
                     {item.value}
                   </span>
                 </div>
@@ -180,7 +180,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
           </div>
 
           {/* Re-Inference Score Telemetry Card */}
-          <div className="bg-slate-950/60 border border-slate-200 rounded-lg p-4">
+          <div className="bg-white/60 border border-slate-200 rounded-lg p-4">
             <div className="text-xs font-semibold text-slate-600 mb-3 flex items-center gap-1.5">
               <TrendingDown className="w-4 h-4 text-emerald-600" />
               Live Re-Inference Telemetry
@@ -207,8 +207,8 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                 <span
                   className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                     isCleared
-                      ? 'text-emerald-300 bg-emerald-950/50 border-emerald-800/30'
-                      : 'text-amber-300 bg-amber-950/50 border-amber-800/30'
+                      ? 'text-emerald-600 bg-emerald-50/50 border-emerald-800/30'
+                      : 'text-amber-600 bg-amber-950/50 border-amber-800/30'
                   }`}
                 >
                   {isCleared ? 'CLEARED (ALLOW)' : 'IN PROGRESS'}
@@ -218,7 +218,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
 
             {/* Score Delta Uplift */}
             {scoreDelta > 0 && (
-              <div className="mt-3 p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-200 flex items-center justify-between text-xs text-emerald-300">
+              <div className="mt-3 p-2.5 rounded-lg bg-emerald-50/20 border border-emerald-200 flex items-center justify-between text-xs text-emerald-600">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Risk Score Reduction:
@@ -231,9 +231,9 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
 
         {/* Right Column: Mutable Controls & Remediation Steps (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-slate-950/60 border border-slate-200 rounded-lg p-4 space-y-4">
+          <div className="bg-white/60 border border-slate-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-indigo-600 flex items-center gap-1.5">
                 <Unlock className="w-3.5 h-3.5 text-indigo-600" />
                 Actionable Parameters (Bounded Domain Sliders)
               </span>
@@ -315,25 +315,25 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                 Target Clearance Score:
               </span>
               <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200/60">
-                ≤ {targetScore.toFixed(0)} / 1000
+                â‰¤ {targetScore.toFixed(0)} / 1000
               </span>
             </div>
           </div>
 
           {/* Remediation Changes (L0 Sparsity Output) */}
-          <div className="bg-slate-950/60 border border-slate-200 rounded-lg p-4">
+          <div className="bg-white/60 border border-slate-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-cyan-600" />
                 Verified Remediation Steps (Minimal L0 Norm)
               </span>
-              <span className="text-[10px] font-mono text-cyan-600 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/30">
+              <span className="text-[10px] font-mono text-cyan-600 bg-cyan-50/40 px-2 py-0.5 rounded border border-cyan-800/30">
                 {report ? `${report.changes.length} Action(s)` : '0 Actions'}
               </span>
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-200 text-xs text-rose-300 flex items-center gap-2">
+              <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-200 text-xs text-rose-600 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
                 {error}
               </div>
@@ -347,7 +347,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                     className="p-2.5 rounded-lg bg-white/90 border border-slate-200 text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-indigo-300 uppercase text-[11px]">
+                      <span className="font-mono font-bold text-indigo-600 uppercase text-[11px]">
                         {change.feature.replace(/_/g, ' ')}
                       </span>
                       <div className="flex items-center gap-1.5 text-[11px] font-mono">
@@ -373,3 +373,4 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
 };
 
 export default CounterfactualExplorer;
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -80,7 +80,7 @@ export default function FlagshipConsortiumWidget() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.55 }}
-      className="p-6 rounded-2xl bg-[#090a1f]/85 border border-indigo-200 backdrop-blur-xl shadow-2xl space-y-6 mt-6 relative overflow-hidden"
+      className="p-6 rounded-2xl bg-white border border-indigo-200 backdrop-blur-xl shadow-2xl space-y-6 mt-6 relative overflow-hidden"
     >
       {/* Background Ambient Glow */}
       <div className="absolute -top-24 -right-24 w-80 h-80 bg-indigo-50 rounded-full blur-3xl pointer-events-none" />
@@ -98,11 +98,11 @@ export default function FlagshipConsortiumWidget() {
               CFI-CrossBank-01
             </span>
             <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-white/5">
-              3 Institutions · 7 Scenarios
+              3 Institutions Â· 7 Scenarios
             </span>
           </div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>🏛️</span>
+            <span>ğŸ›ï¸</span>
             <span>Multi-Bank Consortium Collaborative Advantage</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1 max-w-3xl">
@@ -116,7 +116,7 @@ export default function FlagshipConsortiumWidget() {
             className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-slate-900 transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 active:scale-95"
           >
             <span>Consortium Console</span>
-            <span>→</span>
+            <span>â†’</span>
           </Link>
           <Link
             to="/scenarios"
@@ -135,10 +135,10 @@ export default function FlagshipConsortiumWidget() {
           </div>
           <div className="text-2xl font-black font-mono text-emerald-600 flex items-baseline gap-1.5">
             +19.05%
-            <span className="text-xs font-normal text-slate-500">Δ over silos</span>
+            <span className="text-xs font-normal text-slate-500">Î” over silos</span>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">
-            80.95% Isolated → <span className="text-emerald-300 font-bold">100.0% Federated</span>
+            80.95% Isolated â†’ <span className="text-emerald-600 font-bold">100.0% Federated</span>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export default function FlagshipConsortiumWidget() {
             <span className="text-xs font-normal text-slate-500">USD</span>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">
-            <span className="text-teal-300 font-bold">+42.14%</span> incremental capital preserved
+            <span className="text-teal-600 font-bold">+42.14%</span> incremental capital preserved
           </div>
         </div>
 
@@ -173,7 +173,7 @@ export default function FlagshipConsortiumWidget() {
             Cold-Start Bank Rescue (SC-7)
           </div>
           <div className="text-2xl font-black font-mono text-amber-600 flex items-baseline gap-1.5">
-            0% → 100%
+            0% â†’ 100%
             <span className="text-xs font-normal text-slate-500">(2/2 txns)</span>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">
@@ -186,7 +186,7 @@ export default function FlagshipConsortiumWidget() {
       <div className="p-4 rounded-xl bg-white/40 border border-white/5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-            <span>🔬</span>
+            <span>ğŸ”¬</span>
             <span>Scenario-by-Scenario Horizon Analysis</span>
           </h3>
           <span className="text-[10px] font-mono text-indigo-600 sm:text-slate-500">
@@ -215,7 +215,7 @@ export default function FlagshipConsortiumWidget() {
                 {sc.delta > 0 && (
                   <span
                     className={`hidden xl:inline text-[9px] px-1 py-0.2 rounded font-bold ${
-                      isSelected ? 'bg-white/20 text-slate-900' : 'bg-emerald-500/20 text-emerald-600'
+                      isSelected ? 'bg-white/20 text-slate-900' : 'bg-emerald-100 text-emerald-600'
                     }`}
                   >
                     +{sc.delta.toFixed(0)}%
@@ -234,7 +234,7 @@ export default function FlagshipConsortiumWidget() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="p-4 rounded-xl bg-slate-950/70 border border-white/8 space-y-3"
+            className="p-4 rounded-xl bg-white/70 border border-white/8 space-y-3"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-2.5">
               <div>
@@ -272,8 +272,8 @@ export default function FlagshipConsortiumWidget() {
               </div>
 
               <div className="p-3 rounded-lg bg-slate-50 border border-white/5 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-slate-500">Consortium Uplift (Δ)</span>
-                <div className="text-lg font-bold font-mono text-indigo-300">
+                <span className="text-[10px] font-mono uppercase text-slate-500">Consortium Uplift (Î”)</span>
+                <div className="text-lg font-bold font-mono text-indigo-600">
                   +{activeScenario.delta.toFixed(1)}%
                 </div>
                 <p className="text-[10px] text-slate-500">
@@ -290,27 +290,27 @@ export default function FlagshipConsortiumWidget() {
       {/* Participating Institutions Status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
             A
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold text-slate-800 truncate">Bank Alpha (Retail)</div>
-            <div className="text-[10px] font-mono text-slate-500 truncate">50% Consortium Vol · 5k Accts</div>
+            <div className="text-[10px] font-mono text-slate-500 truncate">50% Consortium Vol Â· 5k Accts</div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-600 flex items-center justify-center font-bold text-xs shrink-0">
             B
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold text-slate-800 truncate">Bank Beta (Commercial)</div>
-            <div className="text-[10px] font-mono text-slate-500 truncate">30% Consortium Vol · 3k Accts</div>
+            <div className="text-[10px] font-mono text-slate-500 truncate">30% Consortium Vol Â· 3k Accts</div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">
             C
           </div>
           <div className="min-w-0">
@@ -322,3 +322,4 @@ export default function FlagshipConsortiumWidget() {
     </motion.div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useAggregationMethods,
@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import PrivacyBudgetWidget from '../components/telemetry/PrivacyBudgetWidget';
 
-// ── Types & Color Helpers ─────────────────────────────────────
+// â”€â”€ Types & Color Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type RiskTier = 'safe' | 'low_risk' | 'moderate_risk' | 'high_risk';
 
@@ -54,7 +54,7 @@ const RISK_CONFIG: Record<
   low_risk: {
     label: 'Low Risk',
     bg: 'bg-emerald-50',
-    text: 'text-emerald-300',
+    text: 'text-emerald-600',
     border: 'border-emerald-200',
     glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]',
   },
@@ -115,7 +115,7 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
   );
 }
 
-// ── Sub-sections ──────────────────────────────────────────────
+// â”€â”€ Sub-sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) {
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
@@ -132,7 +132,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
             Mathematical defense proofs against malicious gradient poisoning, label flipping, and colluding Sybil nodes
           </p>
         </div>
-        <span className="text-xs font-mono text-indigo-300 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto">
+        <span className="text-xs font-mono text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto">
           {methods.length} Active Algorithms
         </span>
       </div>
@@ -148,8 +148,8 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
               onClick={() => setSelectedMethodId(isSelected ? null : m.id)}
               className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between relative overflow-hidden min-w-0 group ${
                 isMultiAttacker
-                  ? 'bg-gradient-to-b from-[#0e1038]/90 to-[#06081e]/90 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                  : 'bg-[#080a21]/80 border-slate-200/80 hover:border-indigo-200'
+                  ? 'bg-gradient-to-b from-white to-white border-indigo-500/40 shadow-lg shadow-indigo-500/10'
+                  : 'bg-white border-slate-200/80 hover:border-indigo-200'
               }`}
             >
               {isMultiAttacker && (
@@ -159,7 +159,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="font-bold text-slate-900 text-sm leading-snug block truncate group-hover:text-indigo-300 transition-colors">
+                    <span className="font-bold text-slate-900 text-sm leading-snug block truncate group-hover:text-indigo-600 transition-colors">
                       {m.label}
                     </span>
                     <span className="text-[10px] font-mono text-slate-500">{m.id}</span>
@@ -172,9 +172,9 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                       </span>
                     )}
                     {m.colluding_defense && (
-                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 whitespace-nowrap flex items-center gap-1 shadow-sm">
+                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-500/40 whitespace-nowrap flex items-center gap-1 shadow-sm">
                         <Sparkles className="w-2.5 h-2.5 text-indigo-600" />
-                        Multi-Attacker ✨
+                        Multi-Attacker âœ¨
                       </span>
                     )}
                   </div>
@@ -188,7 +188,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                   <FileText className="w-3 h-3 text-slate-500 shrink-0" />
                   <span className="truncate">{m.paper}</span>
                 </div>
-                <span className="text-[10px] font-mono text-indigo-600 group-hover:text-indigo-300 transition-colors shrink-0">
+                <span className="text-[10px] font-mono text-indigo-600 group-hover:text-indigo-600 transition-colors shrink-0">
                   {isSelected ? 'Active' : 'Inspect'}
                 </span>
               </div>
@@ -214,19 +214,19 @@ function MIASimulationVisualizer() {
   const simData = simulateMIA.data as MIASimulationResponse | undefined;
 
   const presets = [
-    { label: 'ε = 0.5 (Strong)', val: 0.5 },
-    { label: 'ε = 1.5 (Standard)', val: 1.5 },
-    { label: 'ε = 4.0 (Balanced)', val: 4.0 },
-    { label: 'ε = 8.0 (Target SLA)', val: 8.0 },
-    { label: 'No DP (ε = 60)', val: 60.0 },
+    { label: 'Îµ = 0.5 (Strong)', val: 0.5 },
+    { label: 'Îµ = 1.5 (Standard)', val: 1.5 },
+    { label: 'Îµ = 4.0 (Balanced)', val: 4.0 },
+    { label: 'Îµ = 8.0 (Target SLA)', val: 8.0 },
+    { label: 'No DP (Îµ = 60)', val: 60.0 },
   ];
 
   return (
-    <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-200 bg-[#080a21]/95 shadow-xl space-y-5 min-w-0">
+    <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-200 bg-white shadow-xl space-y-5 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+            <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600">
               <Sliders className="w-4 h-4" />
             </div>
             <h3 className="font-bold text-slate-900 text-sm sm:text-base">
@@ -234,11 +234,11 @@ function MIASimulationVisualizer() {
             </h3>
           </div>
           <p className="text-xs text-slate-500">
-            Simulate shadow model transaction loss distributions and observe empirical ROC-AUC / ASR under Rényi DP
+            Simulate shadow model transaction loss distributions and observe empirical ROC-AUC / ASR under RÃ©nyi DP
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-300 border border-indigo-200">
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200">
             Shokri / Yeom Model
           </span>
         </div>
@@ -248,9 +248,9 @@ function MIASimulationVisualizer() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center min-w-0">
         <div className="space-y-2">
           <label className="text-xs font-mono text-slate-600 flex justify-between">
-            <span>Differential Privacy Noise Level (Target ε):</span>
+            <span>Differential Privacy Noise Level (Target Îµ):</span>
             <span className="font-bold text-indigo-600">
-              {testEps >= 50.0 ? '∞ (No DP)' : `ε = ${testEps.toFixed(2)}`}
+              {testEps >= 50.0 ? 'âˆ (No DP)' : `Îµ = ${testEps.toFixed(2)}`}
             </span>
           </label>
           <input
@@ -286,7 +286,7 @@ function MIASimulationVisualizer() {
             <select
               value={numSamples}
               onChange={(e) => setNumSamples(parseInt(e.target.value, 10))}
-              className="w-full bg-[#050614] border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500"
             >
               <option value="50">50 Shadow Transactions</option>
               <option value="80">80 Shadow Transactions</option>
@@ -308,7 +308,7 @@ function MIASimulationVisualizer() {
             ) : (
               <>
                 <Zap className="w-3.5 h-3.5 fill-current shrink-0" />
-                <span>Simulate Under ε = {testEps >= 50 ? '∞' : testEps.toFixed(2)}</span>
+                <span>Simulate Under Îµ = {testEps >= 50 ? 'âˆ' : testEps.toFixed(2)}</span>
               </>
             )}
           </button>
@@ -346,9 +346,9 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-              <span className="text-[10px] font-mono text-slate-500 uppercase">Loss Disparity Gap (ΔL)</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Loss Disparity Gap (Î”L)</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold font-mono text-indigo-300">
+                <span className="text-xl font-bold font-mono text-indigo-600">
                   {simData.loss_gap.toFixed(4)}
                 </span>
                 <span className="text-[10px] font-mono text-slate-500">(L_test - L_train)</span>
@@ -377,22 +377,22 @@ function MIASimulationVisualizer() {
           </div>
 
           {/* Loss Disparity Visual Bar */}
-          <div className="p-4 rounded-xl bg-[#03040f] border border-white/5 space-y-3">
+          <div className="p-4 rounded-xl bg-white border border-white/5 space-y-3">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Member vs Non-Member Empirical Loss Overlap</span>
               </span>
               <span className="text-[11px] text-slate-500">
-                {simData.loss_gap < 0.1 ? '🟢 High Overlap (Indistinguishable)' : '🔴 Distinct Clusters (Vulnerable)'}
+                {simData.loss_gap < 0.1 ? 'ğŸŸ¢ High Overlap (Indistinguishable)' : 'ğŸ”´ Distinct Clusters (Vulnerable)'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
               <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-200">
-                <div className="flex justify-between text-emerald-300">
+                <div className="flex justify-between text-emerald-600">
                   <span>Training Set Samples (Members):</span>
-                  <span>μ = {simData.mean_train_loss.toFixed(3)}</span>
+                  <span>Î¼ = {simData.mean_train_loss.toFixed(3)}</span>
                 </div>
                 <div className="flex gap-1 overflow-hidden py-1">
                   {simData.train_loss_distribution.slice(0, 16).map((loss, idx) => (
@@ -409,7 +409,7 @@ function MIASimulationVisualizer() {
               <div className="space-y-1.5 p-3 rounded-lg bg-sky-500/5 border border-sky-500/20">
                 <div className="flex justify-between text-sky-300">
                   <span>Test Set Samples (Non-Members):</span>
-                  <span>μ = {simData.mean_test_loss.toFixed(3)}</span>
+                  <span>Î¼ = {simData.mean_test_loss.toFixed(3)}</span>
                 </div>
                 <div className="flex gap-1 overflow-hidden py-1">
                   {simData.test_loss_distribution.slice(0, 16).map((loss, idx) => (
@@ -425,7 +425,7 @@ function MIASimulationVisualizer() {
             </div>
 
             <p className="text-xs text-indigo-200/90 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 leading-relaxed font-mono">
-              💡 {simData.attack_summary}
+              ğŸ’¡ {simData.attack_summary}
             </p>
           </div>
         </div>
@@ -455,14 +455,14 @@ function AttackAuditPanel() {
             Empirical stress testing: Membership Inference, Model Inversion, and Deep Gradient Leakage
           </p>
         </div>
-        <span className="text-xs font-mono text-rose-300 bg-rose-50 px-3 py-1 rounded-lg border border-rose-200 self-start sm:self-auto">
+        <span className="text-xs font-mono text-rose-600 bg-rose-50 px-3 py-1 rounded-lg border border-rose-200 self-start sm:self-auto">
           Audit Suite v2.4
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
         {/* Card 1: MIA */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all h-full">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -480,7 +480,7 @@ function AttackAuditPanel() {
           </div>
 
           {miaResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Classification:</span>
@@ -492,7 +492,7 @@ function AttackAuditPanel() {
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
               <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
@@ -520,7 +520,7 @@ function AttackAuditPanel() {
         </div>
 
         {/* Card 2: Model Inversion */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-sky-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-sky-500/40 transition-all h-full">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-sky-500/20 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-sky-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-sky-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -538,7 +538,7 @@ function AttackAuditPanel() {
           </div>
 
           {invResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Risk Tier:</span>
@@ -546,11 +546,11 @@ function AttackAuditPanel() {
               </div>
               <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Mean Norm: {invResult.mean_gradient_norm.toFixed(3)}</span>
-                <span>σ: {invResult.std_gradient_norm.toFixed(3)}</span>
+                <span>Ïƒ: {invResult.std_gradient_norm.toFixed(3)}</span>
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
               <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
@@ -578,7 +578,7 @@ function AttackAuditPanel() {
         </div>
 
         {/* Card 3: DLG */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all h-full">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -596,7 +596,7 @@ function AttackAuditPanel() {
           </div>
 
           {dlgResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Status:</span>
@@ -604,11 +604,11 @@ function AttackAuditPanel() {
               </div>
               <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Audited Weights:</span>
-                <span className="text-emerald-300 font-bold">{dlgResult.params_audited} params</span>
+                <span className="text-emerald-600 font-bold">{dlgResult.params_audited} params</span>
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
               <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
@@ -636,7 +636,7 @@ function AttackAuditPanel() {
         </div>
       </div>
 
-      {/* Interactive MIA Empirical Simulator under Rényi DP */}
+      {/* Interactive MIA Empirical Simulator under RÃ©nyi DP */}
       <MIASimulationVisualizer />
     </div>
   );
@@ -658,15 +658,15 @@ function BudgetLogSection() {
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
             <Database className="w-5 h-5 text-indigo-600" />
-            <span>Enterprise Privacy Budget Audit Log (DP-SGD ε)</span>
+            <span>Enterprise Privacy Budget Audit Log (DP-SGD Îµ)</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Rényi Differential Privacy (RDP) cumulative ε-consumption tracker with per-bank accountants and automated safety circuit-breaker
+            RÃ©nyi Differential Privacy (RDP) cumulative Îµ-consumption tracker with per-bank accountants and automated safety circuit-breaker
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-emerald-300 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
-            Consortium Target: ε ≤ {bankBudgets?.consortium_target_epsilon ?? 4.0}, δ = {bankBudgets?.consortium_target_delta?.toExponential(1) ?? '1.0e-5'}
+          <span className="text-xs font-mono text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
+            Consortium Target: Îµ â‰¤ {bankBudgets?.consortium_target_epsilon ?? 4.0}, Î´ = {bankBudgets?.consortium_target_delta?.toExponential(1) ?? '1.0e-5'}
           </span>
         </div>
       </div>
@@ -677,16 +677,16 @@ function BudgetLogSection() {
           ? 'bg-rose-100 border-rose-500/50 shadow-xl shadow-rose-500/20 text-rose-200'
           : anyExceeded
           ? 'bg-amber-100 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-200'
-          : 'bg-[#080a21]/90 border-indigo-200 shadow-lg shadow-indigo-500/10 text-slate-800'
+          : 'bg-white border-indigo-200 shadow-lg shadow-indigo-500/10 text-slate-800'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
             <div className={`p-2.5 rounded-xl shrink-0 ${
               isFrozen
-                ? 'bg-rose-500/20 text-rose-300 animate-pulse'
+                ? 'bg-rose-100 text-rose-600 animate-pulse'
                 : anyExceeded
-                ? 'bg-amber-500/20 text-amber-300 animate-pulse'
-                : 'bg-emerald-500/20 text-emerald-300'
+                ? 'bg-amber-100 text-amber-600 animate-pulse'
+                : 'bg-emerald-100 text-emerald-600'
             }`}>
               {isFrozen ? <Lock className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
             </div>
@@ -697,9 +697,9 @@ function BudgetLogSection() {
                     ? 'bg-rose-500/30 text-rose-200'
                     : anyExceeded
                     ? 'bg-amber-500/30 text-amber-200'
-                    : 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-emerald-100 text-emerald-600'
                 }`}>
-                  {isFrozen ? '🚨 TRAINING CIRCUIT-BREAKER ENGAGED' : '🛡️ CONSORTIUM SAFETY LOCK ACTIVE'}
+                  {isFrozen ? 'ğŸš¨ TRAINING CIRCUIT-BREAKER ENGAGED' : 'ğŸ›¡ï¸ CONSORTIUM SAFETY LOCK ACTIVE'}
                 </span>
                 {bankBudgets?.frozen_by_node && (
                   <span className="text-[11px] font-mono text-slate-500">
@@ -710,7 +710,7 @@ function BudgetLogSection() {
               <p className="text-xs sm:text-sm leading-relaxed">
                 {isFrozen
                   ? (bankBudgets?.freeze_reason || 'Consortium model training has been locked due to privacy budget exhaustion or operator safety override.')
-                  : 'Automated Rényi DP accountant monitors cumulative epsilon across all participating bank nodes. Training freezes instantly if any bank depletes ε_max.'}
+                  : 'Automated RÃ©nyi DP accountant monitors cumulative epsilon across all participating bank nodes. Training freezes instantly if any bank depletes Îµ_max.'}
               </p>
               {bankBudgets?.frozen_at && (
                 <span className="text-[10px] font-mono text-slate-500 block">
@@ -756,12 +756,12 @@ function BudgetLogSection() {
         </div>
       </div>
 
-      {/* 3. Consortium Bank Node Rényi DP (RDP) Accountant Grid */}
+      {/* 3. Consortium Bank Node RÃ©nyi DP (RDP) Accountant Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <Activity className="w-4 h-4 text-indigo-600" />
-            <span>Bank-Level Rényi DP Accountants (Live State)</span>
+            <span>Bank-Level RÃ©nyi DP Accountants (Live State)</span>
           </h3>
           <span className="text-xs font-mono text-slate-500">
             {nodes.length} Participating Bank Nodes
@@ -770,7 +770,7 @@ function BudgetLogSection() {
 
         {isBudgetsLoading ? (
           <div className="glass-card p-8 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
-            Querying per-bank Rényi DP accountants...
+            Querying per-bank RÃ©nyi DP accountants...
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 min-w-0">
@@ -786,7 +786,7 @@ function BudgetLogSection() {
                       ? 'bg-rose-50 border-rose-500/40 shadow-lg shadow-rose-500/10'
                       : isWarning
                       ? 'bg-amber-50 border-amber-500/40 shadow-md shadow-amber-500/10'
-                      : 'bg-[#080a21]/80 border-slate-200/80 hover:border-indigo-200'
+                      : 'bg-white border-slate-200/80 hover:border-indigo-200'
                   }`}
                 >
                   <div className="space-y-2.5">
@@ -804,10 +804,10 @@ function BudgetLogSection() {
                       </div>
                       <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
                         isExceeded
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                          ? 'bg-rose-100 text-rose-600 border border-rose-500/40'
                           : isWarning
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'bg-emerald-100 text-emerald-300 border border-emerald-200'
+                          ? 'bg-amber-100 text-amber-600 border border-amber-500/40'
+                          : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                       }`}>
                         {node.risk_tier}
                       </span>
@@ -815,7 +815,7 @@ function BudgetLogSection() {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500">Cumulative ε:</span>
+                        <span className="text-slate-500">Cumulative Îµ:</span>
                         <span className="font-bold text-slate-800">
                           {node.cumulative_epsilon.toFixed(3)} / {node.target_epsilon.toFixed(1)}
                         </span>
@@ -834,18 +834,18 @@ function BudgetLogSection() {
                       </div>
                       <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-0.5">
                         <span>Exhaustion: {node.budget_exhaustion_pct.toFixed(1)}%</span>
-                        <span>δ = {node.target_delta.toExponential(1)}</span>
+                        <span>Î´ = {node.target_delta.toExponential(1)}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-                        <span className="text-[9px] text-slate-500 block">Rényi α*</span>
+                        <span className="text-[9px] text-slate-500 block">RÃ©nyi Î±*</span>
                         <span className="text-slate-800 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-                        <span className="text-[9px] text-slate-500 block">Noise σ</span>
-                        <span className="text-indigo-300 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
+                        <span className="text-[9px] text-slate-500 block">Noise Ïƒ</span>
+                        <span className="text-indigo-600 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
                         <span className="text-[9px] text-slate-500 block">Rounds</span>
@@ -856,12 +856,12 @@ function BudgetLogSection() {
 
                   <div className="pt-2 border-t border-white/5 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-slate-500">
-                      {isExceeded ? '⚠️ Action Required' : 'Budget Secure'}
+                      {isExceeded ? 'âš ï¸ Action Required' : 'Budget Secure'}
                     </span>
                     <button
                       onClick={() => circuitBreakerAction.mutate({ action: 'reset_budget', node_id: node.node_id })}
                       disabled={circuitBreakerAction.isPending}
-                      className="text-[10.5px] font-mono text-indigo-600 hover:text-indigo-300 cursor-pointer transition-colors"
+                      className="text-[10.5px] font-mono text-indigo-600 hover:text-indigo-600 cursor-pointer transition-colors"
                     >
                       Reset Node
                     </button>
@@ -884,12 +884,12 @@ function BudgetLogSection() {
         </h3>
 
         {anyExceeded && (
-          <div className="rounded-2xl border border-rose-500/40 bg-rose-50 p-4 text-xs text-rose-300 flex items-start gap-3 shadow-lg shadow-rose-500/10">
+          <div className="rounded-2xl border border-rose-500/40 bg-rose-50 p-4 text-xs text-rose-600 flex items-start gap-3 shadow-lg shadow-rose-500/10">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <strong className="text-rose-200 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
-              <p className="text-rose-300/90 leading-relaxed">
-                One or more simulation runs have depleted the global Differential Privacy budget (ε &gt; 8.0). Active learning rounds have been isolated to prevent progressive data reconstruction.
+              <p className="text-rose-600/90 leading-relaxed">
+                One or more simulation runs have depleted the global Differential Privacy budget (Îµ &gt; 8.0). Active learning rounds have been isolated to prevent progressive data reconstruction.
               </p>
             </div>
           </div>
@@ -901,7 +901,7 @@ function BudgetLogSection() {
           </div>
         ) : entries.length === 0 ? (
           <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono rounded-2xl border border-dashed border-slate-200">
-            No training runs recorded in the current session. Run a federated round to initiate ε-tracking.
+            No training runs recorded in the current session. Run a federated round to initiate Îµ-tracking.
           </div>
         ) : (
           <>
@@ -916,7 +916,7 @@ function BudgetLogSection() {
                   className={`glass-card p-4 rounded-xl border space-y-3 ${
                     entry.budget_exhausted
                       ? 'bg-rose-500/5 border-rose-500/40'
-                      : 'bg-[#080a21]/90 border-slate-200'
+                      : 'bg-white border-slate-200'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -930,8 +930,8 @@ function BudgetLogSection() {
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                         entry.budget_exhausted
-                          ? 'bg-rose-500/20 text-rose-600 border border-rose-200'
-                          : 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
+                          ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                          : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                       }`}
                     >
                       {entry.budget_exhausted ? 'EXHAUSTED' : 'BUDGET OK'}
@@ -941,7 +941,7 @@ function BudgetLogSection() {
                   {/* Budget bar */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-mono">
-                      <span className="text-slate-500">Total ε Consumed:</span>
+                      <span className="text-slate-500">Total Îµ Consumed:</span>
                       <span
                         className="font-bold"
                         style={{
@@ -961,7 +961,7 @@ function BudgetLogSection() {
 
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-[10px] text-slate-500">Delta (δ)</div>
+                      <div className="text-[10px] text-slate-500">Delta (Î´)</div>
                       <div className="text-slate-800 font-bold">{entry.delta?.toExponential?.(1) ?? '1e-5'}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
@@ -969,8 +969,8 @@ function BudgetLogSection() {
                       <div className="text-slate-800 font-bold">{entry.rounds_spent}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-[10px] text-slate-500">ε / Round</div>
-                      <div className="text-indigo-300 font-bold">{entry.epsilon_per_round?.toFixed(3) ?? '0.120'}</div>
+                      <div className="text-[10px] text-slate-500">Îµ / Round</div>
+                      <div className="text-indigo-600 font-bold">{entry.epsilon_per_round?.toFixed(3) ?? '0.120'}</div>
                     </div>
                   </div>
                 </div>
@@ -979,16 +979,16 @@ function BudgetLogSection() {
           </div>
 
           {/* Desktop Table View (>= 768px) */}
-          <div className="hidden md:block glass-card rounded-2xl border border-indigo-200 bg-[#080a21]/90 overflow-hidden shadow-xl">
+          <div className="hidden md:block glass-card rounded-2xl border border-indigo-200 bg-white overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-950/60 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                  <tr className="bg-white/60 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                     <th className="py-3.5 px-4">Simulation ID</th>
-                    <th className="py-3.5 px-4 text-right">Total ε Spent</th>
-                    <th className="py-3.5 px-4 text-right">Target δ</th>
+                    <th className="py-3.5 px-4 text-right">Total Îµ Spent</th>
+                    <th className="py-3.5 px-4 text-right">Target Î´</th>
                     <th className="py-3.5 px-4 text-right">Rounds Spent</th>
-                    <th className="py-3.5 px-4 text-right">ε / Round</th>
+                    <th className="py-3.5 px-4 text-right">Îµ / Round</th>
                     <th className="py-3.5 px-4 text-center">Status</th>
                   </tr>
                 </thead>
@@ -1015,16 +1015,16 @@ function BudgetLogSection() {
                         {entry.delta?.toExponential?.(1) ?? '1.0e-5'}
                       </td>
                       <td className="py-3.5 px-4 text-right text-slate-800 font-bold">{entry.rounds_spent}</td>
-                      <td className="py-3.5 px-4 text-right text-indigo-300">
+                      <td className="py-3.5 px-4 text-right text-indigo-600">
                         {entry.epsilon_per_round?.toFixed(4) ?? '0.1200'}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {entry.budget_exhausted ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-600 border border-rose-200">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200">
                             EXHAUSTED
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-600 border border-emerald-200">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-600 border border-emerald-200">
                             BUDGET OK
                           </span>
                         )}
@@ -1042,7 +1042,7 @@ function BudgetLogSection() {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function PrivacyDefensePage() {
   const { data: methods = [], isLoading: methodsLoading } = useAggregationMethods();
@@ -1058,13 +1058,13 @@ export default function PrivacyDefensePage() {
     {
       id: 'audit' as const,
       label: 'Attack Audits',
-      desc: 'MIA · Inversion · DLG',
+      desc: 'MIA Â· Inversion Â· DLG',
       icon: ShieldAlert,
     },
     {
       id: 'budget' as const,
       label: 'Privacy Budget Log',
-      desc: 'DP-SGD ε Tracker',
+      desc: 'DP-SGD Îµ Tracker',
       icon: Database,
     },
   ];
@@ -1072,19 +1072,19 @@ export default function PrivacyDefensePage() {
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-900 w-full min-w-0">
       {/* Top Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start sm:items-center gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0 mt-0.5 sm:mt-0">
-              <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-600 shadow-indigo-100 shrink-0 mt-0.5 sm:mt-0">
+              <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight">
                   Privacy Defense & Byzantine Suite
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200 whitespace-nowrap">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-100 text-indigo-600 border border-indigo-200 whitespace-nowrap">
                   Opacus DP + TenSEAL CKKS
                 </span>
               </div>
@@ -1104,7 +1104,7 @@ export default function PrivacyDefensePage() {
       </div>
 
       {/* Segmented 3-Tab Selector (Zero Scroll, Mobile Perfected) */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-[#07091e]/90 border border-indigo-200 shadow-lg min-w-0">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-white border border-indigo-200 shadow-lg min-w-0">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -1122,7 +1122,7 @@ export default function PrivacyDefensePage() {
             >
               <div
                 className={`p-1.5 rounded-lg shrink-0 ${
-                  isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-50 text-slate-500'
+                  isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-500'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -1168,4 +1168,6 @@ export default function PrivacyDefensePage() {
     </div>
   );
 }
+
+
 
