@@ -742,7 +742,7 @@ export default function ApiDocsPage() {
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 Developer & API Reference Portal
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 whitespace-nowrap">
@@ -899,7 +899,7 @@ export default function ApiDocsPage() {
                 onClick={handleCopyCode}
                 aria-label={copiedCode ? 'Code copied to clipboard' : 'Copy code snippet'}
                 title={copiedCode ? 'Copied!' : 'Copy code'}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-white transition-all shrink-0 cursor-pointer border border-slate-200 active:scale-95"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-all shrink-0 cursor-pointer border border-slate-200 active:scale-95"
               >
                 {copiedCode ? (
                   <Check className="w-4 h-4 text-emerald-600" />

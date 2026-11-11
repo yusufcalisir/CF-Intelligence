@@ -137,7 +137,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
           <UsersIcon className="h-5 w-5 text-indigo-600 shrink-0" />
           <div>
             <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Consortium Members</div>
-            <div className="text-xs sm:text-sm font-bold text-white">{activeBanks.length} Nodes Registered</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-900">{activeBanks.length} Nodes Registered</div>
           </div>
         </div>
       </div>

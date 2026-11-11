@@ -42,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
-            <Server className="h-6 w-6 text-white" />
+            <Server className="h-6 w-6 text-slate-900" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Hamburger Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-white"
+          className="md:hidden p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>

@@ -305,7 +305,7 @@ export default function CoordinatorPage() {
                 <button
                   type="button"
                   onClick={() => handleCopyCurl('python scripts/cfi_cli.py init --bank-id bank_alpha --coordinator localhost:50051', 'CLI')}
-                  className="hover:text-white transition flex items-center gap-1 cursor-pointer"
+                  className="hover:text-slate-900 transition flex items-center gap-1 cursor-pointer"
                 >
                   {copiedPath === 'python scripts/cfi_cli.py init --bank-id bank_alpha --coordinator localhost:50051' ? (
                     <Check className="w-3 h-3 text-emerald-600" />

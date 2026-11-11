@@ -271,7 +271,7 @@ export default function CasesPage() {
               <button
                 type="button"
                 onClick={() => handleSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 cursor-pointer"
                 aria-label="Clear search"
               >
                 <X size={12} />
@@ -523,7 +523,7 @@ function CreateCaseModal({
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-[var(--color-text-muted)] hover:text-white p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            className="text-[var(--color-text-muted)] hover:text-slate-900 p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             ✕
           </button>
@@ -542,7 +542,7 @@ function CreateCaseModal({
               )}
             </div>
             <div className="font-mono text-[11px] text-slate-600 truncate">
-              Alert ID: <span className="text-white font-bold">{fromAlertId}</span>
+              Alert ID: <span className="text-slate-900 font-bold">{fromAlertId}</span>
             </div>
           </div>
         )}

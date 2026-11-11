@@ -80,14 +80,14 @@ export default function PilotActionModal({
         <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5">
             {iconMap[actionType]}
-            <h3 className="text-sm font-bold text-white tracking-wide">
+            <h3 className="text-sm font-bold text-slate-900 tracking-wide">
               {titleMap[actionType]}
             </h3>
           </div>
           <button
             onClick={onClose}
             disabled={isPending}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -97,7 +97,7 @@ export default function PilotActionModal({
         <div className="text-xs text-slate-600 space-y-2">
           <p>{descriptionMap[actionType]}</p>
           <div className="font-mono text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-            Target Pilot: <span className="text-white font-semibold">{pilotId}</span>
+            Target Pilot: <span className="text-slate-900 font-semibold">{pilotId}</span>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export default function PilotActionModal({
                 placeholder="Document the regulatory, operational, or compliance reason for this kill switch action..."
                 rows={3}
                 required
-                className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
+                className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
               />
             </div>
           )}
@@ -137,7 +137,7 @@ export default function PilotActionModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             >
               Cancel
             </button>

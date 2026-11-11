@@ -370,7 +370,7 @@ export default function AlertsPage() {
           <span>❌ {escalationError}</span>
           <button
             onClick={() => setEscalationError(null)}
-            className="text-rose-600 hover:text-white text-xs font-bold p-1 rounded"
+            className="text-rose-600 hover:text-slate-900 text-xs font-bold p-1 rounded"
             aria-label="Dismiss error"
           >
             ✕
@@ -387,7 +387,7 @@ export default function AlertsPage() {
           </div>
           <button
             onClick={() => setEscalationWarning(null)}
-            className="text-amber-600 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            className="text-amber-600 hover:text-slate-900 text-xs font-bold p-1 rounded transition-colors"
             aria-label="Dismiss warning"
           >
             ✕
@@ -514,7 +514,7 @@ function AlertCard({
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <span
-            className="px-2 py-0.5 rounded-full text-xs font-bold uppercase text-white"
+            className="px-2 py-0.5 rounded-full text-xs font-bold uppercase text-slate-900"
             style={{ backgroundColor: severityColor }}
           >
             {alert.severity}
@@ -574,7 +574,7 @@ function AlertCard({
               <Link
                 to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
                 onClick={(e) => e.stopPropagation()}
-                className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-white border border-indigo-200 transition-all flex items-center gap-1 group/ent"
+                className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-slate-900 border border-indigo-200 transition-all flex items-center gap-1 group/ent"
                 title={`Trace 2-hop ego network for ${entityId}`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover/ent:scale-125 transition-transform" />

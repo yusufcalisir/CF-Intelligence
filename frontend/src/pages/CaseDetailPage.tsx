@@ -460,7 +460,7 @@ export default function CaseDetailPage() {
           </div>
           <button
             onClick={handleDismissWarning}
-            className="text-amber-600 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            className="text-amber-600 hover:text-slate-900 text-xs font-bold p-1 rounded transition-colors"
             aria-label="Dismiss warning"
           >
             ✕
@@ -490,7 +490,7 @@ export default function CaseDetailPage() {
             </div>
           </div>
           <span
-            className="px-3 py-1 rounded-lg text-sm font-bold text-white self-start sm:self-auto"
+            className="px-3 py-1 rounded-lg text-sm font-bold text-slate-900 self-start sm:self-auto"
             style={{ backgroundColor: statusColor }}
           >
             {CASE_STATUS_LABELS[caseData.status] || caseData.status}
@@ -719,7 +719,7 @@ export default function CaseDetailPage() {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                       }}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
                     >
                       {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                       <span>{isCopied ? 'Copied' : 'Copy'}</span>
@@ -959,7 +959,7 @@ export default function CaseDetailPage() {
                   onClick={() => setSelectedAlertId(selectedAlertId === id ? null : id)}
                   className={`px-3 py-1 text-xs font-mono rounded transition-all border ${
                     selectedAlertId === id
-                      ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] font-bold shadow-md'
+                      ? 'bg-[var(--color-primary)] text-slate-900 border-[var(--color-primary)] font-bold shadow-md'
                       : 'bg-[var(--color-surface-alt)] border-[var(--color-border)] hover:border-[var(--color-primary)] text-[var(--color-text-primary)]'
                   }`}
                 >

@@ -148,7 +148,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'raw'
                 ? 'bg-cyan-500/20 text-cyan-700 border border-cyan-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-white'
+                : 'text-[var(--color-text-muted)] hover:text-slate-900'
             }`}
           >
             Raw Model
@@ -159,7 +159,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'platt'
                 ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-white'
+                : 'text-[var(--color-text-muted)] hover:text-slate-900'
             }`}
           >
             Platt Scaling
@@ -170,7 +170,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'isotonic'
                 ? 'bg-purple-500/20 text-purple-700 border border-purple-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-white'
+                : 'text-[var(--color-text-muted)] hover:text-slate-900'
             }`}
           >
             Isotonic (PAVA)
@@ -387,7 +387,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             <tbody>
               {chartData.map((b) => (
                 <tr key={b.bin_index} className="border-b border-slate-200 hover:bg-white/[0.02]">
-                  <td className="py-1 px-2 font-bold text-white">#{b.bin_index}</td>
+                  <td className="py-1 px-2 font-bold text-slate-900">#{b.bin_index}</td>
                   <td className="py-1 px-2 text-[var(--color-text-muted)]">{b.bin_label.split(' ')[1]}</td>
                   <td className="py-1 px-2 text-cyan-700">{b.mean_confidence.toFixed(3)}</td>
                   <td className="py-1 px-2 text-emerald-700">{b.empirical_ratio.toFixed(3)}</td>

@@ -641,7 +641,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               <button
                 type="submit"
                 disabled={feedbackMutation.isPending}
-                className="px-4 py-1.5 bg-[var(--color-accent-teal)] hover:bg-[var(--color-accent-teal)]/90 text-white rounded text-xs font-semibold shrink-0 active:scale-95 transition-all"
+                className="px-4 py-1.5 bg-[var(--color-accent-teal)] hover:bg-[var(--color-accent-teal)]/90 text-slate-900 rounded text-xs font-semibold shrink-0 active:scale-95 transition-all"
               >
                 {feedbackMutation.isPending ? 'Submitting...' : 'Submit outcome'}
               </button>
@@ -759,7 +759,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                 <button
                   type="submit"
                   disabled={signoffMutation.isPending}
-                  className="px-4 py-1.5 bg-[var(--color-status-success)] hover:bg-[var(--color-status-success)]/95 text-white rounded text-xs font-semibold"
+                  className="px-4 py-1.5 bg-[var(--color-status-success)] hover:bg-[var(--color-status-success)]/95 text-slate-900 rounded text-xs font-semibold"
                 >
                   {signoffMutation.isPending ? 'Submitting...' : 'Authorize Sign-Off'}
                 </button>

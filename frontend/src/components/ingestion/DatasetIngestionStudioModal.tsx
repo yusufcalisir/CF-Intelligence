@@ -206,7 +206,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
           </div>
           <button
             onClick={resetModal}
-            className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-slate-50 transition-colors"
+            className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <X size={18} />
           </button>

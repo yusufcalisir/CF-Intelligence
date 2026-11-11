@@ -69,9 +69,9 @@ export default function FederatedTrainingAnimation({
               <div className="w-10 sm:w-12 2xl:w-16 shrink-0 flex flex-col items-center">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-500 shrink-0 ${isDone
-                    ? 'bg-[var(--color-status-success)] text-white'
+                    ? 'bg-[var(--color-status-success)] text-slate-900'
                     : isCurrent
-                      ? 'bg-[var(--color-accent-indigo)] text-white shadow-lg shadow-[var(--color-accent-indigo)]/30'
+                      ? 'bg-[var(--color-accent-indigo)] text-slate-900 shadow-lg shadow-[var(--color-accent-indigo)]/30'
                       : 'bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] border border-[var(--color-border)]'
                     }`}
                 >

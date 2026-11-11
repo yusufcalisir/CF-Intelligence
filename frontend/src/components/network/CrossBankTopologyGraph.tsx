@@ -545,7 +545,7 @@ export default function CrossBankTopologyGraph({
               };
               const activeColorClass = {
                 global: 'bg-violet-600 text-white font-semibold shadow-sm',
-                bank_a: 'bg-sky-600 text-white font-semibold shadow-sm',
+                bank_a: 'bg-sky-600 text-slate-900 font-semibold shadow-sm',
                 bank_b: 'bg-indigo-600 text-white font-semibold shadow-sm',
                 bank_c: 'bg-emerald-600 text-white font-semibold shadow-sm',
               }[hKey];
@@ -1036,7 +1036,7 @@ export default function CrossBankTopologyGraph({
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="text-slate-500 hover:text-white text-xs px-1"
+                  className="text-slate-500 hover:text-slate-900 text-xs px-1"
                 >
                   ✕
                 </button>

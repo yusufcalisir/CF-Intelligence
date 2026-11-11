@@ -221,7 +221,7 @@ export default function InvestigationDashboard() {
           </Link>
           <Link
             to="/cases"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-white bg-slate-50 border border-slate-200 hover:bg-slate-50 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 hover:bg-slate-50 transition-all"
           >
             📋 Workbench
           </Link>
@@ -327,7 +327,7 @@ export default function InvestigationDashboard() {
                       title={`Filter alerts by ${severity.toUpperCase()}`}
                     >
                       <div className="flex justify-between text-xs">
-                        <span className="capitalize font-semibold text-slate-600 flex items-center gap-1.5 group-hover/sev:text-white transition-colors">
+                        <span className="capitalize font-semibold text-slate-600 flex items-center gap-1.5 group-hover/sev:text-slate-900 transition-colors">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           {severity}
                         </span>
@@ -382,7 +382,7 @@ export default function InvestigationDashboard() {
                     title={`Filter alerts for ${BANK_NAMES[bankId] || bankId}`}
                   >
                     <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-slate-600 flex items-center gap-1.5 group-hover/bank:text-white transition-colors">
+                      <span className="font-semibold text-slate-600 flex items-center gap-1.5 group-hover/bank:text-slate-900 transition-colors">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: bankColor }} />
                         {BANK_NAMES[bankId] || bankId}
                       </span>

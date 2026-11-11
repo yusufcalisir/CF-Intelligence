@@ -37,7 +37,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-semibold text-white tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-900 tracking-wide">
               Authoritative Preflight Verification Probes
             </h3>
           </div>
@@ -127,7 +127,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
                     ) : (
                       <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                     )}
-                    <span className="text-xs font-mono font-semibold text-white">
+                    <span className="text-xs font-mono font-semibold text-slate-900">
                       {check.check_name}
                     </span>
                     <span

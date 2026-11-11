@@ -46,7 +46,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             <button
               onClick={handleCopyDigest}
               title="Copy full 64-character SHA-256 scope digest"
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-600 hover:text-white transition-colors border border-slate-200"
+              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
             </button>
@@ -93,7 +93,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
           <div className="grid grid-cols-2 gap-2 pt-1">
             <div>
               <div className="text-[11px] text-slate-500">Total Enclave Quota</div>
-              <div className="text-lg font-mono font-bold text-white">
+              <div className="text-lg font-mono font-bold text-slate-900">
                 {pilot.queries_total_quota} <span className="text-xs text-slate-500">queries</span>
               </div>
             </div>

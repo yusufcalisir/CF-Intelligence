@@ -101,7 +101,7 @@ export default function FlagshipConsortiumWidget() {
               3 Institutions · 7 Scenarios
             </span>
           </div>
-          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <span>🏛️</span>
             <span>Multi-Bank Consortium Collaborative Advantage</span>
           </h2>

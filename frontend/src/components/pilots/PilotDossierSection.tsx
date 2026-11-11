@@ -42,7 +42,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-semibold text-white tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-900 tracking-wide">
               Authoritative Compliance & Audit Dossier
             </h3>
           </div>
@@ -67,7 +67,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
               disabled={!dossier || isLoading}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {downloadSuccess ? <Check className="w-3.5 h-3.5 text-white" /> : <Download className="w-3.5 h-3.5" />}
+              {downloadSuccess ? <Check className="w-3.5 h-3.5 text-slate-900" /> : <Download className="w-3.5 h-3.5" />}
               {downloadSuccess ? 'Downloaded' : 'Export Dossier JSON'}
             </button>
           )}
@@ -112,7 +112,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
             <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
             <div className="space-y-0.5 flex-1">
               <div className="flex justify-between">
-                <span className="font-bold text-white">{pilot.status}</span>
+                <span className="font-bold text-slate-900">{pilot.status}</span>
                 <span className="text-slate-500">{new Date(pilot.updated_at).toLocaleString()}</span>
               </div>
               <div className="text-slate-500">{pilot.status_reason || 'Initial provision or transition'}</div>
@@ -123,7 +123,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
               <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
               <div className="space-y-0.5 flex-1">
                 <div className="flex justify-between">
-                  <span className="font-bold text-white">ACTIVATED</span>
+                  <span className="font-bold text-slate-900">ACTIVATED</span>
                   <span className="text-slate-500">{new Date(pilot.activated_at).toLocaleString()}</span>
                 </div>
                 <div className="text-slate-500">Pilot activated for live queries</div>
@@ -135,7 +135,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
               <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0 mt-1.5" />
               <div className="space-y-0.5 flex-1">
                 <div className="flex justify-between">
-                  <span className="font-bold text-white">TERMINATED ({pilot.status})</span>
+                  <span className="font-bold text-slate-900">TERMINATED ({pilot.status})</span>
                   <span className="text-slate-500">{new Date(pilot.terminated_at).toLocaleString()}</span>
                 </div>
                 <div className="text-slate-500">{pilot.termination_reason || 'Pilot concluded'}</div>

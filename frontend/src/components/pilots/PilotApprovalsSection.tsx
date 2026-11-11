@@ -76,7 +76,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Key className="w-5 h-5 text-purple-600" />
-            <h3 className="text-sm font-semibold text-white tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-900 tracking-wide">
               Independent Bilateral & Operator Approvals
             </h3>
           </div>
@@ -129,7 +129,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               } space-y-3`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold tracking-wider uppercase text-white">
+                <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-900">
                   {entityId === 'OPERATOR' ? 'Consortium Operator' : entityId.toUpperCase()}
                 </span>
                 {isApproved && !isStale && (
@@ -153,7 +153,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 <div className="space-y-1.5 text-[11px] font-mono text-slate-600">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Approver ID:</span>
-                    <span className="text-white truncate max-w-[140px]">{approval.approver_id}</span>
+                    <span className="text-slate-900 truncate max-w-[140px]">{approval.approver_id}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Role:</span>
@@ -206,7 +206,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 <select
                   value={approvingInstitution}
                   onChange={(e) => setApprovingInstitution(e.target.value)}
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 >
                   {approvableOptions.map((inst) => (
                     <option key={inst} value={inst}>
@@ -228,7 +228,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. Approved per Q4 Cross-Border AML Enclave Authorization"
-                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -254,7 +254,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
                 placeholder="128-char hex Ed25519 signature computed over canonical approval bytes above"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               />
             </div>
 

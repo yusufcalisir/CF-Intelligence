@@ -36,7 +36,7 @@ export default function ConsortiumPage() {
               EMPIRICALLY VERIFIED
             </span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-slate-900">
             Cross-Bank Synthetic Consortium Benchmark
           </h1>
           <p className="text-sm text-slate-600 max-w-3xl mt-1 leading-relaxed">
@@ -176,7 +176,7 @@ export default function ConsortiumPage() {
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6 backdrop-blur-md shadow-xl shrink-0 w-full min-h-fit">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
               <ShieldCheck className="h-5 w-5 text-indigo-600 shrink-0" />
               <span>Canonical Scenarios Empirical Matrix</span>
               <span className="text-xs font-mono text-slate-500 font-normal">(Scenarios 1–7)</span>

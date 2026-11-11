@@ -168,7 +168,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                 <BarChart3 className="w-5 h-5 animate-pulse" />
               </div>
               <div className="min-w-0">
-                <h3 id="benchmark-modal-title" className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                <h3 id="benchmark-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
                   Initializing Benchmark Sandbox
                 </h3>
                 <p id="benchmark-modal-desc" className="text-xs text-indigo-700/80 font-mono truncate">
@@ -183,7 +183,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>

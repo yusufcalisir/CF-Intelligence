@@ -336,7 +336,7 @@ export default function PoliciesPage() {
             <ShieldCheck className="w-4 h-4" />
             Declarative AML & Fraud Policy Engine
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
             Policy Rules & Decisions
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] max-w-2xl mt-1">
@@ -362,7 +362,7 @@ export default function PoliciesPage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-900">
                 <Shield className="w-5 h-5 text-indigo-600" />
                 <span>Active Rules Registry</span>
               </h2>
@@ -384,7 +384,7 @@ export default function PoliciesPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-white text-base">
+                          <h3 className="font-bold text-slate-900 text-base">
                             {rule.rule_name}
                           </h3>
                           <span
@@ -474,7 +474,7 @@ export default function PoliciesPage() {
         <div id="dynamic-rule-tester-panel" className="space-y-6">
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-              <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-900">
                 <Zap className="w-5 h-5 text-amber-600" />
                 <span>Dynamic Rule Tester</span>
               </h2>
@@ -561,7 +561,7 @@ export default function PoliciesPage() {
                       type="button"
                       onClick={() => setLoadedAlertInfo(null)}
                       aria-label="Dismiss loaded alert banner"
-                      className="text-slate-500 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
+                      className="text-slate-500 hover:text-slate-900 ml-2 text-xs cursor-pointer p-0.5"
                     >
                       ✕
                     </button>
@@ -682,7 +682,7 @@ export default function PoliciesPage() {
                     {editingRule ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h3 id="rule-modal-title" className="text-lg font-bold text-white">
+                    <h3 id="rule-modal-title" className="text-lg font-bold text-slate-900">
                       {editingRule ? `Edit Policy Rule: ${editingRule.rule_name}` : 'Create Dynamic Policy Rule'}
                     </h3>
                     <p className="text-xs text-slate-500">
@@ -698,7 +698,7 @@ export default function PoliciesPage() {
                     setEditingRule(null);
                   }}
                   aria-label="Close modal"
-                  className="text-slate-500 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
+                  className="text-slate-500 hover:text-slate-900 text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
                 >
                   ✕
                 </button>
@@ -722,7 +722,7 @@ export default function PoliciesPage() {
                       onClick={() => handleApplyTemplateToModal(tpl)}
                       className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-slate-50 hover:bg-indigo-50 transition-all text-xs cursor-pointer group"
                     >
-                      <div className="font-semibold text-white group-hover:text-indigo-700 flex items-center justify-between">
+                      <div className="font-semibold text-slate-900 group-hover:text-indigo-700 flex items-center justify-between">
                         <span className="truncate">{tpl.badge}</span>
                         <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 uppercase">
                           {tpl.action.split('_')[0]}
@@ -745,7 +745,7 @@ export default function PoliciesPage() {
                     type="text"
                     required
                     placeholder="e.g. suspicious_high_value_block"
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-slate-900 focus:outline-none focus:border-indigo-500"
                     value={newRuleName}
                     onChange={(e) => setNewRuleName(e.target.value)}
                   />
@@ -758,7 +758,7 @@ export default function PoliciesPage() {
                   <select
                     id="modal-rule-action-select"
                     aria-label="Modal Triggered Action"
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-slate-900 focus:outline-none focus:border-indigo-500"
                     value={newRuleAction}
                     onChange={(e) => setNewRuleAction(e.target.value)}
                   >

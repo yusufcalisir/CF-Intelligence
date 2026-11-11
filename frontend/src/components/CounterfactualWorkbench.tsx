@@ -241,7 +241,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <Link
             to="/alerts"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:text-white hover:border-slate-200 transition-all shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-200 transition-all shrink-0"
             title="Return to Consortium Alerts Feed"
           >
             <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
@@ -325,7 +325,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                         className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-cyan-50 text-cyan-700'
-                            : 'hover:bg-slate-100/80 text-slate-600 hover:text-white'
+                            : 'hover:bg-slate-100/80 text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         <div className="flex flex-col min-w-0 flex-1">
@@ -390,7 +390,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
         <div className="flex items-center gap-2 self-start md:self-auto shrink-0 w-full sm:w-auto">
           <button
             onClick={handleResetSliders}
-            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-500 text-xs font-semibold text-slate-600 hover:text-white transition-all shadow-sm cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-500 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
             title="Reset sliders to baseline values"
           >
             <RotateCcw className="h-3.5 w-3.5" />

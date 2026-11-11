@@ -305,7 +305,7 @@ export default function PsiPage() {
           <span className="font-semibold text-amber-700">Research & Benchmark Simulation Environment:</span>{' '}
           This interactive playground evaluates blinded Diffie-Hellman and MinHash fuzzy set intersection in software emulation.
           Physical hardware enclaves (Intel SGX) are absent in this runtime. For institutionally authorized cross-bank intelligence and immutable case evidence ledgers, use the{' '}
-          <Link to="/alerts" className="underline font-semibold text-amber-700 hover:text-white">
+          <Link to="/alerts" className="underline font-semibold text-amber-700 hover:text-slate-900">
             Authorized Cross-Bank Intelligence Workflow
           </Link>.
         </div>

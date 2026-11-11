@@ -149,7 +149,7 @@ export function ThresholdTuningSlider({
             <Sliders className="w-4 h-4" />
             Cost-Sensitive Risk Threshold & Financial Utility Optimizer
           </div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             Decision Threshold Tuning
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-mono border border-indigo-200">
               τ = {threshold} ({(threshold / 1000).toFixed(2)})
@@ -175,7 +175,7 @@ export function ThresholdTuningSlider({
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="text-xs text-slate-500 hover:text-white p-1.5 rounded bg-slate-100/80 hover:bg-slate-700 transition-colors"
+            className="text-xs text-slate-500 hover:text-slate-900 p-1.5 rounded bg-slate-100/80 hover:bg-slate-700 transition-colors"
             title="Reset parameters to defaults"
             aria-label="Reset parameters"
           >
@@ -316,7 +316,7 @@ export function ThresholdTuningSlider({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div className="text-[11px] text-slate-500 font-medium">Expected Total Cost</div>
-          <div className="text-lg font-bold text-white font-mono mt-0.5">
+          <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">
             ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
           <div className="text-[10px] text-slate-500">c_FN·FN + c_FP·FP + c_TP·TP</div>
@@ -346,7 +346,7 @@ export function ThresholdTuningSlider({
             <CheckCircle className="w-3 h-3 text-emerald-600" />
             <span>Optimal Cutoff (τ*)</span>
           </div>
-          <div className="text-lg font-bold text-white font-mono mt-0.5">
+          <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">
             {optimalPoint.threshold}
             {isCurrentOptimal && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 font-sans">

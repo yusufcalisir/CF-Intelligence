@@ -251,7 +251,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                           <button
                             type="button"
                             onClick={() => setShowDownloadPanel((prev) => !prev)}
-                            className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-white hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                            className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-slate-900 hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
                           >
                             <span>📥</span>
                             <span>{showDownloadPanel ? 'Close Downloader' : 'Download to Server'}</span>
@@ -817,7 +817,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
         type="button"
         onClick={handleStart}
         disabled={createMutation.isPending || isSubmittingRef.current}
-        className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-slate-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           background: 'linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-teal))',
         }}

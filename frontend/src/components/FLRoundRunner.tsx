@@ -69,7 +69,7 @@ export const FLRoundRunner: React.FC = () => {
         <button
           onClick={handleStartFLSimulation}
           disabled={isTraining}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs text-white transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs text-slate-900 transition-all ${
             isTraining
               ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
               : 'bg-gradient-to-r from-cyan-500 to-purple-600 shadow-lg shadow-cyan-500/20 hover:opacity-90'

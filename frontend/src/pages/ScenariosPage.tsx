@@ -305,7 +305,7 @@ export default function ScenariosPage() {
                     <button
                       onClick={() => handleStart(scenarioType)}
                       disabled={startScenario.isPending || isRunning}
-                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-white hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-slate-900 hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                       style={{ background: SCENARIO_GRADIENTS[scenarioType] || SCENARIO_GRADIENTS.fraud_ring }}
                     >
                       {startScenario.isPending ? (

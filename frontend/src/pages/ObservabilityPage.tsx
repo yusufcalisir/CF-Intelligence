@@ -174,7 +174,7 @@ export default function ObservabilityPage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl shrink-0">⚡</span>
               <div>
-                <div className="font-bold text-sm text-white">Automated Federated Re-training Round Initiated</div>
+                <div className="font-bold text-sm text-slate-900">Automated Federated Re-training Round Initiated</div>
                 <div className="text-xs opacity-90">
                   Simulation ID: <span className="font-mono text-cyan-700 font-bold">{triggerRetrain.data.new_simulation_id}</span> | Reason: {triggerRetrain.data.reason}
                 </div>
@@ -375,7 +375,7 @@ export default function ObservabilityPage() {
                       className={`px-2 py-1 rounded text-xs font-mono ${
                         targetRounds === rounds
                           ? 'bg-indigo-600 text-white font-bold'
-                          : 'bg-slate-50 text-slate-500 hover:text-white'
+                          : 'bg-slate-50 text-slate-500 hover:text-slate-900'
                       }`}
                     >
                       {rounds}R
@@ -424,7 +424,7 @@ export default function ObservabilityPage() {
                       className="p-4 rounded-xl bg-white border border-slate-200 space-y-3 shadow-lg"
                     >
                       <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                        <span className="font-mono font-bold text-xs text-white truncate">
+                        <span className="font-mono font-bold text-xs text-slate-900 truncate">
                           {fd.feature_name}
                         </span>
                         <span
@@ -706,7 +706,7 @@ export default function ObservabilityPage() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
                       siemFormat === 'json'
                         ? 'bg-cyan-600 text-white'
-                        : 'text-slate-500 hover:text-white'
+                        : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
                     JSON (Splunk/ELK)
@@ -716,7 +716,7 @@ export default function ObservabilityPage() {
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
                       siemFormat === 'cef'
                         ? 'bg-cyan-600 text-white'
-                        : 'text-slate-500 hover:text-white'
+                        : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
                     CEF (ArcSight)

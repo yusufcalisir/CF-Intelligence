@@ -297,7 +297,7 @@ export default function DatasetTrainingConfigPanel({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => onLaunch(selectedProfile, mode)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm text-white shadow-lg transition-all"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm text-slate-900 shadow-lg transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                   boxShadow: `0 4px 20px ${selectedProfile.color}40`,

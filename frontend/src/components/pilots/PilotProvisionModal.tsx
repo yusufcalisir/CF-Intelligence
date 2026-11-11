@@ -105,14 +105,14 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
         <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5">
             <ShieldPlus className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-bold text-white tracking-wide">
+            <h3 className="text-sm font-bold text-slate-900 tracking-wide">
               Provision Governed Two-Bank Controlled Pilot
             </h3>
           </div>
           <button
             onClick={onClose}
             disabled={provisionMutation.isPending}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -143,7 +143,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 placeholder="e.g. pilot_bilateral_2026_q4"
                 pattern="^[a-zA-Z0-9_\-]+$"
                 required
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">Alphanumeric, underscores, hyphens only</span>
             </div>
@@ -158,7 +158,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 onChange={(e) => setConsortiumId(e.target.value)}
                 placeholder="e.g. cfi-consortium"
                 required
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               {cleanConsortiumId && (
                 <span className="text-[10px] text-slate-500 mt-0.5 block">
@@ -182,7 +182,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankA}
                   onChange={(e) => setBankA(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -198,7 +198,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankA(e.target.value)}
                   placeholder="e.g. bank_a"
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
@@ -212,7 +212,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankB}
                   onChange={(e) => setBankB(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -228,7 +228,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankB(e.target.value)}
                   placeholder="e.g. bank_b"
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
@@ -240,7 +240,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               >
                 {STANDARD_PURPOSES.map((p) => (
                   <option key={p} value={p}>
@@ -257,7 +257,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 value={jurisdiction}
                 onChange={(e) => setJurisdiction(e.target.value)}
                 placeholder="e.g. eu-central-1"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 max="365"
                 value={durationDays}
                 onChange={(e) => setDurationDays(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 min="1"
                 value={quotaTotal}
                 onChange={(e) => setQuotaTotal(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -293,7 +293,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 min="1"
                 value={quotaPerBank}
                 onChange={(e) => setQuotaPerBank(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -304,7 +304,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 value={grantId}
                 onChange={(e) => setGrantId(e.target.value)}
                 placeholder="Optional Grant Reference"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -334,7 +334,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={coordUrl}
                   onChange={(e) => setCoordUrl(e.target.value)}
                   placeholder="https://coordinator.consortium..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
               <div>
@@ -344,7 +344,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankAUrl}
                   onChange={(e) => setBankAUrl(e.target.value)}
                   placeholder="https://worker-a.bank..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
               <div>
@@ -354,7 +354,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankBUrl}
                   onChange={(e) => setBankBUrl(e.target.value)}
                   placeholder="https://worker-b.bank..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
                 />
               </div>
             </div>
@@ -365,7 +365,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               type="button"
               onClick={onClose}
               disabled={provisionMutation.isPending}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-white bg-slate-100 hover:bg-slate-700 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-700 transition-colors cursor-pointer"
             >
               Cancel
             </button>

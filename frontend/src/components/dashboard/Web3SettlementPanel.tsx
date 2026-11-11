@@ -96,7 +96,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
             <CoinsIcon className="w-6 h-6 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               Automated Smart Contract Settlement
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 border border-emerald-500/40 font-mono">
                 EVM Web3 / CBDC
@@ -187,7 +187,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
                     payout.is_quarantined ? 'bg-amber-50' : ''
                   }`}
                 >
-                  <td className="py-2.5 px-3 font-sans font-medium text-white flex items-center space-x-2">
+                  <td className="py-2.5 px-3 font-sans font-medium text-slate-900 flex items-center space-x-2">
                     <span>{payout.bank_name || 'Consortium Bank'}</span>
                   </td>
                   <td className="py-2.5 px-3 text-slate-500 text-[11px]" title={payout.wallet_address || 'Unspecified Address'}>

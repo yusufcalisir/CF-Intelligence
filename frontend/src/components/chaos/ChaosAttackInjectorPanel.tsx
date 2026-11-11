@@ -215,7 +215,7 @@ export default function ChaosAttackInjectorPanel({
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-slate-500 hover:text-white p-1 rounded hover:bg-slate-50 transition-colors"
+            className="text-slate-500 hover:text-slate-900 p-1 rounded hover:bg-slate-50 transition-colors"
             title="Dismiss error"
           >
             <X size={14} />

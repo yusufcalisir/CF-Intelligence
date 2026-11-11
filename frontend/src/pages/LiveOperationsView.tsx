@@ -1170,7 +1170,7 @@ export default function LiveOperationsView() {
                 <button
                   id="import-custom-dataset-btn"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-700 hover:text-white bg-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-700 hover:text-slate-900 bg-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
                 >
                   <FileUp size={14} className="text-indigo-600" />
                   <span>Import Dataset</span>
@@ -1191,7 +1191,7 @@ export default function LiveOperationsView() {
                   whileTap={{ scale: 0.96 }}
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                     boxShadow: `0 4px 16px ${selectedProfile.color}35`,
@@ -1205,7 +1205,7 @@ export default function LiveOperationsView() {
               <button
                 id="reset-simulation-btn"
                 onClick={resetTraining}
-                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
+                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
                   trainingPhase === 'failed'
                     ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-90'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'

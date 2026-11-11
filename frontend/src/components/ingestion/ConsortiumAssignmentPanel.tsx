@@ -91,7 +91,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'replace_partition'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'bg-slate-50 text-slate-500 hover:text-white'
+                  : 'bg-slate-50 text-slate-500 hover:text-slate-900'
               }`}
             >
               Replace Partition
@@ -102,7 +102,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'append_partition'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'bg-slate-50 text-slate-500 hover:text-white'
+                  : 'bg-slate-50 text-slate-500 hover:text-slate-900'
               }`}
             >
               Append Records

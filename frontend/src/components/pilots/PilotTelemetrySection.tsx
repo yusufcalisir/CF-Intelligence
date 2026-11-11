@@ -37,7 +37,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         </p>
         <button
           onClick={() => refetch()}
-          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-700 text-white text-xs border border-slate-200 font-medium"
+          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-900 text-xs border border-slate-200 font-medium"
         >
           Retry Telemetry Poll
         </button>
@@ -149,7 +149,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
             Enclave Quota Reservation ({telemetry.queries_executed} / {telemetry.query_quota_total})
           </div>
           <span className="text-xs font-mono text-slate-500">
-            Remaining: <strong className="text-white">{telemetry.quota_remaining}</strong>
+            Remaining: <strong className="text-slate-900">{telemetry.quota_remaining}</strong>
           </span>
         </div>
 

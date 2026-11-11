@@ -1468,7 +1468,7 @@ export default function LandingPage() {
                       key={sub.target}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
@@ -1512,7 +1512,7 @@ export default function LandingPage() {
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
@@ -1556,7 +1556,7 @@ export default function LandingPage() {
                       key={sub.label}
                       type="button"
                       onClick={sub.action}
-                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item text-left cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item text-left cursor-pointer"
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
@@ -1600,7 +1600,7 @@ export default function LandingPage() {
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
@@ -1625,7 +1625,7 @@ export default function LandingPage() {
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-white cursor-pointer transition-colors active:scale-95"
+                className="lg:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 cursor-pointer transition-colors active:scale-95"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
@@ -1655,14 +1655,14 @@ export default function LandingPage() {
                 <div className="flex items-center gap-3">
                   <BrandLogo className="w-8 h-8 shrink-0" />
                   <div>
-                    <div className="font-bold text-sm text-white tracking-tight">CF-Intelligence</div>
+                    <div className="font-bold text-sm text-slate-900 tracking-tight">CF-Intelligence</div>
                     <div className="text-[10px] font-mono text-slate-500">Consortium Fraud Network</div>
                   </div>
                 </div>
                 <button
                   aria-label="Close Navigation Menu"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
                 >
                   <CloseIcon />
                 </button>
@@ -1693,7 +1693,7 @@ export default function LandingPage() {
                       <span className="text-xs font-mono font-bold text-indigo-600 group-hover:text-indigo-700 shrink-0">
                         {item.num}
                       </span>
-                      <span className="text-base font-semibold text-slate-700 group-hover:text-white truncate">
+                      <span className="text-base font-semibold text-slate-700 group-hover:text-slate-900 truncate">
                         {item.label}
                       </span>
                     </div>
@@ -1787,7 +1787,7 @@ export default function LandingPage() {
                 <a
                   href="#architecture"
                   onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
-                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-white bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
+                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-slate-900 bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
                 >
                   <span>Explore System Design</span>
                 </a>
@@ -2308,7 +2308,7 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setIsReportOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-500/30 hover:bg-cyan-50 hover:text-white transition-all shadow-sm cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-500/30 hover:bg-cyan-50 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   <span>Technical Report Dossier</span>
@@ -2351,7 +2351,7 @@ export default function LandingPage() {
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                       )}
                     </div>
-                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-700'}`}>
+                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
                       {ds.name.split('(')[0]?.trim()}
                     </div>
                     <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">
@@ -2374,7 +2374,7 @@ export default function LandingPage() {
                       <div className="text-[10px] font-mono text-emerald-600 uppercase tracking-wider">
                         Collaborative Gain (Δcollab)
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                         {activeDs.uplift}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -2386,7 +2386,7 @@ export default function LandingPage() {
                       <div className="text-[10px] font-mono text-cyan-600 uppercase tracking-wider">
                         False Alarm Reduction
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                         {activeDs.fpReduction}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -2398,7 +2398,7 @@ export default function LandingPage() {
                       <div className="text-[10px] font-mono text-indigo-600 uppercase tracking-wider">
                         Sub-ms Inference Latency
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                         {activeDs.latency}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -2410,7 +2410,7 @@ export default function LandingPage() {
                       <div className="text-[10px] font-mono text-purple-600 uppercase tracking-wider">
                         Net Economic Advantage
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                         {activeDs.roi}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -2423,7 +2423,7 @@ export default function LandingPage() {
                   <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 backdrop-blur-xl shadow-2xl space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
                       <div>
-                        <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                           <span>{activeDs.name}</span>
                           <span className="text-xs font-mono font-normal text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200">
                             {activeDs.scope}
@@ -2469,7 +2469,7 @@ export default function LandingPage() {
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-3 px-3 font-bold text-white">
+                              <td className="py-3 px-3 font-bold text-slate-900">
                                 {r.prauc}
                               </td>
                               <td className="py-3 px-3 text-slate-700">
@@ -2511,7 +2511,7 @@ export default function LandingPage() {
                         <div className="grid grid-cols-2 gap-2 text-center text-xs">
                           <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
                             <div className="text-[10px] text-emerald-600">True Positives (TP)</div>
-                            <div className="text-base font-bold text-white mt-0.5">{activeDs.cm.tp}</div>
+                            <div className="text-base font-bold text-slate-900 mt-0.5">{activeDs.cm.tp}</div>
                             <div className="text-[9px] text-slate-500 mt-0.5">Caught Frauds</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300">
@@ -2540,7 +2540,7 @@ export default function LandingPage() {
                           <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
                               <div className="text-[9px] text-slate-500">Precision</div>
-                              <div className="font-bold text-white mt-0.5">{activeDs.cm.precision}</div>
+                              <div className="font-bold text-slate-900 mt-0.5">{activeDs.cm.precision}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
                               <div className="text-[9px] text-slate-500">Recall</div>
@@ -2588,7 +2588,7 @@ export default function LandingPage() {
                 <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200">
                   DESIGN PARTNER PILOT PROGRAM (2026)
                 </span>
-                <h3 className="text-xl sm:text-2xl font-bold text-white">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Pilot on Your Anonymized Institutional Data with Zero Raw PII Risk
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -2609,7 +2609,7 @@ export default function LandingPage() {
                 </button>
                 <a
                   href="mailto:ysfcals@gmail.com?subject=Design%20Partner%20Pilot%20Inquiry"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-white bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-slate-900 bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
                 >
                   <span>Request Pilot Agreement</span>
                 </a>
@@ -2989,7 +2989,7 @@ telemetry.on('round.stage', (evt) => {
                     <span className="text-indigo-700 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
                       onClick={handleCopyEmail}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-white transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
                     >
                       {isCopied ? 'Copied!' : 'Copy Email'}
                     </button>
@@ -3169,7 +3169,7 @@ function BankDetailsDrawerModal({
           <button
             onClick={onClose}
             aria-label="Close node detail drawer"
-            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             Close
           </button>

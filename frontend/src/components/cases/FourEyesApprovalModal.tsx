@@ -123,7 +123,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   Four-Eyes Dual Control Signoff
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-500/40">
                     Art. 14 High-Risk AI
@@ -137,7 +137,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-100/60 transition-colors"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100/60 transition-colors"
             >
               ✕
             </button>
@@ -151,7 +151,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Title:</span>
-              <span className="text-white font-medium truncate max-w-[280px]">{caseTitle}</span>
+              <span className="text-slate-900 font-medium truncate max-w-[280px]">{caseTitle}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Assigned Investigator:</span>
@@ -213,7 +213,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                     setSubmitError(null);
                   }}
                   placeholder="e.g. supervisor_alice"
-                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-white placeholder-slate-500 outline-none transition-colors ${
+                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-slate-900 placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalPrimary
                       ? 'border-rose-300 focus:border-rose-300'
                       : 'border-slate-200 focus:border-indigo-400'
@@ -243,7 +243,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                     setSubmitError(null);
                   }}
                   placeholder="e.g. supervisor_bob"
-                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-white placeholder-slate-500 outline-none transition-colors ${
+                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-slate-900 placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalSecondary || duplicateSupervisors
                       ? 'border-rose-300 focus:border-rose-300'
                       : 'border-slate-200 focus:border-indigo-400'
@@ -275,7 +275,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 placeholder="Document consensus findings, transaction risk review, and rationale for case closure..."
-                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-white placeholder-slate-500 outline-none focus:border-indigo-400 transition-colors"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-500 outline-none focus:border-indigo-400 transition-colors"
               />
             </div>
 
@@ -293,7 +293,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-white hover:bg-slate-100 rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 Cancel
               </button>

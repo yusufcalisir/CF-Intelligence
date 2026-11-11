@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
 
           <div className="max-w-md space-y-1.5">
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">
               {this.props.fallbackTitle || 'Component Rendering Error'}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed font-mono">

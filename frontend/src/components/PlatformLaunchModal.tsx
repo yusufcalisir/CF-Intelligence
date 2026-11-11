@@ -214,7 +214,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             <button
               onClick={onComplete || onClose}
               aria-label="Skip handshake and proceed to dashboard"
-              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               title="Direct jump to dashboard"
             >
               <span>Skip</span>
@@ -269,7 +269,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold text-white shadow-md border"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold text-slate-900 shadow-md border"
                     style={{
                       backgroundColor: `${node.color}20`,
                       borderColor: `${node.color}70`,
@@ -294,7 +294,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                     boxShadow: `0 0 15px ${currentStage.glow}`,
                   }}
                 >
-                  <StageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <StageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-900" />
                 </div>
 
                 <div className="min-w-0">
