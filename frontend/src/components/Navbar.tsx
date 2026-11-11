@@ -37,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isOnline = health && health.status === 'healthy';
 
   return (
-    <header className="sticky top-0 z-50 glass-card border-b border-slate-800/80 px-4 sm:px-6 py-3">
+    <header className="sticky top-0 z-50 glass-card border-b border-slate-200/80 px-4 sm:px-6 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {health?.version ? `v${health.version}` : 'v2.4.0'}
               </span>
             </div>
-            <p className="hidden sm:block text-xs text-slate-400">
+            <p className="hidden sm:block text-xs text-slate-500">
               Privacy-Preserving Federated Graph Neural Networks & Differential Privacy
             </p>
           </div>
@@ -61,15 +61,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Desktop Tenant Selector & System Health Badge */}
         <div className="hidden md:flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+          <div className="flex items-center gap-2 bg-white/80 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600">
             <Building2 className="h-4 w-4 text-cyan-400" />
             <select
               value={selectedBank}
               onChange={(e) => setSelectedBank(e.target.value)}
-              className="bg-transparent text-slate-200 outline-none cursor-pointer"
+              className="bg-transparent text-slate-800 outline-none cursor-pointer"
             >
               {banks.map((b) => (
-                <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
+                <option key={b.id} value={b.id} className="bg-white text-slate-800">
                   {b.name}
                 </option>
               ))}
@@ -97,14 +97,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Hamburger Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+          className="md:hidden p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-white"
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
       {/* Desktop Navigation Tabs */}
-      <div className="hidden md:flex max-w-7xl mx-auto items-center gap-2 mt-4 pt-3 border-t border-slate-800/60 overflow-x-auto">
+      <div className="hidden md:flex max-w-7xl mx-auto items-center gap-2 mt-4 pt-3 border-t border-slate-200/60 overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -115,10 +115,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
                 isActive
                   ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50'
               }`}
             >
-              <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+              <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
               <span>{tab.label}</span>
             </button>
           );
@@ -127,8 +127,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden pt-4 pb-2 border-t border-slate-800/80 mt-3 space-y-3">
-          <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300">
+        <div className="md:hidden pt-4 pb-2 border-t border-slate-200/80 mt-3 space-y-3">
+          <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-600">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-cyan-400" />
               <span>Tenant:</span>
@@ -136,10 +136,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={selectedBank}
               onChange={(e) => setSelectedBank(e.target.value)}
-              className="bg-slate-900 text-slate-200 outline-none cursor-pointer font-medium"
+              className="bg-white text-slate-800 outline-none cursor-pointer font-medium"
             >
               {banks.map((b) => (
-                <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
+                <option key={b.id} value={b.id} className="bg-white text-slate-800">
                   {b.name}
                 </option>
               ))}
@@ -160,10 +160,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-medium text-left transition-all ${
                     isActive
                       ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-white'
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
                   <span>{tab.label}</span>
                 </button>
               );

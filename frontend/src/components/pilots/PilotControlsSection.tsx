@@ -89,7 +89,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             : isPaused
             ? 'border-amber-500/40 bg-amber-950/20 text-amber-200'
             : isTerminal
-            ? 'border-slate-700 bg-slate-900/50 text-slate-400'
+            ? 'border-slate-200 bg-white/50 text-slate-500'
             : 'border-cyan-500/40 bg-cyan-950/20 text-cyan-200'
         }`}
       >
@@ -108,7 +108,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             {isTerminal && `Pilot Execution Concluded (${pilot.status})`}
             {!isActive && !isPaused && !isAuthorized && !isTerminal && 'Pilot Provisioning & Verification In-Progress'}
           </div>
-          <p className="text-slate-300">
+          <p className="text-slate-600">
             {isActive &&
               'Live PSI queries against participating institutions are permitted subject to rate limits and query quota reservations.'}
             {isPaused &&
@@ -134,11 +134,11 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
       {/* Action Controls Grid */}
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-4">
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
             Governance & Kill Switch Actions
           </h4>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Actions adhere to domain transition rules (<code className="text-slate-300 font-mono text-[11px]">VALID_PILOT_TRANSITIONS</code>) and fail closed on unauthorized or stale calls.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Actions adhere to domain transition rules (<code className="text-slate-600 font-mono text-[11px]">VALID_PILOT_TRANSITIONS</code>) and fail closed on unauthorized or stale calls.
           </p>
         </div>
 
@@ -150,12 +150,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canActivate && !isAnyActionPending
                 ? 'border-cyan-500/50 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-200 cursor-pointer shadow-sm hover:scale-[1.02]'
-                : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-60'
+                : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <Play className="w-5 h-5 text-cyan-400" />
             <span>Activate Pilot</span>
-            <span className="text-[10px] font-normal text-slate-400 text-center">
+            <span className="text-[10px] font-normal text-slate-500 text-center">
               {isAuthorized ? 'Operator Trigger' : 'Requires AUTHORIZED state'}
             </span>
           </button>
@@ -167,12 +167,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canPause && !isAnyActionPending
                 ? 'border-amber-500/50 bg-amber-950/30 hover:bg-amber-900/40 text-amber-200 cursor-pointer shadow-sm hover:scale-[1.02]'
-                : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-60'
+                : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <Pause className="w-5 h-5 text-amber-400" />
             <span>Emergency Pause</span>
-            <span className="text-[10px] font-normal text-slate-400 text-center">
+            <span className="text-[10px] font-normal text-slate-500 text-center">
               {isActive ? 'Instant Kill Switch' : 'Requires ACTIVE state'}
             </span>
           </button>
@@ -184,12 +184,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canResume && !isAnyActionPending
                 ? 'border-emerald-500/50 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-200 cursor-pointer shadow-sm hover:scale-[1.02]'
-                : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-60'
+                : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <RotateCcw className="w-5 h-5 text-emerald-400" />
             <span>Resume Pilot</span>
-            <span className="text-[10px] font-normal text-slate-400 text-center">
+            <span className="text-[10px] font-normal text-slate-500 text-center">
               {isPaused ? 'Re-validates Readiness' : 'Requires PAUSED state'}
             </span>
           </button>
@@ -201,12 +201,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canComplete && !isAnyActionPending
                 ? 'border-teal-500/50 bg-teal-950/30 hover:bg-teal-900/40 text-teal-200 cursor-pointer shadow-sm hover:scale-[1.02]'
-                : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-60'
+                : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <CheckCircle className="w-5 h-5 text-teal-400" />
             <span>Complete Pilot</span>
-            <span className="text-[10px] font-normal text-slate-400 text-center">
+            <span className="text-[10px] font-normal text-slate-500 text-center">
               {isActive || isPaused ? 'Normal Conclusion' : 'Active or Paused'}
             </span>
           </button>
@@ -218,19 +218,19 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canAbort && !isAnyActionPending
                 ? 'border-rose-500/50 bg-rose-950/30 hover:bg-rose-900/40 text-rose-200 cursor-pointer shadow-sm hover:scale-[1.02]'
-                : 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-60'
+                : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <Ban className="w-5 h-5 text-rose-400" />
             <span>Emergency Abort</span>
-            <span className="text-[10px] font-normal text-slate-400 text-center">
+            <span className="text-[10px] font-normal text-slate-500 text-center">
               {!isTerminal ? 'Permanent Termination' : 'Already Terminal'}
             </span>
           </button>
         </div>
 
         {/* Action eligibility feedback for disabled actions */}
-        <div className="pt-2 text-[11px] text-slate-400 space-y-1">
+        <div className="pt-2 text-[11px] text-slate-500 space-y-1">
           {pilot.missing_approvals && pilot.missing_approvals.length > 0 && !pilot.is_fully_approved && (
             <div className="text-amber-400">
               • Activation blocked: Missing approvals from {pilot.missing_approvals.join(', ')}.

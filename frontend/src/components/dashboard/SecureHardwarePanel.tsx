@@ -40,12 +40,12 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
 
   if (hwMode === 'none') {
     return (
-      <div className="glass-card p-6 flex flex-col gap-4 border border-slate-800">
+      <div className="glass-card p-6 flex flex-col gap-4 border border-slate-200">
         <div className="flex items-center gap-3">
           <CpuIcon />
           <div>
-            <h3 className="text-base font-bold text-slate-100">Standard CPU/GPU Plaintext Execution</h3>
-            <p className="text-xs text-slate-400">Parameter aggregation processed without specialized hardware isolation.</p>
+            <h3 className="text-base font-bold text-slate-900">Standard CPU/GPU Plaintext Execution</h3>
+            <p className="text-xs text-slate-500">Parameter aggregation processed without specialized hardware isolation.</p>
           </div>
         </div>
       </div>
@@ -71,20 +71,20 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
   });
 
   return (
-    <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-6 border border-slate-800 relative overflow-hidden min-w-0">
+    <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-6 border border-slate-200 relative overflow-hidden min-w-0">
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-200 pb-4 min-w-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1 min-w-0">
             {hwMode === 'tee' ? <CpuIcon /> : <KeyIcon />}
-            <h3 className="text-sm sm:text-base font-bold text-slate-100 truncate">
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
               {hwMode === 'tee' ? '🛡️ Trusted Execution Environment (TEE)' : '🔑 Fully Homomorphic Encryption (FHE)'}
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {hwMode === 'tee' 
               ? (isHwBacked
                   ? 'Intel SGX / AWS Nitro Enclave secure memory isolation and hardware attestation verification.'
@@ -117,25 +117,25 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Telemetry Info */}
         <div className="lg:col-span-1 space-y-3 min-w-0">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Security Telemetry</h4>
+          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Security Telemetry</h4>
           
           {hwMode === 'tee' ? (
             <div className="space-y-2.5">
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">MRENCLAVE (Code Measurement)</div>
-                <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
+                <div className="text-xs font-mono text-slate-800 truncate mt-0.5">
                   {simulation.tee_mrenclave || 'a7b8e9c0d1e2f3...'}
                 </div>
               </div>
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">MRSIGNER (Signer Authority)</div>
-                <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
+                <div className="text-xs font-mono text-slate-800 truncate mt-0.5">
                   {simulation.tee_mrsigner || 'f3e2d1c0b9a8...'}
                 </div>
               </div>
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Attestation Signature</div>
-                <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
+                <div className="text-xs font-mono text-slate-800 truncate mt-0.5">
                   {simulation.tee_attestation_signature || 'tee_signature_verified'}
                 </div>
               </div>
@@ -154,21 +154,21 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
             </div>
           ) : (
             <div className="space-y-2.5">
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">FHE Poly Degree</div>
-                <div className="text-xs font-mono text-slate-200 mt-0.5">
+                <div className="text-xs font-mono text-slate-800 mt-0.5">
                   {simulation.fhe_poly_degree || 4096}
                 </div>
               </div>
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Noise Bound (Error budget)</div>
-                <div className="text-xs font-mono text-slate-200 mt-0.5">
+                <div className="text-xs font-mono text-slate-800 mt-0.5">
                   {(simulation.fhe_noise_bound || 1e-9).toExponential(2)}
                 </div>
               </div>
-              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-200 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Keyring ID</div>
-                <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
+                <div className="text-xs font-mono text-slate-800 truncate mt-0.5">
                   {simulation.fhe_key_id || simulation.id}
                 </div>
               </div>
@@ -183,18 +183,18 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
         {/* Latency / Performance Comparison Chart */}
         <div className="lg:col-span-2 flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
               Illustrative Overhead Model - Aggregation Latency
             </h4>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap w-fit">
               THEORETICAL BENCHMARK MODEL (ILLUSTRATIVE)
             </span>
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Illustrative analytical model comparing cryptographic aggregation overhead across Plaintext, TEE Enclave, and FHE CKKS, calibrated to theoretical polynomial degree and memory boundaries.
           </p>
           
-          <div className="h-52 bg-slate-950/30 border border-slate-800 rounded-xl p-3">
+          <div className="h-52 bg-slate-950/30 border border-slate-200 rounded-xl p-3">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>

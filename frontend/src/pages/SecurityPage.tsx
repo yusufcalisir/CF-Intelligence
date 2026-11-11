@@ -343,7 +343,7 @@ export default function SecurityPage() {
                 className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold border ${
                   badge.includes('Software Emulated')
                     ? 'bg-amber-500/10 border-amber-500/25 text-amber-300'
-                    : 'bg-white/5 border-white/10 text-slate-300'
+                    : 'bg-white/5 border-slate-200 text-slate-600'
                 }`}
               >
                 {badge}
@@ -418,12 +418,12 @@ export default function SecurityPage() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer border ${
                   isCatActive
                     ? 'bg-indigo-600/25 border-indigo-500/50 text-indigo-200 shadow-sm'
-                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                    : 'bg-white/[0.03] border-white/5 text-slate-500 hover:text-slate-800 hover:bg-white/[0.06]'
                 }`}
               >
                 <span>{cat.icon}</span>
                 <span>{cat.label}</span>
-                <span className="text-[10px] text-slate-300 font-mono">({cat.count})</span>
+                <span className="text-[10px] text-slate-600 font-mono">({cat.count})</span>
               </button>
             );
           })}
@@ -440,7 +440,7 @@ export default function SecurityPage() {
                 className={`p-2.5 sm:p-3 rounded-xl transition-all flex flex-col justify-between text-left border min-h-[58px] cursor-pointer relative overflow-hidden group ${
                   isActive
                     ? 'bg-indigo-600/20 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-200'
-                    : 'bg-[#090b1e]/70 border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/15 hover:bg-[#0d102b]'
+                    : 'bg-[#090b1e]/70 border-white/5 text-slate-500 hover:text-slate-800 hover:border-white/15 hover:bg-[#0d102b]'
                 }`}
               >
                 {isActive && (
@@ -993,7 +993,7 @@ export default function SecurityPage() {
                         className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
                           node.broadcast
                             ? 'bg-indigo-500/5 border-indigo-500/20'
-                            : 'bg-slate-800/40 border-slate-700/30'
+                            : 'bg-slate-50/40 border-slate-200/30'
                         }`}
                       >
                         <span className="text-lg shrink-0 mt-0.5">{node.broadcast ? '🔑' : '⏳'}</span>
@@ -1396,7 +1396,7 @@ export default function SecurityPage() {
             <div className="glass-card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <span>🛡️</span> NIST Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium)
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
@@ -1410,7 +1410,7 @@ export default function SecurityPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Post-Quantum Key Exchange Config</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Post-Quantum Key Exchange Config</h4>
 
                   <div className="space-y-3 text-xs">
                     <div>
@@ -1418,7 +1418,7 @@ export default function SecurityPage() {
                       <select
                         value={pqcKemAlgo}
                         onChange={(e) => setPqcKemAlgo(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       >
                         <option value="Kyber768">CRYSTALS-Kyber-768 (NIST Level 3 - Default)</option>
                         <option value="Kyber1024">CRYSTALS-Kyber-1024 (NIST Level 5)</option>
@@ -1431,7 +1431,7 @@ export default function SecurityPage() {
                       <select
                         value={pqcSigAlgo}
                         onChange={(e) => setPqcSigAlgo(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       >
                         <option value="Dilithium3">CRYSTALS-Dilithium-3 (NIST Level 3 - Default)</option>
                         <option value="Dilithium5">CRYSTALS-Dilithium-5 (NIST Level 5)</option>
@@ -1457,7 +1457,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-300 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-indigo-300">Quantum Security Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Lattice-based Module Learning With Errors (M-LWE) provides 100% mathematical immunity against Shor&apos;s algorithm on future quantum supercomputers.
@@ -1466,7 +1466,7 @@ export default function SecurityPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lattice Keypair Telemetry & Public Keys</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Lattice Keypair Telemetry & Public Keys</h4>
 
                   {pqcResult ? (
                     <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
@@ -1514,7 +1514,7 @@ export default function SecurityPage() {
             <div className="glass-card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <span>🌉</span> Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
@@ -1528,7 +1528,7 @@ export default function SecurityPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-4 md:col-span-1">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Settlement Pool Parameters</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Settlement Pool Parameters</h4>
 
                   <div className="space-y-3 text-xs">
                     <div>
@@ -1537,7 +1537,7 @@ export default function SecurityPage() {
                         type="number"
                         value={bridgePoolAmount}
                         onChange={(e) => setBridgePoolAmount(Number(e.target.value))}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       />
                     </div>
 
@@ -1546,7 +1546,7 @@ export default function SecurityPage() {
                       <select
                         value={bridgeCurrency}
                         onChange={(e) => setBridgeCurrency(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       >
                         <option value="wCBDC">wCBDC (Wholesale CBDC Token)</option>
                         <option value="EUR-Deposit">EUR-Deposit (Tokenized Commercial Deposit)</option>
@@ -1573,7 +1573,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-slate-300 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-emerald-300">Cross-Ledger Coverage:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Routes funds simultaneously across Arbitrum, Optimism, Canton Private DLT, and Hyperledger Fabric with zero counterparty risk.
@@ -1582,7 +1582,7 @@ export default function SecurityPage() {
                 </div>
 
                 <div className="space-y-4 md:col-span-2">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Multi-Ledger Route Receipts & CCIP Message IDs</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Multi-Ledger Route Receipts & CCIP Message IDs</h4>
 
                   {bridgeResult ? (
                     <div className="space-y-3 min-h-[180px]">
@@ -1616,7 +1616,7 @@ export default function SecurityPage() {
                           <tbody className="divide-y divide-[var(--color-border)] bg-black/20">
                             {bridgeResult.routes.map((route, i) => (
                               <tr key={i} className="hover:bg-white/5">
-                                <td className="p-2.5 font-bold text-slate-200">{route.bank_id}</td>
+                                <td className="p-2.5 font-bold text-slate-800">{route.bank_id}</td>
                                 <td className="p-2.5 text-indigo-300">{route.network}</td>
                                 <td className="p-2.5 text-[var(--color-text-muted)]">{route.protocol}</td>
                                 <td className="p-2.5 text-emerald-400 font-bold">{route.amount.toLocaleString()} {route.token_symbol}</td>
@@ -1651,7 +1651,7 @@ export default function SecurityPage() {
             <div className="glass-card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <span>📈</span> Adaptive Dynamic Differential Privacy Budget Auto-Scaler
                   </h3>
                   <p className="text-xs text-[var(--color-text-muted)]">
@@ -1665,7 +1665,7 @@ export default function SecurityPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Dynamic DP Optimization Controls</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dynamic DP Optimization Controls</h4>
 
                   <div className="space-y-3 text-xs">
                     <div>
@@ -1691,7 +1691,7 @@ export default function SecurityPage() {
                         step="0.01"
                         value={rdpRoundLoss}
                         onChange={(e) => setRdpRoundLoss(Number(e.target.value))}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       />
                     </div>
 
@@ -1701,7 +1701,7 @@ export default function SecurityPage() {
                         type="number"
                         value={rdpBatchSize}
                         onChange={(e) => setRdpBatchSize(Number(e.target.value))}
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-800"
                       />
                     </div>
 
@@ -1724,7 +1724,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/15 text-[11px] text-slate-300 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-cyan-300">Anti-Overnoising Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Dynamically reduces noise as gradients converge, preserving fraud detection AUC-ROC (&gt;0.94) without early budget exhaustion.
@@ -1733,7 +1733,7 @@ export default function SecurityPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">RDP Accountant Telemetry & Dual Minimization</h4>
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">RDP Accountant Telemetry & Dual Minimization</h4>
 
                   {rdpResult ? (
                     <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
@@ -1783,7 +1783,7 @@ export default function SecurityPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xl">📡</span>
-                      <h3 className="text-base font-bold text-slate-100">
+                      <h3 className="text-base font-bold text-slate-900">
                         Webhook Gateway & Real-Time Alert Dispatcher
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
@@ -1818,7 +1818,7 @@ export default function SecurityPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         Register Webhook Endpoint
                       </h4>
                       <span className="text-[10px] text-amber-400 font-mono">
@@ -1834,7 +1834,7 @@ export default function SecurityPage() {
                         <select
                           value={webhookTenant}
                           onChange={(e) => setWebhookTenant(e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-200 focus:outline-none focus:border-purple-500/50"
+                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-800 focus:outline-none focus:border-purple-500/50"
                         >
                           <option value="bank_alpha">bank_alpha (Alpha International)</option>
                           <option value="bank_beta">bank_beta (Beta Trust Bancorp)</option>
@@ -1851,9 +1851,9 @@ export default function SecurityPage() {
                           value={webhookUrl}
                           onChange={(e) => setWebhookUrl(e.target.value)}
                           placeholder="https://api.partnerbank.com/cfi-webhook"
-                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-200 focus:outline-none focus:border-purple-500/50"
+                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-800 focus:outline-none focus:border-purple-500/50"
                         />
-                        <span className="text-[10px] text-slate-400 mt-1 block">
+                        <span className="text-[10px] text-slate-500 mt-1 block">
                           Strict SSRF filter rejects loopback (127.0.0.1, localhost), private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), AWS metadata (169.254.169.254), and non-HTTP protocols.
                         </span>
                       </div>
@@ -1864,7 +1864,7 @@ export default function SecurityPage() {
                         </label>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {(['ALERT_CREATED', 'CASE_RESOLVED', 'MODEL_PROMOTED', 'DRIFT_DETECTED'] as WebhookEventType[]).map((ev) => (
-                            <label key={ev} className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                            <label key={ev} className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={webhookEvents.includes(ev)}
@@ -1875,7 +1875,7 @@ export default function SecurityPage() {
                                     setWebhookEvents(webhookEvents.filter((item) => item !== ev));
                                   }
                                 }}
-                                className="rounded border-slate-700 text-purple-600 focus:ring-purple-500/50"
+                                className="rounded border-slate-200 text-purple-600 focus:ring-purple-500/50"
                               />
                               <span>{ev}</span>
                             </label>
@@ -1908,10 +1908,10 @@ export default function SecurityPage() {
                   <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                           Active Tenant Subscriptions ({webhookSubs?.subscriptions.length || 0})
                         </h4>
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[10px] text-slate-500 font-mono">
                           Tenant: {webhookTenant}
                         </span>
                       </div>
@@ -1928,7 +1928,7 @@ export default function SecurityPage() {
                             <div key={sub.subscription_id} className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex items-start justify-between gap-2 text-xs">
                               <div className="min-w-0 flex-1">
                                 <div className="font-mono text-purple-300 truncate font-semibold">{sub.target_url}</div>
-                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
                                   <span>ID: {sub.subscription_id.slice(0, 8)}...</span>
                                   <span>•</span>
                                   <span>Events: {sub.events.join(', ')}</span>
@@ -1956,10 +1956,10 @@ export default function SecurityPage() {
                 {/* Delivery Audit Logs */}
                 <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                       Recent Outbound Delivery Audit Logs
                     </h4>
-                    <span className="text-[10px] font-mono text-slate-400">
+                    <span className="text-[10px] font-mono text-slate-500">
                       Total Deliveries Logged: {webhookLogs?.total_count || 0}
                     </span>
                   </div>
@@ -1986,9 +1986,9 @@ export default function SecurityPage() {
                         <tbody className="divide-y divide-[var(--color-border)] font-mono text-[11px]">
                           {webhookLogs.deliveries.map((item) => (
                             <tr key={item.delivery_id} className="hover:bg-white/5 transition-colors">
-                              <td className="py-2 px-2 text-slate-300">{item.delivery_id.slice(0, 8)}...</td>
+                              <td className="py-2 px-2 text-slate-600">{item.delivery_id.slice(0, 8)}...</td>
                               <td className="py-2 px-2 text-purple-300">{item.event_type}</td>
-                              <td className="py-2 px-2 text-slate-400 max-w-[200px] truncate" title={item.target_url}>
+                              <td className="py-2 px-2 text-slate-500 max-w-[200px] truncate" title={item.target_url}>
                                 {item.target_url}
                               </td>
                               <td className="py-2 px-2">
@@ -2002,8 +2002,8 @@ export default function SecurityPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2 px-2 text-slate-400">{item.attempt_count}</td>
-                              <td className="py-2 px-2 text-slate-400 max-w-[220px] truncate" title={item.error_message || 'OK'}>
+                              <td className="py-2 px-2 text-slate-500">{item.attempt_count}</td>
+                              <td className="py-2 px-2 text-slate-500 max-w-[220px] truncate" title={item.error_message || 'OK'}>
                                 {item.error_message || 'Delivered successfully'}
                               </td>
                             </tr>

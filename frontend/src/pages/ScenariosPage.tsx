@@ -182,7 +182,7 @@ export default function ScenariosPage() {
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                 isRunning
                   ? 'bg-green-500/20 text-green-400 border border-green-500/30 animate-pulse'
-                  : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                  : 'bg-gray-500/20 text-slate-500 border border-gray-500/30'
               }`}>
                 {status.status}
               </span>
@@ -197,7 +197,7 @@ export default function ScenariosPage() {
               ) : (
                 <button
                   onClick={handleDismiss}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-white/10 text-slate-300 hover:bg-white/20 border border-white/15 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-white/10 text-slate-600 hover:bg-white/20 border border-white/15 transition-all cursor-pointer"
                 >
                   ✕ Dismiss
                 </button>
@@ -239,7 +239,7 @@ export default function ScenariosPage() {
             <div className="mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-xs font-mono space-y-1">
               <div className="text-[var(--color-text-muted)] font-semibold mb-1">Live Logs:</div>
               {logs.map((log, idx) => (
-                <div key={idx} className="text-slate-300 truncate">
+                <div key={idx} className="text-slate-600 truncate">
                   &gt; {log}
                 </div>
               ))}

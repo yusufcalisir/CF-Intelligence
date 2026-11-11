@@ -212,9 +212,9 @@ export const BenchmarkHubPage: React.FC = () => {
   const currentCm = benchmarkData?.multi_threshold_confusion_matrices?.[selectedThresholdIndex] ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 space-y-6">
+    <div className="min-h-screen bg-slate-950 text-slate-900 p-4 md:p-8 space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800 pb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
             <Sparkles className="w-4 h-4" />
@@ -223,14 +223,14 @@ export const BenchmarkHubPage: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Real-World Benchmarks & Design Partner Hub
           </h1>
-          <p className="text-slate-400 text-sm mt-1 max-w-3xl">
+          <p className="text-slate-500 text-sm mt-1 max-w-3xl">
             Beyond synthetic data: Rigorous evaluation on real-world financial distributions (PaySim, IEEE-CIS, Elliptic) 
             with distribution shift auditing, multi-threshold confusion matrices, and zero-raw-PII pilot sandbox.
           </p>
         </div>
 
         <div className="w-full lg:w-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-1.5 bg-[#090a1f]/90 border border-white/10 rounded-2xl p-1.5 shadow-xl w-full lg:w-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-1.5 bg-[#090a1f]/90 border border-slate-200 rounded-2xl p-1.5 shadow-xl w-full lg:w-auto">
             {[
               { id: 'benchmarks', label: 'Real Benchmarks' },
               { id: 'confusion_matrix', label: 'Confusion & Cost' },
@@ -243,7 +243,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 className={`w-full lg:w-auto text-center flex items-center justify-center px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer active:scale-95 ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.35)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
                 }`}
               >
                 <span className="truncate sm:whitespace-normal">{tab.label}</span>
@@ -262,23 +262,23 @@ export const BenchmarkHubPage: React.FC = () => {
             className={`text-left p-4 rounded-xl border transition-all ${
               selectedDataset === ds
                 ? 'bg-indigo-950/40 border-indigo-500/80 shadow-lg shadow-indigo-950/50'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                : 'bg-white/60 border-slate-200 hover:border-slate-200'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">{ds.replace('_', '-')}</span>
-              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">
+              <span className="text-[10px] bg-slate-50 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
                 {ds === 'elliptic' ? 'Graph AML' : 'Tabular'}
               </span>
             </div>
             <div className="text-sm font-semibold text-white mt-1 truncate">{datasetDescriptions[ds]?.title ?? ds}</div>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{datasetDescriptions[ds]?.subtitle ?? ''}</p>
+            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{datasetDescriptions[ds]?.subtitle ?? ''}</p>
           </button>
         ))}
       </div>
 
       {/* Institutional Workload & Volume Calibration Bar */}
-      <div className="bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div className="bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-200 rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/5 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
@@ -298,7 +298,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Calibrate daily transaction throughput and benchmark sample scale to model enterprise false alarm suppression and operational savings.
               </p>
             </div>
@@ -308,7 +308,7 @@ export const BenchmarkHubPage: React.FC = () => {
             <button
               onClick={handleResetWorkload}
               aria-label="Reset Workload Parameters"
-              className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition-colors cursor-pointer"
+              className="text-xs text-slate-600 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50/80 hover:bg-slate-50 border border-slate-200 transition-colors cursor-pointer"
               title="Reset parameters to standard 100K daily transactions and 10K samples"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -321,7 +321,7 @@ export const BenchmarkHubPage: React.FC = () => {
           {/* Volume Control */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label htmlFor="benchmark-daily-volume" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <label htmlFor="benchmark-daily-volume" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Daily Clearing Volume (T_daily)</span>
               </label>
@@ -339,7 +339,7 @@ export const BenchmarkHubPage: React.FC = () => {
               step="10000"
               value={dailyVolume}
               onChange={(e) => updateWorkloadParams(selectedDataset, sampleSize, Number(e.target.value))}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              className="w-full h-2 bg-slate-50 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
 
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -352,7 +352,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                     dailyVolume === p.value
                       ? 'bg-indigo-600 text-white font-bold border-indigo-400 shadow-md shadow-indigo-600/30'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-800 hover:border-slate-700'
+                      : 'bg-white/80 text-slate-500 hover:text-slate-800 border-slate-200 hover:border-slate-200'
                   }`}
                   title={p.desc}
                 >
@@ -365,7 +365,7 @@ export const BenchmarkHubPage: React.FC = () => {
           {/* Sample Size Control */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label htmlFor="benchmark-sample-size" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <label htmlFor="benchmark-sample-size" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-purple-400" />
                 <span>Evaluation Sample Size (N_eval)</span>
               </label>
@@ -383,7 +383,7 @@ export const BenchmarkHubPage: React.FC = () => {
               step="1000"
               value={sampleSize}
               onChange={(e) => updateWorkloadParams(selectedDataset, Number(e.target.value), dailyVolume)}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+              className="w-full h-2 bg-slate-50 rounded-lg appearance-none cursor-pointer accent-purple-500"
             />
 
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -396,7 +396,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                     sampleSize === p.value
                       ? 'bg-purple-600 text-white font-bold border-purple-400 shadow-md shadow-purple-600/30'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-800 hover:border-slate-700'
+                      : 'bg-white/80 text-slate-500 hover:text-slate-800 border-slate-200 hover:border-slate-200'
                   }`}
                   title={p.desc}
                 >
@@ -432,8 +432,8 @@ export const BenchmarkHubPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* ROI Metric 1: Annual Savings */}
-              <div className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-xl space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <div className="bg-slate-950/80 border border-slate-200/80 p-4 rounded-xl space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Annual Net Economic Benefit
                 </span>
                 <div className="text-2xl font-extrabold text-emerald-400 font-mono">
@@ -447,8 +447,8 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
 
               {/* ROI Metric 2: False Alarms Eliminated */}
-              <div className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-xl space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <div className="bg-slate-950/80 border border-slate-200/80 p-4 rounded-xl space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Daily False Positives Avoided
                 </span>
                 <div className="text-2xl font-extrabold text-indigo-300 font-mono">
@@ -462,8 +462,8 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
 
               {/* ROI Metric 3: Analyst FTE Hours */}
-              <div className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-xl space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <div className="bg-slate-950/80 border border-slate-200/80 p-4 rounded-xl space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Analyst Labor Saved Annually
                 </span>
                 <div className="text-2xl font-extrabold text-purple-300 font-mono">
@@ -477,8 +477,8 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
 
               {/* ROI Metric 4: Direct Daily Fraud Loss Saved */}
-              <div className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-xl space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <div className="bg-slate-950/80 border border-slate-200/80 p-4 rounded-xl space-y-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Daily Fraud Losses Prevented
                 </span>
                 <div className="text-2xl font-extrabold text-amber-300 font-mono">
@@ -504,10 +504,10 @@ export const BenchmarkHubPage: React.FC = () => {
           {/* Key Advantage Highlight Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Card 1: PR-AUC */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
-                  <span className="text-xs font-semibold text-slate-300 truncate">PR-AUC (Precision-Recall)</span>
+                  <span className="text-xs font-semibold text-slate-600 truncate">PR-AUC (Precision-Recall)</span>
                   <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
                     <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
@@ -526,21 +526,21 @@ export const BenchmarkHubPage: React.FC = () => {
                         ? `+${benchmarkData.performance_comparison.federated_advantage.pr_auc_gain.toFixed(4)}`
                         : (isLoading ? '...' : '-')}
                     </span>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Local Model</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">vs Local Model</span>
                   </div>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Standard metric under extreme class imbalance. Shows FL's ability to minimize false positives without sacrificing recall.
               </p>
             </div>
 
             {/* Card 2: Recall @ 0.1% FPR */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
-                  <span className="text-xs font-semibold text-slate-300 truncate">Recall @ 0.1% FPR</span>
+                  <span className="text-xs font-semibold text-slate-600 truncate">Recall @ 0.1% FPR</span>
                   <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 shrink-0">
                     <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
                   </div>
@@ -559,21 +559,21 @@ export const BenchmarkHubPage: React.FC = () => {
                         ? `+${benchmarkData.performance_comparison.federated_advantage.recall_at_01_fpr_gain.toFixed(4)}`
                         : (isLoading ? '...' : '-')}
                     </span>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Local Model</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">vs Local Model</span>
                   </div>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Percentage of true fraud captured when strictly limiting legitimate customer blockages to 1 in 1,000 transactions.
               </p>
             </div>
 
             {/* Card 3: False Alarm Reduction */}
-            <div className="bg-gradient-to-br from-slate-900 to-purple-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-slate-900 to-purple-950/30 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
-                  <span className="text-xs font-semibold text-slate-300 truncate">False Alarm Reduction</span>
+                  <span className="text-xs font-semibold text-slate-600 truncate">False Alarm Reduction</span>
                   <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 shrink-0">
                     <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
                   </div>
@@ -588,26 +588,26 @@ export const BenchmarkHubPage: React.FC = () => {
                       <TrendingUp className="w-3 h-3 shrink-0 rotate-180" />
                       {falseAlarmReductionPct ? `-${falseAlarmReductionPct}%` : (isLoading ? '...' : '-')}
                     </span>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Isolated Model</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">vs Isolated Model</span>
                   </div>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Drastically cuts triage fatigue and manual analyst queue overload by filtering cross-institution benign anomaly noise.
               </p>
             </div>
           </div>
 
           {/* Model Comparison Table */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
+          <div className="bg-white/80 border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
                   <span>Cross-Bank Collaborative vs Isolated Local Model</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Evaluated on {benchmarkData?.total_transactions_evaluated?.toLocaleString() ?? sampleSize} records of{' '}
                   {datasetDescriptions[selectedDataset]?.title ?? selectedDataset}
                 </p>
@@ -616,7 +616,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 href={datasetDescriptions[selectedDataset]?.sourceLink ?? 'https://www.kaggle.com'}
                 target="_blank"
                 rel="noreferrer"
-                className="self-start sm:self-auto text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 transition-colors shrink-0"
+                className="self-start sm:self-auto text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 bg-slate-50/80 hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 transition-colors shrink-0"
               >
                 <span>Kaggle Dataset Source</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -640,24 +640,24 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-indigo-500/20">
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
                     <div className="text-xs font-bold text-emerald-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.pr_auc != null
                         ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
                     <div className="text-xs font-bold text-white font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.roc_auc != null
                         ? benchmarkData.performance_comparison.federated_learning.roc_auc.toFixed(4)
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-indigo-300 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr != null
                         ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
@@ -667,51 +667,51 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-indigo-500/20">
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
-                    <span className="text-slate-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily != null ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '-')}</span>
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
+                    <span className="text-slate-600 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily != null ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
                     <span className="text-amber-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars != null ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
                     <span className="text-emerald-400 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars != null ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
                 </div>
               </div>
 
               {/* Isolated Single Bank Mobile Card */}
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-xs text-slate-300 truncate">
+                  <span className="font-semibold text-xs text-slate-600 truncate">
                     Isolated Single-Bank Model (Bank A Baseline)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200 shrink-0">
                     Siloed Baseline
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-800">
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
+                <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200">
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
                     <div className="text-xs font-bold text-rose-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc != null
                         ? benchmarkData.performance_comparison.isolated_local_model.pr_auc.toFixed(4)
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
-                    <div className="text-xs font-bold text-slate-300 font-mono mt-1">
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
+                    <div className="text-xs font-bold text-slate-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc != null
                         ? benchmarkData.performance_comparison.isolated_local_model.roc_auc.toFixed(4)
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
-                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-rose-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr != null
                         ? benchmarkData.performance_comparison.isolated_local_model.recall_at_01_fpr.toFixed(4)
@@ -720,17 +720,17 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-slate-800">
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
+                <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-slate-200">
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
                     <span className="text-rose-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily != null ? `${benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
                     <span className="text-rose-400 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars != null ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
-                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
+                  <div className="bg-white/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
                     <span className="text-rose-400 font-bold font-mono text-[11px] mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars != null ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
                 </div>
@@ -741,7 +741,7 @@ export const BenchmarkHubPage: React.FC = () => {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse min-w-[650px]">
                 <thead>
-                  <tr className="border-b border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider">
                     <th className="py-3 px-4">Architecture</th>
                     <th className="py-3 px-4">PR-AUC</th>
                     <th className="py-3 px-4">ROC-AUC</th>
@@ -751,7 +751,7 @@ export const BenchmarkHubPage: React.FC = () => {
                     <th className="py-3 px-4">Net Total Daily Cost</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                <tbody className="divide-y divide-slate-200/60 font-mono text-xs">
                   <tr className="bg-indigo-950/20 text-indigo-200">
                     <td className="py-3 px-4 font-sans font-bold text-white flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
@@ -772,7 +772,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
                         : (isLoading ? '...' : '-')}
                     </td>
-                    <td className="py-3 px-4 text-slate-300">
+                    <td className="py-3 px-4 text-slate-600">
                       {benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily != null
                         ? benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily
                         : (isLoading ? '...' : '-')}
@@ -788,8 +788,8 @@ export const BenchmarkHubPage: React.FC = () => {
                         : (isLoading ? '...' : '-')}
                     </td>
                   </tr>
-                  <tr className="text-slate-300">
-                    <td className="py-3 px-4 font-sans font-semibold text-slate-300">
+                  <tr className="text-slate-600">
+                    <td className="py-3 px-4 font-sans font-semibold text-slate-600">
                       Isolated Single-Bank Model (Bank A Baseline)
                     </td>
                     <td className="py-3 px-4 text-rose-400">
@@ -833,20 +833,20 @@ export const BenchmarkHubPage: React.FC = () => {
       {/* Confusion Matrix & Alert Fatigue Tab */}
       {activeTab === 'confusion_matrix' && (
         <div className="space-y-6">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white/80 border border-slate-200 rounded-2xl p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Sliders className="w-5 h-5 text-indigo-400" />
                   Multi-Threshold Operational Decision Matrix
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Adjust decision threshold (tau) to analyze operational trade-offs between false-positive customer friction and missed fraud loss.
                 </p>
               </div>
 
               {/* Threshold Selector Tabs */}
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto">
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-200 overflow-x-auto">
                 {benchmarkData?.multi_threshold_confusion_matrices?.map((cm, idx) => (
                   <button
                     key={cm.threshold}
@@ -854,7 +854,7 @@ export const BenchmarkHubPage: React.FC = () => {
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                       selectedThresholdIndex === idx
                         ? 'bg-indigo-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
+                        : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     tau = {cm.threshold.toFixed(2)}
@@ -870,12 +870,12 @@ export const BenchmarkHubPage: React.FC = () => {
                 title="Multi-Threshold Operational Decision Matrix"
               />
             ) : (
-              <div className="border border-slate-800 rounded-xl p-8 text-center bg-slate-950/60">
+              <div className="border border-slate-200 rounded-xl p-8 text-center bg-slate-950/60">
                 <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2 opacity-80" />
-                <p className="text-sm font-semibold text-slate-200">
+                <p className="text-sm font-semibold text-slate-800">
                   {isLoading ? 'Loading Empirical Threshold Confusion Matrix...' : 'No Multi-Threshold Decision Data Available'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                   Multi-threshold decision metrics are computed during real-world benchmark evaluations across decision thresholds.
                 </p>
               </div>
@@ -887,21 +887,21 @@ export const BenchmarkHubPage: React.FC = () => {
       {/* Distribution Fidelity Tab */}
       {activeTab === 'fidelity' && (
         <div className="space-y-6">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white/80 border border-slate-200 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Activity className="w-5 h-5 text-indigo-400" />
                   Statistical Fidelity & Distribution Shift Auditor
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Measuring distance between synthetic generator distributions and real-world benchmark datasets via Wasserstein & JS Divergence.
                 </p>
               </div>
 
               {benchmarkData?.distribution_fidelity && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Fidelity Verdict:</span>
+                  <span className="text-xs text-slate-500">Fidelity Verdict:</span>
                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                     {benchmarkData.distribution_fidelity.summary_verdict}
                   </span>
@@ -912,8 +912,8 @@ export const BenchmarkHubPage: React.FC = () => {
             {benchmarkData?.distribution_fidelity ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-400">Overall Fidelity Score</div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs text-slate-500">Overall Fidelity Score</div>
                     <div className="text-2xl font-bold text-white font-mono mt-1">
                       {typeof benchmarkData.distribution_fidelity.overall_fidelity_score === 'number'
                         ? benchmarkData.distribution_fidelity.overall_fidelity_score.toFixed(4)
@@ -922,8 +922,8 @@ export const BenchmarkHubPage: React.FC = () => {
                     <span className="text-[10px] text-slate-500">Scale 0.0 - 1.0 (1.0 = identical)</span>
                   </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-400">Avg Wasserstein Distance</div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs text-slate-500">Avg Wasserstein Distance</div>
                     <div className="text-2xl font-bold text-white font-mono mt-1">
                       {typeof benchmarkData.distribution_fidelity.avg_wasserstein_distance === 'number'
                         ? benchmarkData.distribution_fidelity.avg_wasserstein_distance.toFixed(2)
@@ -932,8 +932,8 @@ export const BenchmarkHubPage: React.FC = () => {
                     <span className="text-[10px] text-slate-500">Earth Mover's Distance</span>
                   </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-400">Avg JS Divergence</div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs text-slate-500">Avg JS Divergence</div>
                     <div className="text-2xl font-bold text-white font-mono mt-1">
                       {typeof benchmarkData.distribution_fidelity.avg_js_divergence === 'number'
                         ? benchmarkData.distribution_fidelity.avg_js_divergence.toFixed(4)
@@ -942,8 +942,8 @@ export const BenchmarkHubPage: React.FC = () => {
                     <span className="text-[10px] text-slate-500">Symmetric KL divergence</span>
                   </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-400">Covariance Matrix Drift</div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs text-slate-500">Covariance Matrix Drift</div>
                     <div className="text-2xl font-bold text-white font-mono mt-1">
                       {typeof benchmarkData.distribution_fidelity.covariance_matrix_drift_frobenius === 'number'
                         ? benchmarkData.distribution_fidelity.covariance_matrix_drift_frobenius.toFixed(4)
@@ -958,7 +958,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                        <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                           <th className="py-2.5 px-3">Feature Name</th>
                           <th className="py-2.5 px-3">Wasserstein Dist</th>
                           <th className="py-2.5 px-3">JS Divergence</th>
@@ -968,15 +968,15 @@ export const BenchmarkHubPage: React.FC = () => {
                           <th className="py-2.5 px-3">Fidelity Score</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                      <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
                         {benchmarkData.distribution_fidelity.feature_metrics.slice(0, 8).map((feat) => (
-                          <tr key={feat.feature_name} className="hover:bg-slate-800/40">
-                            <td className="py-2.5 px-3 font-sans font-medium text-slate-200">{feat.feature_name}</td>
-                            <td className="py-2.5 px-3 text-slate-300">{feat.wasserstein_distance}</td>
-                            <td className="py-2.5 px-3 text-slate-300">{feat.js_divergence}</td>
-                            <td className="py-2.5 px-3 text-slate-300">{feat.ks_statistic} / {typeof feat.ks_p_value === 'number' ? feat.ks_p_value.toFixed(4) : feat.ks_p_value}</td>
-                            <td className="py-2.5 px-3 text-slate-400">{feat.real_mean} ({feat.real_std})</td>
-                            <td className="py-2.5 px-3 text-slate-400">{feat.synth_mean} ({feat.synth_std})</td>
+                          <tr key={feat.feature_name} className="hover:bg-slate-50/40">
+                            <td className="py-2.5 px-3 font-sans font-medium text-slate-800">{feat.feature_name}</td>
+                            <td className="py-2.5 px-3 text-slate-600">{feat.wasserstein_distance}</td>
+                            <td className="py-2.5 px-3 text-slate-600">{feat.js_divergence}</td>
+                            <td className="py-2.5 px-3 text-slate-600">{feat.ks_statistic} / {typeof feat.ks_p_value === 'number' ? feat.ks_p_value.toFixed(4) : feat.ks_p_value}</td>
+                            <td className="py-2.5 px-3 text-slate-500">{feat.real_mean} ({feat.real_std})</td>
+                            <td className="py-2.5 px-3 text-slate-500">{feat.synth_mean} ({feat.synth_std})</td>
                             <td className="py-2.5 px-3">
                               <span className="font-bold text-emerald-400">{(feat.fidelity_score * 100).toFixed(1)}%</span>
                             </td>
@@ -988,12 +988,12 @@ export const BenchmarkHubPage: React.FC = () => {
                 )}
               </>
             ) : (
-              <div className="border border-slate-800 rounded-xl p-8 text-center bg-slate-950/60">
+              <div className="border border-slate-200 rounded-xl p-8 text-center bg-slate-950/60">
                 <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2 opacity-80" />
-                <p className="text-sm font-semibold text-slate-200">
+                <p className="text-sm font-semibold text-slate-800">
                   {isLoading ? 'Auditing Statistical Fidelity & Distribution Drift...' : 'No Distribution Fidelity Audit Available'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                   Wasserstein distance and JS divergence metrics are computed when benchmarking empirical datasets against generator distributions.
                 </p>
               </div>
@@ -1007,37 +1007,37 @@ export const BenchmarkHubPage: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column: PII Ingestion Scanner Demo */}
-            <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col space-y-4">
+            <div className="lg:col-span-7 bg-white/80 border border-slate-200 rounded-2xl p-6 flex flex-col space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Lock className="w-5 h-5 text-indigo-400" />
                   Zero-Raw-PII Ingestion & Regex Scanner
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Enforces banking secrecy & GDPR Art 6 invariants. Bank raw data is hashed locally via type-salted HMAC-SHA256 before extraction.
                 </p>
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1 block">Design Partner Bank / FinTech Name</label>
+                <label className="text-xs text-slate-500 font-semibold mb-1 block">Design Partner Bank / FinTech Name</label>
                 <input
                   type="text"
                   value={partnerName}
                   onChange={(e) => setPartnerName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs text-slate-400 font-semibold block">Sample Ingestion JSON Payload</label>
+                  <label className="text-xs text-slate-500 font-semibold block">Sample Ingestion JSON Payload</label>
                   <span className="text-[10px] font-mono text-slate-500">14 lines • Zero PII</span>
                 </div>
                 <textarea
                   rows={15}
                   value={piiScanInput}
                   onChange={(e) => setPiiScanInput(e.target.value)}
-                  className="w-full flex-1 min-h-[320px] bg-slate-950 font-mono text-xs text-slate-300 border border-slate-800 rounded-lg p-3.5 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
+                  className="w-full flex-1 min-h-[320px] bg-slate-950 font-mono text-xs text-slate-600 border border-slate-200 rounded-lg p-3.5 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
                   placeholder="Paste JSON sample records..."
                 />
               </div>
@@ -1060,7 +1060,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 <button
                   onClick={handleInjectViolation}
                   disabled={injectPiiMutation.isPending}
-                  className="h-11 min-h-[44px] px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition-all border border-slate-700 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
+                  className="h-11 min-h-[44px] px-4 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   {injectPiiMutation.isPending ? (
                     <>
@@ -1092,13 +1092,13 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
                   <p>{validatePiiMutation.data.guidance}</p>
                   {validatePiiMutation.data.violations?.map((v, i) => (
-                    <div key={i} className="bg-slate-950/80 p-3 rounded border border-rose-800/40 text-slate-300 font-mono text-[11px] space-y-1.5">
+                    <div key={i} className="bg-slate-950/80 p-3 rounded border border-rose-800/40 text-slate-600 font-mono text-[11px] space-y-1.5">
                       <div>
                         Violation on column <span className="text-rose-400 font-bold">{v.column}</span>: {v.pii_type} detected. Remediation: {v.remediation}
                       </div>
                       {v.sanitized_sample && (
                         <div className="text-[10px] text-indigo-300 bg-indigo-950/50 p-1.5 rounded border border-indigo-500/20 break-all">
-                          <span className="text-slate-400 font-sans font-semibold">Zero-PII Token Preview: </span>
+                          <span className="text-slate-500 font-sans font-semibold">Zero-PII Token Preview: </span>
                           <span className="text-emerald-400 font-mono font-bold">{v.sanitized_sample}</span>
                         </div>
                       )}
@@ -1106,12 +1106,12 @@ export const BenchmarkHubPage: React.FC = () => {
                   ))}
 
                   {validatePiiMutation.data.sanitized_records && validatePiiMutation.data.sanitized_records.length > 0 && (
-                    <div className="mt-3 p-3 rounded-lg bg-slate-950/90 border border-slate-800 space-y-1.5">
+                    <div className="mt-3 p-3 rounded-lg bg-slate-950/90 border border-slate-200 space-y-1.5">
                       <div className="text-[10px] uppercase font-semibold text-emerald-400 flex items-center justify-between">
                         <span>Sanitized Zero-PII Payload Preview (HMAC-SHA256)</span>
                         <span className="text-slate-500 font-mono">{validatePiiMutation.data.sanitized_records.length} records</span>
                       </div>
-                      <pre className="text-[10px] font-mono text-slate-300 overflow-x-auto max-h-36 p-2 rounded bg-slate-900 border border-slate-800">
+                      <pre className="text-[10px] font-mono text-slate-600 overflow-x-auto max-h-36 p-2 rounded bg-white border border-slate-200">
                         {JSON.stringify(validatePiiMutation.data.sanitized_records, null, 2)}
                       </pre>
                     </div>
@@ -1121,7 +1121,7 @@ export const BenchmarkHubPage: React.FC = () => {
             </div>
 
             {/* Right Column: Pilot Compliance Checklist */}
-            <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-5 flex flex-col justify-between">
+            <div className="lg:col-span-5 bg-white/80 border border-slate-200 rounded-2xl p-6 space-y-5 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
@@ -1131,17 +1131,17 @@ export const BenchmarkHubPage: React.FC = () => {
                     <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
                       Pilot Readiness Assessment
                     </h2>
-                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                       Ready for submission to Bank IT Risk & Compliance Committee.
                     </p>
                   </div>
                 </div>
 
                 {/* Institutional Readiness Card */}
-                <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 space-y-3 shadow-inner">
+                <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-200/80 space-y-3 shadow-inner">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-[130px]">
-                      <span className="text-xs font-medium text-slate-400 block">Institutional Readiness</span>
+                      <span className="text-xs font-medium text-slate-500 block">Institutional Readiness</span>
                       <div className="text-2xl font-bold text-emerald-400 font-mono mt-0.5 tracking-tight">
                         {readinessData?.overall_readiness_score ?? 98.5}%
                       </div>
@@ -1175,7 +1175,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800/60">
+                  <div className="w-full bg-white h-1.5 rounded-full overflow-hidden border border-slate-200/60">
                     <div
                       className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(readinessData?.overall_readiness_score ?? 98.5, 100)}%` }}
@@ -1185,7 +1185,7 @@ export const BenchmarkHubPage: React.FC = () => {
 
                 {/* Compliance Checklist Items */}
                 <div className="space-y-2.5">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center justify-between">
                     <span>Audit Verification Standards</span>
                     <span className="text-slate-500 text-[10px] font-mono">
                       {readinessData?.compliance_items?.length ?? 4} Controls Passed
@@ -1194,7 +1194,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   {readinessData?.compliance_items?.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl text-xs space-y-1.5 hover:border-slate-700/80 transition-colors"
+                      className="bg-slate-950/60 border border-slate-200/80 p-3 rounded-xl text-xs space-y-1.5 hover:border-slate-200/80 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-white truncate">{item.standard}</span>
@@ -1203,7 +1203,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-[11px] font-medium text-indigo-300/90">{item.clause}</div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">{item.evidence}</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">{item.evidence}</p>
                     </div>
                   ))}
                 </div>
@@ -1211,8 +1211,8 @@ export const BenchmarkHubPage: React.FC = () => {
 
               {/* Cryptographic Guarantees Footer */}
               {readinessData?.cryptographic_guarantees && Object.keys(readinessData.cryptographic_guarantees).length > 0 && (
-                <div className="pt-3 border-t border-slate-800/80 space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <div className="pt-3 border-t border-slate-200/80 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     Cryptographic Invariants & Security
                   </div>
@@ -1220,9 +1220,9 @@ export const BenchmarkHubPage: React.FC = () => {
                     {Object.entries(readinessData.cryptographic_guarantees).map(([k, v]) => (
                       <div
                         key={k}
-                        className="bg-slate-950/40 border border-slate-800/60 px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2"
+                        className="bg-slate-950/40 border border-slate-200/60 px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2"
                       >
-                        <span className="text-slate-400 capitalize whitespace-nowrap">{k.replace(/_/g, ' ')}:</span>
+                        <span className="text-slate-500 capitalize whitespace-nowrap">{k.replace(/_/g, ' ')}:</span>
                         <span className="text-emerald-400/90 font-medium truncate text-right">{v}</span>
                       </div>
                     ))}

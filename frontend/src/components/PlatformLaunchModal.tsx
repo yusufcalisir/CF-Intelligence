@@ -199,13 +199,13 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 </span>
               </div>
               <div className="min-w-0">
-                <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight flex items-center gap-1.5 truncate">
+                <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5 truncate">
                   Consortium Handshake
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/25">
                     <Radio className="w-2 h-2 animate-pulse" /> DEMO SEQUENCE
                   </span>
                 </h3>
-                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-400 truncate">
+                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-500 truncate">
                   CF-Intelligence · Initialization Animation Preview
                 </p>
               </div>
@@ -214,7 +214,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             <button
               onClick={onComplete || onClose}
               aria-label="Skip handshake and proceed to dashboard"
-              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               title="Direct jump to dashboard"
             >
               <span>Skip</span>
@@ -278,7 +278,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   >
                     {node.id}
                   </div>
-                  <span className="text-[7.5px] font-mono text-slate-400 mt-0.5">{node.role}</span>
+                  <span className="text-[7.5px] font-mono text-slate-500 mt-0.5">{node.role}</span>
                 </div>
               ))}
             </div>
@@ -303,16 +303,16 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                       STAGE 0{currentStage.id}/0{STAGES.length}
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-[13px] font-bold text-slate-100 tracking-tight truncate mt-0.5">
+                  <h4 className="text-xs sm:text-[13px] font-bold text-slate-900 tracking-tight truncate mt-0.5">
                     {currentStage.label}
                   </h4>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.2">
+                  <p className="text-[10px] text-slate-500 truncate mt-0.2">
                     {currentStage.subtext}
                   </p>
                 </div>
               </div>
 
-              <span className="text-[9.5px] font-mono font-semibold px-2 py-1 rounded-md bg-white/5 border border-white/10 text-cyan-300 shrink-0">
+              <span className="text-[9.5px] font-mono font-semibold px-2 py-1 rounded-md bg-white/5 border border-slate-200 text-cyan-300 shrink-0">
                 {currentStage.tag}
               </span>
             </div>
@@ -362,15 +362,15 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
 
             {/* ── 4. REAL-TIME TELEMETRY MICRO-PILLS ── */}
             <div className="grid grid-cols-3 gap-2 text-center font-mono text-[9px] sm:text-[10px]">
-              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-300">
+              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-600">
                 <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
                 <span className="truncate">3 Nodes Linked</span>
               </div>
-              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-300">
+              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
                 <span className="truncate">ε=1.0 DP Bound</span>
               </div>
-              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-300">
+              <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
                 <span className="truncate">SGX Attested</span>
               </div>
@@ -380,7 +380,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
           {/* Footer: Progress Bar */}
           <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-[#03030d] border-t border-white/8 space-y-1.5">
             <div className="flex items-center justify-between text-[10.5px] sm:text-xs font-mono">
-              <span className="text-slate-300 flex items-center gap-1.5 truncate">
+              <span className="text-slate-600 flex items-center gap-1.5 truncate">
                 <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
                 <span className="truncate">
                   {progress >= 100
@@ -390,13 +390,13 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               </span>
               <span className="text-cyan-400 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
             </div>
-            <div className="relative w-full h-1.5 sm:h-2 bg-slate-900 rounded-full overflow-hidden border border-white/10 p-0.5">
+            <div className="relative w-full h-1.5 sm:h-2 bg-white rounded-full overflow-hidden border border-slate-200 p-0.5">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.8)] transition-[width] duration-75 ease-linear"
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5">
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5">
               <span>Interactive launch preview animation</span>
               <span>Verifying runtime services concurrently</span>
             </div>

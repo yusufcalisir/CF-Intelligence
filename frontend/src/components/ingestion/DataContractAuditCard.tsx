@@ -85,7 +85,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
               <Layers size={11} className="text-amber-400" /> Records Partition
             </span>
-            <p className="text-xs font-bold font-mono text-slate-200 mt-1">
+            <p className="text-xs font-bold font-mono text-slate-800 mt-1">
               <span className="text-emerald-400">{auditResult.passed_records} OK</span>
               {auditResult.quarantined_records > 0 && (
                 <span className="text-rose-400 ml-1.5 font-bold">
@@ -128,7 +128,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             >
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-slate-200">
+                  <span className="font-mono font-bold text-slate-800">
                     {check.expectation_name}
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-indigo-300">

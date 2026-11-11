@@ -44,14 +44,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <h3 className="text-base font-bold text-white tracking-tight">
               {this.props.fallbackTitle || 'Component Rendering Error'}
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-mono">
+            <p className="text-xs text-slate-500 leading-relaxed font-mono">
               {this.state.error?.message || 'An unexpected runtime error occurred while rendering this module.'}
             </p>
           </div>
 
           <button
             onClick={this.handleReset}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 transition-all cursor-pointer shadow-lg active:scale-95 border border-white/10"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 transition-all cursor-pointer shadow-lg active:scale-95 border border-slate-200"
           >
             🔄 Reload Component
           </button>

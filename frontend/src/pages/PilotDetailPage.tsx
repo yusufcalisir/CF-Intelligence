@@ -165,18 +165,18 @@ export default function PilotDetailPage() {
 
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-muted)]">
             <span>
-              Consortium: <strong className="font-mono text-slate-300">{pilot.consortium_id}</strong>
+              Consortium: <strong className="font-mono text-slate-600">{pilot.consortium_id}</strong>
             </span>
             <span>•</span>
             <span>
-              Purposes: <span className="font-mono text-slate-300">{pilot.allowed_purposes?.join(', ') || 'N/A'}</span>
+              Purposes: <span className="font-mono text-slate-600">{pilot.allowed_purposes?.join(', ') || 'N/A'}</span>
             </span>
             <span>•</span>
             <div className="flex items-center gap-1">
-              <Building className="h-3 w-3 text-slate-400" />
-              <span className="font-mono text-slate-300">{pilot.participating_institutions?.[0] || 'Bank A'}</span>
+              <Building className="h-3 w-3 text-slate-500" />
+              <span className="font-mono text-slate-600">{pilot.participating_institutions?.[0] || 'Bank A'}</span>
               <span className="text-[10px] text-slate-500 font-bold">⇄</span>
-              <span className="font-mono text-slate-300">{pilot.participating_institutions?.[1] || 'Bank B'}</span>
+              <span className="font-mono text-slate-600">{pilot.participating_institutions?.[1] || 'Bank B'}</span>
             </div>
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function PilotDetailPage() {
                     : 'border-transparent text-[var(--color-text-muted)] hover:border-slate-500 hover:text-[var(--color-text-primary)]'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
                   <span

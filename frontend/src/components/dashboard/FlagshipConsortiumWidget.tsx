@@ -97,7 +97,7 @@ export default function FlagshipConsortiumWidget() {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
               CFI-CrossBank-01
             </span>
-            <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+            <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
               3 Institutions · 7 Scenarios
             </span>
           </div>
@@ -105,7 +105,7 @@ export default function FlagshipConsortiumWidget() {
             <span>🏛️</span>
             <span>Multi-Bank Consortium Collaborative Advantage</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-3xl">
+          <p className="text-xs text-slate-500 mt-1 max-w-3xl">
             Empirical validation of collaborative intelligence vs. isolated banking silos: detecting cross-institutional money laundering topologies invisible to single-bank visibility horizons.
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function FlagshipConsortiumWidget() {
           </Link>
           <Link
             to="/scenarios"
-            className="px-3 py-2 text-xs font-medium rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all flex items-center gap-1"
+            className="px-3 py-2 text-xs font-medium rounded-xl bg-white/5 hover:bg-white/10 text-slate-600 border border-slate-200 transition-all flex items-center gap-1"
           >
             <span>Topologies</span>
           </Link>
@@ -129,63 +129,63 @@ export default function FlagshipConsortiumWidget() {
 
       {/* Core Impact Highlights Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-indigo-500/30 transition-all space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-indigo-500/30 transition-all space-y-1">
+          <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Overall Detection Uplift
           </div>
           <div className="text-2xl font-black font-mono text-emerald-400 flex items-baseline gap-1.5">
             +19.05%
-            <span className="text-xs font-normal text-slate-400">Δ over silos</span>
+            <span className="text-xs font-normal text-slate-500">Δ over silos</span>
           </div>
-          <div className="text-[11px] text-slate-400 font-mono">
+          <div className="text-[11px] text-slate-500 font-mono">
             80.95% Isolated → <span className="text-emerald-300 font-bold">100.0% Federated</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-teal-500/30 transition-all space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-teal-500/30 transition-all space-y-1">
+          <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Averted Fraud Volume (VaR)
           </div>
           <div className="text-2xl font-black font-mono text-teal-400 flex items-baseline gap-1.5">
             +$790,933
-            <span className="text-xs font-normal text-slate-400">USD</span>
+            <span className="text-xs font-normal text-slate-500">USD</span>
           </div>
-          <div className="text-[11px] text-slate-400 font-mono">
+          <div className="text-[11px] text-slate-500 font-mono">
             <span className="text-teal-300 font-bold">+42.14%</span> incremental capital preserved
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-violet-500/30 transition-all space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-violet-500/30 transition-all space-y-1">
+          <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Cyclic Laundering Ring (SC-3)
           </div>
           <div className="text-2xl font-black font-mono text-violet-400 flex items-baseline gap-1.5">
             100.0%
-            <span className="text-xs font-normal text-slate-400">vs 66.7%</span>
+            <span className="text-xs font-normal text-slate-500">vs 66.7%</span>
           </div>
-          <div className="text-[11px] text-slate-400 font-mono">
+          <div className="text-[11px] text-slate-500 font-mono">
             Cross-bank horizon reveals closed ring
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-amber-500/30 transition-all space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-amber-500/30 transition-all space-y-1">
+          <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Cold-Start Bank Rescue (SC-7)
           </div>
           <div className="text-2xl font-black font-mono text-amber-400 flex items-baseline gap-1.5">
             0% → 100%
-            <span className="text-xs font-normal text-slate-400">(2/2 txns)</span>
+            <span className="text-xs font-normal text-slate-500">(2/2 txns)</span>
           </div>
-          <div className="text-[11px] text-slate-400 font-mono">
+          <div className="text-[11px] text-slate-500 font-mono">
             Bank Gamma zero-positive prior transfer (simulated N=2)
           </div>
         </div>
       </div>
 
       {/* Interactive Scenario Inspection Matrix */}
-      <div className="p-4 rounded-xl bg-slate-900/40 border border-white/5 space-y-4">
+      <div className="p-4 rounded-xl bg-white/40 border border-white/5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
             <span>🔬</span>
             <span>Scenario-by-Scenario Horizon Analysis</span>
           </h3>
@@ -206,7 +206,7 @@ export default function FlagshipConsortiumWidget() {
                 className={`px-1 sm:px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all text-center flex items-center justify-center gap-1 ${
                   isSelected
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
-                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-600 border border-white/5'
                 }`}
                 title={sc.name}
               >
@@ -241,16 +241,16 @@ export default function FlagshipConsortiumWidget() {
                 <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-wider">
                   {activeScenario.id}
                 </span>
-                <h4 className="text-sm font-bold text-slate-100">{activeScenario.name}</h4>
+                <h4 className="text-sm font-bold text-slate-900">{activeScenario.name}</h4>
               </div>
-              <span className="text-[11px] font-mono text-slate-400 bg-white/5 px-2.5 py-1 rounded-md border border-white/5 self-start sm:self-auto">
+              <span className="text-[11px] font-mono text-slate-500 bg-white/5 px-2.5 py-1 rounded-md border border-white/5 self-start sm:self-auto">
                 Topology: {activeScenario.topology}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="p-3 rounded-lg bg-white/3 border border-white/5 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-slate-400">Isolated Silo Detection</span>
+                <span className="text-[10px] font-mono uppercase text-slate-500">Isolated Silo Detection</span>
                 <div className="text-lg font-bold font-mono text-rose-400">
                   {activeScenario.isolated.toFixed(1)}%
                 </div>
@@ -262,7 +262,7 @@ export default function FlagshipConsortiumWidget() {
               </div>
 
               <div className="p-3 rounded-lg bg-white/3 border border-white/5 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-slate-400">Federated Consensus</span>
+                <span className="text-[10px] font-mono uppercase text-slate-500">Federated Consensus</span>
                 <div className="text-lg font-bold font-mono text-emerald-400">
                   {activeScenario.federated.toFixed(1)}%
                 </div>
@@ -272,7 +272,7 @@ export default function FlagshipConsortiumWidget() {
               </div>
 
               <div className="p-3 rounded-lg bg-white/3 border border-white/5 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-slate-400">Consortium Uplift (Δ)</span>
+                <span className="text-[10px] font-mono uppercase text-slate-500">Consortium Uplift (Δ)</span>
                 <div className="text-lg font-bold font-mono text-indigo-300">
                   +{activeScenario.delta.toFixed(1)}%
                 </div>
@@ -289,32 +289,32 @@ export default function FlagshipConsortiumWidget() {
 
       {/* Participating Institutions Status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
           <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">
             A
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-slate-200 truncate">Bank Alpha (Retail)</div>
-            <div className="text-[10px] font-mono text-slate-400 truncate">50% Consortium Vol · 5k Accts</div>
+            <div className="text-xs font-bold text-slate-800 truncate">Bank Alpha (Retail)</div>
+            <div className="text-[10px] font-mono text-slate-500 truncate">50% Consortium Vol · 5k Accts</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
           <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-xs shrink-0">
             B
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-slate-200 truncate">Bank Beta (Commercial)</div>
-            <div className="text-[10px] font-mono text-slate-400 truncate">30% Consortium Vol · 3k Accts</div>
+            <div className="text-xs font-bold text-slate-800 truncate">Bank Beta (Commercial)</div>
+            <div className="text-[10px] font-mono text-slate-500 truncate">30% Consortium Vol · 3k Accts</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
           <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0">
             C
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-slate-200 truncate">Bank Gamma (Cross-Border)</div>
+            <div className="text-xs font-bold text-slate-800 truncate">Bank Gamma (Cross-Border)</div>
             <div className="text-[10px] font-mono text-emerald-400 truncate">Cold-Start Transfer Rescued</div>
           </div>
         </div>

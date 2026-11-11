@@ -383,7 +383,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                       <span className="text-[var(--color-text-muted)]">➔</span>
                       <span className="font-semibold text-[var(--color-text-primary)]">{att.target}</span>
                       {att.relation && (
-                        <span className="hidden sm:inline font-mono text-[9px] px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-slate-400">
+                        <span className="hidden sm:inline font-mono text-[9px] px-1.5 py-0.2 rounded bg-white/5 border border-slate-200 text-slate-500">
                           {att.relation}
                         </span>
                       )}

@@ -271,7 +271,7 @@ export default function CasesPage() {
               <button
                 type="button"
                 onClick={() => handleSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                 aria-label="Clear search"
               >
                 <X size={12} />
@@ -360,10 +360,10 @@ export default function CasesPage() {
           </div>
           {statusFilter || priorityFilter || searchQuery ? (
             <div>
-              <p className="text-base font-semibold text-slate-200 mb-1">
+              <p className="text-base font-semibold text-slate-800 mb-1">
                 No cases matching filter criteria
               </p>
-              <p className="text-xs text-slate-400 mb-4 max-w-md mx-auto">
+              <p className="text-xs text-slate-500 mb-4 max-w-md mx-auto">
                 {statusFilter && `Status: ${CASE_STATUS_LABELS[statusFilter] || statusFilter}. `}
                 {priorityFilter && `Priority: ${PRIORITY_LABELS[priorityFilter] || priorityFilter}. `}
                 {searchQuery && `Search: "${searchQuery}". `}
@@ -373,15 +373,15 @@ export default function CasesPage() {
                 type="button"
                 id="clear-case-status-filter-btn"
                 onClick={handleClearAllFilters}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 transition-all cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/15 text-slate-800 border border-slate-200 transition-all cursor-pointer"
               >
                 Clear Status Filter
               </button>
             </div>
           ) : (
             <div>
-              <p className="text-base font-semibold text-slate-200 mb-1">No cases yet</p>
-              <p className="text-xs text-slate-400 mb-4">Create a case to start tracking investigations.</p>
+              <p className="text-base font-semibold text-slate-800 mb-1">No cases yet</p>
+              <p className="text-xs text-slate-500 mb-4">Create a case to start tracking investigations.</p>
               <button
                 type="button"
                 id="create-first-case-btn"
@@ -434,7 +434,7 @@ export default function CasesPage() {
         <div className="p-3.5 bg-gradient-to-r from-indigo-950/80 via-purple-950/70 to-slate-900/80 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2">
             <span className="text-base">⚡</span>
-            <span className="text-slate-200">
+            <span className="text-slate-800">
               Inbound alert escalation pending for Alert <span className="font-mono font-bold text-indigo-300">{fromAlertId}</span>
               {initialRiskScore !== undefined && (
                 <span className="ml-2 font-mono text-amber-300">
@@ -541,7 +541,7 @@ function CreateCaseModal({
                 </span>
               )}
             </div>
-            <div className="font-mono text-[11px] text-slate-300 truncate">
+            <div className="font-mono text-[11px] text-slate-600 truncate">
               Alert ID: <span className="text-white font-bold">{fromAlertId}</span>
             </div>
           </div>

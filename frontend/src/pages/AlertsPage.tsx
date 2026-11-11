@@ -453,7 +453,7 @@ export default function AlertsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="glass-card w-full max-w-lg max-h-[90vh] overflow-hidden relative flex flex-col p-0 border border-slate-700/80 shadow-2xl bg-slate-950"
+            className="glass-card w-full max-w-lg max-h-[90vh] overflow-hidden relative flex flex-col p-0 border border-slate-200/80 shadow-2xl bg-slate-950"
           >
             <div className="p-3.5 sm:p-4 border-b border-[var(--color-border)] flex items-center justify-between sticky top-0 bg-slate-950/95 backdrop-blur z-10 shrink-0">
               <h3 className="font-bold text-sm sm:text-base text-[var(--color-text-primary)]">Alert Details</h3>
@@ -603,7 +603,7 @@ function AlertCard({
             </span>
           ) : (
             <span className="text-[10px] font-mono text-[var(--color-text-muted)]">
-              Status: <span className="capitalize text-slate-300 font-semibold">{alert.status}</span>
+              Status: <span className="capitalize text-slate-600 font-semibold">{alert.status}</span>
             </span>
           )}
           <Link
@@ -740,14 +740,14 @@ export function ExplainabilityPanel({
       key={alert.id}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className={`space-y-4 text-slate-100 min-w-0 ${
+      className={`space-y-4 text-slate-900 min-w-0 ${
         isModal
           ? 'p-0 bg-transparent'
           : 'glass-card p-3.5 sm:p-5 lg:sticky lg:top-6 border border-[var(--color-border)] shadow-2xl bg-slate-950/90'
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 min-w-0">
-        <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider flex items-center gap-1.5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 min-w-0">
+        <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-800 tracking-wider flex items-center gap-1.5 min-w-0">
           <span className="shrink-0">🧠</span>
           <span className="truncate">AI Explainability Portal</span>
         </h3>
@@ -758,7 +758,7 @@ export function ExplainabilityPanel({
           {onClose && !isModal && (
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
               title="Close panel"
               aria-label="Close explainability panel"
             >
@@ -788,7 +788,7 @@ export function ExplainabilityPanel({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-300 mt-1 leading-normal break-words">
+            <p className="text-[11px] text-slate-600 mt-1 leading-normal break-words">
               {alert.status === 'escalated'
                 ? 'This alert is linked to an AML investigation case with cryptographically chained evidence.'
                 : 'Convert alert telemetry, SHAP attributions, and suspect graph entities into an AML case.'}
@@ -819,8 +819,8 @@ export function ExplainabilityPanel({
 
       {/* Suspect Graph Entities & Deep-Link Jump Bar */}
       {alert.involved_entity_ids && alert.involved_entity_ids.length > 0 && (
-        <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-500/25 space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+        <div className="p-3 bg-white/90 rounded-xl border border-indigo-500/25 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wider">
             <span className="flex items-center gap-1.5 text-indigo-300 min-w-0">
               <span className="shrink-0">🕸️</span>
               <span className="truncate">Suspect Graph Entities</span>
@@ -833,7 +833,7 @@ export function ExplainabilityPanel({
             {alert.involved_entity_ids.map((entityId) => (
               <div
                 key={entityId}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 gap-2 min-w-0"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg bg-slate-950/70 border border-slate-200/80 gap-2 min-w-0"
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
@@ -874,7 +874,7 @@ export function ExplainabilityPanel({
       )}
 
       {/* Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-xs font-bold">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1.5 bg-white/90 border border-slate-200 rounded-xl text-center text-xs font-bold">
         {[
           { id: 'attribution', label: 'Attribution' },
           { id: 'counterfactuals', label: 'Remediation' },
@@ -888,7 +888,7 @@ export function ExplainabilityPanel({
             className={`py-1.5 px-2 rounded-lg transition-all text-[11px] truncate whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50 font-medium'
             }`}
           >
             {tab.label}
@@ -900,14 +900,14 @@ export function ExplainabilityPanel({
       {activeTab === 'attribution' && (
         <div className="space-y-4">
           {isReportLoading ? (
-            <div className="text-center py-6 text-slate-400 text-xs font-mono">Analyzing feature contributions...</div>
+            <div className="text-center py-6 text-slate-500 text-xs font-mono">Analyzing feature contributions...</div>
           ) : !report ? (
-            <div className="text-center py-6 text-slate-400 text-xs font-mono">No report available</div>
+            <div className="text-center py-6 text-slate-500 text-xs font-mono">No report available</div>
           ) : (
             <>
               {/* Risk Factors */}
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-1.5">
                   <span>⚠️</span> Risk Factors
                 </h4>
                 <ul className="space-y-1.5">
@@ -928,7 +928,7 @@ export function ExplainabilityPanel({
                   );
                   return (
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                         <span>📊</span> {isFallback ? 'Analytical Fallback Attribution' : 'Kernel SHAP Feature Attribution'}
                       </h4>
                       {isFallback && (
@@ -956,14 +956,14 @@ export function ExplainabilityPanel({
                     return (
                       <div key={i} className="text-xs space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-200 capitalize truncate min-w-0">
+                          <span className="font-semibold text-slate-800 capitalize truncate min-w-0">
                             {f.feature.replace(/_/g, ' ')}
                           </span>
                           <span className={`font-mono font-bold shrink-0 ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isPositive ? '+' : '-'}{pct.toFixed(0)}%
                           </span>
                         </div>
-                        <div className="h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
+                        <div className="h-2 bg-white border border-slate-200 rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${barWidth}%` }}
@@ -984,7 +984,7 @@ export function ExplainabilityPanel({
               {/* Signal Breakdown */}
               {(report.risk_score_breakdown ?? []).length > 0 && (
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                  <h4 className="text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-1.5">
                     <span className="shrink-0">⚡</span>
                     <span className="truncate">9-Signal Composite Pipeline</span>
                   </h4>
@@ -996,14 +996,14 @@ export function ExplainabilityPanel({
                       .map((sig, i) => (
                         <div key={i} className="text-xs space-y-1">
                           <div className="flex justify-between items-center gap-2">
-                            <span className="font-semibold text-slate-200 capitalize truncate min-w-0">
+                            <span className="font-semibold text-slate-800 capitalize truncate min-w-0">
                               {sig.signal_name.replace(/_/g, ' ').replace('rules', '')}
                             </span>
                             <span className="font-mono text-emerald-400 font-bold shrink-0">
                               {((sig.contribution ?? 0) * 100).toFixed(0)}%
                             </span>
                           </div>
-                          <div className="h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
+                          <div className="h-2 bg-white border border-slate-200 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-teal-400 to-emerald-400"
                               style={{ width: `${Math.max(3, (sig.contribution ?? 0) * 100)}%` }}
@@ -1023,9 +1023,9 @@ export function ExplainabilityPanel({
       {activeTab === 'counterfactuals' && (
         <div className="space-y-4 text-xs">
           {isCfLoading ? (
-            <div className="text-center py-6 text-slate-400 font-mono">Generating remediation paths...</div>
+            <div className="text-center py-6 text-slate-500 font-mono">Generating remediation paths...</div>
           ) : !cfReport ? (
-            <div className="text-center py-6 text-slate-400 font-mono space-y-3">
+            <div className="text-center py-6 text-slate-500 font-mono space-y-3">
               <div>No pre-computed counterfactual report available for this alert.</div>
               <Link
                 to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
@@ -1044,7 +1044,7 @@ export function ExplainabilityPanel({
                     <span className="shrink-0">🎛️</span>
                     <span className="truncate">Interactive Parameter Workbench</span>
                   </div>
-                  <p className="text-[10px] text-slate-300 mt-0.5 leading-normal break-words">
+                  <p className="text-[10px] text-slate-600 mt-0.5 leading-normal break-words">
                     Tune transaction amount, velocity, and risk sliders dynamically to simulate optimal remediation paths.
                   </p>
                 </div>
@@ -1058,9 +1058,9 @@ export function ExplainabilityPanel({
                 </Link>
               </div>
 
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+              <div className="p-3 bg-white/80 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold text-slate-200">Remediation Target</span>
+                  <span className="font-bold text-slate-800">Remediation Target</span>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       cfReport.is_cleared ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -1070,32 +1070,32 @@ export function ExplainabilityPanel({
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-center my-2">
-                  <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-200">
                     <div className="text-lg font-bold text-rose-400 font-mono">{cfReport.original_score}</div>
-                    <div className="text-[9px] uppercase text-slate-400 font-semibold">Current Risk</div>
+                    <div className="text-[9px] uppercase text-slate-500 font-semibold">Current Risk</div>
                   </div>
-                  <div className="text-lg text-slate-400">➔</div>
-                  <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div className="text-lg text-slate-500">➔</div>
+                  <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-200">
                     <div className="text-lg font-bold text-emerald-400 font-mono">{cfReport.remediated_score}</div>
-                    <div className="text-[9px] uppercase text-slate-400 font-semibold">Target Risk</div>
+                    <div className="text-[9px] uppercase text-slate-500 font-semibold">Target Risk</div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                <h4 className="text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wider">
                   Actionable Remediation Statements
                 </h4>
                 <div className="space-y-2">
                   {(cfReport.changes ?? []).map((change, i) => (
-                    <div key={i} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
-                      <div className="flex flex-wrap items-center justify-between gap-1.5 font-bold text-slate-200 capitalize">
+                    <div key={i} className="p-3 bg-white/80 rounded-xl border border-slate-200 space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 font-bold text-slate-800 capitalize">
                         <span className="truncate min-w-0">{change.feature.replace(/_/g, ' ')}</span>
                         <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20 shrink-0">
                           {change.original_value} ➔ {change.remediated_value}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed break-words">
+                      <p className="text-[11px] text-slate-600 leading-relaxed break-words">
                         {change.delta_explanation}
                       </p>
                     </div>
@@ -1111,22 +1111,22 @@ export function ExplainabilityPanel({
       {activeTab === 'audit' && (
         <div className="space-y-4 text-xs">
           {isAuditLoading ? (
-            <div className="text-center py-6 text-slate-400 font-mono">Replaying inference audit...</div>
+            <div className="text-center py-6 text-slate-500 font-mono">Replaying inference audit...</div>
           ) : !auditReport ? (
-            <div className="text-center py-6 text-slate-400 font-mono">Audit replay not available</div>
+            <div className="text-center py-6 text-slate-500 font-mono">Audit replay not available</div>
           ) : (
             <>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-3 bg-white/80 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-300">Model Version</span>
+                  <span className="font-bold text-slate-600">Model Version</span>
                   <span className="font-mono text-indigo-400 font-bold">{auditReport.model_version}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Model Baseline AUC</span>
-                  <span className="font-mono font-bold text-slate-200">{((auditReport.model_auc ?? 0) * 100).toFixed(1)}%</span>
+                  <span className="text-slate-500">Model Baseline AUC</span>
+                  <span className="font-mono font-bold text-slate-800">{((auditReport.model_auc ?? 0) * 100).toFixed(1)}%</span>
                 </div>
-                <div className="flex items-center justify-between pt-1.5 border-t border-slate-800">
-                  <span className="text-slate-400">Inference Audit Match</span>
+                <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                  <span className="text-slate-500">Inference Audit Match</span>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       auditReport.audit_matched ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
@@ -1138,12 +1138,12 @@ export function ExplainabilityPanel({
               </div>
 
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                <h4 className="text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wider">
                   9-Signal Replay Execution Trace
                 </h4>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {(auditReport.policy_rules_evaluated ?? []).map((rule, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-slate-900/80 rounded-lg border border-slate-800 gap-2">
+                    <div key={i} className="flex items-center justify-between p-2 bg-white/80 rounded-lg border border-slate-200 gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
@@ -1151,7 +1151,7 @@ export function ExplainabilityPanel({
                           }`}
                         />
                         <span className="font-mono font-bold text-[10px] text-indigo-400 shrink-0">{rule.rule_code}</span>
-                        <span className="text-slate-300 capitalize truncate text-xs min-w-0">
+                        <span className="text-slate-600 capitalize truncate text-xs min-w-0">
                           {rule.signal_name.replace(/_/g, ' ')}
                         </span>
                       </div>
@@ -1171,14 +1171,14 @@ export function ExplainabilityPanel({
       {activeTab === 'gnn' && (
         <div className="space-y-4 text-xs">
           {isGnnLoading ? (
-            <div className="text-center py-6 text-slate-400 font-mono">Computing GNN attribution...</div>
+            <div className="text-center py-6 text-slate-500 font-mono">Computing GNN attribution...</div>
           ) : !gnnReport ? (
-            <div className="text-center py-6 text-slate-400 font-mono">GNN explanation not available</div>
+            <div className="text-center py-6 text-slate-500 font-mono">GNN explanation not available</div>
           ) : (
             <>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="p-3 bg-white/80 rounded-xl border border-slate-200 space-y-1.5">
                 <div className="flex justify-between items-center font-bold">
-                  <span className="text-slate-300">Target Node ID</span>
+                  <span className="text-slate-600">Target Node ID</span>
                   {gnnReport.node_id ? (
                     <Link
                       to={`/graph?entity_id=${encodeURIComponent(gnnReport.node_id)}&depth=2`}
@@ -1189,33 +1189,33 @@ export function ExplainabilityPanel({
                       <span className="text-[10px]">🕸️</span>
                     </Link>
                   ) : (
-                    <span className="font-mono text-slate-400">N/A</span>
+                    <span className="font-mono text-slate-500">N/A</span>
                   )}
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-500">
                   <span>2-Hop Subgraph</span>
-                  <span className="font-semibold text-slate-200">{gnnReport.subgraph_nodes_count ?? 0} nodes • {gnnReport.subgraph_edges_count ?? 0} edges</span>
+                  <span className="font-semibold text-slate-800">{gnnReport.subgraph_nodes_count ?? 0} nodes • {gnnReport.subgraph_edges_count ?? 0} edges</span>
                 </div>
-                <p className="text-[11px] text-teal-300 font-medium pt-1.5 border-t border-slate-800">
+                <p className="text-[11px] text-teal-300 font-medium pt-1.5 border-t border-slate-200">
                   {gnnReport.primary_driver_text}
                 </p>
               </div>
 
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
+                <h4 className="text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
                   <span>Top Graph Edge Contributors</span>
-                  <span className="text-[9px] font-mono text-slate-400">Click node to inspect ego graph</span>
+                  <span className="text-[9px] font-mono text-slate-500">Click node to inspect ego graph</span>
                 </h4>
                 <div className="space-y-2">
                   {(gnnReport.top_contributing_edges ?? []).map((edge, i) => (
-                    <div key={i} className="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
-                      <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-200">
+                    <div key={i} className="p-2.5 bg-white/80 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-800">
                         <span className="text-indigo-400 capitalize truncate min-w-0">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
                         <span className="text-emerald-400 font-bold shrink-0 ml-2">
                           {(edge.contribution_percentage ?? ((edge.weight ?? 0) * 100)).toFixed(0)}%
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-400">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-500">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.source)}&depth=2`}
                           className="truncate max-w-[120px] text-cyan-400 hover:text-cyan-200 hover:underline"
@@ -1243,8 +1243,8 @@ export function ExplainabilityPanel({
       {/* Tab 5: Cross-Bank Consortium Intelligence */}
       {activeTab === 'cross_bank' && (
         <div className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-500/30 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold text-slate-200">
+          <div className="p-3 bg-white/90 rounded-xl border border-indigo-500/30 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold text-slate-800">
               <span className="flex items-center gap-1.5 text-indigo-300">
                 <span>🛡️</span>
                 <span>Authorized Consortium Matching</span>
@@ -1253,39 +1253,39 @@ export function ExplainabilityPanel({
                 Zero-Raw-PII Boundary
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Query verified counterpart intelligence across active consortium members without exposing cleartext PII, internal customer profiles, or account numbers.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200">
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Execution Mode</label>
+                <label className="text-[10px] uppercase font-mono text-slate-500 block mb-1">Execution Mode</label>
                 <select
                   value={intelExecutionMode}
                   onChange={(e) => setIntelExecutionMode(e.target.value as any)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="VERIFIED_OPERATIONAL">Verified Operational (OpenMined PSI)</option>
                   <option value="SIMULATED_RESEARCH">Simulated Research (Prototype)</option>
                 </select>
               </div>
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Consortium ID</label>
+                <label className="text-[10px] uppercase font-mono text-slate-500 block mb-1">Consortium ID</label>
                 <input
                   type="text"
                   value={intelConsortiumId}
                   onChange={(e) => setIntelConsortiumId(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
                   placeholder="e.g. nordic_aml_ring"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Target Counterpart Bank (Optional)</label>
+                <label className="text-[10px] uppercase font-mono text-slate-500 block mb-1">Target Counterpart Bank (Optional)</label>
                 <input
                   type="text"
                   value={intelTargetBank}
                   onChange={(e) => setIntelTargetBank(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
                   placeholder="All active members (or e.g. bank_b)"
                 />
               </div>
@@ -1331,9 +1331,9 @@ export function ExplainabilityPanel({
 
           {/* Intelligence Signal Display */}
           {intelSignal && (
-            <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-                <span className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+            <div className="p-3.5 bg-white/80 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                   {intelSignal.execution_mode === 'VERIFIED_OPERATIONAL' ? (
                     <>
                       <span>🛡️</span>
@@ -1352,7 +1352,7 @@ export function ExplainabilityPanel({
                       ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                       : intelSignal.match_category === 'PROBABILISTIC_FUZZY'
                       ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      : 'bg-slate-50 text-slate-500 border border-slate-200'
                   }`}
                 >
                   {intelSignal.match_category === 'EXACT_MATCH' && 'VERIFIED EXACT MATCH (100%)'}
@@ -1374,7 +1374,7 @@ export function ExplainabilityPanel({
                         ? 'text-orange-400'
                         : intelSignal.sanitized_risk_level === 'MEDIUM'
                         ? 'text-amber-400'
-                        : 'text-slate-300'
+                        : 'text-slate-600'
                     }`}
                   >
                     {intelSignal.sanitized_risk_level}
@@ -1382,7 +1382,7 @@ export function ExplainabilityPanel({
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 uppercase block">Contributing Banks</span>
-                  <span className="font-mono text-slate-200">
+                  <span className="font-mono text-slate-800">
                     {intelSignal.disclosure_mode === 'ATTRIBUTED_INSTITUTIONS' && intelSignal.contributing_institutions.length > 0
                       ? intelSignal.contributing_institutions.map((b) => BANK_NAMES[b] || b).join(', ')
                       : intelSignal.contributing_institutions_count > 0
@@ -1404,7 +1404,7 @@ export function ExplainabilityPanel({
                 </div>
                 <div className="col-span-2">
                   <span className="text-[10px] text-slate-500 uppercase block">Privacy Digest</span>
-                  <span className="font-mono text-slate-400 text-[10px] truncate block" title={intelSignal.privacy_hash_truncated}>
+                  <span className="font-mono text-slate-500 text-[10px] truncate block" title={intelSignal.privacy_hash_truncated}>
                     {intelSignal.privacy_hash_truncated}
                   </span>
                 </div>
@@ -1426,12 +1426,12 @@ export function ExplainabilityPanel({
                 </div>
               )}
 
-              <p className="text-[10px] text-slate-500 italic border-t border-slate-800/80 pt-2">
+              <p className="text-[10px] text-slate-500 italic border-t border-slate-200/80 pt-2">
                 {intelSignal.disclaimer}
               </p>
 
               {/* Attach to Case Action */}
-              <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="pt-2 border-t border-slate-200 space-y-2">
                 {linkedCase ? (
                   <div className="space-y-1.5">
                     <button
@@ -1460,7 +1460,7 @@ export function ExplainabilityPanel({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-500">
                       This alert is not yet escalated to an investigation case. Escalate the alert or provide an existing Case ID to attach this signal:
                     </p>
                     <div className="flex items-center gap-1.5">
@@ -1469,7 +1469,7 @@ export function ExplainabilityPanel({
                         value={manualCaseId}
                         onChange={(e) => setManualCaseId(e.target.value)}
                         placeholder="Enter Case ID (e.g. case_123)"
-                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
                       />
                       <button
                         type="button"

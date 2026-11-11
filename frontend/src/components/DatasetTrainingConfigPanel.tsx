@@ -180,7 +180,7 @@ export default function DatasetTrainingConfigPanel({
                       onClick={() => setSelectedId(dsId)}
                       className={`flex flex-col gap-2 p-3.5 rounded-xl border-2 transition-all text-left ${
                         isSelected
-                          ? 'bg-slate-800/60'
+                          ? 'bg-slate-50/60'
                           : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)] bg-transparent'
                       }`}
                       style={isSelected ? { borderColor: p.color, backgroundColor: `${p.color}14` } : undefined}

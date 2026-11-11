@@ -9,10 +9,10 @@ export default function ComparativeModelWidget() {
 
   if (isLoading) {
     return (
-      <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl animate-pulse">
-        <div className="h-6 w-72 bg-slate-800 rounded mb-4" />
-        <div className="h-20 bg-slate-900/60 rounded-xl mb-4" />
-        <div className="h-48 bg-slate-900/40 rounded-xl" />
+      <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl animate-pulse">
+        <div className="h-6 w-72 bg-slate-50 rounded mb-4" />
+        <div className="h-20 bg-white/60 rounded-xl mb-4" />
+        <div className="h-48 bg-white/40 rounded-xl" />
       </div>
     );
   }
@@ -29,10 +29,10 @@ export default function ComparativeModelWidget() {
   ) {
     if (isLoading) {
       return (
-        <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl animate-pulse">
-          <div className="h-6 w-72 bg-slate-800 rounded mb-4" />
-          <div className="h-20 bg-slate-900/60 rounded-xl mb-4" />
-          <div className="h-48 bg-slate-900/40 rounded-xl" />
+        <div className="p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl animate-pulse">
+          <div className="h-6 w-72 bg-slate-50 rounded mb-4" />
+          <div className="h-20 bg-white/60 rounded-xl mb-4" />
+          <div className="h-48 bg-white/40 rounded-xl" />
         </div>
       );
     }
@@ -92,7 +92,7 @@ export default function ComparativeModelWidget() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl mt-6 relative overflow-hidden"
+      className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl mt-6 relative overflow-hidden"
     >
       {/* Background Decorative Glow */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -102,14 +102,14 @@ export default function ComparativeModelWidget() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-base">⚖️</span>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
               Multi-Paradigm Benchmark Baselines & Comparative Analysis
             </h3>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               Benchmark Reference · {dataset_name}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Empirical evaluation comparing Centralized Upper Bound, Federated Champion, Isolated Banking Silos, and Classical Tabular Models on untouched global test set.
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function ComparativeModelWidget() {
               className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
                 selectedMetric === metric
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
               }`}
             >
               {metric === 'pr_auc' ? 'PR-AUC' : metric === 'roc_auc' ? 'ROC-AUC' : 'Recall@0.1%'}
@@ -134,9 +134,9 @@ export default function ComparativeModelWidget() {
 
       {/* KPI Cards: Collaborative Uplift & Centralization Gap */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-emerald-500/20 flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white/60 border border-emerald-500/20 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Collaborative Uplift</span>
+            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Collaborative Uplift</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
           </div>
           <div className="mt-2">
@@ -145,30 +145,30 @@ export default function ComparativeModelWidget() {
             </span>
             <span className="text-xs text-emerald-300 font-mono ml-1.5">Δ PR-AUC</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             Uplift over {silo_deficit_analysis?.silo_count ?? 3}-bank isolated silo average
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-indigo-500/20 flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white/60 border border-indigo-500/20 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Federated Efficiency</span>
+            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Federated Efficiency</span>
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
           </div>
           <div className="mt-2">
             <span className="text-2xl font-bold font-mono text-indigo-300">
               {(centralization_gap_analysis?.federated_efficiency_pct ?? 97.34).toFixed(1)}%
             </span>
-            <span className="text-xs text-slate-400 font-mono ml-1.5">of Upper Bound</span>
+            <span className="text-xs text-slate-500 font-mono ml-1.5">of Upper Bound</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             Retained without raw financial data pooling
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-amber-500/20 flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white/60 border border-amber-500/20 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Centralization Gap</span>
+            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Centralization Gap</span>
             <span className="w-2 h-2 rounded-full bg-amber-400" />
           </div>
           <div className="mt-2">
@@ -177,23 +177,23 @@ export default function ComparativeModelWidget() {
             </span>
             <span className="text-xs text-amber-400/80 font-mono ml-1.5">Δ PR-AUC</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             Privacy cost vs illegal data centralization
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-cyan-500/20 flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white/60 border border-cyan-500/20 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Operational Recall</span>
+            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Operational Recall</span>
             <span className="w-2 h-2 rounded-full bg-cyan-400" />
           </div>
           <div className="mt-2">
             <span className="text-2xl font-bold font-mono text-cyan-300">
               {(((comparison_matrix.find((m) => m?.category === 'PRODUCTION_CHAMPION')?.recall_at_01_fpr ?? 0.624)) * 100).toFixed(1)}%
             </span>
-            <span className="text-xs text-slate-400 font-mono ml-1.5">@ 0.1% FPR</span>
+            <span className="text-xs text-slate-500 font-mono ml-1.5">@ 0.1% FPR</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             High-precision fraud capture rate
           </p>
         </div>
@@ -207,28 +207,28 @@ export default function ComparativeModelWidget() {
             className={`p-3.5 rounded-xl border font-mono text-xs space-y-2 ${
               item.category === 'PRODUCTION_CHAMPION'
                 ? 'bg-emerald-950/20 border-emerald-500/40'
-                : 'bg-slate-900/60 border-white/5'
+                : 'bg-white/60 border-white/5'
             }`}
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="font-bold text-slate-200">{item.paradigm}</span>
+              <span className="font-bold text-slate-800">{item.paradigm}</span>
               {getCategoryBadge(item.category)}
             </div>
             <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-2 text-center">
               <div>
                 <span className="text-[10px] text-slate-500 block">PR-AUC</span>
-                <span className="font-bold text-slate-200">{(item.pr_auc ?? 0).toFixed(4)}</span>
+                <span className="font-bold text-slate-800">{(item.pr_auc ?? 0).toFixed(4)}</span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 block">ROC-AUC</span>
-                <span className="font-bold text-slate-200">{(item.roc_auc ?? 0.5).toFixed(4)}</span>
+                <span className="font-bold text-slate-800">{(item.roc_auc ?? 0.5).toFixed(4)}</span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 block">Recall@0.1%</span>
-                <span className="font-bold text-slate-200">{(((item.recall_at_01_fpr ?? 0)) * 100).toFixed(1)}%</span>
+                <span className="font-bold text-slate-800">{(((item.recall_at_01_fpr ?? 0)) * 100).toFixed(1)}%</span>
               </div>
             </div>
-            <div className="border-t border-white/5 pt-2 text-[10px] text-slate-400 flex items-center justify-between">
+            <div className="border-t border-white/5 pt-2 text-[10px] text-slate-500 flex items-center justify-between">
               <span>Latency: {(item.latency_ms ?? 0).toFixed(3)} ms/tx</span>
               <span className="text-slate-500">{item.privacy_guarantee}</span>
             </div>
@@ -240,7 +240,7 @@ export default function ComparativeModelWidget() {
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="border-b border-white/10 text-slate-400 font-mono text-[11px]">
+            <tr className="border-b border-slate-200 text-slate-500 font-mono text-[11px]">
               <th className="py-2.5 px-3">Evaluation Paradigm</th>
               <th className="py-2.5 px-3">Classification</th>
               <th className="py-2.5 px-3 w-48">{metricLabels[selectedMetric]}</th>
@@ -270,7 +270,7 @@ export default function ComparativeModelWidget() {
                     }`}
                   >
                     <td className="py-2.5 px-3">
-                      <span className={`font-semibold ${isChampion ? 'text-emerald-300' : 'text-slate-200'}`}>
+                      <span className={`font-semibold ${isChampion ? 'text-emerald-300' : 'text-slate-800'}`}>
                         {item.paradigm}
                       </span>
                       <span className="block text-[10px] text-slate-500 font-sans truncate max-w-xs">
@@ -280,7 +280,7 @@ export default function ComparativeModelWidget() {
                     <td className="py-2.5 px-3">{getCategoryBadge(item.category)}</td>
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-28 bg-slate-800 rounded-full h-2 overflow-hidden shrink-0">
+                        <div className="w-28 bg-slate-50 rounded-full h-2 overflow-hidden shrink-0">
                           <div
                             className={`h-full rounded-full ${
                               isChampion
@@ -292,16 +292,16 @@ export default function ComparativeModelWidget() {
                             style={{ width: `${Math.min(100, Math.max(0, metricVal * 100))}%` }}
                           />
                         </div>
-                        <span className="text-[11px] font-bold text-slate-300">
+                        <span className="text-[11px] font-bold text-slate-600">
                           {selectedMetric === 'recall_at_01_fpr'
                             ? `${(metricVal * 100).toFixed(1)}%`
                             : metricVal.toFixed(4)}
                         </span>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">{(item.pr_auc ?? 0).toFixed(4)}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">{(item.roc_auc ?? 0.5).toFixed(4)}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">
+                    <td className="py-2.5 px-3 text-center text-slate-600">{(item.pr_auc ?? 0).toFixed(4)}</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">{(item.roc_auc ?? 0.5).toFixed(4)}</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">
                       {(((item.recall_at_01_fpr ?? 0)) * 100).toFixed(1)}%
                     </td>
                     <td className="py-2.5 px-3 text-center">
@@ -313,7 +313,7 @@ export default function ComparativeModelWidget() {
                         <span className="text-amber-400 font-semibold">{(item.delta_pr_auc_vs_fed ?? 0).toFixed(4)}</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right text-slate-400">{(item.latency_ms ?? 0).toFixed(3)} ms</td>
+                    <td className="py-2.5 px-3 text-right text-slate-500">{(item.latency_ms ?? 0).toFixed(3)} ms</td>
                   </tr>
                 );
               })}

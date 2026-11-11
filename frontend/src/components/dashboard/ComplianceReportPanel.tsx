@@ -240,7 +240,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
                   Failed to load report: {(error as any)?.response?.data?.detail || error.message}
                 </div>
               ) : (
-                <pre className="p-4 rounded-lg bg-[#0d1117] text-gray-300 font-mono text-[10px] overflow-auto max-h-80 border border-gray-800">
+                <pre className="p-4 rounded-lg bg-[#0d1117] text-slate-600 font-mono text-[10px] overflow-auto max-h-80 border border-slate-200">
                   {JSON.stringify(report, null, 2)}
                 </pre>
               )}

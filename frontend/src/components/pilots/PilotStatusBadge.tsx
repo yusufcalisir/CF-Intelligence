@@ -8,9 +8,9 @@ interface PilotStatusBadgeProps {
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
   DRAFT: {
     label: 'Draft',
-    bg: 'bg-slate-800/60',
-    text: 'text-slate-300',
-    border: 'border-slate-700',
+    bg: 'bg-slate-50/60',
+    text: 'text-slate-600',
+    border: 'border-slate-200',
     dot: 'bg-slate-400',
   },
   PREFLIGHT: {
@@ -75,9 +75,9 @@ export default function PilotStatusBadge({ status, size = 'md' }: PilotStatusBad
   const normalized = (status || 'DRAFT').toUpperCase();
   const conf = STATUS_CONFIG[normalized] || {
     label: normalized,
-    bg: 'bg-slate-800/60',
-    text: 'text-slate-300',
-    border: 'border-slate-700',
+    bg: 'bg-slate-50/60',
+    text: 'text-slate-600',
+    border: 'border-slate-200',
     dot: 'bg-slate-400',
   };
 

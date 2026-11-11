@@ -58,42 +58,42 @@ export const Predictor: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4 border border-slate-800">
+      <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4 border border-slate-200">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Activity className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm text-slate-100">Real-Time Risk Scoring Engine</h2>
-            <p className="text-xs text-slate-400">Evaluate Single ISO 20022 Financial Transaction Payload</p>
+            <h2 className="font-semibold text-sm text-slate-900">Real-Time Risk Scoring Engine</h2>
+            <p className="text-xs text-slate-500">Evaluate Single ISO 20022 Financial Transaction Payload</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Form Controls */}
-        <form onSubmit={handleSubmit} className="lg:col-span-7 glass-card rounded-xl p-5 border border-slate-800 space-y-4">
-          <h3 className="font-semibold text-xs text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
+        <form onSubmit={handleSubmit} className="lg:col-span-7 glass-card rounded-xl p-5 border border-slate-200 space-y-4">
+          <h3 className="font-semibold text-xs text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-2">
             Transaction Attributes
           </h3>
 
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="text-slate-300 font-medium">Transaction Amount ($)</label>
+              <label className="text-slate-600 font-medium">Transaction Amount ($)</label>
               <input
                 type="number"
                 value={formData.transaction_amount}
                 onChange={(e) => setFormData({ ...formData, transaction_amount: Number(e.target.value) })}
-                className="w-full mt-1 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-slate-200 outline-none focus:border-cyan-400 font-mono"
+                className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg p-2 text-slate-800 outline-none focus:border-cyan-400 font-mono"
               />
             </div>
 
             <div>
-              <label className="text-slate-300 font-medium">Merchant Category</label>
+              <label className="text-slate-600 font-medium">Merchant Category</label>
               <select
                 value={formData.merchant_category}
                 onChange={(e) => setFormData({ ...formData, merchant_category: e.target.value })}
-                className="w-full mt-1 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-slate-200 outline-none focus:border-cyan-400"
+                className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg p-2 text-slate-800 outline-none focus:border-cyan-400"
               >
                 <option value="crypto">Crypto Exchange</option>
                 <option value="wire_transfer">Wire Transfer</option>
@@ -103,11 +103,11 @@ export const Predictor: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-slate-300 font-medium">Country Jurisdiction</label>
+              <label className="text-slate-600 font-medium">Country Jurisdiction</label>
               <select
                 value={formData.country_code}
                 onChange={(e) => setFormData({ ...formData, country_code: e.target.value })}
-                className="w-full mt-1 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-slate-200 outline-none focus:border-cyan-400"
+                className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg p-2 text-slate-800 outline-none focus:border-cyan-400"
               >
                 <option value="NG">Nigeria (NG - High Risk)</option>
                 <option value="RU">Russia (RU - High Risk)</option>
@@ -117,12 +117,12 @@ export const Predictor: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-slate-300 font-medium">Hourly Velocity</label>
+              <label className="text-slate-600 font-medium">Hourly Velocity</label>
               <input
                 type="number"
                 value={formData.velocity}
                 onChange={(e) => setFormData({ ...formData, velocity: Number(e.target.value) })}
-                className="w-full mt-1 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-slate-200 outline-none focus:border-cyan-400 font-mono"
+                className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg p-2 text-slate-800 outline-none focus:border-cyan-400 font-mono"
               />
             </div>
           </div>
@@ -147,16 +147,16 @@ export const Predictor: React.FC = () => {
         </form>
 
         {/* Prediction Results Inspector */}
-        <div className="lg:col-span-5 glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between min-h-[220px]">
-          <h3 className="font-semibold text-xs text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
+        <div className="lg:col-span-5 glass-card rounded-xl p-5 border border-slate-200 flex flex-col justify-between min-h-[220px]">
+          <h3 className="font-semibold text-xs text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-2">
             Evaluation Result
           </h3>
 
           {result ? (
             <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+              <div className="flex items-center justify-between bg-white/80 p-3.5 rounded-lg border border-slate-200">
                 <div>
-                  <span className="text-slate-400">Risk Score</span>
+                  <span className="text-slate-500">Risk Score</span>
                   <p className={`font-mono text-2xl font-bold ${
                     result.risk_level === 'UNASSESSED'
                       ? 'text-amber-400'
@@ -179,14 +179,14 @@ export const Predictor: React.FC = () => {
               </div>
 
               {result.alert_details && (
-                <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
-                  <span className="text-slate-400 font-medium">SHAP Feature Contributions</span>
+                <div className="bg-white/80 p-3 rounded-lg border border-slate-200 space-y-2">
+                  <span className="text-slate-500 font-medium">SHAP Feature Contributions</span>
                   {(result.alert_details.top_features || []).map((f, i) => {
                     const isPositive = f.contribution >= 0;
                     const pct = Math.abs(f.contribution * 100).toFixed(0);
                     return (
                       <div key={i} className="flex justify-between items-center text-[11px]">
-                        <span className="text-slate-300 font-mono">{f.feature}</span>
+                        <span className="text-slate-600 font-mono">{f.feature}</span>
                         <span className={`font-mono font-medium ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
                           {isPositive ? '+' : '-'}{pct}%
                         </span>

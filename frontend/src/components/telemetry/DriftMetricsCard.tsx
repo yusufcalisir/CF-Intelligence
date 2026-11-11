@@ -103,15 +103,15 @@ export default function DriftMetricsCard({
 
   if (isLoading) {
     return (
-      <div className={`p-6 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-xl animate-pulse ${className}`}>
-        <div className="h-6 w-64 bg-slate-800 rounded-md mb-4" />
-        <div className="h-4 w-96 bg-slate-800/60 rounded-md mb-6" />
+      <div className={`p-6 rounded-2xl bg-white/60 border border-slate-200 backdrop-blur-xl animate-pulse ${className}`}>
+        <div className="h-6 w-64 bg-slate-50 rounded-md mb-4" />
+        <div className="h-4 w-96 bg-slate-50/60 rounded-md mb-6" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-slate-800/40 rounded-xl" />
+            <div key={i} className="h-24 bg-slate-50/40 rounded-xl" />
           ))}
         </div>
-        <div className="h-48 bg-slate-800/30 rounded-xl" />
+        <div className="h-48 bg-slate-50/30 rounded-xl" />
       </div>
     );
   }
@@ -119,7 +119,7 @@ export default function DriftMetricsCard({
   return (
     <div
       data-testid="drift-metrics-card"
-      className={`p-6 rounded-2xl bg-slate-900/80 border border-slate-800/90 shadow-2xl backdrop-blur-xl relative overflow-hidden ${className}`}
+      className={`p-6 rounded-2xl bg-white/80 border border-slate-200/90 shadow-2xl backdrop-blur-xl relative overflow-hidden ${className}`}
     >
       {/* Background radial glow */}
       <div
@@ -129,10 +129,10 @@ export default function DriftMetricsCard({
       />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800/80 relative z-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-200/80 relative z-10">
         <div>
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-slate-100 tracking-tight">
+            <h3 className="text-lg font-semibold text-slate-900 tracking-tight">
               Feature & Concept Drift Profiling
             </h3>
             <span
@@ -143,7 +143,7 @@ export default function DriftMetricsCard({
               {statusBadge.label}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Real-time Kolmogorov-Smirnov test, Wasserstein divergence, and Population Stability Index (PSI).
           </p>
         </div>
@@ -158,8 +158,8 @@ export default function DriftMetricsCard({
       {/* Top Metric KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-5 relative z-10">
         {/* KPI 1: Max Feature PSI */}
-        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-200/50 flex flex-col justify-between">
+          <div className="text-xs font-medium text-slate-500 flex items-center justify-between">
             <span>Peak Feature PSI</span>
             <span className="text-[10px] text-slate-500 font-mono">&gt;0.20 Crit</span>
           </div>
@@ -173,7 +173,7 @@ export default function DriftMetricsCard({
               {data?.max_psi !== undefined ? data.max_psi.toFixed(4) : '0.0000'}
             </span>
           </div>
-          <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-slate-100/50 rounded-full h-1.5 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 isCritical ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -184,8 +184,8 @@ export default function DriftMetricsCard({
         </div>
 
         {/* KPI 2: Concept Drift PSI */}
-        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-200/50 flex flex-col justify-between">
+          <div className="text-xs font-medium text-slate-500 flex items-center justify-between">
             <span>Concept Drift PSI</span>
             <span className="text-[10px] text-slate-500 font-mono">Predictions</span>
           </div>
@@ -197,13 +197,13 @@ export default function DriftMetricsCard({
                   ? 'text-rose-400'
                   : (data?.concept_drift_psi ?? 0) >= 0.10
                   ? 'text-amber-400'
-                  : 'text-slate-200'
+                  : 'text-slate-800'
               }`}
             >
               {data?.concept_drift_psi !== undefined ? data.concept_drift_psi.toFixed(4) : '0.0000'}
             </span>
           </div>
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-slate-500">
             {(data?.concept_drift_psi ?? 0) >= 0.20
               ? 'Severe risk score shift'
               : (data?.concept_drift_psi ?? 0) >= 0.10
@@ -213,8 +213,8 @@ export default function DriftMetricsCard({
         </div>
 
         {/* KPI 3: Mean KS p-value */}
-        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-200/50 flex flex-col justify-between">
+          <div className="text-xs font-medium text-slate-500 flex items-center justify-between">
             <span>Mean KS p-value</span>
             <span className="text-[10px] text-slate-500 font-mono">FDR α=0.05</span>
           </div>
@@ -232,14 +232,14 @@ export default function DriftMetricsCard({
               {data?.mean_ks_p_value !== undefined ? data.mean_ks_p_value.toFixed(4) : '1.0000'}
             </span>
           </div>
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-slate-500">
             {(data?.mean_ks_p_value ?? 1.0) < 0.05 ? 'Significant divergence detected' : 'Null hypothesis retained'}
           </div>
         </div>
 
         {/* KPI 4: Retraining State */}
-        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-200/50 flex flex-col justify-between">
+          <div className="text-xs font-medium text-slate-500 flex items-center justify-between">
             <span>Retraining Loop</span>
             <span className="text-[10px] text-slate-500 font-mono">Celery Trigger</span>
           </div>
@@ -247,7 +247,7 @@ export default function DriftMetricsCard({
             <span
               data-testid="retrain-status-text"
               className={`text-base font-semibold tracking-tight ${
-                data?.auto_retrain_triggered ? 'text-rose-400 flex items-center gap-1.5' : 'text-slate-300'
+                data?.auto_retrain_triggered ? 'text-rose-400 flex items-center gap-1.5' : 'text-slate-600'
               }`}
             >
               {data?.auto_retrain_triggered ? (
@@ -260,7 +260,7 @@ export default function DriftMetricsCard({
               )}
             </span>
           </div>
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-slate-500">
             {data?.auto_retrain_triggered ? 'Quality gate evaluation queued' : 'Baseline accuracy preserved'}
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function DriftMetricsCard({
       {/* Feature Drift Detailed Table */}
       <div className="mt-6 relative z-10">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
             Feature Divergence Vector Breakdown
           </h4>
           {driftedFeatures.length > 0 && (
@@ -283,9 +283,9 @@ export default function DriftMetricsCard({
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-950/40">
+        <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-slate-950/40">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-800/60 text-slate-400 font-mono uppercase text-[11px] border-b border-slate-800">
+            <thead className="bg-slate-50/60 text-slate-500 font-mono uppercase text-[11px] border-b border-slate-200">
               <tr>
                 <th className="py-2.5 px-3 w-8">Sel</th>
                 <th className="py-2.5 px-3">Feature Identifier</th>
@@ -296,7 +296,7 @@ export default function DriftMetricsCard({
                 <th className="py-2.5 px-3">Drift Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
+            <tbody className="divide-y divide-slate-200/60 font-mono text-slate-600">
               {data?.feature_drifts && data.feature_drifts.length > 0 ? (
                 data.feature_drifts.map((feat) => {
                   const isSelected = selectedFeatures.includes(feat.feature_name);
@@ -307,7 +307,7 @@ export default function DriftMetricsCard({
                     <tr
                       key={feat.feature_name}
                       data-testid={`feature-row-${feat.feature_name}`}
-                      className={`hover:bg-slate-800/40 transition-colors ${
+                      className={`hover:bg-slate-50/40 transition-colors ${
                         isSelected ? 'bg-indigo-500/5' : ''
                       }`}
                     >
@@ -317,10 +317,10 @@ export default function DriftMetricsCard({
                           aria-label={`Select ${feat.feature_name}`}
                           checked={isSelected}
                           onChange={() => handleToggleFeature(feat.feature_name)}
-                          className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                          className="rounded border-slate-200 bg-slate-50 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
                         />
                       </td>
-                      <td className="py-2.5 px-3 font-sans font-medium text-slate-200">
+                      <td className="py-2.5 px-3 font-sans font-medium text-slate-800">
                         {feat.feature_name}
                       </td>
                       <td className="py-2.5 px-3">{feat.ks_statistic.toFixed(4)}</td>
@@ -338,12 +338,12 @@ export default function DriftMetricsCard({
                                 ? 'text-rose-400 font-bold'
                                 : isFeatModerate
                                 ? 'text-amber-400 font-semibold'
-                                : 'text-slate-300'
+                                : 'text-slate-600'
                             }
                           >
                             {feat.psi.toFixed(4)}
                           </span>
-                          <div className="w-16 bg-slate-800 rounded-full h-1 overflow-hidden hidden sm:block">
+                          <div className="w-16 bg-slate-50 rounded-full h-1 overflow-hidden hidden sm:block">
                             <div
                               className={`h-full rounded-full ${
                                 isFeatSevere ? 'bg-rose-500' : isFeatModerate ? 'bg-amber-500' : 'bg-emerald-500'
@@ -382,11 +382,11 @@ export default function DriftMetricsCard({
       </div>
 
       {/* Retraining Action Bar */}
-      <div className="mt-6 pt-5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-        <div className="text-xs text-slate-400 text-center sm:text-left">
+      <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
+        <div className="text-xs text-slate-500 text-center sm:text-left">
           {selectedFeatures.length > 0 ? (
             <span data-testid="targeted-features-summary">
-              <strong className="text-slate-200">{selectedFeatures.length}</strong> feature(s) targeted for retraining.
+              <strong className="text-slate-800">{selectedFeatures.length}</strong> feature(s) targeted for retraining.
             </span>
           ) : isCritical ? (
             <span className="text-rose-400 font-medium">

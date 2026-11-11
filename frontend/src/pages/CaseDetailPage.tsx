@@ -541,7 +541,7 @@ export default function CaseDetailPage() {
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-[var(--color-text-muted)]">Case Resolution:</span>
-              <span className="px-2.5 py-0.5 rounded font-bold text-xs bg-slate-800 text-slate-200 border border-slate-700">
+              <span className="px-2.5 py-0.5 rounded font-bold text-xs bg-slate-50 text-slate-800 border border-slate-200">
                 {CASE_STATUS_LABELS[caseData.status] || caseData.status}
               </span>
               {caseData.closed_at && (
@@ -569,7 +569,7 @@ export default function CaseDetailPage() {
             className={`px-2.5 py-1 text-xs rounded font-semibold transition-colors flex items-center gap-1 shrink-0 ${
               isFincenEligible
                 ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_12px_rgba(217,119,6,0.35)] cursor-pointer'
-                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
+                : 'bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed opacity-60'
             } disabled:opacity-50 ${!caseData.is_open && caseData.status === 'closed_confirmed' ? 'ml-auto' : ''}`}
             title={
               isFincenEligible
@@ -581,7 +581,7 @@ export default function CaseDetailPage() {
           >
             {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
             {!isFincenEligible && (
-              <span className="text-[9px] px-1 py-0.2 bg-slate-900 text-slate-400 rounded border border-slate-700 ml-1">
+              <span className="text-[9px] px-1 py-0.2 bg-white text-slate-500 rounded border border-slate-200 ml-1">
                 {caseData.status === 'closed_false_positive' ? 'Ineligible (FP)' : '4-Eyes Reqd'}
               </span>
             )}
@@ -639,7 +639,7 @@ export default function CaseDetailPage() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
                   Autonomous Agentic AML Copilot & RAG Narrative
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap">
@@ -655,7 +655,7 @@ export default function CaseDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                 Synthesizes FinCEN 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings from Graph Topology
               </p>
             </div>
@@ -665,7 +665,7 @@ export default function CaseDetailPage() {
             {copilotData && (
               <button
                 onClick={handleClearCopilotCache}
-                className="w-full sm:w-auto px-3 py-2 bg-white/5 hover:bg-rose-500/10 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold transition border border-white/10 hover:border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                className="w-full sm:w-auto px-3 py-2 bg-white/5 hover:bg-rose-500/10 text-slate-600 hover:text-rose-300 rounded-xl text-xs font-semibold transition border border-slate-200 hover:border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 title={`Clear cached Copilot narrative from session storage (${getCopilotCaseStorageKey(caseId || '')})`}
               >
                 <span>🗑️</span>
@@ -694,18 +694,18 @@ export default function CaseDetailPage() {
 
         {/* Narrative Output Grid */}
         {copilotData && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-3 border-t border-white/10 min-w-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-3 border-t border-slate-200 min-w-0">
             {/* FinCEN 5-Paragraph Narrative */}
             <div className="xl:col-span-2 rounded-xl p-4 space-y-3 bg-[#040510]/80 border border-indigo-500/20 shadow-inner flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-300 border-b border-white/10 pb-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-300 border-b border-slate-200 pb-2.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                     <span className="truncate">FinCEN 5-Paragraph Regulatory SAR Narrative</span>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                     <span
-                      className="font-mono text-[9px] text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap"
+                      className="font-mono text-[9px] text-slate-500 bg-white/5 border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap"
                       title={`Session cache storage key: cfi_copilot_case_${caseId}`}
                     >
                       cfi_copilot_case_{caseId?.slice(0, 8)}
@@ -719,14 +719,14 @@ export default function CaseDetailPage() {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                       }}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
                     >
                       {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                       <span>{isCopied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
                 </div>
-                <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 mt-3">
+                <div className="text-xs text-slate-600 leading-relaxed font-mono whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 mt-3">
                   {copilotData.fincen_sar_narrative}
                 </div>
               </div>
@@ -735,7 +735,7 @@ export default function CaseDetailPage() {
             {/* 4-Eyes Supervisor Briefing & SHAP Drivers */}
             <div className="rounded-xl p-4 space-y-3 bg-[#040510]/80 border border-purple-500/20 shadow-inner flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex items-center justify-between text-xs font-bold text-purple-300 border-b border-white/10 pb-2.5 mb-3 min-w-0">
+                <div className="flex items-center justify-between text-xs font-bold text-purple-300 border-b border-slate-200 pb-2.5 mb-3 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                     <span className="truncate">BSA/AML 4-Eyes Briefing</span>
@@ -744,11 +744,11 @@ export default function CaseDetailPage() {
                     SUPERVISOR
                   </span>
                 </div>
-                <div className="text-xs text-slate-300 font-mono whitespace-pre-wrap mb-4 leading-relaxed">
+                <div className="text-xs text-slate-600 font-mono whitespace-pre-wrap mb-4 leading-relaxed">
                   {copilotData.four_eyes_briefing}
                 </div>
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
                   {copilotData.top_risk_drivers.map((d, i) => (
                     <div key={i} className="p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px] flex justify-between items-center font-mono">
                       <span className="text-indigo-300 truncate mr-2">{d.feature}</span>
@@ -757,7 +757,7 @@ export default function CaseDetailPage() {
                   ))}
                 </div>
               </div>
-              <div className="text-[9px] font-mono text-slate-400 pt-2.5 border-t border-white/10 flex justify-between items-center min-w-0">
+              <div className="text-[9px] font-mono text-slate-500 pt-2.5 border-t border-slate-200 flex justify-between items-center min-w-0">
                 <span className="truncate mr-2">Hash: {copilotData.lineage_hash.slice(0, 14)}...</span>
                 <span className="text-indigo-400 font-bold uppercase shrink-0">{copilotData.recommended_action}</span>
               </div>
@@ -867,7 +867,7 @@ export default function CaseDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <span className="text-base">🕸️</span>
-            <h2 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider">
+            <h2 className="text-xs sm:text-sm font-bold uppercase text-slate-800 tracking-wider">
               Suspect Entities & Graph Topology Hub
             </h2>
           </div>
@@ -876,7 +876,7 @@ export default function CaseDetailPage() {
           </span>
         </div>
 
-        <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
           Direct navigation to the Graph Workbench. Deep link directly into 2-hop ego networks or 3-hop multi-bank fraud rings for suspect accounts and devices identified in this case.
         </p>
 
@@ -891,7 +891,7 @@ export default function CaseDetailPage() {
                   <div className="text-xs font-mono font-bold text-indigo-300 truncate" title={entId}>
                     {entId}
                   </div>
-                  <div className="text-[10px] text-slate-400">Suspect Entity Node</div>
+                  <div className="text-[10px] text-slate-500">Suspect Entity Node</div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   <Link
@@ -923,7 +923,7 @@ export default function CaseDetailPage() {
             ))}
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400 font-mono flex items-center justify-between flex-wrap gap-2">
+          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-500 font-mono flex items-center justify-between flex-wrap gap-2">
             <span>No specific entity identifiers registered in evidence yet. Select a linked alert below or register evidence.</span>
             <Link
               to="/graph"
@@ -970,8 +970,8 @@ export default function CaseDetailPage() {
 
             {selectedAlertId && (
               <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800/80">
-                  <div className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-200/80">
+                  <div className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
                     <span>Audit Analysis for Linked Alert:</span>
                     <span className="font-mono text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">{selectedAlertId}</span>
                   </div>
@@ -985,7 +985,7 @@ export default function CaseDetailPage() {
                   </Link>
                 </div>
                 {isSelectedAlertLoading ? (
-                  <div className="p-8 text-center text-xs font-mono text-slate-400">
+                  <div className="p-8 text-center text-xs font-mono text-slate-500">
                     <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2" />
                     Loading alert explainability and graph topology...
                   </div>
@@ -1095,10 +1095,10 @@ export default function CaseDetailPage() {
             evidenceList.map((ev) => (
               <div
                 key={ev.id}
-                className="p-3.5 rounded-xl bg-slate-900/60 border border-[var(--color-border)] space-y-2 font-mono text-xs"
+                className="p-3.5 rounded-xl bg-white/60 border border-[var(--color-border)] space-y-2 font-mono text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-slate-100">{ev.title}</span>
+                  <span className="font-bold text-slate-900">{ev.title}</span>
                   <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold capitalize shrink-0">
                     {ev.evidence_type.replace('_', ' ')}
                   </span>
@@ -1115,8 +1115,8 @@ export default function CaseDetailPage() {
                       {ev.content_hash}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-800/50">
-                    <span className="text-slate-400">By: <span className="text-slate-200">{ev.uploaded_by}</span></span>
+                  <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-200/50">
+                    <span className="text-slate-500">By: <span className="text-slate-800">{ev.uploaded_by}</span></span>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-slate-500 mr-1">{new Date(ev.uploaded_at).toLocaleDateString()}</span>
                       <Link
@@ -1167,12 +1167,12 @@ export default function CaseDetailPage() {
               ) : (
                 evidenceList.map((ev) => (
                   <tr key={ev.id} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-alt)]/20 transition-colors font-mono text-[11px]">
-                    <td className="py-3 px-3 capitalize font-medium text-slate-300 whitespace-nowrap">{ev.evidence_type.replace('_', ' ')}</td>
-                    <td className="py-3 px-3 font-bold text-slate-100 whitespace-nowrap">{ev.title}</td>
-                    <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">{ev.file_path}</td>
+                    <td className="py-3 px-3 capitalize font-medium text-slate-600 whitespace-nowrap">{ev.evidence_type.replace('_', ' ')}</td>
+                    <td className="py-3 px-3 font-bold text-slate-900 whitespace-nowrap">{ev.title}</td>
+                    <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap">{ev.file_path}</td>
                     <td className="py-3 px-3 font-mono text-cyan-400 text-[10px] break-all">{ev.content_hash}</td>
-                    <td className="py-3 px-3 text-slate-300 whitespace-nowrap">{ev.uploaded_by}</td>
-                    <td className="py-3 px-3 text-right text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{ev.uploaded_by}</td>
+                    <td className="py-3 px-3 text-right text-slate-500 whitespace-nowrap">
                       {new Date(ev.uploaded_at).toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">

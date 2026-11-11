@@ -211,18 +211,18 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
               Drop transactions file or click to browse
             </h4>
             <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              Supports <strong className="text-slate-300">.CSV</strong>, <strong className="text-slate-300">.PARQUET</strong>, <strong className="text-slate-300">.TSV</strong>, and <strong className="text-slate-300">.GZ</strong> up to 250 MB
+              Supports <strong className="text-slate-600">.CSV</strong>, <strong className="text-slate-600">.PARQUET</strong>, <strong className="text-slate-600">.TSV</strong>, and <strong className="text-slate-600">.GZ</strong> up to 250 MB
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-white/10 text-slate-300">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-slate-200 text-slate-600">
               <FileSpreadsheet size={12} className="text-emerald-400" /> Auto-sniff Delimiters
             </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-white/10 text-slate-300">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-slate-200 text-slate-600">
               <FileCode size={12} className="text-indigo-400" /> PAR1 Magic Bytes
             </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-white/10 text-slate-300">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/5 border border-slate-200 text-slate-600">
               <FileCheck size={12} className="text-amber-400" /> Client PII Masking
             </span>
           </div>
@@ -252,9 +252,9 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
           <button
             type="button"
             onClick={() => handleSelectTemplate('bank_alpha_csv')}
-            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 text-left transition-all group"
+            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-slate-200 text-left transition-all group"
           >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-200 group-hover:text-indigo-400">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-800 group-hover:text-indigo-400">
               <span>Bank Alpha CSV</span>
               <span className="text-[10px] font-mono text-emerald-400">5k txs</span>
             </div>
@@ -264,9 +264,9 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
           <button
             type="button"
             onClick={() => handleSelectTemplate('wire_parquet')}
-            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 text-left transition-all group"
+            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-slate-200 text-left transition-all group"
           >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-200 group-hover:text-indigo-400">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-800 group-hover:text-indigo-400">
               <span>SWIFT Wire Parquet</span>
               <span className="text-[10px] font-mono text-indigo-400">10k txs</span>
             </div>

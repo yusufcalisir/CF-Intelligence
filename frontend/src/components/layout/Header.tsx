@@ -180,13 +180,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 Connecting...
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-500 border border-slate-500/30">
                 WS Offline
               </span>
             )}
 
             {/* Live streamed transactions ticker */}
-            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-400">
+            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-500">
               <Activity className="w-3 h-3 text-cyan-400" />
               <span>{totalStreamedTransactions.toLocaleString()} txns</span>
             </span>

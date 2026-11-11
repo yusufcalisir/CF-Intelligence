@@ -63,7 +63,7 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
             <ShieldAlert className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block truncate">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 block truncate">
               {bankName}
             </span>
           </div>
@@ -81,7 +81,7 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
           </span>
           <button
             onClick={onDismiss}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-colors"
             aria-label="Dismiss notification"
           >
             <X className="w-3.5 h-3.5" />
@@ -91,10 +91,10 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
 
       {/* Typology & Description */}
       <div className="mb-3">
-        <h5 className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight leading-snug">
+        <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight leading-snug">
           {toast.description || toast.typology}
         </h5>
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 font-mono">
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
           <span>{toast.currency} {toast.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           <span>•</span>
           <span className="truncate">{toast.transaction_id}</span>
@@ -102,8 +102,8 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
       </div>
 
       {/* Action Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px]">
-        <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+      <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-[11px]">
+        <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
           <Zap className="w-3 h-3 text-cyan-400 animate-pulse" /> Live Scoring Stream
         </span>
         <button

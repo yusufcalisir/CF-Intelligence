@@ -2490,7 +2490,7 @@ export default function LandingPage() {
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans ${
                                   r.compliant
                                     ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold'
-                                    : 'bg-slate-800 text-slate-500'
+                                    : 'bg-slate-50 text-slate-500'
                                 }`}>
                                   {r.compliance}
                                 </span>
@@ -2524,7 +2524,7 @@ export default function LandingPage() {
                             <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fn}</div>
                             <div className="text-[9px] text-slate-500 mt-0.5">Escaped Frauds</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-200">
+                          <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                             <div className="text-[10px] text-slate-500">True Negatives (TN)</div>
                             <div className="text-base font-bold text-slate-600 mt-0.5">{activeDs.cm.tn}</div>
                             <div className="text-[9px] text-slate-500 mt-0.5">Valid Clearances</div>

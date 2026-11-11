@@ -78,7 +78,7 @@ export default function Dashboard() {
             </span>
             <span className="text-[10px] font-mono font-bold text-rose-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Inject 500 tx/s smurfing bursts & Byzantine poisoned gradients to test Multi-Krum shield.
           </p>
         </button>
@@ -95,7 +95,7 @@ export default function Dashboard() {
             </span>
             <span className="text-[10px] font-mono font-bold text-indigo-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Client-side Zero-PII sanitization & 12-rule Great Expectations data contract gating.
           </p>
         </button>
@@ -112,7 +112,7 @@ export default function Dashboard() {
             </span>
             <span className="text-[10px] font-mono font-bold text-cyan-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Production compose manifests with Same-Origin Gateway, Postgres 16 & Redis 7.2.
           </p>
         </button>
@@ -130,9 +130,9 @@ export default function Dashboard() {
             ))}
           </div>
         ) : !banks || banks.length === 0 ? (
-          <div className="glass-card p-6 text-center text-[var(--color-text-muted)] border border-dashed border-slate-800 rounded-xl">
-            <p className="text-xs font-semibold text-slate-300">No Bank Nodes Registered</p>
-            <p className="text-[11px] text-slate-400 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
+          <div className="glass-card p-6 text-center text-[var(--color-text-muted)] border border-dashed border-slate-200 rounded-xl">
+            <p className="text-xs font-semibold text-slate-600">No Bank Nodes Registered</p>
+            <p className="text-[11px] text-slate-500 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

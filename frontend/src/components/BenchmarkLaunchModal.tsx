@@ -162,7 +162,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
 
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-4 gap-2">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shadow-inner shrink-0">
                 <BarChart3 className="w-5 h-5 animate-pulse" />
@@ -183,7 +183,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>
@@ -193,7 +193,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           </div>
 
           {/* Active Stage Animated Card */}
-          <div className="p-4 rounded-2xl bg-[#02030a]/80 border border-white/10 space-y-3 relative overflow-hidden">
+          <div className="p-4 rounded-2xl bg-[#02030a]/80 border border-slate-200 space-y-3 relative overflow-hidden">
             <div
               className="absolute -right-8 -top-8 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-40"
               style={{ backgroundColor: currentStage.color }}
@@ -212,10 +212,10 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   <CurrentIcon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block truncate">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block truncate">
                     Stage 0{currentStage.id} of 05
                   </span>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                     {currentStage.label}
                   </h4>
                 </div>
@@ -233,7 +233,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               </span>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed font-sans pl-1">
+            <p className="text-xs text-slate-600 leading-relaxed font-sans pl-1">
               {currentStage.subtext}
             </p>
           </div>
@@ -251,7 +251,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                     isCurrent
                       ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-200'
                       : isCompleted
-                      ? 'text-slate-400 opacity-80'
+                      ? 'text-slate-500 opacity-80'
                       : 'text-slate-600 opacity-40'
                   }`}
                 >
@@ -261,7 +261,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                     ) : isCurrent ? (
                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping shrink-0" />
                     ) : (
-                      <span className="w-2 h-2 rounded-full bg-slate-700 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-slate-100 shrink-0" />
                     )}
                     <span className="truncate">{s.label}</span>
                   </div>
@@ -275,7 +275,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
 
           {/* Progress Bar */}
           <div className="space-y-1.5 pt-1">
-            <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden p-0.5 border border-white/5">
+            <div className="w-full bg-white rounded-full h-1.5 overflow-hidden p-0.5 border border-white/5">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 transition-all duration-150"
                 style={{ width: `${progress}%` }}

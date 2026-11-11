@@ -213,7 +213,7 @@ export default function BankOnboardingPage() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-2xl font-black text-slate-100 tracking-tight">
+              <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
                 Bank Node Onboarding Wizard
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -228,7 +228,7 @@ export default function BankOnboardingPage() {
 
         <Link
           to="/operations"
-          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-slate-200 hover:bg-white/10 text-slate-600 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Operations</span>
@@ -243,13 +243,13 @@ export default function BankOnboardingPage() {
             <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">
               Step {step} of 5
             </span>
-            <span className="text-xs font-bold text-slate-200">
-              {ONBOARDING_STEPS[step - 1]?.title} · <span className="text-slate-400 font-normal">{ONBOARDING_STEPS[step - 1]?.subtitle}</span>
+            <span className="text-xs font-bold text-slate-800">
+              {ONBOARDING_STEPS[step - 1]?.title} · <span className="text-slate-500 font-normal">{ONBOARDING_STEPS[step - 1]?.subtitle}</span>
             </span>
           </div>
 
           {/* Glowing Segmented Progress Bar */}
-          <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden p-0.5 border border-white/5 flex gap-1">
+          <div className="w-full bg-slate-50/80 h-2 rounded-full overflow-hidden p-0.5 border border-white/5 flex gap-1">
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
@@ -258,7 +258,7 @@ export default function BankOnboardingPage() {
                     ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
                     : i === step
                     ? 'bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
-                    : 'bg-slate-700/40'
+                    : 'bg-slate-100/40'
                 }`}
               />
             ))}
@@ -279,7 +279,7 @@ export default function BankOnboardingPage() {
                       ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 cursor-pointer'
                       : isCurrent
                       ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/40 scale-110'
-                      : 'bg-slate-800/50 border-white/5 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-50/50 border-white/5 text-slate-500 cursor-not-allowed'
                   }`}
                 >
                   {isPast ? '✓' : s.num}
@@ -300,9 +300,9 @@ export default function BankOnboardingPage() {
                 onClick={() => isPast && setStep(item.num as any)}
                 className={`p-3 rounded-xl transition-all border relative flex flex-col justify-between min-h-[72px] ${
                   isCurrent
-                    ? 'bg-indigo-600/20 border-indigo-500/70 text-slate-100 shadow-lg shadow-indigo-600/15'
+                    ? 'bg-indigo-600/20 border-indigo-500/70 text-slate-900 shadow-lg shadow-indigo-600/15'
                     : isPast
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-300 cursor-pointer hover:bg-emerald-500/15'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-600 cursor-pointer hover:bg-emerald-500/15'
                     : 'bg-white/[0.02] border-white/5 text-slate-500'
                 }`}
               >
@@ -317,7 +317,7 @@ export default function BankOnboardingPage() {
                         ? 'bg-emerald-500/20 text-emerald-400'
                         : isCurrent
                         ? 'bg-indigo-500/30 text-indigo-300'
-                        : 'bg-slate-800 text-slate-500'
+                        : 'bg-slate-50 text-slate-500'
                     }`}
                   >
                     {isPast ? '✓ Done' : `0${item.num}`}
@@ -336,12 +336,12 @@ export default function BankOnboardingPage() {
       {/* STEP 1: Legal Info Form */}
       {step === 1 && (
         <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <div className="border-b border-slate-200 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🏛️</span>
               <span>Step 1: Institutional Legal & Regional Profile</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Enter official banking consortium identifier and designated sovereign data residency region.
             </p>
           </div>
@@ -349,7 +349,7 @@ export default function BankOnboardingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block">
+                <label className="text-xs text-slate-600 font-semibold uppercase tracking-wider block">
                   Bank Identifier (ID)
                 </label>
                 <button
@@ -364,27 +364,27 @@ export default function BankOnboardingPage() {
                 type="text"
                 value={formData.bank_id}
                 onChange={(e) => handleInputChange('bank_id', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 font-mono transition outline-none"
+                className="w-full bg-[#03040d] border border-slate-200 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-900 font-mono transition outline-none"
                 placeholder="e.g. bank_delta"
               />
             </div>
 
             <div>
-              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+              <label className="text-xs text-slate-600 font-semibold uppercase tracking-wider block mb-1.5">
                 Full Legal Entity Name
               </label>
               <input
                 type="text"
                 value={formData.legal_name}
                 onChange={(e) => handleInputChange('legal_name', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+                className="w-full bg-[#03040d] border border-slate-200 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-900 transition outline-none"
                 placeholder="e.g. Delta International Bank AG"
               />
             </div>
 
             {/* Legal Jurisdiction Custom Dropdown */}
             <div className="relative">
-              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+              <label className="text-xs text-slate-600 font-semibold uppercase tracking-wider block mb-1.5">
                 Legal Jurisdiction
               </label>
               <button
@@ -393,16 +393,16 @@ export default function BankOnboardingPage() {
                   setOpenJurisdictionDropdown(!openJurisdictionDropdown);
                   setOpenRegionDropdown(false);
                 }}
-                className="w-full bg-[#03040d] border border-white/10 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 flex items-center justify-between transition outline-none cursor-pointer"
+                className="w-full bg-[#03040d] border border-slate-200 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 flex items-center justify-between transition outline-none cursor-pointer"
               >
                 <span className="truncate">
                   {JURISDICTION_OPTIONS.find((o) => o.value === formData.jurisdiction)?.label ?? formData.jurisdiction}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${openJurisdictionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openJurisdictionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
               </button>
 
               {openJurisdictionDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-slate-200 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
                   {JURISDICTION_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
@@ -414,7 +414,7 @@ export default function BankOnboardingPage() {
                       className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
                         formData.jurisdiction === opt.value
                           ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                          : 'text-slate-600 hover:bg-white/5 hover:text-white'
                       }`}
                     >
                       <span className="truncate">{opt.label}</span>
@@ -426,21 +426,21 @@ export default function BankOnboardingPage() {
             </div>
 
             <div>
-              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+              <label className="text-xs text-slate-600 font-semibold uppercase tracking-wider block mb-1.5">
                 Security Contact Email
               </label>
               <input
                 type="email"
                 value={formData.contact_email}
                 onChange={(e) => handleInputChange('contact_email', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+                className="w-full bg-[#03040d] border border-slate-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 transition outline-none"
                 placeholder="secops@deltabank.eu"
               />
             </div>
 
             {/* Data Residency Region Custom Dropdown */}
             <div className="sm:col-span-2 relative">
-              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+              <label className="text-xs text-slate-600 font-semibold uppercase tracking-wider block mb-1.5">
                 Data Residency Region
               </label>
               <button
@@ -449,16 +449,16 @@ export default function BankOnboardingPage() {
                   setOpenRegionDropdown(!openRegionDropdown);
                   setOpenJurisdictionDropdown(false);
                 }}
-                className="w-full bg-[#03040d] border border-white/10 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 flex items-center justify-between transition outline-none cursor-pointer"
+                className="w-full bg-[#03040d] border border-slate-200 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 flex items-center justify-between transition outline-none cursor-pointer"
               >
                 <span className="truncate">
                   {REGION_OPTIONS.find((o) => o.value === formData.data_residency_region)?.label ?? formData.data_residency_region}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${openRegionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openRegionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
               </button>
 
               {openRegionDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-slate-200 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
                   {REGION_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
@@ -470,7 +470,7 @@ export default function BankOnboardingPage() {
                       className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
                         formData.data_residency_region === opt.value
                           ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                          : 'text-slate-600 hover:bg-white/5 hover:text-white'
                       }`}
                     >
                       <span className="truncate">{opt.label}</span>
@@ -482,7 +482,7 @@ export default function BankOnboardingPage() {
             </div>
           </div>
 
-          <div className="flex justify-end pt-3 border-t border-white/10">
+          <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(2)}
               className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
@@ -497,35 +497,35 @@ export default function BankOnboardingPage() {
       {/* STEP 2: Review & Submit */}
       {step === 2 && (
         <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <div className="border-b border-slate-200 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>📋</span>
               <span>Step 2: Review Registration Details</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Confirm legal entity credentials before generating cryptographic mTLS X.509 certificates.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#03040d]/80 border border-white/10 space-y-2.5 text-xs sm:text-sm">
+          <div className="p-4 rounded-xl bg-[#03040d]/80 border border-slate-200 space-y-2.5 text-xs sm:text-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
-              <span className="text-slate-400 font-semibold">Consortium Bank ID:</span>
+              <span className="text-slate-500 font-semibold">Consortium Bank ID:</span>
               <span className="font-mono font-bold text-indigo-400">{formData.bank_id}</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
-              <span className="text-slate-400 font-semibold">Legal Entity Name:</span>
-              <span className="font-bold text-slate-200">{formData.legal_name}</span>
+              <span className="text-slate-500 font-semibold">Legal Entity Name:</span>
+              <span className="font-bold text-slate-800">{formData.legal_name}</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
-              <span className="text-slate-400 font-semibold">Jurisdiction & Standard:</span>
+              <span className="text-slate-500 font-semibold">Jurisdiction & Standard:</span>
               <span className="font-bold text-emerald-400">{formData.jurisdiction} Compliance</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
-              <span className="text-slate-400 font-semibold">SecOps Contact:</span>
-              <span className="text-slate-200 font-mono">{formData.contact_email}</span>
+              <span className="text-slate-500 font-semibold">SecOps Contact:</span>
+              <span className="text-slate-800 font-mono">{formData.contact_email}</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-              <span className="text-slate-400 font-semibold">Data Residency Region:</span>
+              <span className="text-slate-500 font-semibold">Data Residency Region:</span>
               <span className="font-mono text-indigo-300">{formData.data_residency_region}</span>
             </div>
           </div>
@@ -554,7 +554,7 @@ export default function BankOnboardingPage() {
                   <button
                     type="button"
                     onClick={handleGenerateUniqueBankId}
-                    className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>🔄 Generate New Unique Bank ID</span>
                   </button>
@@ -563,10 +563,10 @@ export default function BankOnboardingPage() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(1)}
-              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-white/10 shrink-0 whitespace-nowrap"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-600 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 shrink-0 whitespace-nowrap"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Step 1</span>
@@ -595,12 +595,12 @@ export default function BankOnboardingPage() {
       {/* STEP 3: Download Certificates */}
       {step === 3 && (
         <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <div className="border-b border-slate-200 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🔑</span>
               <span>Step 3: Cryptographic X.509 mTLS Keypair</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Unique mutual TLS identity issued for node authentication over gRPC secure channel.
             </p>
           </div>
@@ -651,7 +651,7 @@ export default function BankOnboardingPage() {
             </div>
           </div>
 
-          <div className="flex justify-end pt-3 border-t border-white/10">
+          <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(4)}
               className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
@@ -666,12 +666,12 @@ export default function BankOnboardingPage() {
       {/* STEP 4: Download Connector Config */}
       {step === 4 && (
         <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <div className="border-b border-slate-200 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>📄</span>
               <span>Step 4: Connector Configuration YAML</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Production configuration manifest for launching local bank node container.
             </p>
           </div>
@@ -695,9 +695,9 @@ export default function BankOnboardingPage() {
             </button>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#03040d] border border-white/10 space-y-2">
+          <div className="p-4 rounded-xl bg-[#03040d] border border-slate-200 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 CLI Command for Bank IT Operations Team
               </span>
@@ -707,7 +707,7 @@ export default function BankOnboardingPage() {
                   setIsCliCopied(true);
                   setTimeout(() => setIsCliCopied(false), 2000);
                 }}
-                className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-white bg-white/5 border border-white/10 transition flex items-center gap-1 cursor-pointer"
+                className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-white bg-white/5 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
               >
                 {isCliCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 <span>{isCliCopied ? 'Copied' : 'Copy'}</span>
@@ -718,7 +718,7 @@ export default function BankOnboardingPage() {
             </code>
           </div>
 
-          <div className="flex justify-end pt-3 border-t border-white/10">
+          <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(5)}
               className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
@@ -740,10 +740,10 @@ export default function BankOnboardingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-20" />
               </div>
               <div>
-                <h3 className="text-lg sm:text-xl font-bold text-slate-100">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900">
                   Listening for Bank Node Heartbeat...
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
                   Awaiting initial gRPC mTLS 1.3 handshake from <span className="font-mono text-indigo-400 font-bold">{formData.bank_id}</span> on port 50051.
                 </p>
               </div>
@@ -761,7 +761,7 @@ export default function BankOnboardingPage() {
                 <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-400 tracking-tight">
                   Bank Node Successfully Onboarded!
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
                   <span className="font-bold text-white">{formData.legal_name}</span> is now fully verified and registered as an active node in the Privacy-Preserving FL Consortium.
                 </p>
               </div>

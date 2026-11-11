@@ -167,7 +167,7 @@ export default function PilotOperationsPage() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
             <span>Halted / Finished</span>
-            <AlertCircle className="h-4 w-4 text-slate-400" />
+            <AlertCircle className="h-4 w-4 text-slate-500" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-[var(--color-text-primary)]">
             {isLoading ? '...' : metrics.halted}
@@ -298,12 +298,12 @@ export default function PilotOperationsPage() {
 
                   {/* Institutions Badge Strip */}
                   <div className="mt-4 flex items-center gap-1.5 text-xs text-[var(--color-text-primary)]">
-                    <Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                    <span className="font-mono text-[11px] bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                    <Building className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <span className="font-mono text-[11px] bg-slate-50/80 px-2 py-0.5 rounded border border-slate-200">
                       {pilot.participating_institutions?.[0] || 'Bank A'}
                     </span>
                     <span className="text-[10px] text-slate-500 font-bold">⇄</span>
-                    <span className="font-mono text-[11px] bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                    <span className="font-mono text-[11px] bg-slate-50/80 px-2 py-0.5 rounded border border-slate-200">
                       {pilot.participating_institutions?.[1] || 'Bank B'}
                     </span>
                   </div>
@@ -312,7 +312,7 @@ export default function PilotOperationsPage() {
                   <div className="mt-3.5 pt-3 border-t border-[var(--color-border)] text-[11px] text-[var(--color-text-muted)] space-y-1">
                     <div className="flex items-center justify-between font-mono">
                       <span>Scope Digest:</span>
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {pilot.scope_digest ? `${pilot.scope_digest.slice(0, 10)}...` : 'N/A'}
                       </span>
                     </div>
@@ -325,7 +325,7 @@ export default function PilotOperationsPage() {
                           {pilot.queries_executed} / {pilot.queries_total_quota} ({usagePercent}%)
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
                             usagePercent >= 90

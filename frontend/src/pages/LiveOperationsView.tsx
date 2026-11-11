@@ -1112,7 +1112,7 @@ export default function LiveOperationsView() {
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5 min-w-0">
           {/* Title & Live Status */}
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-white/5 border border-white/10 shadow-xs">
+            <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-white/5 border border-slate-200 shadow-xs">
               📡
             </span>
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
@@ -1125,7 +1125,7 @@ export default function LiveOperationsView() {
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                     : wsStatus === 'RECONNECTING'
                     ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                    : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+                    : 'bg-slate-500/15 text-slate-500 border border-slate-500/30'
                 }`}
               >
                 <span
@@ -1530,7 +1530,7 @@ export default function LiveOperationsView() {
                 key={bank.id}
                 className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 min-w-0 ${bank.status === 'QUARANTINED'
                     ? 'border-rose-500/80 bg-rose-950/30 shadow-[0_0_25px_rgba(244,63,94,0.3)] ring-1 ring-rose-500/40'
-                    : 'border-[var(--color-border)] bg-slate-900/40'
+                    : 'border-[var(--color-border)] bg-white/40'
                   }`}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
@@ -1568,8 +1568,8 @@ export default function LiveOperationsView() {
       </div>
 
       {/* Institutional Model Verification & Discrimination Analytics */}
-      <div className="glass-card p-3.5 sm:p-5 md:p-6 space-y-6 min-w-0 border border-slate-800">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
+      <div className="glass-card p-3.5 sm:p-5 md:p-6 space-y-6 min-w-0 border border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
             <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
               <span className="p-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">🔬</span>
@@ -1596,7 +1596,7 @@ export default function LiveOperationsView() {
                   aria-label="Select consortium bank for discrimination analytics"
                   value={selectedBankId || effectiveBanks[0]?.id}
                   onChange={(e) => setSelectedBankId(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-400"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-400"
                 >
                   {effectiveBanks.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -1606,13 +1606,13 @@ export default function LiveOperationsView() {
                 </select>
               </div>
             )}
-            <div className="flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+            <div className="flex rounded-lg bg-white p-0.5 border border-slate-200 text-xs">
               <button
                 type="button"
                 onClick={() => setRocModelType('federated')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'federated'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-800'
                   }`}
               >
                 Federated
@@ -1622,7 +1622,7 @@ export default function LiveOperationsView() {
                 onClick={() => setRocModelType('local')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'local'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-800'
                   }`}
               >
                 Local Baselines
@@ -1657,8 +1657,8 @@ export default function LiveOperationsView() {
             <MetricsComparisonBarChart banks={effectiveBanks} />
           </div>
         ) : (
-          <div className="p-8 text-center border border-dashed border-slate-800 rounded-xl">
-            <p className="text-xs text-slate-400">
+          <div className="p-8 text-center border border-dashed border-slate-200 rounded-xl">
+            <p className="text-xs text-slate-500">
               Launch a federated training run or select an existing simulation to view real-time model verification metrics.
             </p>
           </div>
@@ -1681,7 +1681,7 @@ export default function LiveOperationsView() {
                 Asset Recovery &amp; FININT Operational Hub
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-mono text-slate-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
               LIVE · {arSummary.total_events} events
             </span>
           </div>
@@ -1689,34 +1689,34 @@ export default function LiveOperationsView() {
           {/* KPI Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/15 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Frozen</p>
+              <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Frozen</p>
               <p className="text-xl font-bold text-emerald-300 font-mono">€{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">via camt.056 recalls</p>
             </div>
             <div className="rounded-xl bg-cyan-950/40 border border-cyan-500/15 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Recovered</p>
+              <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Recovered</p>
               <p className="text-xl font-bold text-cyan-300 font-mono">€{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">successful recalls</p>
             </div>
             <div className="rounded-xl bg-indigo-950/40 border border-indigo-500/15 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-400 mb-1">MTTR Reduction</p>
+              <p className="text-[10px] font-mono text-slate-500 mb-1">MTTR Reduction</p>
               <p className="text-xl font-bold text-indigo-300 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">vs. 48h baseline</p>
             </div>
             <div className="rounded-xl bg-purple-950/40 border border-purple-500/15 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-400 mb-1">Containment Rate</p>
+              <p className="text-[10px] font-mono text-slate-500 mb-1">Containment Rate</p>
               <p className="text-xl font-bold text-purple-300 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">&lt;60min freezes</p>
             </div>
           </div>
 
           {/* Sub-metrics bar */}
-          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-400">
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.active_provisional_holds} active holds</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.consortium_banks_active} consortium nodes</span>
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.active_provisional_holds} active holds</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.consortium_banks_active} consortium nodes</span>
           </div>
         </motion.div>
       )}

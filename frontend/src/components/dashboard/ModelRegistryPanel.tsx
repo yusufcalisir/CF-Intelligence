@@ -288,13 +288,13 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                       <div>Saved: {new Date(ver.created_at).toLocaleString()}</div>
                       <div className="font-mono text-[9px]">
                         Git Commit:{' '}
-                        <span className="text-gray-400">
+                        <span className="text-slate-500">
                           {ver.git_commit_hash?.slice(0, 8) || 'unknown'}
                         </span>
                       </div>
                       <div className="font-mono text-[9px]">
                         Dataset SHA:{' '}
-                        <span className="text-gray-400">
+                        <span className="text-slate-500">
                           {ver.dataset_hash?.slice(0, 8) || 'unknown'}
                         </span>
                       </div>

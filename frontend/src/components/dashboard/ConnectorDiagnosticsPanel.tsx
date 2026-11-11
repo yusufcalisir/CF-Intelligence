@@ -187,7 +187,7 @@ export default function ConnectorDiagnosticsPanel() {
   };
 
   return (
-    <div className="space-y-6 w-full text-slate-100">
+    <div className="space-y-6 w-full text-slate-900">
       {/* Top Banner & Summary KPIs */}
       <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0c1033]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -196,10 +196,10 @@ export default function ConnectorDiagnosticsPanel() {
               <Server className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 Enterprise Connectors & Infrastructure Health
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 Real-time transport latency, mutual TLS validation, and on-demand connectivity test probes
               </p>
             </div>
@@ -218,9 +218,9 @@ export default function ConnectorDiagnosticsPanel() {
 
       {/* KPI Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="glass-card p-3.5 rounded-xl border border-white/5 bg-slate-900/40">
-          <span className="text-[11px] font-mono text-slate-400 uppercase block">Registered Adapters</span>
-          <span className="text-xl sm:text-2xl font-black text-slate-100 mt-1 block">{totalCount}</span>
+        <div className="glass-card p-3.5 rounded-xl border border-white/5 bg-white/40">
+          <span className="text-[11px] font-mono text-slate-500 uppercase block">Registered Adapters</span>
+          <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">{totalCount}</span>
         </div>
         <div className="glass-card p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-950/10">
           <span className="text-[11px] font-mono text-emerald-400 uppercase block">Healthy / Active</span>
@@ -247,7 +247,7 @@ export default function ConnectorDiagnosticsPanel() {
               key={connector.connector_id}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card p-4 sm:p-5 rounded-2xl border border-white/10 bg-slate-900/60 flex flex-col justify-between hover:border-indigo-500/40 transition-all shadow-lg min-w-0"
+              className="glass-card p-4 sm:p-5 rounded-2xl border border-slate-200 bg-white/60 flex flex-col justify-between hover:border-indigo-500/40 transition-all shadow-lg min-w-0"
             >
               <div className="min-w-0">
                 {/* Header Row */}
@@ -257,10 +257,10 @@ export default function ConnectorDiagnosticsPanel() {
                       <IconComponent className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-slate-100 tracking-tight leading-snug truncate">
+                      <h4 className="text-sm font-bold text-slate-900 tracking-tight leading-snug truncate">
                         {connector.name}
                       </h4>
-                      <span className="text-[11px] font-mono text-slate-400 block mt-0.5 truncate">
+                      <span className="text-[11px] font-mono text-slate-500 block mt-0.5 truncate">
                         {connector.category}
                       </span>
                     </div>
@@ -273,18 +273,18 @@ export default function ConnectorDiagnosticsPanel() {
 
                 {/* Endpoint & Protocol specs */}
                 <div className="space-y-2 py-2.5 border-y border-white/5 text-xs min-w-0">
-                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
-                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Endpoint</span>
+                  <div className="flex items-center justify-between text-slate-600 min-w-0 gap-2">
+                    <span className="text-slate-500 font-mono text-[11px] shrink-0">Endpoint</span>
                     <span className="font-mono text-[11px] truncate text-indigo-300 text-right min-w-0">
                       {connector.endpoint}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
-                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Protocol</span>
-                    <span className="font-mono text-[11px] text-slate-300 text-right truncate min-w-0">{connector.protocol}</span>
+                  <div className="flex items-center justify-between text-slate-600 min-w-0 gap-2">
+                    <span className="text-slate-500 font-mono text-[11px] shrink-0">Protocol</span>
+                    <span className="font-mono text-[11px] text-slate-600 text-right truncate min-w-0">{connector.protocol}</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
-                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Latency</span>
+                  <div className="flex items-center justify-between text-slate-600 min-w-0 gap-2">
+                    <span className="text-slate-500 font-mono text-[11px] shrink-0">Latency</span>
                     <span className="font-mono text-[11px] font-bold text-cyan-300 text-right shrink-0">{connector.latency_ms} ms</span>
                   </div>
                 </div>
@@ -292,9 +292,9 @@ export default function ConnectorDiagnosticsPanel() {
                 {/* Specific Config Details */}
                 <div className="mt-3 space-y-1 min-w-0">
                   {Object.entries(connector.details).slice(0, 2).map(([key, val]) => (
-                    <div key={key} className="flex items-center justify-between text-[11px] font-mono text-slate-400 min-w-0 gap-2">
+                    <div key={key} className="flex items-center justify-between text-[11px] font-mono text-slate-500 min-w-0 gap-2">
                       <span className="truncate shrink-0">{key.replace(/_/g, ' ')}:</span>
-                      <span className="text-slate-200 truncate text-right min-w-0">
+                      <span className="text-slate-800 truncate text-right min-w-0">
                         {Array.isArray(val) ? val.join(', ') : String(val)}
                       </span>
                     </div>
@@ -338,18 +338,18 @@ export default function ConnectorDiagnosticsPanel() {
               className="glass-card max-w-2xl w-full rounded-2xl border border-indigo-500/30 bg-slate-950 p-6 shadow-2xl relative"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-200">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-100">{activeProbeResult.name}</h3>
+                    <h3 className="text-base font-bold text-slate-900">{activeProbeResult.name}</h3>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="px-2 py-0.2 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                         HTTP {activeProbeResult.status_code} OK
                       </span>
-                      <span className="text-xs font-mono text-slate-400">
+                      <span className="text-xs font-mono text-slate-500">
                         Round-trip: {activeProbeResult.round_trip_ms} ms
                       </span>
                     </div>
@@ -358,7 +358,7 @@ export default function ConnectorDiagnosticsPanel() {
 
                 <button
                   onClick={() => setActiveProbeResult(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-colors"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
@@ -372,10 +372,10 @@ export default function ConnectorDiagnosticsPanel() {
 
               {/* Diagnostics Logs */}
               <div className="mt-4">
-                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 mb-2">
+                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Handshake Execution Trace
                 </h5>
-                <div className="p-3 rounded-xl bg-slate-900 border border-white/5 font-mono text-[11px] text-slate-300 space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="p-3 rounded-xl bg-white border border-white/5 font-mono text-[11px] text-slate-600 space-y-1.5 max-h-40 overflow-y-auto">
                   {activeProbeResult.diagnostics_log.map((log, idx) => (
                     <div key={idx} className="flex items-start gap-2">
                       <span className="text-emerald-400 font-bold shrink-0">✓</span>
@@ -387,7 +387,7 @@ export default function ConnectorDiagnosticsPanel() {
 
               {/* Response Payload Preview */}
               <div className="mt-4">
-                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 mb-2">
+                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Sanitized Handshake Payload
                 </h5>
                 <pre className="p-3 rounded-xl bg-black/60 border border-white/5 font-mono text-[11px] text-cyan-300 overflow-x-auto">

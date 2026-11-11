@@ -735,7 +735,7 @@ export default function ApiDocsPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full pb-12">
       {/* Top Banner */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-white/10 bg-slate-900/80 shadow-2xl min-w-0">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-slate-200 bg-white/80 shadow-2xl min-w-0">
         <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0">
             <Code2 className="w-6 h-6" />
@@ -749,7 +749,7 @@ export default function ApiDocsPage() {
                 OpenAPI 3.1
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
               Bank Integration SDK generator, multi-language code snippets, and live interactive API request sandbox
             </p>
           </div>
@@ -758,7 +758,7 @@ export default function ApiDocsPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             onClick={handleDownloadSpec}
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export OpenAPI JSON</span>
@@ -776,7 +776,7 @@ export default function ApiDocsPage() {
             href={redocUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all whitespace-nowrap"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
           >
             <span>ReDoc</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -785,7 +785,7 @@ export default function ApiDocsPage() {
             href={docsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all whitespace-nowrap"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
           >
             <span>Swagger UI</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -796,8 +796,8 @@ export default function ApiDocsPage() {
       {/* Main 2-Column Explorer */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Endpoints Index */}
-        <div className="lg:col-span-4 glass-card p-4 rounded-2xl border border-white/10 bg-slate-900/60 space-y-2">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">
+        <div className="lg:col-span-4 glass-card p-4 rounded-2xl border border-slate-200 bg-white/60 space-y-2">
+          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 px-2 mb-2">
             Consortium Endpoints
           </h3>
           <div className="space-y-1.5">
@@ -812,7 +812,7 @@ export default function ApiDocsPage() {
                   className={`w-full p-3 rounded-xl transition-all border text-left flex items-start gap-2.5 cursor-pointer ${
                     isSelected
                       ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 shadow-md shadow-indigo-600/15'
-                      : 'bg-white/3 border-white/5 text-slate-300 hover:bg-white/5 hover:text-slate-100'
+                      : 'bg-white/3 border-white/5 text-slate-600 hover:bg-white/5 hover:text-slate-900'
                   }`}
                 >
                   <span
@@ -828,7 +828,7 @@ export default function ApiDocsPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold truncate">{endpoint.title}</div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">{endpoint.path}</div>
+                    <div className="text-[10px] font-mono text-slate-500 truncate mt-0.5">{endpoint.path}</div>
                   </div>
                 </button>
               );
@@ -839,8 +839,8 @@ export default function ApiDocsPage() {
         {/* Right Column: Spec, SDK Snippets & Playground */}
         <div className="lg:col-span-8 space-y-6">
           {/* Endpoint Specification Detail Card */}
-          <div className="glass-card p-5 sm:p-6 rounded-2xl border border-white/10 bg-slate-900/60 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+          <div className="glass-card p-5 sm:p-6 rounded-2xl border border-slate-200 bg-white/60 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-mono font-black ${
@@ -853,7 +853,7 @@ export default function ApiDocsPage() {
                 >
                   {selectedEndpoint.method}
                 </span>
-                <span className="font-mono text-sm sm:text-base font-bold text-slate-100">
+                <span className="font-mono text-sm sm:text-base font-bold text-slate-900">
                   {selectedEndpoint.path}
                 </span>
               </div>
@@ -864,21 +864,21 @@ export default function ApiDocsPage() {
                     <Lock className="w-2.5 h-2.5" /> Bearer Token
                   </span>
                 )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-white/5 border border-slate-200">
                   {selectedEndpoint.rateLimit}
                 </span>
               </div>
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-sans">
               {selectedEndpoint.description}
             </p>
           </div>
 
           {/* Multi-Language SDK Snippet Box */}
-          <div className="glass-card rounded-2xl border border-white/10 bg-slate-950 overflow-hidden shadow-xl">
+          <div className="glass-card rounded-2xl border border-slate-200 bg-slate-950 overflow-hidden shadow-xl">
             {/* Language Selection Tabs */}
-            <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-white/10 bg-slate-900/80 gap-2 min-w-0">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-slate-200 bg-white/80 gap-2 min-w-0">
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
                 {(['curl', 'python', 'node', 'java', 'go'] as SupportedLanguage[]).map((lang) => (
                   <button
@@ -887,7 +887,7 @@ export default function ApiDocsPage() {
                     className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 cursor-pointer ${
                       selectedLang === lang
                         ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
                     }`}
                   >
                     {lang.toUpperCase()}
@@ -899,12 +899,12 @@ export default function ApiDocsPage() {
                 onClick={handleCopyCode}
                 aria-label={copiedCode ? 'Code copied to clipboard' : 'Copy code snippet'}
                 title={copiedCode ? 'Copied!' : 'Copy code'}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all shrink-0 cursor-pointer border border-white/5 active:scale-95"
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-600 hover:text-white transition-all shrink-0 cursor-pointer border border-white/5 active:scale-95"
               >
                 {copiedCode ? (
                   <Check className="w-4 h-4 text-emerald-400" />
                 ) : (
-                  <Copy className="w-4 h-4 text-slate-400 hover:text-slate-200" />
+                  <Copy className="w-4 h-4 text-slate-500 hover:text-slate-800" />
                 )}
               </button>
             </div>
@@ -916,11 +916,11 @@ export default function ApiDocsPage() {
           </div>
 
           {/* Live Request Playground */}
-          <div className="glass-card p-5 rounded-2xl border border-indigo-500/20 bg-slate-900/70 space-y-4 shadow-xl">
+          <div className="glass-card p-5 rounded-2xl border border-indigo-500/20 bg-white/70 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-cyan-400" />
-                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100">
+                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900">
                   Interactive API Request Runner
                 </h4>
               </div>
@@ -948,7 +948,7 @@ export default function ApiDocsPage() {
             {selectedEndpoint.requestBodySample && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">Request Body (Editable JSON)</span>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">Request Body (Editable JSON)</span>
                   <button
                     onClick={() => {
                       setRequestPayloadText(
@@ -966,7 +966,7 @@ export default function ApiDocsPage() {
                   rows={6}
                   value={requestPayloadText}
                   onChange={(e) => setRequestPayloadText(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-black/60 border border-white/10 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition-all leading-relaxed resize-y"
+                  className="w-full p-3 rounded-xl bg-black/60 border border-slate-200 font-mono text-[11px] text-slate-800 focus:outline-none focus:border-indigo-500 transition-all leading-relaxed resize-y"
                   placeholder="Enter JSON request payload..."
                 />
               </div>
@@ -978,10 +978,10 @@ export default function ApiDocsPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-2 pt-3 border-t border-white/10"
+                  className="space-y-2 pt-3 border-t border-slate-200"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Live Server Response</span>
+                    <span className="text-[10px] font-mono text-slate-500 uppercase">Live Server Response</span>
                     <div className="flex items-center gap-2">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${

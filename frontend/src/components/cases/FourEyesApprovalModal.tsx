@@ -114,7 +114,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="w-full max-w-xl rounded-2xl bg-gradient-to-br from-[#0c0e29]/95 via-[#0e1138]/90 to-[#0c0e29]/95 border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.2)] p-6 space-y-5 text-slate-200 relative overflow-hidden"
+          className="w-full max-w-xl rounded-2xl bg-gradient-to-br from-[#0c0e29]/95 via-[#0e1138]/90 to-[#0c0e29]/95 border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.2)] p-6 space-y-5 text-slate-800 relative overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-start justify-between border-b border-indigo-500/20 pb-4">
@@ -129,7 +129,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                     Art. 14 High-Risk AI
                   </span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Case resolution requires dual supervisor approval. Self-approval is cryptographically blocked.
                 </p>
               </div>
@@ -137,24 +137,24 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+              className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-50/60 transition-colors"
             >
               ✕
             </button>
           </div>
 
           {/* Case Context Summary */}
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs space-y-1.5">
+          <div className="p-3 rounded-xl bg-white/60 border border-slate-200 text-xs space-y-1.5">
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Case ID:</span>
+              <span className="text-slate-500">Case ID:</span>
               <span className="font-mono text-indigo-300 font-semibold">{caseId}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Title:</span>
+              <span className="text-slate-500">Title:</span>
               <span className="text-white font-medium truncate max-w-[280px]">{caseTitle}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Assigned Investigator:</span>
+              <span className="text-slate-500">Assigned Investigator:</span>
               <span className="font-medium text-amber-300 flex items-center gap-1">
                 <UserCheck className="w-3.5 h-3.5" />
                 {assignedInvestigator || 'Unassigned'}
@@ -165,7 +165,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Resolution Choice */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                 Resolution Determination
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -175,7 +175,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium ${
                     resolution === 'CONFIRMED_FRAUD'
                       ? 'bg-rose-500/15 border-rose-500/50 text-rose-300 shadow-[0_0_20px_rgba(244,63,94,0.2)]'
-                      : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+                      : 'bg-white/40 border-slate-200 text-slate-500 hover:bg-slate-50/40'
                   }`}
                 >
                   <ShieldAlert className="w-5 h-5 text-rose-400" />
@@ -189,7 +189,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium ${
                     resolution === 'FALSE_POSITIVE'
                       ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                      : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+                      : 'bg-white/40 border-slate-200 text-slate-500 hover:bg-slate-50/40'
                   }`}
                 >
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -201,7 +201,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
 
             {/* Primary Supervisor Input */}
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-300">
+              <label className="block text-xs font-semibold text-slate-600">
                 Primary Supervisor Identity <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
@@ -213,10 +213,10 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                     setSubmitError(null);
                   }}
                   placeholder="e.g. supervisor_alice"
-                  className={`w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border text-white placeholder-slate-500 outline-none transition-colors ${
+                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-white placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalPrimary
                       ? 'border-rose-500/80 focus:border-rose-500'
-                      : 'border-slate-700 focus:border-indigo-400'
+                      : 'border-slate-200 focus:border-indigo-400'
                   }`}
                 />
                 <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-2.5" />
@@ -231,7 +231,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
 
             {/* Secondary Supervisor Input */}
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-300">
+              <label className="block text-xs font-semibold text-slate-600">
                 Secondary Supervisor Identity <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
@@ -243,10 +243,10 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                     setSubmitError(null);
                   }}
                   placeholder="e.g. supervisor_bob"
-                  className={`w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border text-white placeholder-slate-500 outline-none transition-colors ${
+                  className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-white placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalSecondary || duplicateSupervisors
                       ? 'border-rose-500/80 focus:border-rose-500'
-                      : 'border-slate-700 focus:border-indigo-400'
+                      : 'border-slate-200 focus:border-indigo-400'
                   }`}
                 />
                 <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-2.5" />
@@ -267,7 +267,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
 
             {/* Resolution Notes */}
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-300">
+              <label className="block text-xs font-semibold text-slate-600">
                 Governance & Investigation Findings Rationale
               </label>
               <textarea
@@ -275,7 +275,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 placeholder="Document consensus findings, transaction risk review, and rationale for case closure..."
-                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 outline-none focus:border-indigo-400 transition-colors"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-white placeholder-slate-500 outline-none focus:border-indigo-400 transition-colors"
               />
             </div>
 
@@ -293,7 +293,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors"
               >
                 Cancel
               </button>
@@ -304,7 +304,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                 className={`px-4 py-2 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all ${
                   isValid && !isSubmitting
                     ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-[0_0_20px_rgba(99,102,241,0.35)]'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                    : 'bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed'
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />

@@ -187,7 +187,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="ingest-modal-title"
-        className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--color-bg-primary)] border border-white/10 shadow-2xl flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--color-bg-primary)] border border-slate-200 shadow-2xl flex flex-col max-h-[90vh]"
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border-subtle)]">
@@ -206,7 +206,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
           </div>
           <button
             onClick={resetModal}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
           >
             <X size={18} />
           </button>
@@ -243,7 +243,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
               <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                 <CheckCircle2 size={32} />
               </div>
-              <h4 className="text-lg font-bold text-slate-100">
+              <h4 className="text-lg font-bold text-slate-900">
                 Dataset Enrolled into {enrollSuccess.bank_id.toUpperCase()} Successfully!
               </h4>
               <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
@@ -304,7 +304,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                   if (currentStep === 'contract') setCurrentStep('mapping');
                   if (currentStep === 'consortium') setCurrentStep('contract');
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-white/5 hover:bg-white/10 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 bg-white/5 hover:bg-white/10 transition-colors"
               >
                 <ArrowLeft size={13} />
                 <span>Previous Step</span>

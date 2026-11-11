@@ -41,7 +41,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
               Authoritative Preflight Verification Probes
             </h3>
           </div>
-          <p className="text-xs text-slate-400 max-w-2xl">
+          <p className="text-xs text-slate-500 max-w-2xl">
             Preflight evaluates container connectivity, bilateral Ed25519 public key registries, active consortium grants,
             and query quota reserves via SSRF-safe backend probes before institutional activation.
           </p>
@@ -54,7 +54,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm ${
               canRunPreflight && !runPreflightMutation.isPending
                 ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer'
-                : 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
+                : 'bg-slate-50 text-slate-500 border border-slate-200/50 cursor-not-allowed'
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${runPreflightMutation.isPending ? 'animate-spin' : ''}`} />
@@ -75,10 +75,10 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
 
       {/* Preflight State Overview Banner */}
       {!hasChecks && (
-        <div className="p-4 rounded-xl border border-slate-700/60 bg-slate-900/40 text-slate-400 text-xs flex items-center gap-3">
+        <div className="p-4 rounded-xl border border-slate-200/60 bg-white/40 text-slate-500 text-xs flex items-center gap-3">
           <Clock className="w-5 h-5 text-slate-500 shrink-0" />
           <div>
-            <div className="font-semibold text-slate-300">Preflight Probes Never Executed</div>
+            <div className="font-semibold text-slate-600">Preflight Probes Never Executed</div>
             <div>Run preflight verification to evaluate bilateral node connectivity, signing keys, and grant validity.</div>
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <div>
             <div className="font-semibold">All Preflight Readiness Probes Passed</div>
-            <div className="text-slate-400 mt-0.5">
+            <div className="text-slate-500 mt-0.5">
               Infrastructure topology, institutional cryptographic keys, and consortium grants verified operational.
             </div>
           </div>
@@ -101,7 +101,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
           <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
           <div>
             <div className="font-semibold">Preflight Verification Failed</div>
-            <div className="text-slate-400 mt-0.5">
+            <div className="text-slate-500 mt-0.5">
               One or more mandatory infrastructure preconditions failed. Pilot activation is blocked until corrected.
             </div>
           </div>
@@ -112,14 +112,14 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
       {hasChecks && (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] overflow-hidden">
           <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
               Verification Check Results ({checks.filter((c) => c.passed).length}/{checks.length} Passed)
             </span>
           </div>
 
           <div className="divide-y divide-[var(--color-border)]">
             {checks.map((check, idx) => (
-              <div key={idx} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-900/30 transition-colors">
+              <div key={idx} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-white/30 transition-colors">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     {check.passed ? (
@@ -140,7 +140,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
                       {check.passed ? 'PASSED' : 'FAILED'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 font-mono pl-6 break-words">
+                  <p className="text-xs text-slate-500 font-mono pl-6 break-words">
                     {check.details}
                   </p>
                 </div>

@@ -98,14 +98,14 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
   return (
     <div className="space-y-1.5 w-full min-w-0">
       <div className="flex items-center justify-between gap-2 text-xs min-w-0">
-        <span className="text-slate-400 font-mono text-[11px] truncate min-w-0 flex-1" title={label}>
+        <span className="text-slate-500 font-mono text-[11px] truncate min-w-0 flex-1" title={label}>
           {label}
         </span>
-        <span className="font-mono font-bold text-slate-200 shrink-0 whitespace-nowrap text-right">
+        <span className="font-mono font-bold text-slate-800 shrink-0 whitespace-nowrap text-right">
           {(value * 100).toFixed(1)}% <span className="text-slate-500 font-normal">({pct}/100)</span>
         </span>
       </div>
-      <div className="w-full bg-slate-900/80 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+      <div className="w-full bg-white/80 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
         <div
           className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-700`}
           style={{ width: `${pct}%` }}
@@ -124,11 +124,11 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-400" />
             <span>Byzantine-Robust Aggregation Catalog</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Mathematical defense proofs against malicious gradient poisoning, label flipping, and colluding Sybil nodes
           </p>
         </div>
@@ -149,7 +149,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
               className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between relative overflow-hidden min-w-0 group ${
                 isMultiAttacker
                   ? 'bg-gradient-to-b from-[#0e1038]/90 to-[#06081e]/90 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                  : 'bg-[#080a21]/80 border-slate-800/80 hover:border-indigo-500/30'
+                  : 'bg-[#080a21]/80 border-slate-200/80 hover:border-indigo-500/30'
               }`}
             >
               {isMultiAttacker && (
@@ -159,10 +159,10 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="font-bold text-slate-100 text-sm leading-snug block truncate group-hover:text-indigo-300 transition-colors">
+                    <span className="font-bold text-slate-900 text-sm leading-snug block truncate group-hover:text-indigo-300 transition-colors">
                       {m.label}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                    <span className="text-[10px] font-mono text-slate-500">{m.id}</span>
                   </div>
 
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -180,12 +180,12 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed">{m.description}</p>
+                <p className="text-xs text-slate-500 leading-relaxed">{m.description}</p>
               </div>
 
               <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 truncate">
-                  <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 truncate">
+                  <FileText className="w-3 h-3 text-slate-500 shrink-0" />
                   <span className="truncate">{m.paper}</span>
                 </div>
                 <span className="text-[10px] font-mono text-indigo-400 group-hover:text-indigo-300 transition-colors shrink-0">
@@ -229,11 +229,11 @@ function MIASimulationVisualizer() {
             <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
               <Sliders className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-slate-100 text-sm sm:text-base">
+            <h3 className="font-bold text-slate-900 text-sm sm:text-base">
               Membership Inference Attack (MIA) Empirical Simulator
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Simulate shadow model transaction loss distributions and observe empirical ROC-AUC / ASR under Rényi DP
           </p>
         </div>
@@ -247,7 +247,7 @@ function MIASimulationVisualizer() {
       {/* Preset Buttons & Slider */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center min-w-0">
         <div className="space-y-2">
-          <label className="text-xs font-mono text-slate-300 flex justify-between">
+          <label className="text-xs font-mono text-slate-600 flex justify-between">
             <span>Differential Privacy Noise Level (Target ε):</span>
             <span className="font-bold text-indigo-400">
               {testEps >= 50.0 ? '∞ (No DP)' : `ε = ${testEps.toFixed(2)}`}
@@ -261,7 +261,7 @@ function MIASimulationVisualizer() {
             step="0.1"
             value={testEps > 10 ? 10 : testEps}
             onChange={(e) => setTestEps(parseFloat(e.target.value))}
-            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            className="w-full h-2 bg-slate-50 rounded-lg appearance-none cursor-pointer accent-indigo-500"
           />
           <div className="flex flex-wrap gap-1.5 pt-1">
             {presets.map((p) => (
@@ -271,7 +271,7 @@ function MIASimulationVisualizer() {
                 className={`px-2.5 py-1 rounded-lg text-[10.5px] font-mono transition-all cursor-pointer ${
                   testEps === p.val
                     ? 'bg-indigo-600 text-white font-bold border border-indigo-400 shadow-sm'
-                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/5'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-600 border border-white/5'
                 }`}
               >
                 {p.label}
@@ -282,11 +282,11 @@ function MIASimulationVisualizer() {
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="w-full sm:w-auto flex-1 space-y-1">
-            <span className="text-xs font-mono text-slate-400 block">Shadow Samples:</span>
+            <span className="text-xs font-mono text-slate-500 block">Shadow Samples:</span>
             <select
               value={numSamples}
               onChange={(e) => setNumSamples(parseInt(e.target.value, 10))}
-              className="w-full bg-[#050614] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-[#050614] border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500"
             >
               <option value="50">50 Shadow Transactions</option>
               <option value="80">80 Shadow Transactions</option>
@@ -317,12 +317,12 @@ function MIASimulationVisualizer() {
 
       {/* Simulation Result Display */}
       {simData && (
-        <div className="space-y-4 pt-3 border-t border-white/10">
+        <div className="space-y-4 pt-3 border-t border-slate-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">Attack Success Rate (ASR)</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Attack Success Rate (ASR)</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold font-mono text-slate-100">
+                <span className="text-xl font-bold font-mono text-slate-900">
                   {(simData.membership_leakage_asr * 100).toFixed(1)}%
                 </span>
                 <span className="text-[10px] font-mono text-slate-500">(Random Guess: 50%)</span>
@@ -331,7 +331,7 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">MIA ROC-AUC Score</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">MIA ROC-AUC Score</span>
               <div className="flex items-baseline gap-2">
                 <span className={`text-xl font-bold font-mono ${
                   simData.mia_roc_auc < 0.6 ? 'text-emerald-400' : simData.mia_roc_auc < 0.75 ? 'text-amber-400' : 'text-rose-400'
@@ -346,20 +346,20 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">Loss Disparity Gap (ΔL)</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Loss Disparity Gap (ΔL)</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold font-mono text-indigo-300">
                   {simData.loss_gap.toFixed(4)}
                 </span>
                 <span className="text-[10px] font-mono text-slate-500">(L_test - L_train)</span>
               </div>
-              <p className="text-[10.5px] text-slate-400 font-mono">
+              <p className="text-[10.5px] text-slate-500 font-mono">
                 Train: {simData.mean_train_loss.toFixed(3)} | Test: {simData.mean_test_loss.toFixed(3)}
               </p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1 flex flex-col justify-between">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">DP Defense Status</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">DP Defense Status</span>
               <div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1.5 ${
                   simData.is_dp_enabled
@@ -379,11 +379,11 @@ function MIASimulationVisualizer() {
           {/* Loss Disparity Visual Bar */}
           <div className="p-4 rounded-xl bg-[#03040f] border border-white/5 space-y-3">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+              <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Member vs Non-Member Empirical Loss Overlap</span>
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500">
                 {simData.loss_gap < 0.1 ? '🟢 High Overlap (Indistinguishable)' : '🔴 Distinct Clusters (Vulnerable)'}
               </span>
             </div>
@@ -447,11 +447,11 @@ function AttackAuditPanel() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-rose-400" />
             <span>Adversarial Privacy Attack Evaluators</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Empirical stress testing: Membership Inference, Model Inversion, and Deep Gradient Leakage
           </p>
         </div>
@@ -469,32 +469,32 @@ function AttackAuditPanel() {
               <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 1
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Shokri et al.</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Shokri et al.</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+            <h3 className="font-bold text-slate-900 text-sm leading-snug h-10 flex items-center">
               Membership Inference Attack (MIA)
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Assesses whether an adversary can infer if a specific bank transaction was present in local training datasets via shadow loss disparities.
             </p>
           </div>
 
           {miaResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Classification:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Classification:</span>
                 <RiskBadge tier={miaResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Train: {miaResult.num_train_samples_audited} samples</span>
                 <span>Test: {miaResult.num_test_samples_audited} samples</span>
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -527,32 +527,32 @@ function AttackAuditPanel() {
               <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 2
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Fredrikson et al.</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Fredrikson et al.</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+            <h3 className="font-bold text-slate-900 text-sm leading-snug h-10 flex items-center">
               Model Inversion & Reconstruction
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Audits if shared gradient norms allow adversaries to reconstruct sensitive transaction feature distributions and client account balances.
             </p>
           </div>
 
           {invResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Risk Tier:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Risk Tier:</span>
                 <RiskBadge tier={invResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Mean Norm: {invResult.mean_gradient_norm.toFixed(3)}</span>
                 <span>σ: {invResult.std_gradient_norm.toFixed(3)}</span>
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -585,32 +585,32 @@ function AttackAuditPanel() {
               <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 3
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Zhu et al. (NeurIPS)</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Zhu et al. (NeurIPS)</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+            <h3 className="font-bold text-slate-900 text-sm leading-snug h-10 flex items-center">
               Deep Leakage from Gradients (DLG)
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Verifies whether shared gradient vectors correlate closely enough to synthesize exact transaction raw data without DP noise injection.
             </p>
           </div>
 
           {dlgResult ? (
-            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Status:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Status:</span>
                 <RiskBadge tier={dlgResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Audited Weights:</span>
                 <span className="text-emerald-300 font-bold">{dlgResult.params_audited} params</span>
               </div>
             </div>
           ) : (
-            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -656,11 +656,11 @@ function BudgetLogSection() {
       {/* 1. Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
             <Database className="w-5 h-5 text-indigo-400" />
             <span>Enterprise Privacy Budget Audit Log (DP-SGD ε)</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Rényi Differential Privacy (RDP) cumulative ε-consumption tracker with per-bank accountants and automated safety circuit-breaker
           </p>
         </div>
@@ -677,7 +677,7 @@ function BudgetLogSection() {
           ? 'bg-rose-500/15 border-rose-500/50 shadow-xl shadow-rose-500/20 text-rose-200'
           : anyExceeded
           ? 'bg-amber-500/15 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-200'
-          : 'bg-[#080a21]/90 border-indigo-500/30 shadow-lg shadow-indigo-500/10 text-slate-200'
+          : 'bg-[#080a21]/90 border-indigo-500/30 shadow-lg shadow-indigo-500/10 text-slate-800'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
@@ -702,8 +702,8 @@ function BudgetLogSection() {
                   {isFrozen ? '🚨 TRAINING CIRCUIT-BREAKER ENGAGED' : '🛡️ CONSORTIUM SAFETY LOCK ACTIVE'}
                 </span>
                 {bankBudgets?.frozen_by_node && (
-                  <span className="text-[11px] font-mono text-slate-400">
-                    Halted by: <span className="font-bold text-slate-200">{bankBudgets.frozen_by_node}</span>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Halted by: <span className="font-bold text-slate-800">{bankBudgets.frozen_by_node}</span>
                   </span>
                 )}
               </div>
@@ -713,7 +713,7 @@ function BudgetLogSection() {
                   : 'Automated Rényi DP accountant monitors cumulative epsilon across all participating bank nodes. Training freezes instantly if any bank depletes ε_max.'}
               </p>
               {bankBudgets?.frozen_at && (
-                <span className="text-[10px] font-mono text-slate-400 block">
+                <span className="text-[10px] font-mono text-slate-500 block">
                   Lock Engaged At: {new Date(bankBudgets.frozen_at).toLocaleString()}
                 </span>
               )}
@@ -747,9 +747,9 @@ function BudgetLogSection() {
               id="btn-reset-consortium-budgets"
               onClick={() => circuitBreakerAction.mutate({ action: 'reset_budget' })}
               disabled={circuitBreakerAction.isPending}
-              className="h-10 min-h-[40px] px-3.5 rounded-xl text-xs font-mono font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/10 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="h-10 min-h-[40px] px-3.5 rounded-xl text-xs font-mono font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-600 border border-slate-200 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
               <span>Reset All Budgets</span>
             </button>
           </div>
@@ -759,17 +759,17 @@ function BudgetLogSection() {
       {/* 3. Consortium Bank Node Rényi DP (RDP) Accountant Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <Activity className="w-4 h-4 text-indigo-400" />
             <span>Bank-Level Rényi DP Accountants (Live State)</span>
           </h3>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono text-slate-500">
             {nodes.length} Participating Bank Nodes
           </span>
         </div>
 
         {isBudgetsLoading ? (
-          <div className="glass-card p-8 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+          <div className="glass-card p-8 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
             Querying per-bank Rényi DP accountants...
           </div>
         ) : (
@@ -786,18 +786,18 @@ function BudgetLogSection() {
                       ? 'bg-rose-500/10 border-rose-500/40 shadow-lg shadow-rose-500/10'
                       : isWarning
                       ? 'bg-amber-500/10 border-amber-500/40 shadow-md shadow-amber-500/10'
-                      : 'bg-[#080a21]/80 border-slate-800/80 hover:border-indigo-500/30'
+                      : 'bg-[#080a21]/80 border-slate-200/80 hover:border-indigo-500/30'
                   }`}
                 >
                   <div className="space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="font-bold text-slate-100 text-sm block truncate">
+                        <span className="font-bold text-slate-900 text-sm block truncate">
                           {node.bank_name}
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-mono text-slate-400">{node.node_id}</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">
+                          <span className="text-[10px] font-mono text-slate-500">{node.node_id}</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-500">
                             {node.tier}
                           </span>
                         </div>
@@ -815,12 +815,12 @@ function BudgetLogSection() {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-400">Cumulative ε:</span>
-                        <span className="font-bold text-slate-200">
+                        <span className="text-slate-500">Cumulative ε:</span>
+                        <span className="font-bold text-slate-800">
                           {node.cumulative_epsilon.toFixed(3)} / {node.target_epsilon.toFixed(1)}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-white/5">
+                      <div className="w-full bg-white rounded-full h-2 overflow-hidden border border-white/5">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
                             isExceeded
@@ -832,7 +832,7 @@ function BudgetLogSection() {
                           style={{ width: `${Math.min(100, Math.max(0, node.budget_exhaustion_pct))}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-0.5">
+                      <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-0.5">
                         <span>Exhaustion: {node.budget_exhaustion_pct.toFixed(1)}%</span>
                         <span>δ = {node.target_delta.toExponential(1)}</span>
                       </div>
@@ -840,16 +840,16 @@ function BudgetLogSection() {
 
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-                        <span className="text-[9px] text-slate-400 block">Rényi α*</span>
-                        <span className="text-slate-200 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
+                        <span className="text-[9px] text-slate-500 block">Rényi α*</span>
+                        <span className="text-slate-800 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-                        <span className="text-[9px] text-slate-400 block">Noise σ</span>
+                        <span className="text-[9px] text-slate-500 block">Noise σ</span>
                         <span className="text-indigo-300 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-                        <span className="text-[9px] text-slate-400 block">Rounds</span>
-                        <span className="text-slate-200 font-bold">{node.rounds_completed}</span>
+                        <span className="text-[9px] text-slate-500 block">Rounds</span>
+                        <span className="text-slate-800 font-bold">{node.rounds_completed}</span>
                       </div>
                     </div>
                   </div>
@@ -878,7 +878,7 @@ function BudgetLogSection() {
 
       {/* 4. Global Simulation Runs Audit Ledger */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
           <Database className="w-4 h-4 text-indigo-400" />
           <span>Simulation Ledger (Historical DP Runs)</span>
         </h3>
@@ -896,11 +896,11 @@ function BudgetLogSection() {
         )}
 
         {isLoading ? (
-          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+          <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
             Querying enterprise DP budget ledger...
           </div>
         ) : entries.length === 0 ? (
-          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono rounded-2xl border border-dashed border-white/10">
+          <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono rounded-2xl border border-dashed border-slate-200">
             No training runs recorded in the current session. Run a federated round to initiate ε-tracking.
           </div>
         ) : (
@@ -916,13 +916,13 @@ function BudgetLogSection() {
                   className={`glass-card p-4 rounded-xl border space-y-3 ${
                     entry.budget_exhausted
                       ? 'bg-rose-500/5 border-rose-500/40'
-                      : 'bg-[#080a21]/90 border-white/10'
+                      : 'bg-[#080a21]/90 border-slate-200'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="text-[10px] font-mono text-slate-400 block truncate">Simulation ID</span>
-                      <span className="font-mono text-xs font-bold text-slate-100 truncate block">
+                      <span className="text-[10px] font-mono text-slate-500 block truncate">Simulation ID</span>
+                      <span className="font-mono text-xs font-bold text-slate-900 truncate block">
                         {entry.simulation_id}
                       </span>
                     </div>
@@ -941,7 +941,7 @@ function BudgetLogSection() {
                   {/* Budget bar */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-mono">
-                      <span className="text-slate-400">Total ε Consumed:</span>
+                      <span className="text-slate-500">Total ε Consumed:</span>
                       <span
                         className="font-bold"
                         style={{
@@ -951,7 +951,7 @@ function BudgetLogSection() {
                         {entry.total_epsilon.toFixed(4)} / 8.00
                       </span>
                     </div>
-                    <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
                       <div
                         className="h-full bg-indigo-500 rounded-full"
                         style={{ width: `${epsPct}%` }}
@@ -961,15 +961,15 @@ function BudgetLogSection() {
 
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-[10px] text-slate-400">Delta (δ)</div>
-                      <div className="text-slate-200 font-bold">{entry.delta?.toExponential?.(1) ?? '1e-5'}</div>
+                      <div className="text-[10px] text-slate-500">Delta (δ)</div>
+                      <div className="text-slate-800 font-bold">{entry.delta?.toExponential?.(1) ?? '1e-5'}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-[10px] text-slate-400">Rounds</div>
-                      <div className="text-slate-200 font-bold">{entry.rounds_spent}</div>
+                      <div className="text-[10px] text-slate-500">Rounds</div>
+                      <div className="text-slate-800 font-bold">{entry.rounds_spent}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-[10px] text-slate-400">ε / Round</div>
+                      <div className="text-[10px] text-slate-500">ε / Round</div>
                       <div className="text-indigo-300 font-bold">{entry.epsilon_per_round?.toFixed(3) ?? '0.120'}</div>
                     </div>
                   </div>
@@ -983,7 +983,7 @@ function BudgetLogSection() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-950/60 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
+                  <tr className="bg-slate-950/60 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                     <th className="py-3.5 px-4">Simulation ID</th>
                     <th className="py-3.5 px-4 text-right">Total ε Spent</th>
                     <th className="py-3.5 px-4 text-right">Target δ</th>
@@ -992,15 +992,15 @@ function BudgetLogSection() {
                     <th className="py-3.5 px-4 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-slate-200/60 font-mono">
                   {entries.map((entry: BudgetLogEntry) => (
                     <tr
                       key={entry.simulation_id}
-                      className={`transition-colors hover:bg-slate-800/40 ${
+                      className={`transition-colors hover:bg-slate-50/40 ${
                         entry.budget_exhausted ? 'bg-rose-500/5' : ''
                       }`}
                     >
-                      <td className="py-3.5 px-4 font-bold text-slate-200 truncate max-w-[220px]">
+                      <td className="py-3.5 px-4 font-bold text-slate-800 truncate max-w-[220px]">
                         {entry.simulation_id}
                       </td>
                       <td
@@ -1011,10 +1011,10 @@ function BudgetLogSection() {
                       >
                         {entry.total_epsilon.toFixed(4)}
                       </td>
-                      <td className="py-3.5 px-4 text-right text-slate-400">
+                      <td className="py-3.5 px-4 text-right text-slate-500">
                         {entry.delta?.toExponential?.(1) ?? '1.0e-5'}
                       </td>
-                      <td className="py-3.5 px-4 text-right text-slate-200 font-bold">{entry.rounds_spent}</td>
+                      <td className="py-3.5 px-4 text-right text-slate-800 font-bold">{entry.rounds_spent}</td>
                       <td className="py-3.5 px-4 text-right text-indigo-300">
                         {entry.epsilon_per_round?.toFixed(4) ?? '0.1200'}
                       </td>
@@ -1070,7 +1070,7 @@ export default function PrivacyDefensePage() {
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-100 w-full min-w-0">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-900 w-full min-w-0">
       {/* Top Header Banner */}
       <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
@@ -1081,7 +1081,7 @@ export default function PrivacyDefensePage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-100 tracking-tight leading-tight">
+                <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight">
                   Privacy Defense & Byzantine Suite
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
@@ -1117,12 +1117,12 @@ export default function PrivacyDefensePage() {
               className={`px-1.5 py-2 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer min-w-0 w-full flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 border ${
                 isActive
                   ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500/60 text-white shadow-md shadow-indigo-600/15'
-                  : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/5 text-slate-400 hover:text-slate-200'
+                  : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/5 text-slate-500 hover:text-slate-800'
               }`}
             >
               <div
                 className={`p-1.5 rounded-lg shrink-0 ${
-                  isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/5 text-slate-400'
+                  isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/5 text-slate-500'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -1131,7 +1131,7 @@ export default function PrivacyDefensePage() {
                 <span className="text-[11px] sm:text-sm font-bold block text-center sm:text-left leading-tight sm:leading-normal sm:whitespace-nowrap">
                   {tab.label}
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 hidden sm:block truncate mt-0.5">
+                <span className="text-[10px] font-mono text-slate-500 hidden sm:block truncate mt-0.5">
                   {tab.desc}
                 </span>
               </div>
@@ -1152,7 +1152,7 @@ export default function PrivacyDefensePage() {
         >
           {activeTab === 'defense' && (
             methodsLoading ? (
-              <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+              <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
                 Loading Byzantine algorithm catalog...
               </div>
             ) : (

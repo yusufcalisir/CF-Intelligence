@@ -45,7 +45,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Header & Status bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-slate-200">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
             <SlidersHorizontal size={18} />
@@ -91,11 +91,11 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
 
               return (
                 <tr key={col} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-3.5 py-2.5 font-mono font-semibold text-slate-200">
+                  <td className="px-3.5 py-2.5 font-mono font-semibold text-slate-800">
                     {col}
                   </td>
                   <td className="px-3.5 py-2.5">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 border border-white/10 text-slate-300">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 border border-slate-200 text-slate-600">
                       {mappingItem?.data_type || 'string'}
                     </span>
                   </td>
@@ -107,7 +107,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
                       id={`mapping-select-${col}`}
                       value={currentTarget}
                       onChange={(e) => onMappingChange(col, e.target.value)}
-                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/15 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 font-sans"
+                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/15 text-slate-800 text-xs focus:outline-none focus:border-indigo-500 font-sans"
                     >
                       {CANONICAL_TARGET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>

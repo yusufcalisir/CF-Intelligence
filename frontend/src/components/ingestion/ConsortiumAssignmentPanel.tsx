@@ -66,13 +66,13 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Landmark size={16} className={isSelected ? 'text-indigo-400' : 'text-slate-400'} />
-                  <span className="text-xs font-bold text-slate-200">{bank.name}</span>
+                  <Landmark size={16} className={isSelected ? 'text-indigo-400' : 'text-slate-500'} />
+                  <span className="text-xs font-bold text-slate-800">{bank.name}</span>
                 </div>
                 {isSelected && <CheckCircle2 size={15} className="text-indigo-400" />}
               </div>
               <p className="text-[11px] text-[var(--color-text-muted)] mt-1">{bank.subtitle}</p>
-              <span className="text-[10px] font-mono text-slate-400 mt-2 block">{bank.records}</span>
+              <span className="text-[10px] font-mono text-slate-500 mt-2 block">{bank.records}</span>
             </div>
           );
         })}
@@ -81,7 +81,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
       {/* Allocation Mode & Trigger Options */}
       <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
             <Layers size={13} className="text-indigo-400" /> Partition Allocation Strategy:
           </label>
           <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'replace_partition'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'bg-white/5 text-slate-400 hover:text-white'
+                  : 'bg-white/5 text-slate-500 hover:text-white'
               }`}
             >
               Replace Partition
@@ -102,7 +102,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'append_partition'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'bg-white/5 text-slate-400 hover:text-white'
+                  : 'bg-white/5 text-slate-500 hover:text-white'
               }`}
             >
               Append Records
@@ -111,7 +111,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
         </div>
 
         <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-          <label htmlFor="trigger-fl-toggle" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 cursor-pointer">
+          <label htmlFor="trigger-fl-toggle" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-pointer">
             <Zap size={13} className="text-amber-400" /> Trigger Federated Learning Round Automatically
           </label>
           <input

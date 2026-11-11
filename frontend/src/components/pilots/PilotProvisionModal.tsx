@@ -112,13 +112,13 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <button
             onClick={onClose}
             disabled={provisionMutation.isPending}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-50 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           Provisions an authorized bilateral pilot in <code className="text-indigo-300 font-mono">DRAFT</code> state.
           Calculates the initial immutable scope digest and establishes durable reservation quotas.
         </p>
@@ -133,7 +133,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 Pilot Identifier <span className="text-rose-400">*</span>
               </label>
               <input
@@ -143,13 +143,13 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 placeholder="e.g. pilot_bilateral_2026_q4"
                 pattern="^[a-zA-Z0-9_\-]+$"
                 required
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">Alphanumeric, underscores, hyphens only</span>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 Governing Consortium ID <span className="text-rose-400">*</span>
               </label>
               <input
@@ -158,10 +158,10 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 onChange={(e) => setConsortiumId(e.target.value)}
                 placeholder="e.g. cfi-consortium"
                 required
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               {cleanConsortiumId && (
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
                   {isConsortiumLoading
                     ? 'Validating consortium...'
                     : consortium
@@ -174,7 +174,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 Participating Institution A <span className="text-rose-400">*</span>
               </label>
               {candidateBanks.length > 0 ? (
@@ -182,7 +182,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankA}
                   onChange={(e) => setBankA(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -198,13 +198,13 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankA(e.target.value)}
                   placeholder="e.g. bank_a"
                   required
-                  className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 Participating Institution B <span className="text-rose-400">*</span>
               </label>
               {candidateBanks.length > 0 ? (
@@ -212,7 +212,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   value={bankB}
                   onChange={(e) => setBankB(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -228,7 +228,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankB(e.target.value)}
                   placeholder="e.g. bank_b"
                   required
-                  className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
@@ -236,11 +236,11 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Investigation Purpose</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Investigation Purpose</label>
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               >
                 {STANDARD_PURPOSES.map((p) => (
                   <option key={p} value={p}>
@@ -251,75 +251,75 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Jurisdiction</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Jurisdiction</label>
               <input
                 type="text"
                 value={jurisdiction}
                 onChange={(e) => setJurisdiction(e.target.value)}
                 placeholder="e.g. eu-central-1"
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Duration (Days)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Duration (Days)</label>
               <input
                 type="number"
                 min="1"
                 max="365"
                 value={durationDays}
                 onChange={(e) => setDurationDays(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Total Enclave Quota</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Total Enclave Quota</label>
               <input
                 type="number"
                 min="1"
                 value={quotaTotal}
                 onChange={(e) => setQuotaTotal(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Quota Per Institution</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Quota Per Institution</label>
               <input
                 type="number"
                 min="1"
                 value={quotaPerBank}
                 onChange={(e) => setQuotaPerBank(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Operational Grant ID</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Operational Grant ID</label>
               <input
                 type="text"
                 value={grantId}
                 onChange={(e) => setGrantId(e.target.value)}
                 placeholder="Optional Grant Reference"
-                className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
 
           {/* Topology Details */}
-          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2.5">
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white/60 space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                 <Server className="w-4 h-4 text-cyan-400" />
                 Operational Topology Endpoints
               </div>
               <span className="text-[10px] text-slate-500">Optional during initial DRAFT</span>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-400 flex items-start gap-2">
+            <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
               <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
               <span>
                 Provide explicit operational hostnames or URLs. If endpoints are not yet configured, the pilot will remain in truthful DRAFT state and preflight will require verified endpoints before approval.
@@ -328,33 +328,33 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">Coordinator URL</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">Coordinator URL</label>
                 <input
                   type="text"
                   value={coordUrl}
                   onChange={(e) => setCoordUrl(e.target.value)}
                   placeholder="https://coordinator.consortium..."
-                  className="w-full text-xs bg-slate-950 border border-slate-700 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
                 <input
                   type="text"
                   value={bankAUrl}
                   onChange={(e) => setBankAUrl(e.target.value)}
                   placeholder="https://worker-a.bank..."
-                  className="w-full text-xs bg-slate-950 border border-slate-700 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
                 <input
                   type="text"
                   value={bankBUrl}
                   onChange={(e) => setBankBUrl(e.target.value)}
                   placeholder="https://worker-b.bank..."
-                  className="w-full text-xs bg-slate-950 border border-slate-700 rounded p-1.5 text-white placeholder-slate-600"
+                  className="w-full text-xs bg-slate-950 border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
             </div>
@@ -365,7 +365,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               type="button"
               onClick={onClose}
               disabled={provisionMutation.isPending}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-white bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancel
             </button>

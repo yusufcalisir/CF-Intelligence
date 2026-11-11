@@ -141,7 +141,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
         </div>
 
         {/* Method Selector Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-[var(--color-surface-alt)] border border-white/10 shrink-0 self-start sm:self-auto max-w-full">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-[var(--color-surface-alt)] border border-slate-200 shrink-0 self-start sm:self-auto max-w-full">
           <button
             type="button"
             onClick={() => setSelectedMethod('raw')}
@@ -274,7 +274,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
                   const data = payload[0].payload as ChartPoint;
                   return (
                     <div className="p-3 rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)] shadow-xl text-xs space-y-1.5 font-mono">
-                      <div className="font-bold text-[var(--color-text-primary)] border-b border-white/10 pb-1">
+                      <div className="font-bold text-[var(--color-text-primary)] border-b border-slate-200 pb-1">
                         {data.bin_label}
                       </div>
                       <div className="text-cyan-400">
@@ -283,7 +283,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
                       <div className="text-emerald-400">
                         Empirical Fraud Rate: <strong>{data.empirical_ratio.toFixed(3)}</strong>
                       </div>
-                      <div className="text-slate-400">
+                      <div className="text-slate-500">
                         Perfect Calib Target: <strong>{data.perfect_ref.toFixed(3)}</strong>
                       </div>
                       <div className="text-amber-400">
@@ -375,7 +375,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
         <div className="pt-2 overflow-x-auto min-w-0">
           <table className="w-full text-left text-xs font-mono border-collapse min-w-[480px]">
             <thead>
-              <tr className="border-b border-white/10 text-[var(--color-text-muted)]">
+              <tr className="border-b border-slate-200 text-[var(--color-text-muted)]">
                 <th className="py-1.5 px-2">Bin</th>
                 <th className="py-1.5 px-2">Range</th>
                 <th className="py-1.5 px-2">Pred Conf</th>

@@ -46,7 +46,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
               Authoritative Compliance & Audit Dossier
             </h3>
           </div>
-          <p className="text-xs text-slate-400 max-w-2xl">
+          <p className="text-xs text-slate-500 max-w-2xl">
             Immutable dossier compiled from durable pilot storage and <code className="text-indigo-300 font-mono text-[11px]">ImmutableAuditChain</code>.
             Restricted to compliance officers, security authorities, and institutional auditors.
           </p>
@@ -80,7 +80,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
           <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="font-semibold">Access Restricted - Compliance / Auditor Authority Required</div>
-            <p className="text-slate-400">
+            <p className="text-slate-500">
               Your authenticated principal does not hold compliance or audit clearance for dossier export.
               High-level status remains accessible; detailed cryptographic audit trails are restricted.
             </p>
@@ -93,7 +93,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Failed to Load Audit Dossier</div>
-            <p className="text-slate-400 mt-0.5">{(error as any)?.message || 'An error occurred.'}</p>
+            <p className="text-slate-500 mt-0.5">{(error as any)?.message || 'An error occurred.'}</p>
           </div>
         </div>
       )}
@@ -102,43 +102,43 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-4">
         <div className="flex items-center gap-2">
           <History className="w-4 h-4 text-cyan-400" />
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
             Lifecycle State Transitions History
           </h4>
         </div>
 
         <div className="space-y-2 text-xs font-mono">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-slate-200">
             <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
             <div className="space-y-0.5 flex-1">
               <div className="flex justify-between">
                 <span className="font-bold text-white">{pilot.status}</span>
                 <span className="text-slate-500">{new Date(pilot.updated_at).toLocaleString()}</span>
               </div>
-              <div className="text-slate-400">{pilot.status_reason || 'Initial provision or transition'}</div>
+              <div className="text-slate-500">{pilot.status_reason || 'Initial provision or transition'}</div>
             </div>
           </div>
           {pilot.activated_at && (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-slate-200">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
               <div className="space-y-0.5 flex-1">
                 <div className="flex justify-between">
                   <span className="font-bold text-white">ACTIVATED</span>
                   <span className="text-slate-500">{new Date(pilot.activated_at).toLocaleString()}</span>
                 </div>
-                <div className="text-slate-400">Pilot activated for live queries</div>
+                <div className="text-slate-500">Pilot activated for live queries</div>
               </div>
             </div>
           )}
           {pilot.terminated_at && (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-slate-200">
               <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0 mt-1.5" />
               <div className="space-y-0.5 flex-1">
                 <div className="flex justify-between">
                   <span className="font-bold text-white">TERMINATED ({pilot.status})</span>
                   <span className="text-slate-500">{new Date(pilot.terminated_at).toLocaleString()}</span>
                 </div>
-                <div className="text-slate-400">{pilot.termination_reason || 'Pilot concluded'}</div>
+                <div className="text-slate-500">{pilot.termination_reason || 'Pilot concluded'}</div>
               </div>
             </div>
           )}
@@ -151,16 +151,16 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Authoritative Dossier Payload Preview
               </h4>
             </div>
-            <span className="text-[11px] font-mono text-slate-400">
+            <span className="text-[11px] font-mono text-slate-500">
               Audit Events: <strong>{(dossier.audit_events || []).length}</strong> | Receipts: <strong>{(dossier.execution_receipts || []).length}</strong>
             </span>
           </div>
 
-          <pre className="p-4 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 max-h-96 overflow-y-auto leading-relaxed select-all">
+          <pre className="p-4 rounded-lg bg-slate-950 border border-slate-200 font-mono text-[11px] text-slate-600 max-h-96 overflow-y-auto leading-relaxed select-all">
             {JSON.stringify(dossier, null, 2)}
           </pre>
         </div>

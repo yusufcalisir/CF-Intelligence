@@ -204,10 +204,10 @@ export default function InvestigationDashboard() {
             </span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Investigation Dashboard
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 max-w-2xl mt-1 leading-relaxed">
             Aggregated real-time metrics across multi-bank alerts, cases, entities, and privacy-preserving federated intelligence feeds.
           </p>
         </div>
@@ -221,7 +221,7 @@ export default function InvestigationDashboard() {
           </Link>
           <Link
             to="/cases"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-white bg-white/5 border border-slate-200 hover:bg-white/10 transition-all"
           >
             📋 Workbench
           </Link>
@@ -230,7 +230,7 @@ export default function InvestigationDashboard() {
 
       {/* High-Impact Stat Cards */}
       {isLoading ? (
-        <div className="p-12 text-center text-slate-400 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl">
+        <div className="p-12 text-center text-slate-500 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl">
           <div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2" />
           <div className="text-xs font-mono">Synchronizing consortium intelligence metrics...</div>
         </div>
@@ -257,11 +257,11 @@ export default function InvestigationDashboard() {
                     <div className={`p-1.5 rounded-lg border ${card.badgeColor} shrink-0 flex items-center justify-center`}>
                       {card.icon}
                     </div>
-                    <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-slate-300 truncate min-w-0">
+                    <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-slate-600 truncate min-w-0">
                       {card.badge}
                     </span>
                   </div>
-                  <div className="text-[9.5px] font-mono text-slate-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0 font-medium whitespace-nowrap">
+                  <div className="text-[9.5px] font-mono text-slate-600 bg-white/5 border border-slate-200 px-2 py-0.5 rounded-full shrink-0 font-medium whitespace-nowrap">
                     {card.trend}
                   </div>
                 </div>
@@ -271,13 +271,13 @@ export default function InvestigationDashboard() {
                   <div className={`text-3xl sm:text-4xl font-extrabold font-mono tracking-tight bg-gradient-to-r ${card.textColor} bg-clip-text text-transparent group-hover:scale-105 transition-transform origin-left`}>
                     {(card.value ?? 0).toLocaleString()}
                   </div>
-                  <div className="text-xs font-bold text-slate-200 mt-1 uppercase tracking-wider">
+                  <div className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">
                     {card.title}
                   </div>
                 </div>
 
                 {/* Subtext description */}
-                <div className="text-[10.5px] font-mono text-slate-400 line-clamp-1 relative z-10 mt-1">
+                <div className="text-[10.5px] font-mono text-slate-500 line-clamp-1 relative z-10 mt-1">
                   {card.subtext}
                 </div>
 
@@ -298,10 +298,10 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
               <span className="truncate">Alerts by Severity</span>
             </h3>
@@ -327,11 +327,11 @@ export default function InvestigationDashboard() {
                       title={`Filter alerts by ${severity.toUpperCase()}`}
                     >
                       <div className="flex justify-between text-xs">
-                        <span className="capitalize font-semibold text-slate-300 flex items-center gap-1.5 group-hover/sev:text-white transition-colors">
+                        <span className="capitalize font-semibold text-slate-600 flex items-center gap-1.5 group-hover/sev:text-white transition-colors">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           {severity}
                         </span>
-                        <span className="font-mono font-bold text-slate-200">
+                        <span className="font-mono font-bold text-slate-800">
                           {count.toLocaleString()} <span className="text-[10px] text-slate-500 font-normal">({pct.toFixed(1)}%)</span>
                         </span>
                       </div>
@@ -358,10 +358,10 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
               <span className="truncate">Consortium Distribution</span>
             </h3>
@@ -382,11 +382,11 @@ export default function InvestigationDashboard() {
                     title={`Filter alerts for ${BANK_NAMES[bankId] || bankId}`}
                   >
                     <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-slate-300 flex items-center gap-1.5 group-hover/bank:text-white transition-colors">
+                      <span className="font-semibold text-slate-600 flex items-center gap-1.5 group-hover/bank:text-white transition-colors">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: bankColor }} />
                         {BANK_NAMES[bankId] || bankId}
                       </span>
-                      <span className="font-mono font-bold text-slate-200">
+                      <span className="font-mono font-bold text-slate-800">
                         {count.toLocaleString()} <span className="text-[10px] text-slate-500 font-normal">({pct.toFixed(1)}%)</span>
                       </span>
                     </div>
@@ -413,10 +413,10 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
           <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
               <span className="truncate">Shared Intelligence Matrix</span>
             </h3>
@@ -430,23 +430,23 @@ export default function InvestigationDashboard() {
                   <div className="text-xl sm:text-2xl font-black font-mono text-violet-300 truncate">
                     {intelStats.total_items.toLocaleString()}
                   </div>
-                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Total Shared Items</div>
+                  <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">Total Shared Items</div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 overflow-hidden">
                   <div className="text-lg sm:text-xl font-black font-mono text-emerald-300 truncate">
                     {(intelStats.avg_risk_indicator * 100).toFixed(1)}%
                   </div>
-                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Avg Risk Indicator</div>
+                  <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">Avg Risk Indicator</div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-[10px] font-mono uppercase text-slate-400 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
+                <h4 className="text-[10px] font-mono uppercase text-slate-500 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
                 <div className="space-y-1.5">
                   {Object.entries(intelStats.items_by_type).map(([type, count]) => (
                     <div key={type} className="flex justify-between items-center text-xs p-2 rounded-lg bg-white/3 border border-white/5">
-                      <span className="text-slate-300 capitalize text-[11px] font-mono truncate mr-2">
+                      <span className="text-slate-600 capitalize text-[11px] font-mono truncate mr-2">
                         {type.replace(/_/g, ' ')}
                       </span>
                       <span className="font-mono font-bold text-violet-300 shrink-0 px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20">{count}</span>
@@ -458,7 +458,7 @@ export default function InvestigationDashboard() {
           ) : (
             <div className="text-center py-6 space-y-2">
               <div className="text-3xl">🔗</div>
-              <p className="text-xs text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 font-mono">
                 No shared intelligence yet. Trigger a scenario to generate cross-bank threat objects.
               </p>
             </div>
@@ -471,9 +471,9 @@ export default function InvestigationDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl"
+        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl"
       >
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3.5 flex items-center gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3.5 flex items-center gap-2">
           ⚡ Operational Quick Shortcuts
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full">
@@ -488,7 +488,7 @@ export default function InvestigationDashboard() {
             <Link
               key={link.label}
               to={link.href}
-              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-white/10 bg-white/3 hover:bg-white/8 hover:border-indigo-500/40 transition-all text-slate-200 text-center active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white/3 hover:bg-white/8 hover:border-indigo-500/40 transition-all text-slate-800 text-center active:scale-[0.98]"
               style={{ boxShadow: `0 0 15px ${link.color}15` }}
             >
               <span className="shrink-0">{link.icon}</span>
@@ -509,10 +509,10 @@ export default function InvestigationDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl mt-6"
+        className="p-5 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-xl mt-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-3 mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 flex-wrap min-w-0">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 flex-wrap min-w-0">
             <span>🕵️</span>
             <span>Investigator Activity Audit Trail</span>
             <span className="text-slate-500 text-[10px] font-normal font-mono">(Immutable Log Chain)</span>
@@ -533,7 +533,7 @@ export default function InvestigationDashboard() {
             auditLogs.map((log: any) => (
               <div
                 key={log.id}
-                className="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-2 font-mono text-xs"
+                className="p-3 rounded-xl bg-white/60 border border-white/5 space-y-2 font-mono text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-indigo-400">{log.investigator}</span>
@@ -541,18 +541,18 @@ export default function InvestigationDashboard() {
                     {log.action.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 text-[11px] text-slate-400 border-t border-white/5 pt-2">
+                <div className="flex flex-col gap-1 text-[11px] text-slate-500 border-t border-white/5 pt-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-500">Target ID:</span>
-                    <span className="text-slate-200 font-semibold truncate max-w-[180px]">{log.target_id}</span>
+                    <span className="text-slate-800 font-semibold truncate max-w-[180px]">{log.target_id}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10px]">
                     <span className="text-slate-500">Timestamp:</span>
-                    <span className="text-slate-400">{new Date(log.timestamp).toLocaleString()}</span>
+                    <span className="text-slate-500">{new Date(log.timestamp).toLocaleString()}</span>
                   </div>
                 </div>
                 {log.metadata && (
-                  <div className="text-[10px] text-slate-400 bg-black/40 p-2 rounded border border-white/5 break-all mt-1">
+                  <div className="text-[10px] text-slate-500 bg-black/40 p-2 rounded border border-white/5 break-all mt-1">
                     <span className="text-slate-500 font-semibold block mb-0.5">Details:</span>
                     {typeof log.metadata === 'object' ? JSON.stringify(log.metadata) : String(log.metadata)}
                   </div>
@@ -566,7 +566,7 @@ export default function InvestigationDashboard() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-white/10 text-slate-400 font-mono text-[11px]">
+              <tr className="border-b border-slate-200 text-slate-500 font-mono text-[11px]">
                 <th className="py-2.5 px-3">Investigator</th>
                 <th className="py-2.5 px-3">Action</th>
                 <th className="py-2.5 px-3">Target ID</th>
@@ -585,8 +585,8 @@ export default function InvestigationDashboard() {
                 auditLogs.map((log: any) => (
                   <tr key={log.id} className="border-b border-white/5 hover:bg-white/3 transition-colors font-mono text-[11px]">
                     <td className="py-2.5 px-3 font-semibold text-indigo-400">{log.investigator}</td>
-                    <td className="py-2.5 px-3 uppercase font-bold text-slate-200">{log.action.replace(/_/g, ' ')}</td>
-                    <td className="py-2.5 px-3 text-slate-400">{log.target_id.slice(0, 10)}...</td>
+                    <td className="py-2.5 px-3 uppercase font-bold text-slate-800">{log.action.replace(/_/g, ' ')}</td>
+                    <td className="py-2.5 px-3 text-slate-500">{log.target_id.slice(0, 10)}...</td>
                     <td className="py-2.5 px-3 text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right text-[10px] text-slate-500 max-w-xs truncate">
                       {JSON.stringify(log.metadata)}

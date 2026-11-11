@@ -379,7 +379,7 @@ export default function PoliciesPage() {
                   <motion.div
                     key={rule.id}
                     layoutId={rule.id}
-                    className="p-5 rounded-xl bg-[var(--color-bg-card)] border border-[var(--color-border)] hover:border-slate-700 transition-all space-y-3.5 shadow-sm"
+                    className="p-5 rounded-xl bg-[var(--color-bg-card)] border border-[var(--color-border)] hover:border-slate-200 transition-all space-y-3.5 shadow-sm"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-1">
@@ -416,7 +416,7 @@ export default function PoliciesPage() {
                             onChange={() => handleToggleActive(rule.id, rule.is_active)}
                             aria-label={`Toggle active state for ${rule.rule_name}`}
                           />
-                          <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                          <div className="w-9 h-5 bg-slate-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                           <span className="ml-2 text-xs font-medium text-[var(--color-text-muted)]">
                             {rule.is_active ? 'Active' : 'Inactive'}
                           </span>
@@ -437,7 +437,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleOpenEditModal(rule)}
                           aria-label={`Edit Rule ${rule.rule_name}`}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-50/80 hover:bg-slate-100 text-slate-800 border border-slate-200 hover:border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Edit rule name, condition AST, or action"
                         >
                           <Pencil className="w-3.5 h-3.5 text-indigo-400" />
@@ -491,7 +491,7 @@ export default function PoliciesPage() {
               {/* Condition Section with Templates */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="test-condition-ast" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <label htmlFor="test-condition-ast" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                     <FileCode className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Condition JSON AST</span>
                   </label>
@@ -502,7 +502,7 @@ export default function PoliciesPage() {
 
                 {/* Responsive Quick Template Grid */}
                 <div className="space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                     Load Template:
                   </span>
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -512,7 +512,7 @@ export default function PoliciesPage() {
                         type="button"
                         aria-label={`Tester Template ${tpl.id}`}
                         onClick={() => handleApplyTemplateToTester(tpl)}
-                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-800/90 hover:bg-indigo-900/50 text-slate-300 hover:text-indigo-200 border border-slate-700 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
+                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-50/90 hover:bg-indigo-900/50 text-slate-600 hover:text-indigo-200 border border-slate-200 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
                         title={tpl.description}
                       >
                         {tpl.badge.split('(')[0]?.trim() ?? tpl.badge}
@@ -533,7 +533,7 @@ export default function PoliciesPage() {
               {/* Transaction Payload Section with Load Live Alert */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label htmlFor="test-transaction-payload" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <label htmlFor="test-transaction-payload" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                     <Database className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Transaction Payload</span>
                   </label>
@@ -561,7 +561,7 @@ export default function PoliciesPage() {
                       type="button"
                       onClick={() => setLoadedAlertInfo(null)}
                       aria-label="Dismiss loaded alert banner"
-                      className="text-slate-400 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
+                      className="text-slate-500 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
                     >
                       ✕
                     </button>
@@ -570,13 +570,13 @@ export default function PoliciesPage() {
 
                 {suspiciousAlerts.length > 1 && (
                   <div className="space-y-1 text-xs">
-                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-400 font-medium block">
+                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-500 font-medium block">
                       Or select from recent alerts:
                     </label>
                     <select
                       id="test-alert-select"
                       aria-label="Select Suspicious Alert"
-                      className="w-full text-xs p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      className="w-full text-xs p-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
                       onChange={(e) => {
                         const target = suspiciousAlerts.find((a) => a.id === e.target.value);
                         if (target) handleLoadAlertPayload(target);
@@ -642,7 +642,7 @@ export default function PoliciesPage() {
                     </div>
                     {testResult.matched_fields && testResult.matched_fields.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-sans">Matched Fields:</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-sans">Matched Fields:</span>
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
@@ -685,7 +685,7 @@ export default function PoliciesPage() {
                     <h3 id="rule-modal-title" className="text-lg font-bold text-white">
                       {editingRule ? `Edit Policy Rule: ${editingRule.rule_name}` : 'Create Dynamic Policy Rule'}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       {editingRule
                         ? 'Update declarative AST conditions and triggered policy actions.'
                         : 'Define declarative screening conditions evaluated on transactions in real time.'}
@@ -698,14 +698,14 @@ export default function PoliciesPage() {
                     setEditingRule(null);
                   }}
                   aria-label="Close modal"
-                  className="text-slate-400 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
+                  className="text-slate-500 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               {/* Pre-built AML Rule Templates Section */}
-              <div className="space-y-2 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+              <div className="space-y-2 bg-white/60 p-3.5 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
@@ -720,15 +720,15 @@ export default function PoliciesPage() {
                       type="button"
                       aria-label={`Apply Template ${tpl.id}`}
                       onClick={() => handleApplyTemplateToModal(tpl)}
-                      className="text-left p-2.5 rounded-lg border border-slate-800 hover:border-indigo-500/60 bg-slate-950/60 hover:bg-indigo-950/20 transition-all text-xs cursor-pointer group"
+                      className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-slate-950/60 hover:bg-indigo-950/20 transition-all text-xs cursor-pointer group"
                     >
                       <div className="font-semibold text-white group-hover:text-indigo-300 flex items-center justify-between">
                         <span className="truncate">{tpl.badge}</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 uppercase">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-50 text-slate-500 uppercase">
                           {tpl.action.split('_')[0]}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{tpl.description}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{tpl.description}</p>
                     </button>
                   ))}
                 </div>
@@ -736,7 +736,7 @@ export default function PoliciesPage() {
 
               <form onSubmit={handleSubmitRule} className="space-y-4">
                 <div>
-                  <label htmlFor="modal-rule-name-input" className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label htmlFor="modal-rule-name-input" className="block text-xs font-semibold text-slate-600 mb-1">
                     Rule Name
                   </label>
                   <input
@@ -752,7 +752,7 @@ export default function PoliciesPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="modal-rule-action-select" className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label htmlFor="modal-rule-action-select" className="block text-xs font-semibold text-slate-600 mb-1">
                     Triggered Action
                   </label>
                   <select
@@ -774,7 +774,7 @@ export default function PoliciesPage() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="modal-rule-condition-textarea" className="text-xs font-semibold text-slate-300">
+                    <label htmlFor="modal-rule-condition-textarea" className="text-xs font-semibold text-slate-600">
                       Condition JSON AST
                     </label>
                     <span className="text-[10px] text-slate-500 font-mono">and/or/field/operator/value</span>
@@ -803,7 +803,7 @@ export default function PoliciesPage() {
                       setIsModalOpen(false);
                       setEditingRule(null);
                     }}
-                    className="btn hover:bg-gray-800"
+                    className="btn hover:bg-slate-50"
                   >
                     Cancel
                   </button>

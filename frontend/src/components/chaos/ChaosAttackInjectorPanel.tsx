@@ -215,7 +215,7 @@ export default function ChaosAttackInjectorPanel({
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+            className="text-slate-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
             title="Dismiss error"
           >
             <X size={14} />
@@ -233,7 +233,7 @@ export default function ChaosAttackInjectorPanel({
                 <Zap size={14} className="shrink-0" />
                 <span className="truncate">AML Layering Storm</span>
               </span>
-              <span className="text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono text-slate-500 bg-white/5 border border-slate-200 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
                 Target: Bank Alpha
               </span>
             </div>
@@ -355,7 +355,7 @@ export default function ChaosAttackInjectorPanel({
               <p className="text-xs font-bold text-emerald-400 mt-1 truncate">
                 {activeAttack.defense_activated}
               </p>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-500 font-mono">
                 Latency: {activeAttack.mitigation_latency_ms.toFixed(1)}ms
               </span>
             </div>
@@ -373,7 +373,7 @@ export default function ChaosAttackInjectorPanel({
                   ? `Quarantined: ${activeAttack.adversary_quarantined}`
                   : `Intercepted: ${activeAttack.packets_blocked} txs`}
               </p>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-500 font-mono">
                 {activeAttack.status === 'quarantined' ? 'Byzantine Dropped' : 'LSH Pool Isolated'}
               </span>
             </div>
@@ -388,7 +388,7 @@ export default function ChaosAttackInjectorPanel({
                   ? `Δ ${activeAttack.euclidean_distance.toFixed(1)} (Cutoff: ${activeAttack.distance_threshold.toFixed(1)})`
                   : `${activeAttack.packets_blocked} Blocked`}
               </p>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-500 font-mono">
                 {activeAttack.euclidean_distance > activeAttack.distance_threshold ? 'Threshold Exceeded' : 'Filtered'}
               </span>
             </div>
@@ -423,7 +423,7 @@ export default function ChaosAttackInjectorPanel({
           </div>
 
           {/* Audit Log ticker */}
-          <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-slate-300 flex items-center gap-2">
+          <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-slate-600 flex items-center gap-2">
             <span className="text-rose-400 font-bold shrink-0">AUDIT:</span>
             <span className="truncate">{activeAttack.log_entry}</span>
           </div>

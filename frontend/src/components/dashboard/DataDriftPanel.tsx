@@ -330,7 +330,7 @@ export default function DataDriftPanel() {
                         <span className="text-xs font-semibold text-[var(--color-text-primary)] capitalize">
                           {feature.replace(/_/g, ' ')}
                         </span>
-                        <span className="px-2 py-0.5 rounded text-[8.5px] font-mono uppercase bg-white/5 border border-white/10 text-[var(--color-text-muted)]">
+                        <span className="px-2 py-0.5 rounded text-[8.5px] font-mono uppercase bg-white/5 border border-slate-200 text-[var(--color-text-muted)]">
                           {isCategorical ? 'Categorical' : 'Continuous'}
                         </span>
                       </div>
