@@ -153,7 +153,7 @@ export default function ObservabilityPage() {
           >
             {triggerRetrain.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Initiating FL Round...</span>
               </>
             ) : (
@@ -266,7 +266,7 @@ export default function ObservabilityPage() {
             className={`p-2.5 sm:p-3 rounded-xl transition-all border text-left min-h-[56px] flex items-center gap-2.5 cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-indigo-100 border-indigo-500/50 text-indigo-600 shadow-md shadow-indigo-600/15'
-                : 'bg-slate-50 border-white/5 text-[var(--color-text-muted)] hover:text-slate-800 hover:bg-slate-50'
+                : 'bg-slate-50 border-slate-200 text-[var(--color-text-muted)] hover:text-slate-800 hover:bg-slate-50'
             }`}
           >
             <span className="text-lg sm:text-xl shrink-0">{tab.icon}</span>
@@ -282,7 +282,7 @@ export default function ObservabilityPage() {
       {activeTab === 'drift' && (
         <div className="space-y-6">
           {/* Parametric Retraining Bridge Card */}
-          <div className="glass-card p-4 sm:p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
+          <div className="glass-card p-4 sm:p-5 space-y-4 border border-indigo-200 bg-indigo-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-200 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">ğŸ§¬</span>
@@ -309,13 +309,13 @@ export default function ObservabilityPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleSelectAllDrifted}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-white/10 text-cyan-600 border border-slate-200 transition-colors"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-cyan-600 border border-slate-200 transition-colors"
                   >
                     Select Drifted ({automaticallyDriftedFeatures.length})
                   </button>
                   <button
                     onClick={handleSelectAllFeatures}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-white/10 text-slate-600 border border-slate-200 transition-colors"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors"
                   >
                     Select All ({allAvailableFeatures.length})
                   </button>
@@ -352,7 +352,7 @@ export default function ObservabilityPage() {
 
             {/* Pipeline Execution Parameters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-black/30 border border-white/5 cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-black/30 border border-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={dispatchWebhookAlert}
@@ -365,7 +365,7 @@ export default function ObservabilityPage() {
                 </div>
               </label>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-black/30 border border-white/5">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-black/30 border border-slate-200">
                 <span className="text-slate-600">Target FL Rounds:</span>
                 <div className="flex items-center gap-1">
                   {[3, 5, 10].map((rounds) => (
@@ -391,7 +391,7 @@ export default function ObservabilityPage() {
               >
                 {triggerRetrain.isPending ? (
                   <>
-                    <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <span className="h-3 w-3 rounded-full border-2 border-slate-200 border-t-white animate-spin" />
                     <span>Dispatching Bridge Payload...</span>
                   </>
                 ) : (
@@ -423,7 +423,7 @@ export default function ObservabilityPage() {
                       key={i}
                       className="p-4 rounded-xl bg-white border border-slate-200 space-y-3 shadow-lg"
                     >
-                      <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
                         <span className="font-mono font-bold text-xs text-slate-900 truncate">
                           {fd.feature_name}
                         </span>
@@ -441,19 +441,19 @@ export default function ObservabilityPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                        <div className="bg-slate-50 p-2 rounded-lg border border-white/5">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-[10px] text-slate-500 block font-sans">KS Statistic</span>
                           <span className="font-bold text-slate-800">{fd.ks_statistic.toFixed(4)}</span>
                         </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-white/5">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-[10px] text-slate-500 block font-sans">KS p-value</span>
                           <span className="font-bold text-slate-800">{fd.ks_p_value.toFixed(4)}</span>
                         </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-white/5">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-[10px] text-slate-500 block font-sans">Wasserstein Dist</span>
                           <span className="font-bold text-slate-800">{fd.wasserstein_distance.toFixed(4)}</span>
                         </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-white/5">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-[10px] text-slate-500 block font-sans">PSI Index</span>
                           <span className="font-bold text-indigo-600">{fd.psi.toFixed(4)}</span>
                         </div>
@@ -558,7 +558,7 @@ export default function ObservabilityPage() {
                     </p>
                   </div>
 
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 sm:gap-1 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5 font-mono text-xs sm:text-[11px]">
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 sm:gap-1 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 font-mono text-xs sm:text-[11px]">
                     <span
                       className={`font-bold inline-flex items-center gap-1.5 text-xs ${
                         alert.status === 'firing' ? 'text-red-600' : 'text-emerald-600'
@@ -624,7 +624,7 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Interactive Prometheus Metric Exposition Panel */}
-          <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
+          <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-200 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">ğŸ”¥</span>
@@ -642,7 +642,7 @@ export default function ObservabilityPage() {
                 <button
                   onClick={() => refetchPrometheus()}
                   disabled={isPrometheusLoading}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-50 hover:bg-white/10 text-slate-600 border border-slate-200 transition-colors flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center gap-1.5 shrink-0"
                 >
                   <span>ğŸ”„</span>
                   <span>Refresh</span>
@@ -658,19 +658,19 @@ export default function ObservabilityPage() {
 
             {/* Metric Highlights Pill Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono min-w-0">
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-sans truncate">Metric Count</span>
                 <span className="font-bold text-cyan-600 truncate block">{prometheusData?.metric_count ?? 14} series</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-sans truncate">cfi_concept_drift_psi</span>
                 <span className="font-bold text-indigo-600 truncate block">{driftData?.concept_drift_psi.toFixed(4) ?? '0.0000'}</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-sans truncate">Retraining Counter</span>
                 <span className="font-bold text-emerald-600 truncate block">active gauge</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-sans truncate">Scraped At</span>
                 <span className="font-bold text-slate-600 text-[11px] truncate block">{prometheusData?.scraped_at ?? 'Live'}</span>
               </div>
@@ -685,7 +685,7 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Interactive SIEM Metric Exporter (JSON & CEF) */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-500/5 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-100 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cyan-500/20 pb-3 min-w-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-xl shrink-0">ğŸ›¡ï¸</span>
@@ -730,7 +730,7 @@ export default function ObservabilityPage() {
                 >
                   {exportSiem.isPending ? (
                     <>
-                      <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      <span className="h-3 w-3 rounded-full border-2 border-slate-200 border-t-white animate-spin" />
                       <span>Exporting...</span>
                     </>
                   ) : (
@@ -778,7 +778,7 @@ export default function ObservabilityPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => copyToClipboard(exportSiem.data!.payload, 'siem')}
-                      className="px-2.5 py-1 rounded text-xs font-mono bg-slate-50 hover:bg-white/10 text-cyan-600 border border-slate-200 transition-colors"
+                      className="px-2.5 py-1 rounded text-xs font-mono bg-slate-50 hover:bg-slate-100 text-cyan-600 border border-slate-200 transition-colors"
                     >
                       {copiedSiem ? 'âœ“ Copied' : 'ğŸ“‹ Copy Payload'}
                     </button>
@@ -791,7 +791,7 @@ export default function ObservabilityPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-white border border-cyan-500/20 p-3 max-h-60 overflow-y-auto overflow-x-auto max-w-full font-mono text-[11px] text-cyan-100 leading-relaxed min-w-0">
+                <div className="rounded-xl bg-white border border-cyan-500/20 p-3 max-h-60 overflow-y-auto overflow-x-auto max-w-full font-mono text-[11px] text-cyan-700 leading-relaxed min-w-0">
                   <pre className="whitespace-pre overflow-x-auto min-w-0">{exportSiem.data.payload}</pre>
                 </div>
               </div>
@@ -799,12 +799,12 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Flower Serverless P2P Peer Mesh Visualizer */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-500/5 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-100 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
                 <span className="truncate">ğŸŒ¸ Flower FL Framework - Serverless P2P Peer Mesh Topology</span>
               </h3>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-600 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-600 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
                 âš¡ SERVERLESS P2P MESH (NO CENTRAL SERVER)
               </span>
             </div>
@@ -828,7 +828,7 @@ export default function ObservabilityPage() {
               </div>
             </div>
 
-            <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-50 text-xs space-y-1 text-cyan-200">
+            <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-50 text-xs space-y-1 text-cyan-700">
               <div className="font-bold">Serverless Peer-to-Peer Architectural Guarantee:</div>
               <p className="text-[10px] opacity-90 leading-relaxed">
                 FlowerP2PEngine executes peer gossip weight mixing directly between consortium bank nodes without a central server or coordinator. Each node trains locally and exchanges model parameter updates with neighboring peers over authenticated P2P channels.
@@ -837,7 +837,7 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Apache Flink Real-Time Graph Streaming Visualizer Card */}
-          <div className="glass-card p-5 space-y-4 border border-emerald-200 bg-emerald-500/5 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-emerald-200 bg-emerald-100 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
                 <span className="truncate">âš¡ Apache Flink - Sub-Second Real-Time Graph Streaming Engine</span>
@@ -866,7 +866,7 @@ export default function ObservabilityPage() {
               </div>
             </div>
 
-            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-xs space-y-1 text-emerald-200">
+            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-xs space-y-1 text-emerald-700">
               <div className="font-bold">Sub-Second Graph Streaming Engine Guarantee:</div>
               <p className="text-[10px] opacity-90 leading-relaxed">
                 FlinkGraphStreamProcessor ingests streaming transaction edge events in real-time, executing stateful sliding-window accumulator updates and edge velocity anomaly detection in &lt;19ms, bypassing batch Neo4j query overhead.
@@ -881,4 +881,6 @@ export default function ObservabilityPage() {
     </div>
   );
 }
+
+
 

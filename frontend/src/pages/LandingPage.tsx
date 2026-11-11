@@ -466,10 +466,10 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     routeDataset: 'paysim',
     rows: [
       { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
-      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
+      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
       { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
       { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
-      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
+      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
     ],
   },
   creditcard: {
@@ -488,8 +488,8 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.8248 Â± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
       { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.8219 Â± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
-      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
       { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
     ],
   },
@@ -528,7 +528,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     routeDataset: 'ieee_cis',
     rows: [
       { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-600 bg-indigo-50 border-indigo-200', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
-      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
+      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
       { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
     ],
   },
@@ -548,7 +548,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.3761 Â± 0.0482', rocauc: '0.8325 Â± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
       { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
-      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
       { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
@@ -568,7 +568,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     rows: [
       { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
       { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
-      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-600 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
+      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
     ],
   },
   synthaml: {
@@ -813,15 +813,15 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
       <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-slate-100 border-b border-slate-200 min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <div className="flex gap-1 shrink-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-100" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-100" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-100" />
           </div>
           <button
             type="button"
             onClick={() => navigate(`/${tabUrlPaths[activeTab]}`)}
             title={`Click to open https://cf-intelligence.vercel.app/${tabUrlPaths[activeTab]}`}
-            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-600 flex items-center gap-1 border border-white/5 truncate cursor-pointer hover:bg-white/10 hover:border-indigo-500/40 transition-all text-left"
+            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-600 flex items-center gap-1 border border-slate-200 truncate cursor-pointer hover:bg-slate-100 hover:border-indigo-500/40 transition-all text-left"
           >
             <span className="text-emerald-600 text-[10px] shrink-0">ğŸ”’</span>
             <span className="text-slate-600 truncate">https://cf-intelligence.vercel.app/</span>
@@ -886,7 +886,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 </div>
 
                 <div className="rounded-xl border border-slate-200 overflow-hidden bg-white/2 min-w-0">
-                  <div className="flex items-center justify-between px-2 py-1 border-b border-white/5 bg-slate-50">
+                  <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 bg-slate-50">
                     <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-600 uppercase tracking-wider">Risk Alert Feed</span>
                     <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-600">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
@@ -1044,7 +1044,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <div className="text-emerald-600 font-bold mt-0.5">Krum (Score=48.2)</div>
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-rose-950/30 border border-rose-200 text-rose-600 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-between text-[8.5px] sm:text-[9px]">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     Bank Gamma: QUARANTINED BY KRUM
@@ -1081,7 +1081,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             )}
           </AnimatePresence>
 
-          <div className="text-[8px] sm:text-[9px] font-mono text-slate-600 text-center border-t border-white/5 pt-1.5">
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-600 text-center border-t border-slate-200 pt-1.5">
             Click sidebar icons ({sidebarButtons.map(b => b.label).join(' Â· ')}) to inspect live platform modules
           </div>
         </div>
@@ -1193,7 +1193,7 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
         <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-600">Key Engineering & Privacy Highlights</div>
         <div className="space-y-1.5 font-sans text-xs text-slate-600 min-w-0">
           {step.highlights.map(hl => (
-            <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-white/5 min-w-0">
+            <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 min-w-0">
               <span className="text-indigo-600 font-bold shrink-0">âœ“</span>
               <span className="break-words">{hl}</span>
             </div>
@@ -1256,7 +1256,7 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
         {[
           { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-200 bg-indigo-50' },
           { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-500/20 bg-cyan-50/15' },
-          { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-200 bg-amber-950/15' },
+          { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-200 bg-amber-50' },
           { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-200 bg-emerald-50/15' },
         ].map(row => (
           <div key={row.label} className={`p-3 sm:p-3.5 rounded-xl border ${row.color} min-w-0`}>
@@ -1411,9 +1411,9 @@ export default function LandingPage() {
 
       {/* 2026 Ambient Fluid Glow background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-500/8 blur-[140px]" />
-        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-500/6 blur-[150px]" />
-        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-500/5 blur-[130px]" />
+        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-100 blur-[140px]" />
+        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-100 blur-[150px]" />
+        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-100 blur-[130px]" />
         <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
       </div>
 
@@ -1455,7 +1455,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Core Platform Suite
                   </div>
                   {[
@@ -1500,7 +1500,7 @@ export default function LandingPage() {
                     openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Security & Topology
                   </div>
                   {[
@@ -1544,7 +1544,7 @@ export default function LandingPage() {
                     openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Empirical Proof Suite
                   </div>
                   {[
@@ -1588,7 +1588,7 @@ export default function LandingPage() {
                     openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Integration & Contracts
                   </div>
                   {[
@@ -1662,7 +1662,7 @@ export default function LandingPage() {
                 <button
                   aria-label="Close Navigation Menu"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
                 >
                   <CloseIcon />
                 </button>
@@ -1884,7 +1884,7 @@ export default function LandingPage() {
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                           isActive
                             ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-white/12'
+                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
@@ -2010,12 +2010,12 @@ export default function LandingPage() {
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
                           isSelected
                             ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-white/12'
+                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
                           <div className="text-xs font-semibold truncate flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-100' : 'bg-purple-100'}`} />
                             <span className="truncate">{mod.name}</span>
                           </div>
                           <div className="text-[9.5px] font-mono text-slate-600 truncate mt-0.5 ml-3.5">{mod.category}</div>
@@ -2129,7 +2129,7 @@ export default function LandingPage() {
                       className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                         isSelected
                           ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                          : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-white/12'
+                          : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
@@ -2167,7 +2167,7 @@ export default function LandingPage() {
                     className={`p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeArchNode?.id === node.id
                         ? 'bg-indigo-100 border-indigo-500/40 text-slate-900 shadow-indigo-100'
-                        : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-white/12'
+                        : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
@@ -2308,7 +2308,7 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setIsReportOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-600 bg-cyan-50/30 border border-cyan-500/30 hover:bg-cyan-900/40 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-600 bg-cyan-50 border border-cyan-500/30 hover:bg-cyan-100 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   <span>Technical Report Dossier</span>
@@ -2457,7 +2457,7 @@ export default function LandingPage() {
                               key={i}
                               className={`transition-colors ${
                                 r.compliant
-                                  ? 'bg-emerald-50/20 hover:bg-emerald-50/30'
+                                  ? 'bg-emerald-50/20 hover:bg-emerald-50'
                                   : 'hover:bg-slate-50'
                               }`}
                             >
@@ -2509,17 +2509,17 @@ export default function LandingPage() {
                           <span className="text-emerald-600 font-normal">Holistic Holdout</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                          <div className="p-2.5 rounded-xl bg-emerald-50/30 border border-emerald-200">
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
                             <div className="text-[10px] text-emerald-600">True Positives (TP)</div>
                             <div className="text-base font-bold text-slate-900 mt-0.5">{activeDs.cm.tp}</div>
                             <div className="text-[9px] text-slate-600 mt-0.5">Caught Frauds</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-200">
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
                             <div className="text-[10px] text-rose-600">False Positives (FP)</div>
                             <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fp}</div>
                             <div className="text-[9px] text-slate-600 mt-0.5">Benign Alarms</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-200">
+                          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
                             <div className="text-[10px] text-amber-600">False Negatives (FN)</div>
                             <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fn}</div>
                             <div className="text-[9px] text-slate-600 mt-0.5">Escaped Frauds</div>
@@ -2720,7 +2720,7 @@ export default function LandingPage() {
                     Institutional Legal Framework & Agreement Suite
                   </h3>
                 </div>
-                <span className="text-xs font-mono text-emerald-600 bg-emerald-50/30 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
+                <span className="text-xs font-mono text-emerald-600 bg-emerald-50 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
                   Standard B2B Legal Pack (2026)
                 </span>
               </div>
@@ -2764,7 +2764,7 @@ export default function LandingPage() {
                       <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
                       <p className="text-[11px] text-slate-600 leading-relaxed font-sans">{item.desc}</p>
                     </div>
-                    <div className="text-[9px] font-mono text-slate-600 truncate pt-2 border-t border-white/5">
+                    <div className="text-[9px] font-mono text-slate-600 truncate pt-2 border-t border-slate-200">
                       Ref: {item.ref}
                     </div>
                   </div>
@@ -2798,7 +2798,7 @@ export default function LandingPage() {
                     href="/scalar"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-800 font-mono text-xs font-semibold transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-mono text-xs font-semibold transition-all"
                   >
                     <span>ğŸ“– Open Scalar Reference</span>
                     <span className="text-slate-600">â†—</span>
@@ -2989,7 +2989,7 @@ telemetry.on('round.stage', (evt) => {
                     <span className="text-indigo-600 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
                       onClick={handleCopyEmail}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-white/10 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
                     >
                       {isCopied ? 'Copied!' : 'Copy Email'}
                     </button>
@@ -3169,7 +3169,7 @@ function BankDetailsDrawerModal({
           <button
             onClick={onClose}
             aria-label="Close node detail drawer"
-            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             Close
           </button>
@@ -3199,7 +3199,7 @@ function BankDetailsDrawerModal({
           </div>
           <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-600 overflow-x-auto max-w-full">
             {bank.xmlLogs.map((log, i) => (
-              <div key={i} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0 min-w-0">
+              <div key={i} className="flex items-start gap-2 border-b border-slate-200 pb-2 last:border-0 last:pb-0 min-w-0">
                 <span className="text-indigo-600 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
                 <span className="break-all leading-relaxed">{log}</span>
               </div>
@@ -3210,6 +3210,12 @@ function BankDetailsDrawerModal({
     </motion.div>
   );
 }
+
+
+
+
+
+
 
 
 

@@ -70,7 +70,7 @@ const RISK_CONFIG: Record<
     bg: 'bg-rose-100',
     text: 'text-rose-600',
     border: 'border-rose-200',
-    glow: 'shadow-[0_0_12px_rgba(244,63,94,0.25)]',
+    glow: 'shadow-rose-100',
   },
 };
 
@@ -93,7 +93,7 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
       ? 'from-emerald-500 to-teal-400 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
       : pct < 60
       ? 'from-amber-500 to-yellow-400 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
-      : 'from-rose-500 to-red-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]';
+      : 'from-rose-500 to-red-400 shadow-rose-100';
 
   return (
     <div className="space-y-1.5 w-full min-w-0">
@@ -105,7 +105,7 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
           {(value * 100).toFixed(1)}% <span className="text-slate-500 font-normal">({pct}/100)</span>
         </span>
       </div>
-      <div className="w-full bg-white/80 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+      <div className="w-full bg-white/80 rounded-full h-2 overflow-hidden p-0.5 border border-slate-200">
         <div
           className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-700`}
           style={{ width: `${pct}%` }}
@@ -167,7 +167,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
 
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {m.byzantine_robust && (
-                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 whitespace-nowrap">
+                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-600 border border-sky-500/30 whitespace-nowrap">
                         Byzantine Robust
                       </span>
                     )}
@@ -183,7 +183,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                 <p className="text-xs text-slate-500 leading-relaxed">{m.description}</p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+              <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 truncate">
                   <FileText className="w-3 h-3 text-slate-500 shrink-0" />
                   <span className="truncate">{m.paper}</span>
@@ -223,7 +223,7 @@ function MIASimulationVisualizer() {
 
   return (
     <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-200 bg-white shadow-xl space-y-5 min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600">
@@ -271,7 +271,7 @@ function MIASimulationVisualizer() {
                 className={`px-2.5 py-1 rounded-lg text-[10.5px] font-mono transition-all cursor-pointer ${
                   testEps === p.val
                     ? 'bg-indigo-600 text-slate-900 font-bold border border-indigo-400 shadow-sm'
-                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-600 border border-white/5'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-600 border border-slate-200'
                 }`}
               >
                 {p.label}
@@ -302,7 +302,7 @@ function MIASimulationVisualizer() {
           >
             {simulateMIA.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Simulating Attack...</span>
               </>
             ) : (
@@ -319,7 +319,7 @@ function MIASimulationVisualizer() {
       {simData && (
         <div className="space-y-4 pt-3 border-t border-slate-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
               <span className="text-[10px] font-mono text-slate-500 uppercase">Attack Success Rate (ASR)</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold font-mono text-slate-900">
@@ -330,7 +330,7 @@ function MIASimulationVisualizer() {
               <ScoreMeter value={simData.membership_leakage_asr} label="Empirical ASR" />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
               <span className="text-[10px] font-mono text-slate-500 uppercase">MIA ROC-AUC Score</span>
               <div className="flex items-baseline gap-2">
                 <span className={`text-xl font-bold font-mono ${
@@ -345,7 +345,7 @@ function MIASimulationVisualizer() {
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
               <span className="text-[10px] font-mono text-slate-500 uppercase">Loss Disparity Gap (Î”L)</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold font-mono text-indigo-600">
@@ -358,7 +358,7 @@ function MIASimulationVisualizer() {
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1 flex flex-col justify-between">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1 flex flex-col justify-between">
               <span className="text-[10px] font-mono text-slate-500 uppercase">DP Defense Status</span>
               <div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1.5 ${
@@ -377,7 +377,7 @@ function MIASimulationVisualizer() {
           </div>
 
           {/* Loss Disparity Visual Bar */}
-          <div className="p-4 rounded-xl bg-white border border-white/5 space-y-3">
+          <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-indigo-600" />
@@ -389,7 +389,7 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
-              <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-200">
+              <div className="space-y-1.5 p-3 rounded-lg bg-emerald-100 border border-emerald-200">
                 <div className="flex justify-between text-emerald-600">
                   <span>Training Set Samples (Members):</span>
                   <span>Î¼ = {simData.mean_train_loss.toFixed(3)}</span>
@@ -398,7 +398,7 @@ function MIASimulationVisualizer() {
                   {simData.train_loss_distribution.slice(0, 16).map((loss, idx) => (
                     <div
                       key={idx}
-                      className="flex-1 bg-emerald-500/40 rounded-sm hover:bg-emerald-400 transition-colors"
+                      className="flex-1 bg-emerald-100 rounded-sm hover:bg-emerald-400 transition-colors"
                       style={{ height: `${Math.min(48, Math.max(8, loss * 60))}px` }}
                       title={`Member Loss: ${loss}`}
                     />
@@ -407,7 +407,7 @@ function MIASimulationVisualizer() {
               </div>
 
               <div className="space-y-1.5 p-3 rounded-lg bg-sky-500/5 border border-sky-500/20">
-                <div className="flex justify-between text-sky-300">
+                <div className="flex justify-between text-sky-600">
                   <span>Test Set Samples (Non-Members):</span>
                   <span>Î¼ = {simData.mean_test_loss.toFixed(3)}</span>
                 </div>
@@ -424,7 +424,7 @@ function MIASimulationVisualizer() {
               </div>
             </div>
 
-            <p className="text-xs text-indigo-200/90 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 leading-relaxed font-mono">
+            <p className="text-xs text-indigo-700/90 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 leading-relaxed font-mono">
               ğŸ’¡ {simData.attack_summary}
             </p>
           </div>
@@ -482,11 +482,11 @@ function AttackAuditPanel() {
           {miaResult ? (
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Classification:</span>
                 <RiskBadge tier={miaResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Train: {miaResult.num_train_samples_audited} samples</span>
                 <span>Test: {miaResult.num_test_samples_audited} samples</span>
               </div>
@@ -507,7 +507,7 @@ function AttackAuditPanel() {
           >
             {auditMIA.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Simulating MIA...</span>
               </>
             ) : (
@@ -540,11 +540,11 @@ function AttackAuditPanel() {
           {invResult ? (
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Risk Tier:</span>
                 <RiskBadge tier={invResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Mean Norm: {invResult.mean_gradient_norm.toFixed(3)}</span>
                 <span>Ïƒ: {invResult.std_gradient_norm.toFixed(3)}</span>
               </div>
@@ -565,7 +565,7 @@ function AttackAuditPanel() {
           >
             {auditInversion.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Auditing Inversion...</span>
               </>
             ) : (
@@ -598,11 +598,11 @@ function AttackAuditPanel() {
           {dlgResult ? (
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage" />
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
                 <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Status:</span>
                 <RiskBadge tier={dlgResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-white/5 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Audited Weights:</span>
                 <span className="text-emerald-600 font-bold">{dlgResult.params_audited} params</span>
               </div>
@@ -623,7 +623,7 @@ function AttackAuditPanel() {
           >
             {auditDLG.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Computing DLG...</span>
               </>
             ) : (
@@ -674,9 +674,9 @@ function BudgetLogSection() {
       {/* 2. Automated Training Safety Circuit-Breaker Banner */}
       <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
         isFrozen
-          ? 'bg-rose-100 border-rose-500/50 shadow-xl shadow-rose-500/20 text-rose-200'
+          ? 'bg-rose-100 border-rose-300 shadow-xl shadow-rose-500/20 text-rose-700'
           : anyExceeded
-          ? 'bg-amber-100 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-200'
+          ? 'bg-amber-100 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-700'
           : 'bg-white border-indigo-200 shadow-lg shadow-indigo-500/10 text-slate-800'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -694,9 +694,9 @@ function BudgetLogSection() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                   isFrozen
-                    ? 'bg-rose-500/30 text-rose-200'
+                    ? 'bg-rose-100 text-rose-700'
                     : anyExceeded
-                    ? 'bg-amber-500/30 text-amber-200'
+                    ? 'bg-amber-100 text-amber-700'
                     : 'bg-emerald-100 text-emerald-600'
                 }`}>
                   {isFrozen ? 'ğŸš¨ TRAINING CIRCUIT-BREAKER ENGAGED' : 'ğŸ›¡ï¸ CONSORTIUM SAFETY LOCK ACTIVE'}
@@ -783,7 +783,7 @@ function BudgetLogSection() {
                   key={node.node_id}
                   className={`glass-card p-4 rounded-2xl border flex flex-col justify-between gap-3 relative overflow-hidden transition-all duration-200 ${
                     isExceeded
-                      ? 'bg-rose-50 border-rose-500/40 shadow-lg shadow-rose-500/10'
+                      ? 'bg-rose-50 border-rose-300 shadow-lg shadow-rose-500/10'
                       : isWarning
                       ? 'bg-amber-50 border-amber-500/40 shadow-md shadow-amber-500/10'
                       : 'bg-white border-slate-200/80 hover:border-indigo-200'
@@ -804,7 +804,7 @@ function BudgetLogSection() {
                       </div>
                       <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
                         isExceeded
-                          ? 'bg-rose-100 text-rose-600 border border-rose-500/40'
+                          ? 'bg-rose-100 text-rose-600 border border-rose-300'
                           : isWarning
                           ? 'bg-amber-100 text-amber-600 border border-amber-500/40'
                           : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
@@ -820,11 +820,11 @@ function BudgetLogSection() {
                           {node.cumulative_epsilon.toFixed(3)} / {node.target_epsilon.toFixed(1)}
                         </span>
                       </div>
-                      <div className="w-full bg-white rounded-full h-2 overflow-hidden border border-white/5">
+                      <div className="w-full bg-white rounded-full h-2 overflow-hidden border border-slate-200">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
                             isExceeded
-                              ? 'bg-gradient-to-r from-rose-500 to-red-400 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+                              ? 'bg-gradient-to-r from-rose-500 to-red-400 shadow-rose-100'
                               : isWarning
                               ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
                               : 'bg-gradient-to-r from-emerald-500 to-teal-400'
@@ -838,23 +838,23 @@ function BudgetLogSection() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
-                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs font-mono">
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
                         <span className="text-[9px] text-slate-500 block">RÃ©nyi Î±*</span>
                         <span className="text-slate-800 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
                       </div>
-                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
                         <span className="text-[9px] text-slate-500 block">Noise Ïƒ</span>
                         <span className="text-indigo-600 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
                       </div>
-                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
                         <span className="text-[9px] text-slate-500 block">Rounds</span>
                         <span className="text-slate-800 font-bold">{node.rounds_completed}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-slate-500">
                       {isExceeded ? 'âš ï¸ Action Required' : 'Budget Secure'}
                     </span>
@@ -884,10 +884,10 @@ function BudgetLogSection() {
         </h3>
 
         {anyExceeded && (
-          <div className="rounded-2xl border border-rose-500/40 bg-rose-50 p-4 text-xs text-rose-600 flex items-start gap-3 shadow-lg shadow-rose-500/10">
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-600 flex items-start gap-3 shadow-lg shadow-rose-500/10">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <strong className="text-rose-200 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
+              <strong className="text-rose-700 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
               <p className="text-rose-600/90 leading-relaxed">
                 One or more simulation runs have depleted the global Differential Privacy budget (Îµ &gt; 8.0). Active learning rounds have been isolated to prevent progressive data reconstruction.
               </p>
@@ -915,7 +915,7 @@ function BudgetLogSection() {
                   key={entry.simulation_id}
                   className={`glass-card p-4 rounded-xl border space-y-3 ${
                     entry.budget_exhausted
-                      ? 'bg-rose-500/5 border-rose-500/40'
+                      ? 'bg-rose-100 border-rose-300'
                       : 'bg-white border-slate-200'
                   }`}
                 >
@@ -959,16 +959,16 @@ function BudgetLogSection() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
-                    <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs font-mono">
+                    <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
                       <div className="text-[10px] text-slate-500">Delta (Î´)</div>
                       <div className="text-slate-800 font-bold">{entry.delta?.toExponential?.(1) ?? '1e-5'}</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                    <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
                       <div className="text-[10px] text-slate-500">Rounds</div>
                       <div className="text-slate-800 font-bold">{entry.rounds_spent}</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                    <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
                       <div className="text-[10px] text-slate-500">Îµ / Round</div>
                       <div className="text-indigo-600 font-bold">{entry.epsilon_per_round?.toFixed(3) ?? '0.120'}</div>
                     </div>
@@ -997,7 +997,7 @@ function BudgetLogSection() {
                     <tr
                       key={entry.simulation_id}
                       className={`transition-colors hover:bg-slate-50/40 ${
-                        entry.budget_exhausted ? 'bg-rose-500/5' : ''
+                        entry.budget_exhausted ? 'bg-rose-100' : ''
                       }`}
                     >
                       <td className="py-3.5 px-4 font-bold text-slate-800 truncate max-w-[220px]">
@@ -1117,7 +1117,7 @@ export default function PrivacyDefensePage() {
               className={`px-1.5 py-2 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer min-w-0 w-full flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 border ${
                 isActive
                   ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500/60 text-slate-900 shadow-md shadow-indigo-600/15'
-                  : 'bg-white/[0.02] hover:bg-slate-50 border-white/5 text-slate-500 hover:text-slate-800'
+                  : 'bg-white/[0.02] hover:bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800'
               }`}
             >
               <div
@@ -1168,6 +1168,9 @@ export default function PrivacyDefensePage() {
     </div>
   );
 }
+
+
+
 
 
 

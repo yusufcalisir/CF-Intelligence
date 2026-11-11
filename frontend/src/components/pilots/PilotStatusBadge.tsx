@@ -1,4 +1,4 @@
-import type { PilotStatus } from '../../api/types';
+﻿import type { PilotStatus } from '../../api/types';
 
 interface PilotStatusBadgeProps {
   status: PilotStatus | string;
@@ -15,56 +15,56 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
   },
   PREFLIGHT: {
     label: 'Preflight Verification',
-    bg: 'bg-purple-900/40',
+    bg: 'bg-purple-100',
     text: 'text-purple-600',
     border: 'border-purple-600/40',
     dot: 'bg-purple-400 animate-pulse',
   },
   AWAITING_APPROVAL: {
     label: 'Awaiting Approvals',
-    bg: 'bg-amber-900/40',
+    bg: 'bg-amber-100',
     text: 'text-amber-600',
     border: 'border-amber-600/40',
     dot: 'bg-amber-400',
   },
   AUTHORIZED: {
     label: 'Fully Authorized',
-    bg: 'bg-cyan-900/40',
+    bg: 'bg-cyan-100',
     text: 'text-cyan-600',
     border: 'border-cyan-600/40',
     dot: 'bg-cyan-400',
   },
   ACTIVE: {
     label: 'Operational Active',
-    bg: 'bg-emerald-900/40',
+    bg: 'bg-emerald-100',
     text: 'text-emerald-600',
     border: 'border-emerald-600/40',
     dot: 'bg-emerald-400 animate-ping',
   },
   PAUSED: {
     label: 'Emergency Paused',
-    bg: 'bg-amber-950/60',
-    text: 'text-amber-200',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
     border: 'border-amber-500/60',
     dot: 'bg-amber-500',
   },
   COMPLETED: {
     label: 'Completed',
-    bg: 'bg-teal-900/40',
+    bg: 'bg-teal-100',
     text: 'text-teal-600',
     border: 'border-teal-600/40',
     dot: 'bg-teal-400',
   },
   ABORTED: {
     label: 'Aborted (Terminal)',
-    bg: 'bg-rose-950/60',
+    bg: 'bg-rose-50',
     text: 'text-rose-600',
     border: 'border-rose-600/50',
     dot: 'bg-rose-500',
   },
   FAILED: {
     label: 'Failed (Terminal)',
-    bg: 'bg-red-950/60',
+    bg: 'bg-red-50',
     text: 'text-red-600',
     border: 'border-red-600/50',
     dot: 'bg-red-500',
@@ -96,3 +96,7 @@ export default function PilotStatusBadge({ status, size = 'md' }: PilotStatusBad
     </span>
   );
 }
+
+
+
+

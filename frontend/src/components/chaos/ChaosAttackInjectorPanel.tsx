@@ -1,4 +1,4 @@
-import { useState, useId, useEffect } from 'react';
+﻿import { useState, useId, useEffect } from 'react';
 import {
   ShieldAlert,
   Zap,
@@ -150,9 +150,9 @@ export default function ChaosAttackInjectorPanel({
       id="chaos-attack-injector-panel"
       className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 transition-all duration-500 border ${
         activeAttack?.status === 'quarantined'
-          ? 'bg-rose-950/20 border-rose-500/50 shadow-[0_0_40px_rgba(244,63,94,0.25)]'
+          ? 'bg-rose-50 border-rose-300 shadow-rose-100'
           : activeAttack?.status === 'intercepted'
-            ? 'bg-amber-950/20 border-amber-500/50 shadow-[0_0_40px_rgba(245,158,11,0.2)]'
+            ? 'bg-amber-50 border-amber-500/50 shadow-[0_0_40px_rgba(245,158,11,0.2)]'
             : 'bg-[var(--color-bg-card)] border-[var(--color-border)] shadow-md'
       }`}
     >
@@ -177,7 +177,7 @@ export default function ChaosAttackInjectorPanel({
                 id="threat-level-badge"
                 className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   activeAttack
-                    ? 'bg-rose-100 text-rose-600 border border-rose-500/40 animate-pulse'
+                    ? 'bg-rose-100 text-rose-600 border border-rose-300 animate-pulse'
                     : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                 }`}
               >
@@ -215,7 +215,7 @@ export default function ChaosAttackInjectorPanel({
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-slate-500 hover:text-slate-900 p-1 rounded hover:bg-white/10 transition-colors"
+            className="text-slate-500 hover:text-slate-900 p-1 rounded hover:bg-slate-100 transition-colors"
             title="Dismiss error"
           >
             <X size={14} />
@@ -238,7 +238,7 @@ export default function ChaosAttackInjectorPanel({
               </span>
             </div>
             <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
-              Injects high-frequency ({intensity} tx/s) micro-transactions below the €10,000 reporting threshold to test autonomous LSH-PSI intersection.
+              Injects high-frequency ({intensity} tx/s) micro-transactions below the â‚¬10,000 reporting threshold to test autonomous LSH-PSI intersection.
             </p>
 
             {/* Defense Specification */}
@@ -258,7 +258,7 @@ export default function ChaosAttackInjectorPanel({
           >
             {injectAttackMutation.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Injecting...</span>
               </>
             ) : (
@@ -283,7 +283,7 @@ export default function ChaosAttackInjectorPanel({
               </span>
             </div>
             <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
-              Bank Gamma uploads malicious sign-flipped gradient weights (Δw × -10.0). Krum evaluates Euclidean distances and drops the rogue update.
+              Bank Gamma uploads malicious sign-flipped gradient weights (Î”w Ã— -10.0). Krum evaluates Euclidean distances and drops the rogue update.
             </p>
 
             {/* Defense Selector */}
@@ -300,8 +300,8 @@ export default function ChaosAttackInjectorPanel({
                     onClick={() => setSelectedDefense(def)}
                     className={`text-[9px] sm:text-[10px] font-mono py-1 px-1 rounded-lg text-center transition-all cursor-pointer truncate ${
                       selectedDefense === def
-                        ? 'bg-rose-100 text-rose-600 border border-rose-500/40 font-bold shadow-sm'
-                        : 'text-[var(--color-text-muted)] bg-slate-50 hover:bg-white/10 border border-transparent'
+                        ? 'bg-rose-100 text-rose-600 border border-rose-300 font-bold shadow-sm'
+                        : 'text-[var(--color-text-muted)] bg-slate-50 hover:bg-slate-100 border border-transparent'
                     }`}
                     title={def.toUpperCase()}
                   >
@@ -327,7 +327,7 @@ export default function ChaosAttackInjectorPanel({
           >
             {injectAttackMutation.isPending ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Injecting...</span>
               </>
             ) : (
@@ -348,7 +348,7 @@ export default function ChaosAttackInjectorPanel({
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {/* Defense Shield Activated */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
                 <Lock size={11} className="text-emerald-600" /> Defense Shield
               </span>
@@ -361,7 +361,7 @@ export default function ChaosAttackInjectorPanel({
             </div>
 
             {/* Status / Quarantine */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
                 <Cpu size={11} className="text-rose-600" /> Action Taken
               </span>
@@ -379,13 +379,13 @@ export default function ChaosAttackInjectorPanel({
             </div>
 
             {/* Anomaly Metric */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
                 <TrendingDown size={11} className="text-amber-600" /> Outlier Score
               </span>
               <p className="text-xs font-bold font-mono text-amber-600 mt-1">
                 {activeAttack.euclidean_distance > 0
-                  ? `Δ ${activeAttack.euclidean_distance.toFixed(1)} (Cutoff: ${activeAttack.distance_threshold.toFixed(1)})`
+                  ? `Î” ${activeAttack.euclidean_distance.toFixed(1)} (Cutoff: ${activeAttack.distance_threshold.toFixed(1)})`
                   : `${activeAttack.packets_blocked} Blocked`}
               </p>
               <span className="text-[10px] text-slate-500 font-mono">
@@ -394,7 +394,7 @@ export default function ChaosAttackInjectorPanel({
             </div>
 
             {/* Model AUC Protection */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-white/5 flex flex-col justify-between">
+            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
@@ -416,14 +416,14 @@ export default function ChaosAttackInjectorPanel({
                   +{(activeAttack.auc_protected - activeAttack.auc_compromised_baseline).toFixed(2)} AUC Preserved
                 </span>
               </div>
-              <span className="text-[9px] text-[var(--color-text-muted)] mt-1.5 leading-tight block border-t border-white/5 pt-1">
+              <span className="text-[9px] text-[var(--color-text-muted)] mt-1.5 leading-tight block border-t border-slate-200 pt-1">
                 * Live continuous proxy from cosine alignment (not holdout validation AUC).
               </span>
             </div>
           </div>
 
           {/* Audit Log ticker */}
-          <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-slate-600 flex items-center gap-2">
+          <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-slate-200 text-[11px] font-mono text-slate-600 flex items-center gap-2">
             <span className="text-rose-600 font-bold shrink-0">AUDIT:</span>
             <span className="truncate">{activeAttack.log_entry}</span>
           </div>
@@ -456,3 +456,7 @@ export default function ChaosAttackInjectorPanel({
     </div>
   );
 }
+
+
+
+

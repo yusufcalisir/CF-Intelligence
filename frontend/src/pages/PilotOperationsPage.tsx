@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePilotsList } from '../api/pilots';
 import { useCurrentUserQuery } from '../api/queries';
@@ -214,7 +214,7 @@ export default function PilotOperationsPage() {
           </div>
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-6 text-center">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
           <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
           <h3 className="text-sm font-semibold text-rose-600">Failed to Load Consortium Pilots</h3>
           <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
@@ -302,7 +302,7 @@ export default function PilotOperationsPage() {
                     <span className="font-mono text-[11px] bg-slate-50/80 px-2 py-0.5 rounded border border-slate-200">
                       {pilot.participating_institutions?.[0] || 'Bank A'}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-bold">⇄</span>
+                    <span className="text-[10px] text-slate-500 font-bold">â‡„</span>
                     <span className="font-mono text-[11px] bg-slate-50/80 px-2 py-0.5 rounded border border-slate-200">
                       {pilot.participating_institutions?.[1] || 'Bank B'}
                     </span>
@@ -366,3 +366,4 @@ export default function PilotOperationsPage() {
     </div>
   );
 }
+

@@ -25,7 +25,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
         className={`p-4 rounded-2xl border transition-all ${
           isPassed
             ? 'bg-emerald-50/20 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)]'
-            : 'bg-amber-950/20 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)]'
+            : 'bg-amber-50 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)]'
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -62,7 +62,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             <a
               href={auditResult.quarantine_csv_download_url}
               download="quarantine_records.csv"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-amber-600 bg-amber-100 hover:bg-amber-500/30 border border-amber-500/40 transition-all shrink-0 self-start sm:self-auto"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-amber-600 bg-amber-100 hover:bg-amber-100 border border-amber-500/40 transition-all shrink-0 self-start sm:self-auto"
             >
               <Download size={13} />
               <span>Download Quarantine CSV ({auditResult.quarantined_records} rows)</span>
@@ -71,8 +71,8 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
         </div>
 
         {/* Statistical Metrics Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-3.5 border-t border-white/5">
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-3.5 border-t border-slate-200">
+          <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
               <FileCheck2 size={11} className="text-indigo-600" /> Compliance Score
             </span>
@@ -81,7 +81,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             </p>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+          <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
               <Layers size={11} className="text-amber-600" /> Records Partition
             </span>
@@ -95,7 +95,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             </p>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+          <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
               <Gauge size={11} className="text-cyan-600" /> Dirichlet Non-IID (Î±)
             </span>
@@ -104,7 +104,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
             </p>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+          <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
               <Activity size={11} className="text-purple-600" /> Drift (KS Metric)
             </span>
@@ -124,7 +124,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
           {auditResult.contract_checks.map((check, idx) => (
             <div
               key={idx}
-              className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-start justify-between gap-3 text-xs"
+              className="p-3 rounded-xl bg-white/[0.02] border border-slate-200 flex items-start justify-between gap-3 text-xs"
             >
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
                 className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                   check.status === 'passed'
                     ? 'bg-emerald-100 text-emerald-600 border border-emerald-500/40'
-                    : 'bg-rose-100 text-rose-600 border border-rose-500/40'
+                    : 'bg-rose-100 text-rose-600 border border-rose-300'
                 }`}
               >
                 {check.status.toUpperCase()}
@@ -154,4 +154,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
     </div>
   );
 };
+
+
+
 

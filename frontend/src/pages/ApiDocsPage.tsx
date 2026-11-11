@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Code2,
@@ -211,7 +211,7 @@ const API_ENDPOINTS: ApiEndpointSpec[] = [
     path: '/api/v1/scenarios/inject-attack',
     title: 'Inject Adversarial Byzantine Attack & Evaluate Multi-Krum Shield',
     description:
-      'Simulates live smurfing bursts (500 tx/s) or Byzantine gradient poisoning (Δw × -10.0) from compromised bank nodes. Evaluates defense shield, triggers node quarantine, and measures global AUC protection.',
+      'Simulates live smurfing bursts (500 tx/s) or Byzantine gradient poisoning (Î”w Ã— -10.0) from compromised bank nodes. Evaluates defense shield, triggers node quarantine, and measures global AUC protection.',
     authRequired: true,
     rateLimit: '100 req/min',
     headers: {
@@ -346,7 +346,7 @@ const API_ENDPOINTS: ApiEndpointSpec[] = [
     path: '/api/v1/compliance/dossier/generate',
     title: 'Compile EU AI Act & SR 11-7 Regulatory Compliance Dossier',
     description:
-      'Compiles EU Artificial Intelligence Act Articles 9–15 and Federal Reserve SR 11-7 model risk management verification package with immutable SHA-256 audit digest.',
+      'Compiles EU Artificial Intelligence Act Articles 9â€“15 and Federal Reserve SR 11-7 model risk management verification package with immutable SHA-256 audit digest.',
     authRequired: true,
     rateLimit: '60 req/min',
     headers: {
@@ -758,7 +758,7 @@ export default function ApiDocsPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             onClick={handleDownloadSpec}
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export OpenAPI JSON</span>
@@ -811,8 +811,8 @@ export default function ApiDocsPage() {
                   }}
                   className={`w-full p-3 rounded-xl transition-all border text-left flex items-start gap-2.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-indigo-100 border-indigo-500/50 text-indigo-200 shadow-md shadow-indigo-600/15'
-                      : 'bg-slate-50 border-white/5 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-indigo-100 border-indigo-500/50 text-indigo-700 shadow-md shadow-indigo-600/15'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   <span
@@ -899,7 +899,7 @@ export default function ApiDocsPage() {
                 onClick={handleCopyCode}
                 aria-label={copiedCode ? 'Code copied to clipboard' : 'Copy code snippet'}
                 title={copiedCode ? 'Copied!' : 'Copy code'}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-white/10 text-slate-600 hover:text-slate-900 transition-all shrink-0 cursor-pointer border border-white/5 active:scale-95"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-all shrink-0 cursor-pointer border border-slate-200 active:scale-95"
               >
                 {copiedCode ? (
                   <Check className="w-4 h-4 text-emerald-600" />
@@ -1032,3 +1032,5 @@ export default function ApiDocsPage() {
     </div>
   );
 }
+
+

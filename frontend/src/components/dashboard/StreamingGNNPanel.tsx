@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { SimulationDetail } from '../../api/types';
@@ -235,7 +235,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] pb-4">
         <div>
           <h3 className="text-lg font-bold text-[var(--color-text-primary)] flex items-center gap-2">
-            <span className="text-[var(--color-accent-teal)]">⚡</span>
+            <span className="text-[var(--color-accent-teal)]">âš¡</span>
             Real-Time Streaming GNN Dynamics
           </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
@@ -359,7 +359,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-600 border border-indigo-200 whitespace-nowrap">
                   4-HEAD GAT
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 border border-teal-500/30 whitespace-nowrap">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-100 text-teal-600 border border-teal-500/30 whitespace-nowrap">
                   {streaming_gnn_attention_weights ? 'BACKEND TELEMETRY' : 'ONLINE TOPOLOGY'}
                 </span>
               </div>
@@ -380,7 +380,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 truncate mr-2">
                       <span className="font-semibold text-[var(--color-text-primary)]">{att.source}</span>
-                      <span className="text-[var(--color-text-muted)]">➔</span>
+                      <span className="text-[var(--color-text-muted)]">â”</span>
                       <span className="font-semibold text-[var(--color-text-primary)]">{att.target}</span>
                       {att.relation && (
                         <span className="hidden sm:inline font-mono text-[9px] px-1.5 py-0.2 rounded bg-slate-50 border border-slate-200 text-slate-500">
@@ -408,7 +408,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
             </div>
             <div className="text-[10px] text-[var(--color-text-muted)] flex items-center justify-between pt-1 shrink-0 border-t border-[var(--color-border-subtle)] mt-2">
               <span>Entropy: {entropyScore.toFixed(3)} bits</span>
-              <span>4 Heads · Softmax Normalized</span>
+              <span>4 Heads Â· Softmax Normalized</span>
             </div>
           </div>
         </div>
@@ -416,3 +416,5 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
     </motion.div>
   );
 }
+
+

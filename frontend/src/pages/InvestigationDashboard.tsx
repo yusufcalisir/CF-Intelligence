@@ -195,7 +195,7 @@ export default function InvestigationDashboard() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/6 pb-5"
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5"
       >
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -221,7 +221,7 @@ export default function InvestigationDashboard() {
           </Link>
           <Link
             to="/cases"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 hover:bg-white/10 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all"
           >
             ğŸ“‹ Workbench
           </Link>
@@ -300,12 +300,12 @@ export default function InvestigationDashboard() {
           transition={{ delay: 0.2 }}
           className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
               <span className="truncate">Alerts by Severity</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-white/5">Live Breakdown</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200">Live Breakdown</span>
           </div>
 
           {alertsBySeverity && Object.keys(alertsBySeverity).length > 0 ? (
@@ -335,7 +335,7 @@ export default function InvestigationDashboard() {
                           {count.toLocaleString()} <span className="text-[10px] text-slate-500 font-normal">({pct.toFixed(1)}%)</span>
                         </span>
                       </div>
-                      <div className="h-2 bg-slate-50 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-2 bg-slate-50 rounded-full overflow-hidden p-0.5 border border-slate-200">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${pct}%` }}
@@ -360,12 +360,12 @@ export default function InvestigationDashboard() {
           transition={{ delay: 0.3 }}
           className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
               <span className="truncate">Consortium Distribution</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-white/5">3 Bank Nodes</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200">3 Bank Nodes</span>
           </div>
 
           {alertsByBank && Object.keys(alertsByBank).length > 0 ? (
@@ -390,7 +390,7 @@ export default function InvestigationDashboard() {
                         {count.toLocaleString()} <span className="text-[10px] text-slate-500 font-normal">({pct.toFixed(1)}%)</span>
                       </span>
                     </div>
-                    <div className="h-2 bg-slate-50 rounded-full overflow-hidden p-0.5 border border-white/5">
+                    <div className="h-2 bg-slate-50 rounded-full overflow-hidden p-0.5 border border-slate-200">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${pct}%` }}
@@ -415,12 +415,12 @@ export default function InvestigationDashboard() {
           transition={{ delay: 0.4 }}
           className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
               <span className="truncate">Shared Intelligence Matrix</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-white/5">DP Guarded</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200">DP Guarded</span>
           </div>
 
           {intelStats && intelStats.total_items > 0 ? (
@@ -445,7 +445,7 @@ export default function InvestigationDashboard() {
                 <h4 className="text-[10px] font-mono uppercase text-slate-500 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
                 <div className="space-y-1.5">
                   {Object.entries(intelStats.items_by_type).map(([type, count]) => (
-                    <div key={type} className="flex justify-between items-center text-xs p-2 rounded-lg bg-slate-50 border border-white/5">
+                    <div key={type} className="flex justify-between items-center text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">
                       <span className="text-slate-600 capitalize text-[11px] font-mono truncate mr-2">
                         {type.replace(/_/g, ' ')}
                       </span>
@@ -488,7 +488,7 @@ export default function InvestigationDashboard() {
             <Link
               key={link.label}
               to={link.href}
-              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 hover:bg-white/8 hover:border-indigo-500/40 transition-all text-slate-800 text-center active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-50 hover:border-indigo-500/40 transition-all text-slate-800 text-center active:scale-[0.98]"
               style={{ boxShadow: `0 0 15px ${link.color}15` }}
             >
               <span className="shrink-0">{link.icon}</span>
@@ -511,7 +511,7 @@ export default function InvestigationDashboard() {
         transition={{ delay: 0.6 }}
         className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl mt-6"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 flex-wrap min-w-0">
             <span>ğŸ•µï¸</span>
             <span>Investigator Activity Audit Trail</span>
@@ -533,7 +533,7 @@ export default function InvestigationDashboard() {
             auditLogs.map((log: any) => (
               <div
                 key={log.id}
-                className="p-3 rounded-xl bg-white/60 border border-white/5 space-y-2 font-mono text-xs"
+                className="p-3 rounded-xl bg-white/60 border border-slate-200 space-y-2 font-mono text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-indigo-600">{log.investigator}</span>
@@ -541,7 +541,7 @@ export default function InvestigationDashboard() {
                     {log.action.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 text-[11px] text-slate-500 border-t border-white/5 pt-2">
+                <div className="flex flex-col gap-1 text-[11px] text-slate-500 border-t border-slate-200 pt-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-500">Target ID:</span>
                     <span className="text-slate-800 font-semibold truncate max-w-[180px]">{log.target_id}</span>
@@ -552,7 +552,7 @@ export default function InvestigationDashboard() {
                   </div>
                 </div>
                 {log.metadata && (
-                  <div className="text-[10px] text-slate-500 bg-black/40 p-2 rounded border border-white/5 break-all mt-1">
+                  <div className="text-[10px] text-slate-500 bg-black/40 p-2 rounded border border-slate-200 break-all mt-1">
                     <span className="text-slate-500 font-semibold block mb-0.5">Details:</span>
                     {typeof log.metadata === 'object' ? JSON.stringify(log.metadata) : String(log.metadata)}
                   </div>
@@ -583,7 +583,7 @@ export default function InvestigationDashboard() {
                 </tr>
               ) : (
                 auditLogs.map((log: any) => (
-                  <tr key={log.id} className="border-b border-white/5 hover:bg-slate-50 transition-colors font-mono text-[11px]">
+                  <tr key={log.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors font-mono text-[11px]">
                     <td className="py-2.5 px-3 font-semibold text-indigo-600">{log.investigator}</td>
                     <td className="py-2.5 px-3 uppercase font-bold text-slate-800">{log.action.replace(/_/g, ' ')}</td>
                     <td className="py-2.5 px-3 text-slate-500">{log.target_id.slice(0, 10)}...</td>
@@ -601,5 +601,7 @@ export default function InvestigationDashboard() {
     </div>
   );
 }
+
+
 
 

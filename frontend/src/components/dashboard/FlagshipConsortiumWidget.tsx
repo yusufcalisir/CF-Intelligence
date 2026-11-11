@@ -87,7 +87,7 @@ export default function FlagshipConsortiumWidget() {
       <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header & Meta */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/8 pb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1.5">
@@ -97,7 +97,7 @@ export default function FlagshipConsortiumWidget() {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-emerald-600 bg-emerald-50 border border-emerald-200">
               CFI-CrossBank-01
             </span>
-            <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-white/5">
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200">
               3 Institutions Â· 7 Scenarios
             </span>
           </div>
@@ -120,7 +120,7 @@ export default function FlagshipConsortiumWidget() {
           </Link>
           <Link
             to="/scenarios"
-            className="px-3 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-white/10 text-slate-600 border border-slate-200 transition-all flex items-center gap-1"
+            className="px-3 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all flex items-center gap-1"
           >
             <span>Topologies</span>
           </Link>
@@ -129,7 +129,7 @@ export default function FlagshipConsortiumWidget() {
 
       {/* Core Impact Highlights Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-indigo-200 transition-all space-y-1">
+        <div className="p-4 rounded-xl bg-white/60 border border-slate-200 hover:border-indigo-200 transition-all space-y-1">
           <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Overall Detection Uplift
           </div>
@@ -142,7 +142,7 @@ export default function FlagshipConsortiumWidget() {
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-teal-500/30 transition-all space-y-1">
+        <div className="p-4 rounded-xl bg-white/60 border border-slate-200 hover:border-teal-500/30 transition-all space-y-1">
           <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Averted Fraud Volume (VaR)
           </div>
@@ -155,7 +155,7 @@ export default function FlagshipConsortiumWidget() {
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-violet-500/30 transition-all space-y-1">
+        <div className="p-4 rounded-xl bg-white/60 border border-slate-200 hover:border-violet-500/30 transition-all space-y-1">
           <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Cyclic Laundering Ring (SC-3)
           </div>
@@ -168,7 +168,7 @@ export default function FlagshipConsortiumWidget() {
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/60 border border-white/5 hover:border-amber-200 transition-all space-y-1">
+        <div className="p-4 rounded-xl bg-white/60 border border-slate-200 hover:border-amber-200 transition-all space-y-1">
           <div className="text-[10px] font-mono uppercase text-slate-500 font-semibold tracking-wider">
             Cold-Start Bank Rescue (SC-7)
           </div>
@@ -183,7 +183,7 @@ export default function FlagshipConsortiumWidget() {
       </div>
 
       {/* Interactive Scenario Inspection Matrix */}
-      <div className="p-4 rounded-xl bg-white/40 border border-white/5 space-y-4">
+      <div className="p-4 rounded-xl bg-white/40 border border-slate-200 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
             <span>ğŸ”¬</span>
@@ -206,7 +206,7 @@ export default function FlagshipConsortiumWidget() {
                 className={`px-1 sm:px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all text-center flex items-center justify-center gap-1 ${
                   isSelected
                     ? 'bg-indigo-600 text-slate-900 shadow-md shadow-indigo-600/30 font-bold'
-                    : 'bg-slate-50 hover:bg-white/10 text-slate-600 border border-white/5'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
                 }`}
                 title={sc.name}
               >
@@ -234,22 +234,22 @@ export default function FlagshipConsortiumWidget() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="p-4 rounded-xl bg-white/70 border border-white/8 space-y-3"
+            className="p-4 rounded-xl bg-white/70 border border-slate-200 space-y-3"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
               <div>
                 <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-wider">
                   {activeScenario.id}
                 </span>
                 <h4 className="text-sm font-bold text-slate-900">{activeScenario.name}</h4>
               </div>
-              <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-white/5 self-start sm:self-auto">
+              <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200 self-start sm:self-auto">
                 Topology: {activeScenario.topology}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3 rounded-lg bg-slate-50 border border-white/5 space-y-1">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <span className="text-[10px] font-mono uppercase text-slate-500">Isolated Silo Detection</span>
                 <div className="text-lg font-bold font-mono text-rose-600">
                   {activeScenario.isolated.toFixed(1)}%
@@ -261,7 +261,7 @@ export default function FlagshipConsortiumWidget() {
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-50 border border-white/5 space-y-1">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <span className="text-[10px] font-mono uppercase text-slate-500">Federated Consensus</span>
                 <div className="text-lg font-bold font-mono text-emerald-600">
                   {activeScenario.federated.toFixed(1)}%
@@ -271,7 +271,7 @@ export default function FlagshipConsortiumWidget() {
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-50 border border-white/5 space-y-1">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <span className="text-[10px] font-mono uppercase text-slate-500">Consortium Uplift (Î”)</span>
                 <div className="text-lg font-bold font-mono text-indigo-600">
                   +{activeScenario.delta.toFixed(1)}%
@@ -289,7 +289,7 @@ export default function FlagshipConsortiumWidget() {
 
       {/* Participating Institutions Status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-slate-200">
           <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
             A
           </div>
@@ -299,8 +299,8 @@ export default function FlagshipConsortiumWidget() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-600 flex items-center justify-center font-bold text-xs shrink-0">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-slate-200">
+          <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-xs shrink-0">
             B
           </div>
           <div className="min-w-0">
@@ -309,7 +309,7 @@ export default function FlagshipConsortiumWidget() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/40 border border-slate-200">
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">
             C
           </div>
@@ -322,4 +322,6 @@ export default function FlagshipConsortiumWidget() {
     </motion.div>
   );
 }
+
+
 

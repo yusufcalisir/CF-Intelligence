@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import type { PilotStatusResponse } from '../../api/types';
 import { usePilotDossier } from '../../api/pilots';
 import { FileText, Download, ShieldCheck, Lock, AlertCircle, History, Check } from 'lucide-react';
@@ -76,7 +76,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
 
       {/* Role Restriction Banner if 403 */}
       {isForbidden && (
-        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-600 text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-50 text-amber-600 text-xs flex items-start gap-3">
           <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="font-semibold">Access Restricted - Compliance / Auditor Authority Required</div>
@@ -89,7 +89,7 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
       )}
 
       {error && !isForbidden && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-600 text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-3">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Failed to Load Audit Dossier</div>
@@ -168,3 +168,5 @@ export default function PilotDossierSection({ pilot }: PilotDossierSectionProps)
     </div>
   );
 }
+
+

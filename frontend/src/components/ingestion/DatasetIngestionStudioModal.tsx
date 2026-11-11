@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   X,
   Upload,
@@ -200,7 +200,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                 Real Dataset Ingestion Studio
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                CSV & Parquet Dropzone • Great Expectations Gating • Zero-Raw-PII
+                CSV & Parquet Dropzone â€¢ Great Expectations Gating â€¢ Zero-Raw-PII
               </p>
             </div>
           </div>
@@ -304,7 +304,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                   if (currentStep === 'contract') setCurrentStep('mapping');
                   if (currentStep === 'consortium') setCurrentStep('contract');
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 bg-slate-50 hover:bg-white/10 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
               >
                 <ArrowLeft size={13} />
                 <span>Previous Step</span>
@@ -341,3 +341,4 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
     </div>
   );
 };
+

@@ -95,10 +95,10 @@ export default function ComparativeModelWidget() {
       className="p-5 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-xl mt-6 relative overflow-hidden"
     >
       {/* Background Decorative Glow */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-100 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/6 pb-4 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-base">âš–ï¸</span>
@@ -115,7 +115,7 @@ export default function ComparativeModelWidget() {
         </div>
 
         {/* Metric Selector Pills */}
-        <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/5 self-start sm:self-auto shrink-0">
+        <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-slate-200 self-start sm:self-auto shrink-0">
           {(['pr_auc', 'roc_auc', 'recall_at_01_fpr'] as const).map((metric) => (
             <button
               key={metric}
@@ -207,14 +207,14 @@ export default function ComparativeModelWidget() {
             className={`p-3.5 rounded-xl border font-mono text-xs space-y-2 ${
               item.category === 'PRODUCTION_CHAMPION'
                 ? 'bg-emerald-50/20 border-emerald-500/40'
-                : 'bg-white/60 border-white/5'
+                : 'bg-white/60 border-slate-200'
             }`}
           >
             <div className="flex items-start justify-between gap-2">
               <span className="font-bold text-slate-800">{item.paradigm}</span>
               {getCategoryBadge(item.category)}
             </div>
-            <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-2 text-center">
+            <div className="grid grid-cols-3 gap-2 border-t border-slate-200 pt-2 text-center">
               <div>
                 <span className="text-[10px] text-slate-500 block">PR-AUC</span>
                 <span className="font-bold text-slate-800">{(item.pr_auc ?? 0).toFixed(4)}</span>
@@ -228,7 +228,7 @@ export default function ComparativeModelWidget() {
                 <span className="font-bold text-slate-800">{(((item.recall_at_01_fpr ?? 0)) * 100).toFixed(1)}%</span>
               </div>
             </div>
-            <div className="border-t border-white/5 pt-2 text-[10px] text-slate-500 flex items-center justify-between">
+            <div className="border-t border-slate-200 pt-2 text-[10px] text-slate-500 flex items-center justify-between">
               <span>Latency: {(item.latency_ms ?? 0).toFixed(3)} ms/tx</span>
               <span className="text-slate-500">{item.privacy_guarantee}</span>
             </div>
@@ -261,11 +261,11 @@ export default function ComparativeModelWidget() {
                 return (
                   <tr
                     key={idx}
-                    className={`border-b border-white/5 transition-colors font-mono text-[11px] ${
+                    className={`border-b border-slate-200 transition-colors font-mono text-[11px] ${
                       isChampion
-                        ? 'bg-emerald-500/5 hover:bg-emerald-50'
+                        ? 'bg-emerald-100 hover:bg-emerald-50'
                         : isUpper
-                        ? 'bg-rose-500/3 hover:bg-rose-500/5'
+                        ? 'bg-rose-100 hover:bg-rose-100'
                         : 'hover:bg-slate-50'
                     }`}
                   >
@@ -324,5 +324,6 @@ export default function ComparativeModelWidget() {
     </motion.div>
   );
 }
+
 
 

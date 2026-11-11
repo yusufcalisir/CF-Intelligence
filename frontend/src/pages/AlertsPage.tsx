@@ -584,7 +584,7 @@ function AlertCard({
               <Link
                 to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
                 onClick={(e) => e.stopPropagation()}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-100 border border-emerald-200 transition-all flex items-center gap-0.5"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border border-emerald-200 transition-all flex items-center gap-0.5"
                 title={`Check PSI Consortium Intersection for ${entityId}`}
               >
                 <span>ğŸ” PSI</span>
@@ -609,7 +609,7 @@ function AlertCard({
           <Link
             to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-600 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-600 hover:text-cyan-700 border border-cyan-500/30 transition-all flex items-center gap-1"
             title="Simulate feature remediation in Counterfactual Workbench"
           >
             <span>ğŸ›ï¸ Simulate</span>
@@ -620,7 +620,7 @@ function AlertCard({
           <Link
             to={`/cases?alert_id=${encodeURIComponent(alert.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-200 transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/25 hover:bg-purple-600/40 text-purple-700 border border-purple-200 transition-all flex items-center gap-1.5 shadow-sm"
             title="View investigation case for this alert"
           >
             <span>ğŸ“ View Case</span>
@@ -772,7 +772,7 @@ export function ExplainabilityPanel({
 
       {/* AML Case Escalation Action Banner */}
       {!hideEscalateButton && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-900/90 rounded-xl border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-white rounded-xl border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-amber-600 font-bold text-xs uppercase tracking-wider flex items-center gap-1 shrink-0">
@@ -837,14 +837,14 @@ export function ExplainabilityPanel({
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                  <span className="font-mono text-xs text-indigo-200 truncate font-semibold min-w-0" title={entityId}>
+                  <span className="font-mono text-xs text-indigo-700 truncate font-semibold min-w-0" title={entityId}>
                     {entityId}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
-                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Explore 2-hop ego network for ${entityId}`}
                   >
                     <span>2-Hop</span>
@@ -852,7 +852,7 @@ export function ExplainabilityPanel({
                   </Link>
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=3`}
-                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-700 border border-purple-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Explore 3-hop ring network for ${entityId}`}
                   >
                     <span>3-Hop</span>
@@ -860,7 +860,7 @@ export function ExplainabilityPanel({
                   </Link>
                   <Link
                     to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
-                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-700 border border-emerald-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Check PSI Consortium Intersection for ${entityId}`}
                   >
                     <span>ğŸ” Check PSI</span>
@@ -912,7 +912,7 @@ export function ExplainabilityPanel({
                 </h4>
                 <ul className="space-y-1.5">
                   {(report.risk_factors ?? []).map((factor, i) => (
-                    <li key={i} className="text-xs flex items-start gap-2 bg-rose-50 border border-rose-200 p-2 rounded-lg text-rose-200 font-medium leading-normal">
+                    <li key={i} className="text-xs flex items-start gap-2 bg-rose-50 border border-rose-200 p-2 rounded-lg text-rose-700 font-medium leading-normal">
                       <span className="text-rose-600 font-bold shrink-0 mt-0.5">â€¢</span>
                       <span className="break-words min-w-0">{factor}</span>
                     </li>
@@ -1038,7 +1038,7 @@ export function ExplainabilityPanel({
           ) : (
             <>
               {/* Direct Deep Link to Counterfactual Workbench */}
-              <div className="p-3 bg-gradient-to-r from-cyan-50 via-slate-900/90 to-purple-50 rounded-xl border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-cyan-50 via-white to-purple-50 rounded-xl border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-bold text-cyan-600 uppercase tracking-wider flex items-center gap-1.5">
                     <span className="shrink-0">ğŸ›ï¸</span>
@@ -1182,7 +1182,7 @@ export function ExplainabilityPanel({
                   {gnnReport.node_id ? (
                     <Link
                       to={`/graph?entity_id=${encodeURIComponent(gnnReport.node_id)}&depth=2`}
-                      className="font-mono text-cyan-600 hover:text-cyan-200 underline decoration-cyan-500/40 hover:decoration-cyan-300 transition-colors flex items-center gap-1"
+                      className="font-mono text-cyan-600 hover:text-cyan-700 underline decoration-cyan-500/40 hover:decoration-cyan-300 transition-colors flex items-center gap-1"
                       title="Inspect 2-hop ego network in Graph Workbench"
                     >
                       <span>{gnnReport.node_id.slice(0, 16)}</span>
@@ -1218,7 +1218,7 @@ export function ExplainabilityPanel({
                       <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-500">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.source)}&depth=2`}
-                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-700 hover:underline"
                           title={`Trace graph for ${edge.source}`}
                         >
                           {edge.source}
@@ -1226,7 +1226,7 @@ export function ExplainabilityPanel({
                         <span className="text-slate-500 shrink-0">â”</span>
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.target)}&depth=2`}
-                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-700 hover:underline"
                           title={`Trace graph for ${edge.target}`}
                         >
                           {edge.target}
@@ -1292,7 +1292,7 @@ export function ExplainabilityPanel({
             </div>
 
             {!alert.involved_entity_ids?.[0] && (
-              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/40 text-amber-600 text-[11px]">
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-800/40 text-amber-600 text-[11px]">
                 âš ï¸ No institution-owned entity identifier is linked to this alert. Cross-bank intelligence queries require a verified local entity belonging to this bank to prevent arbitrary counterpart probing.
               </div>
             )}
@@ -1319,7 +1319,7 @@ export function ExplainabilityPanel({
             </div>
 
             {queryIntelMutation.isError && (
-              <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-600 text-[11px] space-y-1">
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-[11px] space-y-1">
                 <div className="font-bold flex items-center gap-1.5">
                   <span>â›”</span>
                   <span>Query Execution Failed</span>
@@ -1495,7 +1495,7 @@ export function ExplainabilityPanel({
                 )}
 
                 {attachError && (
-                  <div className="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-[10px] text-rose-600">
+                  <div className="p-2 rounded bg-rose-50 border border-rose-200 text-[10px] text-rose-600">
                     {attachError}
                   </div>
                 )}
@@ -1507,5 +1507,9 @@ export function ExplainabilityPanel({
     </motion.div>
   );
 }
+
+
+
+
 
 

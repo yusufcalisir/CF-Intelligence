@@ -88,7 +88,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-indigo-50 backdrop-blur-md rounded-xl border border-indigo-200 p-6 shadow-2xl space-y-6">
+    <div className="bg-gradient-to-br from-indigo-50 via-white to-white backdrop-blur-md rounded-xl border border-indigo-200 p-6 shadow-2xl space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/60">
         <div className="flex items-center space-x-3">
@@ -111,7 +111,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
         {/* Currency badge */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500">Settlement Asset:</span>
-          <span className="px-3 py-1 bg-indigo-600/30 text-indigo-200 border border-indigo-400/40 text-sm font-semibold rounded-md font-mono flex items-center gap-1.5">
+          <span className="px-3 py-1 bg-indigo-600/30 text-indigo-700 border border-indigo-400/40 text-sm font-semibold rounded-md font-mono flex items-center gap-1.5">
             <CoinsIcon className="w-3.5 h-3.5 text-indigo-600" />
             {settlementCurrency}
           </span>
@@ -184,7 +184,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
                 <tr
                   key={idx}
                   className={`hover:bg-slate-50/50 transition-colors ${
-                    payout.is_quarantined ? 'bg-amber-950/10' : ''
+                    payout.is_quarantined ? 'bg-amber-50' : ''
                   }`}
                 >
                   <td className="py-2.5 px-3 font-sans font-medium text-slate-900 flex items-center space-x-2">
@@ -230,4 +230,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
     </div>
   );
 };
+
+
+
 

@@ -40,7 +40,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             </p>
           </div>
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <code className="text-xs font-mono bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-indigo-200 select-all">
+            <code className="text-xs font-mono bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-indigo-700 select-all">
               {pilot.scope_digest ? `${pilot.scope_digest.slice(0, 16)}...${pilot.scope_digest.slice(-8)}` : 'Generating...'}
             </code>
             <button
@@ -160,7 +160,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
               <div className="text-[11px] text-slate-500">Permitted Investigation Purposes</div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {pilot.allowed_purposes.map((purpose) => (
-                  <span key={purpose} className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-50/40 text-purple-600 border border-purple-800/40">
+                  <span key={purpose} className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-50/40 text-purple-600 border border-purple-200/40">
                     {purpose}
                   </span>
                 ))}
@@ -204,4 +204,6 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
     </div>
   );
 }
+
+
 

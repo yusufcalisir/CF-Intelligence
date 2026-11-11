@@ -218,7 +218,7 @@ export default function ConnectorDiagnosticsPanel() {
 
       {/* KPI Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="glass-card p-3.5 rounded-xl border border-white/5 bg-white/40">
+        <div className="glass-card p-3.5 rounded-xl border border-slate-200 bg-white/40">
           <span className="text-[11px] font-mono text-slate-500 uppercase block">Registered Adapters</span>
           <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">{totalCount}</span>
         </div>
@@ -272,7 +272,7 @@ export default function ConnectorDiagnosticsPanel() {
                 </div>
 
                 {/* Endpoint & Protocol specs */}
-                <div className="space-y-2 py-2.5 border-y border-white/5 text-xs min-w-0">
+                <div className="space-y-2 py-2.5 border-y border-slate-200 text-xs min-w-0">
                   <div className="flex items-center justify-between text-slate-600 min-w-0 gap-2">
                     <span className="text-slate-500 font-mono text-[11px] shrink-0">Endpoint</span>
                     <span className="font-mono text-[11px] truncate text-indigo-600 text-right min-w-0">
@@ -303,7 +303,7 @@ export default function ConnectorDiagnosticsPanel() {
               </div>
 
               {/* Action Button */}
-              <div className="mt-4 pt-3 border-t border-white/5">
+              <div className="mt-4 pt-3 border-t border-slate-200">
                 <button
                   onClick={() => handleTestProbe(connector.connector_id)}
                   disabled={isProbing}
@@ -358,7 +358,7 @@ export default function ConnectorDiagnosticsPanel() {
 
                 <button
                   onClick={() => setActiveProbeResult(null)}
-                  className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
@@ -366,7 +366,7 @@ export default function ConnectorDiagnosticsPanel() {
               </div>
 
               {/* Handshake summary */}
-              <div className="mt-4 p-3.5 rounded-xl bg-indigo-50/30 border border-indigo-200 text-xs text-indigo-200 leading-relaxed font-sans">
+              <div className="mt-4 p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-700 leading-relaxed font-sans">
                 {activeProbeResult.handshake_summary}
               </div>
 
@@ -375,7 +375,7 @@ export default function ConnectorDiagnosticsPanel() {
                 <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Handshake Execution Trace
                 </h5>
-                <div className="p-3 rounded-xl bg-white border border-white/5 font-mono text-[11px] text-slate-600 space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono text-[11px] text-slate-600 space-y-1.5 max-h-40 overflow-y-auto">
                   {activeProbeResult.diagnostics_log.map((log, idx) => (
                     <div key={idx} className="flex items-start gap-2">
                       <span className="text-emerald-600 font-bold shrink-0">âœ“</span>
@@ -390,7 +390,7 @@ export default function ConnectorDiagnosticsPanel() {
                 <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Sanitized Handshake Payload
                 </h5>
-                <pre className="p-3 rounded-xl bg-black/60 border border-white/5 font-mono text-[11px] text-cyan-600 overflow-x-auto">
+                <pre className="p-3 rounded-xl bg-black/60 border border-slate-200 font-mono text-[11px] text-cyan-600 overflow-x-auto">
                   {JSON.stringify(activeProbeResult.payload_sample, null, 2)}
                 </pre>
               </div>
@@ -411,5 +411,7 @@ export default function ConnectorDiagnosticsPanel() {
     </div>
   );
 }
+
+
 
 

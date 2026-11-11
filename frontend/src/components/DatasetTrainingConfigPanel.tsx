@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DatasetTrainingConfigPanel.tsx
  *
  * Inline collapsible panel rendered inside LiveOperationsView that lets the
@@ -27,7 +27,7 @@ interface DatasetTrainingConfigPanelProps {
   initialMode?: TrainingMode;
 }
 
-// ── small helper: format numbers with K/M suffix ──────────────────────────
+// â”€â”€ small helper: format numbers with K/M suffix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
@@ -78,7 +78,7 @@ export default function DatasetTrainingConfigPanel({
           className="overflow-hidden focus:outline-none"
         >
           <div className="glass-card p-4 sm:p-6 border border-[var(--color-border)] rounded-2xl space-y-6">
-            {/* ── Header ──────────────────────────────────────────────────── */}
+            {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <h3 id="training-config-title" className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
@@ -90,14 +90,14 @@ export default function DatasetTrainingConfigPanel({
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 aria-label="Close config panel"
               >
-                ✕
+                âœ•
               </button>
             </div>
 
-            {/* ── Mode Toggle ─────────────────────────────────────────────── */}
+            {/* â”€â”€ Mode Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                 Training Mode
@@ -165,7 +165,7 @@ export default function DatasetTrainingConfigPanel({
               </div>
             </div>
 
-            {/* ── Dataset Cards ────────────────────────────────────────────── */}
+            {/* â”€â”€ Dataset Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                 Benchmark Dataset
@@ -248,7 +248,7 @@ export default function DatasetTrainingConfigPanel({
               </div>
             </div>
 
-            {/* ── Selected dataset detail strip ────────────────────────────── */}
+            {/* â”€â”€ Selected dataset detail strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
               style={{
@@ -270,7 +270,7 @@ export default function DatasetTrainingConfigPanel({
               <div className="flex items-center gap-2 shrink-0">
                 {mode === 'mock' && (
                   <span className="text-[10px] text-[var(--color-text-muted)] whitespace-nowrap">
-                    AUC {selectedProfile.initialAuc.toFixed(3)} → {selectedProfile.targetAuc.toFixed(3)}
+                    AUC {selectedProfile.initialAuc.toFixed(3)} â†’ {selectedProfile.targetAuc.toFixed(3)}
                   </span>
                 )}
                 <a
@@ -285,7 +285,7 @@ export default function DatasetTrainingConfigPanel({
               </div>
             </div>
 
-            {/* ── Launch button ────────────────────────────────────────────── */}
+            {/* â”€â”€ Launch button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <button
                 onClick={onClose}
@@ -315,3 +315,4 @@ export default function DatasetTrainingConfigPanel({
     </AnimatePresence>
   );
 }
+

@@ -261,7 +261,7 @@ export const BenchmarkHubPage: React.FC = () => {
             onClick={() => updateWorkloadParams(ds, sampleSize, dailyVolume)}
             className={`text-left p-4 rounded-xl border transition-all ${
               selectedDataset === ds
-                ? 'bg-indigo-50/40 border-indigo-500/80 shadow-lg shadow-indigo-950/50'
+                ? 'bg-indigo-50 border-indigo-500/80 shadow-lg shadow-indigo-950/50'
                 : 'bg-white/60 border-slate-200 hover:border-slate-200'
             }`}
           >
@@ -278,8 +278,8 @@ export const BenchmarkHubPage: React.FC = () => {
       </div>
 
       {/* Institutional Workload & Volume Calibration Bar */}
-      <div className="bg-gradient-to-r from-slate-900/90 via-indigo-50 to-slate-900/90 border border-slate-200 rounded-2xl p-5 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/5 pb-3">
+      <div className="bg-gradient-to-r from-indigo-50 via-white to-indigo-50 border border-slate-200 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600">
               <Sliders className="w-4 h-4" />
@@ -412,8 +412,8 @@ export const BenchmarkHubPage: React.FC = () => {
       {activeTab === 'benchmarks' && (
         <div className="space-y-6">
           {/* Institutional Alert Fatigue & Economic ROI Impact Panel */}
-          <div className="bg-gradient-to-br from-indigo-50 via-slate-900 to-slate-50 border border-indigo-200 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/5 pb-4">
+          <div className="bg-gradient-to-br from-indigo-50 via-white to-slate-50 border border-indigo-200 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
               <div>
                 <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold uppercase tracking-wider">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
@@ -494,7 +494,7 @@ export const BenchmarkHubPage: React.FC = () => {
           </div>
 
           {/* Institutional Benchmark Notice */}
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-50/30 border border-indigo-200 text-indigo-600 text-xs">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs">
             <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>
               <strong>Calibrated Reference Benchmarks:</strong> Metrics reflect calibrated empirical reference distributions for institutional pilot evaluation ({datasetDescriptions[selectedDataset]?.title}) with {dailyVolume.toLocaleString()} daily clearing transactions.
@@ -504,7 +504,7 @@ export const BenchmarkHubPage: React.FC = () => {
           {/* Key Advantage Highlight Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Card 1: PR-AUC */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-indigo-50 to-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
                   <span className="text-xs font-semibold text-slate-600 truncate">PR-AUC (Precision-Recall)</span>
@@ -531,13 +531,13 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-slate-200 pt-3">
                 Standard metric under extreme class imbalance. Shows FL's ability to minimize false positives without sacrificing recall.
               </p>
             </div>
 
             {/* Card 2: Recall @ 0.1% FPR */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-indigo-50 to-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
                   <span className="text-xs font-semibold text-slate-600 truncate">Recall @ 0.1% FPR</span>
@@ -564,13 +564,13 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-slate-200 pt-3">
                 Percentage of true fraud captured when strictly limiting legitimate customer blockages to 1 in 1,000 transactions.
               </p>
             </div>
 
             {/* Card 3: False Alarm Reduction */}
-            <div className="bg-gradient-to-br from-slate-900 to-purple-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-purple-50 to-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 min-w-0">
                   <span className="text-xs font-semibold text-slate-600 truncate">False Alarm Reduction</span>
@@ -593,7 +593,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-white/5 pt-3">
+              <p className="text-xs text-slate-500 mt-4 leading-relaxed border-t border-slate-200 pt-3">
                 Drastically cuts triage fatigue and manual analyst queue overload by filtering cross-institution benign anomaly noise.
               </p>
             </div>
@@ -640,7 +640,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-indigo-200">
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
                     <div className="text-xs font-bold text-emerald-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.pr_auc != null
@@ -648,7 +648,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
                     <div className="text-xs font-bold text-slate-900 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.roc_auc != null
@@ -656,7 +656,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-indigo-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr != null
@@ -694,7 +694,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200">
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
                     <div className="text-xs font-bold text-rose-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc != null
@@ -702,7 +702,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
                     <div className="text-xs font-bold text-slate-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc != null
@@ -710,7 +710,7 @@ export const BenchmarkHubPage: React.FC = () => {
                         : (isLoading ? '...' : '-')}
                     </div>
                   </div>
-                  <div className="bg-white/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                  <div className="bg-white/60 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <div className="text-[10px] text-slate-500 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-rose-600 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr != null
@@ -752,7 +752,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200/60 font-mono text-xs">
-                  <tr className="bg-indigo-50/20 text-indigo-200">
+                  <tr className="bg-indigo-50/20 text-indigo-700">
                     <td className="py-3 px-4 font-sans font-bold text-slate-900 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
                       <span>Privacy-Preserving Federated Model (FedAvg + DP)</span>
@@ -1050,7 +1050,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 >
                   {validatePiiMutation.isPending ? (
                     <>
-                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                       <span>Scanning...</span>
                     </>
                   ) : (
@@ -1064,7 +1064,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 >
                   {injectPiiMutation.isPending ? (
                     <>
-                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                       <span>Injecting Violations...</span>
                     </>
                   ) : (
@@ -1079,7 +1079,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   className={`p-4 rounded-xl border text-xs space-y-3 ${
                     validatePiiMutation.data.is_clean_zero_pii
                       ? 'bg-emerald-50/20 border-emerald-800/60 text-emerald-600'
-                      : 'bg-rose-950/20 border-rose-800/60 text-rose-600'
+                      : 'bg-rose-50 border-rose-200 text-rose-600'
                   }`}
                 >
                   <div className="font-bold flex items-center gap-2">
@@ -1092,7 +1092,7 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
                   <p>{validatePiiMutation.data.guidance}</p>
                   {validatePiiMutation.data.violations?.map((v, i) => (
-                    <div key={i} className="bg-white/80 p-3 rounded border border-rose-800/40 text-slate-600 font-mono text-[11px] space-y-1.5">
+                    <div key={i} className="bg-white/80 p-3 rounded border border-rose-200 text-slate-600 font-mono text-[11px] space-y-1.5">
                       <div>
                         Violation on column <span className="text-rose-600 font-bold">{v.column}</span>: {v.pii_type} detected. Remediation: {v.remediation}
                       </div>
@@ -1238,6 +1238,10 @@ export const BenchmarkHubPage: React.FC = () => {
 };
 
 export default BenchmarkHubPage;
+
+
+
+
 
 
 

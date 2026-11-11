@@ -281,9 +281,9 @@ export default function PsiPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass-card rounded-2xl bg-gradient-to-r from-slate-900/60 to-indigo-50 border border-indigo-200">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass-card rounded-2xl bg-gradient-to-r from-indigo-50 to-white border border-indigo-200">
         <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 via-indigo-500 to-indigo-600 bg-clip-text text-transparent">
             Private Set Intersection (PSI)
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -299,13 +299,13 @@ export default function PsiPage() {
       </div>
 
       {/* Research & Simulation Disclaimer Banner */}
-      <div className="p-3.5 rounded-xl bg-amber-950/25 border border-amber-800/40 flex items-start gap-3 text-xs text-amber-200/90">
+      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-800/40 flex items-start gap-3 text-xs text-amber-700/90">
         <span className="text-amber-600 font-bold text-sm mt-0.5">â„¹ï¸</span>
         <div>
           <span className="font-semibold text-amber-600">Research & Benchmark Simulation Environment:</span>{' '}
           This interactive playground evaluates blinded Diffie-Hellman and MinHash fuzzy set intersection in software emulation.
           Physical hardware enclaves (Intel SGX) are absent in this runtime. For institutionally authorized cross-bank intelligence and immutable case evidence ledgers, use the{' '}
-          <Link to="/alerts" className="underline font-semibold text-amber-200 hover:text-slate-900">
+          <Link to="/alerts" className="underline font-semibold text-amber-700 hover:text-slate-900">
             Authorized Cross-Bank Intelligence Workflow
           </Link>.
         </div>
@@ -313,7 +313,7 @@ export default function PsiPage() {
 
       {/* Deep-Linked Entity Context Banner */}
       {deepLinkTarget && (
-        <div className="glass-card p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-indigo-50 to-slate-900/60 border border-emerald-200 shadow-xl space-y-3">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-indigo-50 to-white border border-emerald-200 shadow-xl space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 text-lg">
@@ -343,7 +343,7 @@ export default function PsiPage() {
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
               <Link
                 to={`/graph?entity_id=${encodeURIComponent(deepLinkTarget)}&depth=2`}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-mono font-bold transition flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/40 text-xs font-mono font-bold transition flex items-center gap-1.5"
                 title={`Explore 2-hop ego network for ${deepLinkTarget}`}
               >
                 <span>ğŸ•¸ï¸ Ego Graph</span>
@@ -351,7 +351,7 @@ export default function PsiPage() {
               </Link>
               <button
                 onClick={handleClearDeepLink}
-                className="px-3 py-1.5 rounded-xl bg-slate-50/80 hover:bg-rose-100 text-slate-600 hover:text-rose-200 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-slate-50/80 hover:bg-rose-100 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
                 title="Clear URL deep link parameters and restore default playground"
               >
                 <span>âœ•</span>
@@ -501,7 +501,7 @@ export default function PsiPage() {
               >
                 {runPSIMutation.isPending || logsRunning ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
+                    <span className="w-4 h-4 border-2 border-slate-200 border-t-white rounded-full animate-spin shrink-0"></span>
                     <span>Executing PSI Protocol...</span>
                   </>
                 ) : (
@@ -790,7 +790,7 @@ export default function PsiPage() {
                       <td className="p-3 text-right">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(match.entity_id || match.privacy_id)}&depth=2`}
-                          className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors inline-flex items-center gap-1"
+                          className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/40 transition-colors inline-flex items-center gap-1"
                           title={`Inspect ego network for ${match.display_label}`}
                         >
                           <span>ğŸ•¸ï¸ Graph</span>
@@ -842,8 +842,8 @@ export default function PsiPage() {
                   runPSIMutation.data.matches.map((match, index) => (
                     <tr key={index} className="hover:bg-slate-50/40 text-slate-600">
                       <td className="p-3 uppercase font-semibold text-slate-500">{match.entity_type}</td>
-                      <td className="p-3 font-semibold text-indigo-200">{match.display_label_a}</td>
-                      <td className="p-3 font-semibold text-emerald-200">{match.display_label_b}</td>
+                      <td className="p-3 font-semibold text-indigo-700">{match.display_label_a}</td>
+                      <td className="p-3 font-semibold text-emerald-700">{match.display_label_b}</td>
                       <td className="p-3 font-mono">
                         <span
                           className={`font-semibold ${
@@ -892,4 +892,8 @@ export default function PsiPage() {
     </div>
   );
 }
+
+
+
+
 

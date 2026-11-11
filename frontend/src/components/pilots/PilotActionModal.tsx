@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { AlertTriangle, PauseCircle, PlayCircle, CheckCircle, Ban, X } from 'lucide-react';
 
 interface PilotActionModalProps {
@@ -102,14 +102,14 @@ export default function PilotActionModal({
         </div>
 
         {actionType === 'abort' && (
-          <div className="p-3 rounded-lg border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-lg border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>CRITICAL: Aborting is permanent and cannot be undone by operator resume.</span>
           </div>
         )}
 
         {error && (
-          <div className="p-3 rounded-lg border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs">
+          <div className="p-3 rounded-lg border border-rose-300 bg-rose-50 text-rose-600 text-xs">
             {error}
           </div>
         )}
@@ -154,3 +154,4 @@ export default function PilotActionModal({
     </div>
   );
 }
+

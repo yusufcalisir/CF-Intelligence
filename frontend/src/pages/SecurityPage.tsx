@@ -365,7 +365,7 @@ export default function SecurityPage() {
               </>
             ) : (
               <>
-                <Lock className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span>Verify SHA-256 Audit Chain</span>
               </>
             )}
@@ -417,8 +417,8 @@ export default function SecurityPage() {
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer border ${
                   isCatActive
-                    ? 'bg-indigo-600/25 border-indigo-500/50 text-indigo-200 shadow-sm'
-                    : 'bg-slate-50 border-white/5 text-slate-500 hover:text-slate-800 hover:bg-white/[0.06]'
+                    ? 'bg-indigo-600/25 border-indigo-500/50 text-indigo-700 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white/[0.06]'
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -439,8 +439,8 @@ export default function SecurityPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`p-2.5 sm:p-3 rounded-xl transition-all flex flex-col justify-between text-left border min-h-[58px] cursor-pointer relative overflow-hidden group ${
                   isActive
-                    ? 'bg-indigo-100 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-200'
-                    : 'bg-white border-white/5 text-slate-500 hover:text-slate-800 hover:border-white/15 hover:bg-white'
+                    ? 'bg-indigo-100 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-200 hover:bg-white'
                 }`}
               >
                 {isActive && (
@@ -672,7 +672,7 @@ export default function SecurityPage() {
                 >
                   {evaluateABAC.isPending ? (
                     <>
-                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                       <span>Evaluating Policy...</span>
                     </>
                   ) : (
@@ -751,7 +751,7 @@ export default function SecurityPage() {
               </div>
 
               {/* HSM Root CA Binding Card */}
-              <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
+              <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-100">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                     <span>ğŸ›¡ï¸ Vault PKI Root CA - PKCS#11 Hardware HSM Interface</span>
@@ -794,7 +794,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50 text-xs space-y-1 text-indigo-200">
+                <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50 text-xs space-y-1 text-indigo-700">
                   <div className="font-bold">Hardware-Anchored Root CA Key Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
                     {isHsmHw
@@ -805,7 +805,7 @@ export default function SecurityPage() {
               </div>
 
               {/* Gnosis Safe 2-of-3 Multi-Sig Governance Card */}
-              <div className="glass-card p-5 space-y-4 border border-purple-200 bg-purple-500/5">
+              <div className="glass-card p-5 space-y-4 border border-purple-200 bg-purple-100">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                     <span>âš¡ On-Chain Governance - Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
@@ -830,7 +830,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg border border-purple-200 bg-purple-50 text-xs space-y-2 text-purple-200">
+                <div className="p-3 rounded-lg border border-purple-200 bg-purple-50 text-xs space-y-2 text-purple-700">
                   <div className="font-bold">Multi-Sig State Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
                     Single-wallet EOA coordinator centralization risk is eliminated. Critical smart contract functions (Incentive Settlement, Participant Quarantine, and Token Pool Deposits) require at least 2 valid cryptographic signatures from authorized consortium trustees.
@@ -992,7 +992,7 @@ export default function SecurityPage() {
                         key={node.id}
                         className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
                           node.broadcast
-                            ? 'bg-indigo-500/5 border-indigo-200'
+                            ? 'bg-indigo-100 border-indigo-200'
                             : 'bg-slate-50/40 border-slate-200/30'
                         }`}
                       >
@@ -1045,7 +1045,7 @@ export default function SecurityPage() {
                 </div>
 
                 {/* Shamir (t, n) Threshold & Node Dropout Simulator */}
-                <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
+                <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-100">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                       <span>ğŸ§® Shamir (t, n) Dropout Reconstruction</span>
@@ -1083,7 +1083,7 @@ export default function SecurityPage() {
                             onClick={() => toggleDropout(bank.id)}
                             className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between border transition-all ${
                               isDropped
-                                ? 'bg-rose-100 border-rose-500/40 text-rose-600'
+                                ? 'bg-rose-100 border-rose-300 text-rose-600'
                                 : 'bg-emerald-50 border-emerald-200 text-emerald-600'
                             }`}
                           >
@@ -1445,7 +1445,7 @@ export default function SecurityPage() {
                     >
                       {isPqcLoading ? (
                         <>
-                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                           <span>Deriving Lattice Keys...</span>
                         </>
                       ) : (
@@ -1457,7 +1457,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-600 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-indigo-100 border border-indigo-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-indigo-600">Quantum Security Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Lattice-based Module Learning With Errors (M-LWE) provides 100% mathematical immunity against Shor&apos;s algorithm on future quantum supercomputers.
@@ -1561,7 +1561,7 @@ export default function SecurityPage() {
                     >
                       {isBridgeLoading ? (
                         <>
-                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                           <span>Relaying CCIP Messages...</span>
                         </>
                       ) : (
@@ -1573,7 +1573,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-slate-600 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-emerald-100 border border-emerald-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-emerald-600">Cross-Ledger Coverage:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Routes funds simultaneously across Arbitrum, Optimism, Canton Private DLT, and Hyperledger Fabric with zero counterparty risk.
@@ -1712,7 +1712,7 @@ export default function SecurityPage() {
                     >
                       {isRdpLoading ? (
                         <>
-                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                           <span>Optimizing RDP Bounds...</span>
                         </>
                       ) : (
@@ -1724,7 +1724,7 @@ export default function SecurityPage() {
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/15 text-[11px] text-slate-600 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-cyan-100 border border-cyan-500/15 text-[11px] text-slate-600 space-y-1.5">
                     <div className="font-bold text-cyan-600">Anti-Overnoising Guarantee:</div>
                     <p className="text-[var(--color-text-muted)]">
                       Dynamically reduces noise as gradients converge, preserving fraud detection AUC-ROC (&gt;0.94) without early budget exhaustion.
@@ -1789,7 +1789,7 @@ export default function SecurityPage() {
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200">
                         HMAC-SHA256 Signed
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-600 border border-cyan-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-100 text-cyan-600 border border-cyan-500/30">
                         SSRF Protected
                       </span>
                     </div>
@@ -1809,7 +1809,7 @@ export default function SecurityPage() {
                 </div>
 
                 {testDispatchStatus && (
-                  <div className="p-3 rounded-lg text-xs font-mono bg-purple-50 border border-purple-200 text-purple-200">
+                  <div className="p-3 rounded-lg text-xs font-mono bg-purple-50 border border-purple-200 text-purple-700">
                     {testDispatchStatus}
                   </div>
                 )}
@@ -2026,4 +2026,7 @@ export default function SecurityPage() {
     </div>
   );
 }
+
+
+
 

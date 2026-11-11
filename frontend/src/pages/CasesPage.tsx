@@ -373,7 +373,7 @@ export default function CasesPage() {
                 type="button"
                 id="clear-case-status-filter-btn"
                 onClick={handleClearAllFilters}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/15 text-slate-800 border border-slate-200 transition-all cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-white/15 text-slate-800 border border-slate-200 transition-all cursor-pointer"
               >
                 Clear Status Filter
               </button>
@@ -431,7 +431,7 @@ export default function CasesPage() {
 
       {/* Inbound Alert Escalation Banner */}
       {fromAlertId && !showCreateModal && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-900/80 rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-white rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2">
             <span className="text-base">âš¡</span>
             <span className="text-slate-800">
@@ -530,7 +530,7 @@ function CreateCaseModal({
         </div>
 
         {fromAlertId && (
-          <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-900/80 rounded-lg border border-indigo-200 text-xs space-y-1">
+          <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-white rounded-lg border border-indigo-200 text-xs space-y-1">
             <div className="flex items-center justify-between font-semibold text-indigo-600">
               <span className="flex items-center gap-1.5">
                 <span>âš¡</span> Escalating from Inbound Alert
@@ -614,4 +614,6 @@ function CreateCaseModal({
     </div>
   );
 }
+
+
 

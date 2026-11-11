@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+﻿import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useScenarios, useStartScenario, useScenarioStatus, useStopScenario, useActiveScenarios } from '../api/queries';
 import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
@@ -102,10 +102,10 @@ export default function ScenariosPage() {
   }, []);
 
   const SCENARIO_ICONS: Record<string, string> = {
-    fraud_ring: '🕸️',
-    account_takeover: '🔐',
-    money_laundering: '💰',
-    card_testing: '💳',
+    fraud_ring: 'ğŸ•¸ï¸',
+    account_takeover: 'ğŸ”',
+    money_laundering: 'ğŸ’°',
+    card_testing: 'ğŸ’³',
   };
 
   const SCENARIO_GRADIENTS: Record<string, string> = {
@@ -172,10 +172,10 @@ export default function ScenariosPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold flex items-center gap-2">
               <span>
-                {isRunning ? '▶️ Scenario Running' :
-                 isCompleted ? '✅ Scenario Complete' :
-                 isStopped ? '⏹️ Scenario Stopped' :
-                 `ℹ️ Scenario ${status?.status ?? ''}`}
+                {isRunning ? 'â–¶ï¸ Scenario Running' :
+                 isCompleted ? 'âœ… Scenario Complete' :
+                 isStopped ? 'â¹ï¸ Scenario Stopped' :
+                 `â„¹ï¸ Scenario ${status?.status ?? ''}`}
               </span>
             </h3>
             <div className="flex items-center gap-2">
@@ -190,16 +190,16 @@ export default function ScenariosPage() {
                 <button
                   onClick={handleStop}
                   disabled={stopScenario.isPending}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-100 text-rose-600 hover:bg-rose-500/30 border border-rose-500/40 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-100 text-rose-600 hover:bg-rose-100 border border-rose-300 transition-all cursor-pointer"
                 >
-                  {stopScenario.isPending ? 'Stopping...' : '⏹ Stop'}
+                  {stopScenario.isPending ? 'Stopping...' : 'â¹ Stop'}
                 </button>
               ) : (
                 <button
                   onClick={handleDismiss}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-white/10 text-slate-600 hover:bg-white/20 border border-white/15 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-white/20 border border-slate-200 transition-all cursor-pointer"
                 >
-                  ✕ Dismiss
+                  âœ• Dismiss
                 </button>
               )}
             </div>
@@ -277,11 +277,11 @@ export default function ScenariosPage() {
 
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-3xl">{SCENARIO_ICONS[scenarioType] || '🎯'}</span>
+                    <span className="text-3xl">{SCENARIO_ICONS[scenarioType] || 'ğŸ¯'}</span>
                     <div>
                       <h3 className="font-bold">{scenarioName}</h3>
                       <span className="text-xs text-[var(--color-text-muted)]">
-                        {scenarioEvents} events • ~{scenarioDuration}s
+                        {scenarioEvents} events â€¢ ~{scenarioDuration}s
                       </span>
                     </div>
                   </div>
@@ -310,11 +310,11 @@ export default function ScenariosPage() {
                     >
                       {startScenario.isPending ? (
                         <>
-                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                           <span>Starting...</span>
                         </>
                       ) : (
-                        <span>▶ Run</span>
+                        <span>â–¶ Run</span>
                       )}
                     </button>
                   </div>
@@ -327,3 +327,6 @@ export default function ScenariosPage() {
     </div>
   );
 }
+
+
+

@@ -174,7 +174,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   onClick={() => setResolution('CONFIRMED_FRAUD')}
                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium ${
                     resolution === 'CONFIRMED_FRAUD'
-                      ? 'bg-rose-100 border-rose-500/50 text-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.2)]'
+                      ? 'bg-rose-100 border-rose-300 text-rose-600 shadow-rose-100'
                       : 'bg-white/40 border-slate-200 text-slate-500 hover:bg-slate-50/40'
                   }`}
                 >
@@ -215,7 +215,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   placeholder="e.g. supervisor_alice"
                   className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-slate-900 placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalPrimary
-                      ? 'border-rose-500/80 focus:border-rose-500'
+                      ? 'border-rose-300 focus:border-rose-300'
                       : 'border-slate-200 focus:border-indigo-400'
                   }`}
                 />
@@ -245,7 +245,7 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
                   placeholder="e.g. supervisor_bob"
                   className={`w-full px-3 py-2 text-xs rounded-xl bg-white border text-slate-900 placeholder-slate-500 outline-none transition-colors ${
                     selfApprovalSecondary || duplicateSupervisors
-                      ? 'border-rose-500/80 focus:border-rose-500'
+                      ? 'border-rose-300 focus:border-rose-300'
                       : 'border-slate-200 focus:border-indigo-400'
                   }`}
                 />
@@ -319,5 +319,6 @@ export const FourEyesApprovalModal: FC<FourEyesApprovalModalProps> = ({
 };
 
 export default FourEyesApprovalModal;
+
 
 

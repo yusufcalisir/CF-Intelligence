@@ -85,12 +85,12 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
       <div
         className={`p-5 rounded-xl border flex items-start gap-3.5 ${
           isActive
-            ? 'border-emerald-500/40 bg-emerald-50/20 text-emerald-200'
+            ? 'border-emerald-500/40 bg-emerald-50/20 text-emerald-700'
             : isPaused
-            ? 'border-amber-500/40 bg-amber-950/20 text-amber-200'
+            ? 'border-amber-500/40 bg-amber-50 text-amber-700'
             : isTerminal
             ? 'border-slate-200 bg-white/50 text-slate-500'
-            : 'border-cyan-500/40 bg-cyan-50/20 text-cyan-200'
+            : 'border-cyan-500/40 bg-cyan-50/20 text-cyan-700'
         }`}
       >
         {isActive ? (
@@ -122,7 +122,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
       </div>
 
       {actionError && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
+        <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Action Execution Failed</div>
@@ -149,7 +149,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canActivate || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canActivate && !isAnyActionPending
-                ? 'border-cyan-500/50 bg-cyan-50/30 hover:bg-cyan-900/40 text-cyan-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-cyan-500/50 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -166,7 +166,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canPause || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canPause && !isAnyActionPending
-                ? 'border-amber-500/50 bg-amber-950/30 hover:bg-amber-900/40 text-amber-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-amber-500/50 bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -183,7 +183,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canResume || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canResume && !isAnyActionPending
-                ? 'border-emerald-500/50 bg-emerald-50/30 hover:bg-emerald-900/40 text-emerald-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-emerald-500/50 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -200,7 +200,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canComplete || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canComplete && !isAnyActionPending
-                ? 'border-teal-500/50 bg-teal-950/30 hover:bg-teal-900/40 text-teal-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-teal-500/50 bg-teal-50 hover:bg-teal-100 text-teal-700 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -217,7 +217,7 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
             disabled={!canAbort || isAnyActionPending}
             className={`p-3.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all ${
               canAbort && !isAnyActionPending
-                ? 'border-rose-500/50 bg-rose-950/30 hover:bg-rose-900/40 text-rose-200 cursor-pointer shadow-sm hover:scale-[1.02]'
+                ? 'border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 cursor-pointer shadow-sm hover:scale-[1.02]'
                 : 'border-slate-200 bg-white/40 text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
@@ -254,4 +254,8 @@ export default function PilotControlsSection({ pilot }: PilotControlsSectionProp
     </div>
   );
 }
+
+
+
+
 

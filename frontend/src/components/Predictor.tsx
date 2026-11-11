@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Activity, Send } from 'lucide-react';
 import { PredictPayload, PredictResponse } from '../types';
 import { predictTransaction } from '../services/api';
@@ -134,7 +134,7 @@ export const Predictor: React.FC = () => {
           >
             {loading ? (
               <>
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-white animate-spin shrink-0" />
                 <span>Evaluating Payload...</span>
               </>
             ) : (
@@ -206,3 +206,4 @@ export const Predictor: React.FC = () => {
     </div>
   );
 };
+

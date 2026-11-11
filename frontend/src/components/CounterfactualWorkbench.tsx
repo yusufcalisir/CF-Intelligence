@@ -324,7 +324,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                         onClick={() => handleSelectAlert(alt.id)}
                         className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-cyan-50 text-cyan-200'
+                            ? 'bg-cyan-50 text-cyan-700'
                             : 'hover:bg-slate-50/80 text-slate-600 hover:text-slate-900'
                         }`}
                       >
@@ -489,7 +489,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   setVelocity(35);
                   setMerchantRisk(0.95);
                 }}
-                className="p-2.5 sm:p-2 rounded-lg bg-rose-950/30 border border-rose-200 hover:border-rose-500 text-left text-xs sm:text-[11px] text-rose-200 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
+                className="p-2.5 sm:p-2 rounded-lg bg-rose-50 border border-rose-200 hover:border-rose-300 text-left text-xs sm:text-[11px] text-rose-700 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
               >
                 <div className="font-bold">Smurfing Burst</div>
                 <div className="text-[10px] text-rose-600 font-mono shrink-0">$25K â€¢ 35 tx/h</div>
@@ -501,7 +501,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   setVelocity(18);
                   setMerchantRisk(0.65);
                 }}
-                className="p-2.5 sm:p-2 rounded-lg bg-amber-950/30 border border-amber-200 hover:border-amber-500 text-left text-xs sm:text-[11px] text-amber-200 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
+                className="p-2.5 sm:p-2 rounded-lg bg-amber-50 border border-amber-200 hover:border-amber-500 text-left text-xs sm:text-[11px] text-amber-700 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
               >
                 <div className="font-bold">Wire Outlier</div>
                 <div className="text-[10px] text-amber-600 font-mono shrink-0">$12K â€¢ 18 tx/h</div>
@@ -513,7 +513,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   setVelocity(4);
                   setMerchantRisk(0.20);
                 }}
-                className="p-2.5 sm:p-2 rounded-lg bg-emerald-50/30 border border-emerald-200 hover:border-emerald-500 text-left text-xs sm:text-[11px] text-emerald-200 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
+                className="p-2.5 sm:p-2 rounded-lg bg-emerald-50 border border-emerald-200 hover:border-emerald-500 text-left text-xs sm:text-[11px] text-emerald-700 transition-all cursor-pointer flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-1"
               >
                 <div className="font-bold">Low-Risk Retail</div>
                 <div className="text-[10px] text-emerald-600 font-mono shrink-0">$1.2K â€¢ 4 tx/h</div>
@@ -678,7 +678,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               {/* Status and Baseline Delta */}
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 {isSuspicious ? (
-                  <span className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-500/25 font-bold">
+                  <span className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-300 font-bold">
                     <AlertTriangle className="h-3.5 w-3.5" /> High Risk (Fraud Suspected)
                   </span>
                 ) : (
@@ -745,7 +745,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
           {/* Error Banner */}
           {error && (
-            <div className="bg-rose-50 border border-rose-500/25 text-rose-600 p-3.5 sm:p-4 rounded-xl text-xs flex items-center gap-3 min-w-0">
+            <div className="bg-rose-50 border border-rose-300 text-rose-600 p-3.5 sm:p-4 rounded-xl text-xs flex items-center gap-3 min-w-0">
               <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
               <div className="min-w-0">
                 <p className="font-bold">Counterfactual Simulation Error</p>
@@ -777,7 +777,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 <button
                   type="button"
                   onClick={handleApplySuggestedValues}
-                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-500/25 text-emerald-600 hover:text-emerald-100 border border-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                   title="Update sliders to suggested remediation values to clear risk score"
                 >
                   <Wand2 className="h-3.5 w-3.5" />
@@ -835,5 +835,9 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 };
 
 export default CounterfactualWorkbench;
+
+
+
+
 
 

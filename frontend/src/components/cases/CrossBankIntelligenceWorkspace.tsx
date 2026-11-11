@@ -267,7 +267,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   return (
     <div
-      className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/50 to-indigo-50 border border-indigo-200 backdrop-blur-md shadow-2xl space-y-6"
+      className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-indigo-50 via-white to-white border border-indigo-200 backdrop-blur-md shadow-2xl space-y-6"
       data-testid="cross-bank-intelligence-workspace"
     >
       {/* Workspace Header */}
@@ -308,7 +308,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
       {/* Tenant Context Warning if unauthenticated / missing bankId */}
       {(!bankId || bankId.trim() === '') && (
-        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2.5" data-testid="unauthenticated-warning">
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-500/40 text-amber-700 text-xs flex items-center gap-2.5" data-testid="unauthenticated-warning">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
             Tenant Context Required: An authenticated institution bank ID is required to query cross-bank intelligence and view authorized capabilities.
@@ -353,11 +353,11 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                   Loading authorized case entities...
                 </div>
               ) : entitiesError ? (
-                <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-200 text-rose-600 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs font-mono">
                   Failed to load entities: {formatApiError(entitiesError)}
                 </div>
               ) : eligibleEntities.length === 0 ? (
-                <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-200 text-amber-200 text-xs leading-relaxed">
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs leading-relaxed">
                   No institution-owned entities currently linked to this case. Please link alerts or ensure bank customer/merchant entities exist.
                 </div>
               ) : (
@@ -391,11 +391,11 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                   Loading authorized consortium capabilities...
                 </div>
               ) : capabilitiesError ? (
-                <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-200 text-rose-600 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs font-mono">
                   Failed to load capabilities: {formatApiError(capabilitiesError)}
                 </div>
               ) : activeConsortia.length === 0 ? (
-                <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-200 text-amber-200 text-xs leading-relaxed" data-testid="empty-consortia-callout">
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs leading-relaxed" data-testid="empty-consortia-callout">
                   No verified consortium participation or authorized bilateral counterparts configured for this institution.
                 </div>
               ) : (
@@ -438,7 +438,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                         disabled={!isAuth}
                         className={`px-3 py-2 rounded-lg text-xs font-mono font-bold transition flex flex-col justify-between border text-left ${
                           isChecked
-                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-700'
                             : isAuth
                             ? 'bg-white/60 border-slate-200 text-slate-500 hover:border-slate-200'
                             : 'bg-white/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
@@ -489,7 +489,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             </div>
 
             {/* Assurance Guarantees Indicator */}
-            <div className="p-2.5 rounded-lg bg-indigo-50/40 border border-indigo-200 text-[11px] text-indigo-600 space-y-1">
+            <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-600 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
                 <Lock className="w-3.5 h-3.5 text-indigo-600" />
                 Operational Assurance Guarantees
@@ -501,7 +501,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
             {/* Query Dispatch Error */}
             {queryError && (
-              <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 text-xs flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="break-all">{queryError}</div>
               </div>
@@ -545,8 +545,8 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                       queryResponse.overall_outcome === 'COMPLETED'
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                         : queryResponse.overall_outcome === 'PARTIAL_FAILURE'
-                        ? 'bg-amber-950 text-amber-600 border border-amber-200'
-                        : 'bg-rose-950 text-rose-600 border border-rose-200'
+                        ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                        : 'bg-rose-50 text-rose-600 border border-rose-200'
                     }`}
                   >
                     {queryResponse.overall_outcome}
@@ -566,7 +566,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             ) : queryMultiMutation.isPending ? (
               <div className="py-12 px-4 text-center rounded-xl bg-white/40 border border-indigo-200 space-y-3">
                 <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-                <div className="text-xs text-indigo-200 font-semibold">
+                <div className="text-xs text-indigo-700 font-semibold">
                   Executing Server-Authoritative Multi-Counterparty PSI...
                 </div>
                 <p className="text-[11px] text-slate-500 max-w-md mx-auto">
@@ -635,7 +635,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                             : signal
                             ? 'bg-white/60 border-slate-200'
                             : failure
-                            ? 'bg-rose-950/20 border-rose-200'
+                            ? 'bg-rose-50 border-rose-200'
                             : 'bg-white/40 border-slate-200'
                         }`}
                         data-testid={isAnonymized ? `outcome-card-anonymized-${index}` : `outcome-card-${bankKey}`} data-outcome-index={index}
@@ -646,7 +646,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                               {displayCounterpart}
                             </span>
                             {isAnonymized && signal && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-900/50 text-purple-600 border border-purple-200">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-100 text-purple-700 border border-purple-200">
                                 ANONYMOUS MASKED
                               </span>
                             )}
@@ -663,7 +663,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                               VERIFIED NO MATCH
                             </span>
                           ) : failure ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-500/40 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-300 flex items-center gap-1">
                               <XCircle className="w-3 h-3 text-rose-600" />
                               {failure.error_category}
                             </span>
@@ -688,7 +688,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                                 {signal.sanitized_typology_indicators.map((typ) => (
                                   <span
                                     key={typ}
-                                    className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-100 text-amber-200 border border-amber-200"
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-100 text-amber-700 border border-amber-200"
                                   >
                                     {typ}
                                   </span>
@@ -736,7 +736,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                   </div>
 
                   {attachError && (
-                    <div className="p-2.5 rounded-lg bg-rose-950/50 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
+                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 text-xs flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                       <span>{attachError}</span>
                     </div>
@@ -744,7 +744,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                   {attachResponse && (
                     <div
-                      className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-500/40 text-emerald-200 text-xs space-y-1.5"
+                      className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-500/40 text-emerald-700 text-xs space-y-1.5"
                       data-testid="attach-success-banner"
                     >
                       <div className="font-bold flex items-center gap-1.5 text-emerald-600">
@@ -861,7 +861,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                             : ev.verification_state === 'INTEGRITY_VERIFIED_ONLY'
                             ? 'bg-amber-100 text-amber-600 border-amber-500/40'
                             : ev.verification_state === 'FAILED_VERIFICATION'
-                            ? 'bg-rose-100 text-rose-600 border-rose-500/40'
+                            ? 'bg-rose-100 text-rose-600 border-rose-300'
                             : 'bg-slate-50 text-slate-500 border-slate-200'
                         }`}
                       >
@@ -953,4 +953,8 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
     </div>
   );
 };
+
+
+
+
 

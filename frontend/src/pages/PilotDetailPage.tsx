@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { usePilotStatus } from '../api/pilots';
 import type { PilotStatus } from '../api/types';
@@ -100,7 +100,7 @@ export default function PilotDetailPage() {
   if (isError || !pilot) {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-8">
-        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-6 text-center">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
           <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
           <h2 className="text-base font-semibold text-rose-600">Consortium Pilot Not Accessible</h2>
           <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
@@ -111,7 +111,7 @@ export default function PilotDetailPage() {
           <div className="mt-5 flex items-center justify-center gap-3">
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-700/50 bg-rose-900/40 px-3 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-700/50 bg-rose-100 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry</span>
@@ -167,15 +167,15 @@ export default function PilotDetailPage() {
             <span>
               Consortium: <strong className="font-mono text-slate-600">{pilot.consortium_id}</strong>
             </span>
-            <span>•</span>
+            <span>â€¢</span>
             <span>
               Purposes: <span className="font-mono text-slate-600">{pilot.allowed_purposes?.join(', ') || 'N/A'}</span>
             </span>
-            <span>•</span>
+            <span>â€¢</span>
             <div className="flex items-center gap-1">
               <Building className="h-3 w-3 text-slate-500" />
               <span className="font-mono text-slate-600">{pilot.participating_institutions?.[0] || 'Bank A'}</span>
-              <span className="text-[10px] text-slate-500 font-bold">⇄</span>
+              <span className="text-[10px] text-slate-500 font-bold">â‡„</span>
               <span className="font-mono text-slate-600">{pilot.participating_institutions?.[1] || 'Bank B'}</span>
             </div>
           </div>
@@ -192,11 +192,11 @@ export default function PilotDetailPage() {
 
       {/* Alert Notices */}
       {pilot.status === 'PAUSED' && (
-        <div className="rounded-xl border border-amber-200 bg-amber-950/20 p-4 text-xs text-amber-200 flex items-start gap-3">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700 flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-amber-600">Pilot Execution Paused</div>
-            <div className="text-amber-200/80 mt-0.5">
+            <div className="text-amber-700/80 mt-0.5">
               Live operational queries between {pilot.participating_institutions?.join(' and ') || 'participants'} are temporarily halted.
               Authorized operators can resume once conditions are cleared.
             </div>
@@ -205,11 +205,11 @@ export default function PilotDetailPage() {
       )}
 
       {pilot.status === 'ABORTED' && (
-        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-600">Pilot Permanently Aborted</div>
-            <div className="text-rose-200/80 mt-0.5">
+            <div className="text-rose-700/80 mt-0.5">
               This pilot was aborted via emergency intervention. No further queries, approvals or transitions are permitted.
             </div>
           </div>
@@ -217,11 +217,11 @@ export default function PilotDetailPage() {
       )}
 
       {isExpired && pilot.status !== 'ABORTED' && pilot.status !== 'COMPLETED' && (
-        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-3">
           <Clock className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-600">Pilot Scope Expired</div>
-            <div className="text-rose-200/80 mt-0.5">
+            <div className="text-rose-700/80 mt-0.5">
               The operational validity window for this pilot has expired ({pilot.expires_at}). Query execution is prohibited.
             </div>
           </div>
@@ -275,3 +275,6 @@ export default function PilotDetailPage() {
     </div>
   );
 }
+
+
+

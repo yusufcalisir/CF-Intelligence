@@ -228,7 +228,7 @@ export default function BankOnboardingPage() {
 
         <Link
           to="/operations"
-          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-200 hover:bg-white/10 text-slate-600 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Operations</span>
@@ -249,7 +249,7 @@ export default function BankOnboardingPage() {
           </div>
 
           {/* Glowing Segmented Progress Bar */}
-          <div className="w-full bg-slate-50/80 h-2 rounded-full overflow-hidden p-0.5 border border-white/5 flex gap-1">
+          <div className="w-full bg-slate-50/80 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200 flex gap-1">
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
@@ -279,7 +279,7 @@ export default function BankOnboardingPage() {
                       ? 'bg-emerald-100 border-emerald-500/50 text-emerald-600 cursor-pointer'
                       : isCurrent
                       ? 'bg-indigo-600 border-indigo-400 text-slate-900 shadow-lg shadow-indigo-500/40 scale-110'
-                      : 'bg-slate-50/50 border-white/5 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-50/50 border-slate-200 text-slate-500 cursor-not-allowed'
                   }`}
                 >
                   {isPast ? 'âœ“' : s.num}
@@ -303,7 +303,7 @@ export default function BankOnboardingPage() {
                     ? 'bg-indigo-100 border-indigo-500/70 text-slate-900 shadow-lg shadow-indigo-600/15'
                     : isPast
                     ? 'bg-emerald-50 border-emerald-200 text-slate-600 cursor-pointer hover:bg-emerald-100'
-                    : 'bg-white/[0.02] border-white/5 text-slate-500'
+                    : 'bg-white/[0.02] border-slate-200 text-slate-500'
                 }`}
               >
                 {isCurrent && (
@@ -316,7 +316,7 @@ export default function BankOnboardingPage() {
                       isPast
                         ? 'bg-emerald-100 text-emerald-600'
                         : isCurrent
-                        ? 'bg-indigo-500/30 text-indigo-600'
+                        ? 'bg-indigo-100 text-indigo-600'
                         : 'bg-slate-50 text-slate-500'
                     }`}
                   >
@@ -508,19 +508,19 @@ export default function BankOnboardingPage() {
           </div>
 
           <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5 text-xs sm:text-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Consortium Bank ID:</span>
               <span className="font-mono font-bold text-indigo-600">{formData.bank_id}</span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Legal Entity Name:</span>
               <span className="font-bold text-slate-800">{formData.legal_name}</span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Jurisdiction & Standard:</span>
               <span className="font-bold text-emerald-600">{formData.jurisdiction} Compliance</span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">SecOps Contact:</span>
               <span className="text-slate-800 font-mono">{formData.contact_email}</span>
             </div>
@@ -535,7 +535,7 @@ export default function BankOnboardingPage() {
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-bold text-amber-200">
+                  <div className="font-bold text-amber-700">
                     {isConflict ? 'Registration Conflict (HTTP 409)' : 'Registration Error'}
                   </div>
                   <div className="mt-0.5 text-amber-600/90 leading-relaxed">{errorMessage}</div>
@@ -547,14 +547,14 @@ export default function BankOnboardingPage() {
                     type="button"
                     onClick={handleLoadExistingBundle}
                     disabled={isSubmitting}
-                    className="px-3.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-100 border border-amber-500/40 text-amber-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>ğŸ“¥ Retrieve Existing Node Configuration</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleGenerateUniqueBankId}
-                    className="px-3.5 py-1.5 rounded-lg bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>ğŸ”„ Generate New Unique Bank ID</span>
                   </button>
@@ -566,7 +566,7 @@ export default function BankOnboardingPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(1)}
-              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 shrink-0 whitespace-nowrap"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 shrink-0 whitespace-nowrap"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Step 1</span>
@@ -616,7 +616,7 @@ export default function BankOnboardingPage() {
                   2048-bit RSA
                 </span>
               </div>
-              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-emerald-600 overflow-x-auto max-h-28 border border-white/5 custom-scrollbar">
+              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-emerald-600 overflow-x-auto max-h-28 border border-slate-200 custom-scrollbar">
                 {generatedCert}
               </pre>
               <button
@@ -638,7 +638,7 @@ export default function BankOnboardingPage() {
                   CONFIDENTIAL
                 </span>
               </div>
-              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-amber-600 overflow-x-auto max-h-28 border border-white/5 custom-scrollbar">
+              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-amber-600 overflow-x-auto max-h-28 border border-slate-200 custom-scrollbar">
                 {generatedKey}
               </pre>
               <button
@@ -683,7 +683,7 @@ export default function BankOnboardingPage() {
                 Generated config.yaml
               </span>
             </div>
-            <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-indigo-200 overflow-x-auto max-h-36 border border-white/5 custom-scrollbar">
+            <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-indigo-700 overflow-x-auto max-h-36 border border-slate-200 custom-scrollbar">
               {generatedYaml}
             </pre>
             <button
@@ -804,6 +804,8 @@ export default function BankOnboardingPage() {
     </div>
   );
 }
+
+
 
 
 

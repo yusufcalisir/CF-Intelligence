@@ -183,7 +183,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-white/10 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>
@@ -249,7 +249,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   key={s.id}
                   className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
                     isCurrent
-                      ? 'bg-indigo-100 border border-indigo-200 text-indigo-200'
+                      ? 'bg-indigo-100 border border-indigo-200 text-indigo-700'
                       : isCompleted
                       ? 'text-slate-500 opacity-80'
                       : 'text-slate-600 opacity-40'
@@ -275,7 +275,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
 
           {/* Progress Bar */}
           <div className="space-y-1.5 pt-1">
-            <div className="w-full bg-white rounded-full h-1.5 overflow-hidden p-0.5 border border-white/5">
+            <div className="w-full bg-white rounded-full h-1.5 overflow-hidden p-0.5 border border-slate-200">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 transition-all duration-150"
                 style={{ width: `${progress}%` }}
@@ -291,5 +291,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
     </AnimatePresence>
   );
 }
+
+
 
 

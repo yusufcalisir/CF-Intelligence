@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Cpu, Play, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { FLRoundResult } from '../types';
@@ -81,17 +81,17 @@ export const FLRoundRunner: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center gap-3 text-rose-600 text-xs">
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-300 flex items-center gap-3 text-rose-600 text-xs">
           <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
           <div className="flex-1">
-            <span className="font-semibold text-rose-200">Simulation Error: </span>
+            <span className="font-semibold text-rose-700">Simulation Error: </span>
             <span>{error}</span>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-xs text-rose-600 hover:text-rose-200 cursor-pointer font-bold px-1"
+            className="text-xs text-rose-600 hover:text-rose-700 cursor-pointer font-bold px-1"
           >
-            ✕
+            âœ•
           </button>
         </div>
       )}
@@ -229,3 +229,5 @@ export const FLRoundRunner: React.FC = () => {
     </div>
   );
 };
+
+

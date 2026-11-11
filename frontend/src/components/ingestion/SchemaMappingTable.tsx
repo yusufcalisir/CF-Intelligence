@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   SlidersHorizontal,
   CheckCircle2,
@@ -107,7 +107,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
                       id={`mapping-select-${col}`}
                       value={currentTarget}
                       onChange={(e) => onMappingChange(col, e.target.value)}
-                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/15 text-slate-800 text-xs focus:outline-none focus:border-indigo-500 font-sans"
+                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-indigo-500 font-sans"
                     >
                       {CANONICAL_TARGET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -134,3 +134,4 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
     </div>
   );
 };
+

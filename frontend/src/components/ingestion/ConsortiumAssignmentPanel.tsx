@@ -60,7 +60,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               onClick={() => setSelectedBank(bank.id)}
               className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-indigo-500 bg-indigo-50/30 shadow-indigo-100'
+                  ? 'border-indigo-500 bg-indigo-50 shadow-indigo-100'
                   : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/70 hover:border-indigo-300'
               }`}
             >
@@ -79,7 +79,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
       </div>
 
       {/* Allocation Mode & Trigger Options */}
-      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
             <Layers size={13} className="text-indigo-600" /> Partition Allocation Strategy:
@@ -110,7 +110,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
           </div>
         </div>
 
-        <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+        <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
           <label htmlFor="trigger-fl-toggle" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-pointer">
             <Zap size={13} className="text-amber-600" /> Trigger Federated Learning Round Automatically
           </label>
@@ -119,7 +119,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
             type="checkbox"
             checked={triggerFL}
             onChange={(e) => setTriggerFL(e.target.checked)}
-            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-black/40 border-white/20 cursor-pointer"
+            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-black/40 border-slate-200 cursor-pointer"
           />
         </div>
       </div>
@@ -138,4 +138,6 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
     </div>
   );
 };
+
+
 

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { SimulationDetail } from '../../api/types';
 import { ResponsiveContainer, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Area } from 'recharts';
 
@@ -73,7 +73,7 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
   return (
     <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-6 border border-slate-200 relative overflow-hidden min-w-0">
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-100 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-200 pb-4 min-w-0">
@@ -81,7 +81,7 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
           <div className="flex items-center gap-2 mb-1 min-w-0">
             {hwMode === 'tee' ? <CpuIcon /> : <KeyIcon />}
             <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
-              {hwMode === 'tee' ? '🛡️ Trusted Execution Environment (TEE)' : '🔑 Fully Homomorphic Encryption (FHE)'}
+              {hwMode === 'tee' ? 'ğŸ›¡ï¸ Trusted Execution Environment (TEE)' : 'ğŸ”‘ Fully Homomorphic Encryption (FHE)'}
             </h3>
           </div>
           <p className="text-xs text-slate-500">
@@ -141,8 +141,8 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
               </div>
               <div className={`flex items-center gap-2 text-xs font-semibold p-2 rounded border min-w-0 ${
                 isHwBacked
-                  ? 'text-emerald-600 bg-emerald-500/5 border-emerald-500/10'
-                  : 'text-amber-600 bg-amber-500/5 border-amber-200'
+                  ? 'text-emerald-600 bg-emerald-100 border-emerald-500/10'
+                  : 'text-amber-600 bg-amber-100 border-amber-200'
               }`}>
                 <ShieldCheckIcon />
                 <span className="truncate">
@@ -233,3 +233,4 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
     </div>
   );
 };
+

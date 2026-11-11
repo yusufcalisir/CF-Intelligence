@@ -46,8 +46,8 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       className={`pointer-events-auto rounded-2xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-xl border transition-all ${
         isCritical
-          ? 'bg-gradient-to-br from-red-950/90 via-slate-900/95 to-slate-50 border-red-500/40 shadow-[0_0_25px_rgba(239,68,68,0.25)]'
-          : 'bg-gradient-to-br from-amber-950/90 via-slate-900/95 to-slate-50 border-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+          ? 'bg-gradient-to-br from-red-50 via-red-50 to-white border-red-200'
+          : 'bg-gradient-to-br from-amber-50 via-amber-50 to-white border-amber-200'
       }`}
     >
       {/* Header Row */}
@@ -81,7 +81,7 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
           </span>
           <button
             onClick={onDismiss}
-            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             aria-label="Dismiss notification"
           >
             <X className="w-3.5 h-3.5" />
@@ -120,4 +120,6 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
     </motion.div>
   );
 }
+
+
 

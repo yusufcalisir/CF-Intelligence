@@ -92,7 +92,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
             className={`px-3 py-1 rounded-full font-semibold border ${
               pilot.is_fully_approved
                 ? 'bg-emerald-50/60 text-emerald-600 border-emerald-600/50'
-                : 'bg-amber-950/60 text-amber-600 border-amber-600/50'
+                : 'bg-amber-50 text-amber-600 border-amber-600/50'
             }`}
           >
             {pilot.is_fully_approved ? 'FULLY AUTHORIZED' : 'APPROVALS PENDING'}
@@ -101,7 +101,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       </div>
 
       {submitError && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
+        <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Approval Submission Failed</div>
@@ -124,7 +124,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 isApproved && !isStale
                   ? 'border-emerald-500/40 bg-emerald-50/10'
                   : isStale
-                  ? 'border-amber-500/40 bg-amber-950/10'
+                  ? 'border-amber-500/40 bg-amber-50'
                   : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
               } space-y-3`}
             >
@@ -284,4 +284,6 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
     </div>
   );
 }
+
+
 

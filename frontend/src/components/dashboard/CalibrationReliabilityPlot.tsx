@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -127,7 +127,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
       className={`glass-card p-5 sm:p-6 space-y-5 min-h-[480px] flex flex-col ${className}`}
     >
       {/* Header with Title and Calibration Method Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-cyan-600" />
@@ -180,7 +180,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
 
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-slate-200 space-y-1 min-w-0">
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Expected Calib Error (ECE)
           </div>
@@ -192,7 +192,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-slate-200 space-y-1 min-w-0">
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Max Calib Error (MCE)
           </div>
@@ -204,7 +204,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-slate-200 space-y-1 min-w-0">
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Brier Score (MSE)
           </div>
@@ -216,7 +216,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-slate-200 space-y-1 min-w-0">
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Reliability Verdict
           </div>
@@ -350,7 +350,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
       </div>
 
       {/* Footer Info & Toggleable Bin Table */}
-      <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-t border-white/5">
+      <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-t border-slate-200">
         <div className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
           <Info className="w-4 h-4 text-cyan-600 shrink-0" />
           <span>
@@ -386,7 +386,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             </thead>
             <tbody>
               {chartData.map((b) => (
-                <tr key={b.bin_index} className="border-b border-white/5 hover:bg-white/[0.02]">
+                <tr key={b.bin_index} className="border-b border-slate-200 hover:bg-white/[0.02]">
                   <td className="py-1 px-2 font-bold text-slate-900">#{b.bin_index}</td>
                   <td className="py-1 px-2 text-[var(--color-text-muted)]">{b.bin_label.split(' ')[1]}</td>
                   <td className="py-1 px-2 text-cyan-600">{b.mean_confidence.toFixed(3)}</td>
@@ -404,3 +404,4 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
 };
 
 export default CalibrationReliabilityPlot;
+

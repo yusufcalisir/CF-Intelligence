@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DriftMetricsCard - Empirical Concept & Feature Drift Profiling Telemetry Card
  *
  * Visualizes multi-period statistical drift metrics:
@@ -111,7 +111,7 @@ export default function DriftMetricsCard({
             <div key={i} className="h-24 bg-slate-50/40 rounded-xl" />
           ))}
         </div>
-        <div className="h-48 bg-slate-50/30 rounded-xl" />
+        <div className="h-48 bg-slate-50 rounded-xl" />
       </div>
     );
   }
@@ -216,7 +216,7 @@ export default function DriftMetricsCard({
         <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-200/50 flex flex-col justify-between">
           <div className="text-xs font-medium text-slate-500 flex items-center justify-between">
             <span>Mean KS p-value</span>
-            <span className="text-[10px] text-slate-500 font-mono">FDR α=0.05</span>
+            <span className="text-[10px] text-slate-500 font-mono">FDR Î±=0.05</span>
           </div>
           <div className="my-2">
             <span
@@ -291,7 +291,7 @@ export default function DriftMetricsCard({
                 <th className="py-2.5 px-3">Feature Identifier</th>
                 <th className="py-2.5 px-3">KS Statistic (D)</th>
                 <th className="py-2.5 px-3">KS p-value</th>
-                <th className="py-2.5 px-3">Wasserstein (EMD/σ)</th>
+                <th className="py-2.5 px-3">Wasserstein (EMD/Ïƒ)</th>
                 <th className="py-2.5 px-3">PSI Divergence</th>
                 <th className="py-2.5 px-3">Drift Status</th>
               </tr>
@@ -308,7 +308,7 @@ export default function DriftMetricsCard({
                       key={feat.feature_name}
                       data-testid={`feature-row-${feat.feature_name}`}
                       className={`hover:bg-slate-50/40 transition-colors ${
-                        isSelected ? 'bg-indigo-500/5' : ''
+                        isSelected ? 'bg-indigo-100' : ''
                       }`}
                     >
                       <td className="py-2.5 px-3">
@@ -438,3 +438,5 @@ export default function DriftMetricsCard({
     </div>
   );
 }
+
+

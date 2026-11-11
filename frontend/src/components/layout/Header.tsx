@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+﻿import { useState, useEffect, useContext } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
 import { useRealTimeFraudStream } from '../../hooks/useRealTimeFraudStream';
 import {
@@ -180,7 +180,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 Connecting...
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-500 border border-slate-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-100 text-slate-500 border border-slate-500/30">
                 WS Offline
               </span>
             )}
@@ -202,7 +202,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{sessionUser.username}</span>
-                <span className="text-emerald-600/70">·</span>
+                <span className="text-emerald-600/70">Â·</span>
                 <span data-testid="active-session-tenant">{sessionUser.bank_id.toUpperCase()}</span>
               </span>
               <button
@@ -247,7 +247,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             rel="noopener noreferrer"
             className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           >
-            API Docs ↗
+            API Docs â†—
           </a>
           <div className="w-px h-4 bg-[var(--color-border)]" />
           <span className="text-xs font-mono text-[var(--color-text-muted)]">v2.4.1</span>
@@ -272,7 +272,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 onClick={() => setIsLoginModalOpen(false)}
                 className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-sm"
               >
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -351,3 +351,4 @@ export default function Header({ onMenuClick }: HeaderProps) {
     </>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useProvisionPilot } from '../../api/pilots';
 import { useConsortium } from '../../api/queries';
 import { formatApiError } from '../../api/client';
@@ -124,7 +124,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
         </p>
 
         {formError && (
-          <div className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
+          <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>{formError}</div>
           </div>
@@ -382,3 +382,4 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
     </div>
   );
 }
+

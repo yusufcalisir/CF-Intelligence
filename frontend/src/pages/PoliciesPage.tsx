@@ -426,7 +426,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleLoadRuleToTester(rule)}
                           aria-label={`Test Rule ${rule.rule_name} in engine`}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50/40 hover:bg-indigo-900/60 text-indigo-600 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Load this rule into the dynamic tester panel"
                         >
                           <Zap className="w-3.5 h-3.5" />
@@ -457,7 +457,7 @@ export default function PoliciesPage() {
                     </div>
 
                     <div className="bg-[var(--color-bg-secondary)] p-3.5 rounded-lg border border-[var(--color-border)] text-xs font-mono overflow-auto max-h-40">
-                      <pre className="text-indigo-200">{JSON.stringify(rule.condition, null, 2)}</pre>
+                      <pre className="text-indigo-700">{JSON.stringify(rule.condition, null, 2)}</pre>
                     </div>
                   </motion.div>
                 ))}
@@ -512,7 +512,7 @@ export default function PoliciesPage() {
                         type="button"
                         aria-label={`Tester Template ${tpl.id}`}
                         onClick={() => handleApplyTemplateToTester(tpl)}
-                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-50/90 hover:bg-indigo-900/50 text-slate-600 hover:text-indigo-200 border border-slate-200 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
+                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-50 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 border border-slate-200 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
                         title={tpl.description}
                       >
                         {tpl.badge.split('(')[0]?.trim() ?? tpl.badge}
@@ -524,7 +524,7 @@ export default function PoliciesPage() {
                 <textarea
                   id="test-condition-ast"
                   aria-label="Condition JSON AST"
-                  className="w-full h-36 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-indigo-200 focus:outline-none focus:border-indigo-500 shadow-inner"
+                  className="w-full h-36 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-indigo-700 focus:outline-none focus:border-indigo-500 shadow-inner"
                   value={testConditionText}
                   onChange={(e) => setTestConditionText(e.target.value)}
                 />
@@ -541,7 +541,7 @@ export default function PoliciesPage() {
                     type="button"
                     onClick={() => handleLoadAlertPayload()}
                     aria-label="Load Live Alert"
-                    className="text-xs font-semibold text-emerald-600 bg-emerald-50/60 hover:bg-emerald-900/80 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                    className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
                     title="Load highest-risk live alert from real-time ledger into test payload"
                   >
                     <Zap className="w-3.5 h-3.5 text-emerald-600" />
@@ -598,7 +598,7 @@ export default function PoliciesPage() {
                 <textarea
                   id="test-transaction-payload"
                   aria-label="Mock Transaction Payload"
-                  className="w-full h-36 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-emerald-200 focus:outline-none focus:border-indigo-500 shadow-inner"
+                  className="w-full h-36 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-emerald-700 focus:outline-none focus:border-indigo-500 shadow-inner"
                   value={testTransactionText}
                   onChange={(e) => setTestTransactionText(e.target.value)}
                 />
@@ -626,8 +626,8 @@ export default function PoliciesPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`p-4 rounded-xl border flex items-start gap-3 ${
                     testResult.matches
-                      ? 'bg-rose-950/30 border-rose-200 text-rose-600'
-                      : 'bg-emerald-50/30 border-emerald-200 text-emerald-600'
+                      ? 'bg-rose-50 border-rose-200 text-rose-600'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-600'
                   }`}
                 >
                   <div className="text-xl shrink-0 mt-0.5">
@@ -646,7 +646,7 @@ export default function PoliciesPage() {
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
-                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-200 border border-rose-200 font-semibold"
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 font-semibold"
                           >
                             {f}
                           </span>
@@ -784,7 +784,7 @@ export default function PoliciesPage() {
                     aria-label="Modal Condition JSON AST"
                     required
                     rows={8}
-                    className="w-full p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-indigo-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-indigo-700 focus:outline-none focus:border-indigo-500"
                     value={newRuleConditionText}
                     onChange={(e) => setNewRuleConditionText(e.target.value)}
                   />
@@ -827,4 +827,7 @@ export default function PoliciesPage() {
     </div>
   );
 }
+
+
+
 

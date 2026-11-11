@@ -686,3 +686,4 @@ function MerchantChart({ data }: { data: Record<string, unknown>[] }) {
   );
 }
 
+

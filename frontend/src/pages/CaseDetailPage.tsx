@@ -684,7 +684,7 @@ export default function CaseDetailPage() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                  <Sparkles className="w-3.5 h-3.5 text-purple-700" />
                   <span>{copilotData ? 'Regenerate Narrative' : 'Generate AI SAR Narrative'}</span>
                 </>
               )}
@@ -719,7 +719,7 @@ export default function CaseDetailPage() {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                       }}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-white/10 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
                     >
                       {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                       <span>{isCopied ? 'Copied' : 'Copy'}</span>
@@ -750,7 +750,7 @@ export default function CaseDetailPage() {
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
                   {copilotData.top_risk_drivers.map((d, i) => (
-                    <div key={i} className="p-2 rounded-lg bg-slate-50 border border-white/5 text-[11px] flex justify-between items-center font-mono">
+                    <div key={i} className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] flex justify-between items-center font-mono">
                       <span className="text-indigo-600 truncate mr-2">{d.feature}</span>
                       <span className="text-emerald-600 font-bold shrink-0">+{(d.impact * 100).toFixed(1)}%</span>
                     </div>
@@ -896,7 +896,7 @@ export default function CaseDetailPage() {
                 <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=2`}
-                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-200 transition flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-200 transition flex items-center gap-1"
                     title={`Trace 2-hop ego network for ${entId}`}
                   >
                     <span>2-Hop</span>
@@ -904,7 +904,7 @@ export default function CaseDetailPage() {
                   </Link>
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=3`}
-                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-200 transition flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-700 border border-purple-200 transition flex items-center gap-1"
                     title={`Trace 3-hop ring network for ${entId}`}
                   >
                     <span>3-Hop</span>
@@ -912,7 +912,7 @@ export default function CaseDetailPage() {
                   </Link>
                   <Link
                     to={`/psi?entity_id=${encodeURIComponent(entId)}&auto_match=true`}
-                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-200 transition flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-700 border border-emerald-200 transition flex items-center gap-1"
                     title={`Check PSI Consortium Intersection for ${entId}`}
                   >
                     <span>ğŸ” PSI</span>
@@ -923,7 +923,7 @@ export default function CaseDetailPage() {
             ))}
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-500 font-mono flex items-center justify-between flex-wrap gap-2">
+          <div className="p-3 rounded-xl bg-white/[0.02] border border-slate-200 text-xs text-slate-500 font-mono flex items-center justify-between flex-wrap gap-2">
             <span>No specific entity identifiers registered in evidence yet. Select a linked alert below or register evidence.</span>
             <Link
               to="/graph"
@@ -977,7 +977,7 @@ export default function CaseDetailPage() {
                   </div>
                   <Link
                     to={`/workbench?alert_id=${encodeURIComponent(selectedAlertId)}`}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-600 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1.5 shadow-sm"
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-600 hover:text-cyan-700 border border-cyan-500/30 transition-all flex items-center gap-1.5 shadow-sm"
                     title="Open this alert in Counterfactual Remediation Workbench"
                   >
                     <span>ğŸ›ï¸ Counterfactual Workbench</span>
@@ -1121,7 +1121,7 @@ export default function CaseDetailPage() {
                       <span className="text-slate-500 mr-1">{new Date(ev.uploaded_at).toLocaleDateString()}</span>
                       <Link
                         to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
-                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-200 transition flex items-center gap-1"
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-200 transition flex items-center gap-1"
                         title="Inspect entity ego network in Graph Workbench"
                       >
                         <span>ğŸ•¸ï¸ Graph</span>
@@ -1129,7 +1129,7 @@ export default function CaseDetailPage() {
                       </Link>
                       <Link
                         to={`/psi?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&auto_match=true`}
-                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-200 transition flex items-center gap-1"
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-700 border border-emerald-200 transition flex items-center gap-1"
                         title="Check PSI consortium intersection for evidence entity"
                       >
                         <span>ğŸ” PSI</span>
@@ -1144,7 +1144,7 @@ export default function CaseDetailPage() {
         </div>
 
         {/* Desktop View: Full Table */}
-        <div className="hidden lg:block overflow-x-auto rounded-xl border border-white/5">
+        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-left text-xs border-collapse min-w-[750px]">
             <thead>
               <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)] font-mono text-[11px] bg-white/2">
@@ -1219,6 +1219,8 @@ export default function CaseDetailPage() {
     </div>
   );
 }
+
+
 
 
 

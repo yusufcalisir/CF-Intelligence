@@ -127,12 +127,12 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
           >
             {loading ? (
               <>
-                <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-slate-200 border-t-white rounded-full animate-spin" />
                 Re-Inferring...
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+                <Sparkles className="w-3.5 h-3.5 text-indigo-700" />
                 Run Re-Inference
               </>
             )}
@@ -193,7 +193,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                   {report ? report.original_score.toFixed(1) : initialScore.toFixed(1)}
                   <span className="text-xs text-slate-500 font-normal">/1000</span>
                 </div>
-                <span className="inline-block mt-1 text-[10px] font-semibold text-rose-600 bg-rose-950/50 px-1.5 py-0.5 rounded border border-rose-800/30">
+                <span className="inline-block mt-1 text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                   {report && report.original_score >= 800 ? 'CRITICAL RISK' : 'HIGH RISK'}
                 </span>
               </div>
@@ -208,7 +208,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
                   className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                     isCleared
                       ? 'text-emerald-600 bg-emerald-50/50 border-emerald-800/30'
-                      : 'text-amber-600 bg-amber-950/50 border-amber-800/30'
+                      : 'text-amber-600 bg-amber-50 border-amber-800/30'
                   }`}
                 >
                   {isCleared ? 'CLEARED (ALLOW)' : 'IN PROGRESS'}
@@ -333,7 +333,7 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-200 text-xs text-rose-600 flex items-center gap-2">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-600 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
                 {error}
               </div>
@@ -373,4 +373,8 @@ export const CounterfactualExplorer: React.FC<CounterfactualExplorerProps> = ({
 };
 
 export default CounterfactualExplorer;
+
+
+
+
 

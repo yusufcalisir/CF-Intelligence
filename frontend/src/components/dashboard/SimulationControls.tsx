@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   useCreateSimulation,
@@ -119,7 +119,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
             onClick={() => setIsExpanded(!isExpanded)}
             className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           >
-            {isExpanded ? 'Collapse ▴' : 'Expand ▾'}
+            {isExpanded ? 'Collapse â–´' : 'Expand â–¾'}
           </button>
         )}
       </div>
@@ -179,8 +179,8 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                 <span className={`text-[10px] font-mono ${effectiveMode === 'real' ? 'text-[var(--color-accent-emerald)]' : 'text-[var(--color-accent-indigo)]'}`}>
                   {isBenchmark
                     ? effectiveMode === 'real'
-                      ? '✓ Real Kaggle Dataset'
-                      : '⚡ Synthetic Fixture'
+                      ? 'âœ“ Real Kaggle Dataset'
+                      : 'âš¡ Synthetic Fixture'
                     : 'Synthetic Generator'}
                 </span>
               </h4>
@@ -217,7 +217,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                             : 'bg-transparent text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-text-primary)]'
                         }`}
                       >
-                        Real Kaggle Files {hasRealFiles ? '✓' : ''}
+                        Real Kaggle Files {hasRealFiles ? 'âœ“' : ''}
                       </button>
                       <button
                         type="button"
@@ -235,17 +235,17 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                   <p className={`text-[10px] mt-1 ${effectiveMode === 'real' ? (hasRealFiles ? 'text-[var(--color-accent-emerald)]' : 'text-amber-600') : 'text-[var(--color-accent-indigo)]'}`}>
                     {effectiveMode === 'real'
                       ? hasRealFiles
-                        ? '✓ Real Kaggle benchmark dataset files verified on disk. Partitioned Non-IID across banks with dynamic PyTorch model sizing.'
-                        : '⚠️ Real files not detected in storage. Training in real mode will fail closed unless physical CSV/Parquet files are mounted or downloaded.'
-                      : '⚡ High-fidelity synthetic benchmark fixture preserving exact dataset schema and feature columns for fast offline testing.'}
+                        ? 'âœ“ Real Kaggle benchmark dataset files verified on disk. Partitioned Non-IID across banks with dynamic PyTorch model sizing.'
+                        : 'âš ï¸ Real files not detected in storage. Training in real mode will fail closed unless physical CSV/Parquet files are mounted or downloaded.'
+                      : 'âš¡ High-fidelity synthetic benchmark fixture preserving exact dataset schema and feature columns for fast offline testing.'}
                   </p>
 
                   {/* Benchmark Downloader Card for Hugging Face Spaces & Cloud/Container environments */}
                   {selectedDataset && !hasRealFiles && (
-                    <div className="mt-2.5 p-2.5 rounded-lg border border-amber-200 bg-amber-500/5 space-y-2">
+                    <div className="mt-2.5 p-2.5 rounded-lg border border-amber-200 bg-amber-100 space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                          <span>⚠️ Real files missing on server</span>
+                          <span>âš ï¸ Real files missing on server</span>
                         </div>
                         {!isDownloading && (
                           <button
@@ -253,7 +253,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                             onClick={() => setShowDownloadPanel((prev) => !prev)}
                             className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-slate-900 hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
                           >
-                            <span>📥</span>
+                            <span>ğŸ“¥</span>
                             <span>{showDownloadPanel ? 'Close Downloader' : 'Download to Server'}</span>
                           </button>
                         )}
@@ -337,7 +337,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                           {serverHasKaggleCreds ? (
                             <div className="p-2 rounded bg-[var(--color-accent-emerald)]/10 border border-[var(--color-accent-emerald)]/30 flex items-center justify-between text-xs text-[var(--color-accent-emerald)]">
                               <span className="flex items-center gap-1.5 font-medium text-[11px]">
-                                <span>🔒</span>
+                                <span>ğŸ”’</span>
                                 <span>Hugging Face Kaggle Secrets detected. Server ready for 1-click download!</span>
                               </span>
                             </div>
@@ -352,7 +352,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                                     rel="noopener noreferrer"
                                     className="text-[var(--color-accent-indigo)] hover:underline"
                                   >
-                                    Get Token ↗
+                                    Get Token â†—
                                   </a>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
@@ -416,7 +416,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
               </select>
               {config.fl_engine_type === 'flower' && (
                 <p className="text-[10px] text-[var(--color-accent-amber)] mt-1">
-                  ⚡ Flower mode uses FedAvg only. Dropout, latency, poisoning, and Byzantine-robust aggregation are disabled.
+                  âš¡ Flower mode uses FedAvg only. Dropout, latency, poisoning, and Byzantine-robust aggregation are disabled.
                 </p>
               )}
             </div>
@@ -483,7 +483,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
               {(config.privacy_mechanism === 'differential_privacy' || config.privacy_mechanism === 'both') && (
                 <div className="mt-2">
                   <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-                    ε (Epsilon): {config.dp_epsilon}
+                    Îµ (Epsilon): {config.dp_epsilon}
                   </label>
                   <input
                     type="range"
@@ -495,7 +495,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                     className="w-full accent-[var(--color-accent-indigo)]"
                   />
                   <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
-                    Lower ε = stronger privacy, more noise, lower utility
+                    Lower Îµ = stronger privacy, more noise, lower utility
                   </p>
                 </div>
               )}
@@ -533,14 +533,14 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                   <option value="fed_avg_weighted">FedAvg Weighted (Default)</option>
                   <option value="fed_avg">FedAvg (Unweighted)</option>
                 </optgroup>
-                <optgroup label="Adaptive Server Optimizers ✨">
+                <optgroup label="Adaptive Server Optimizers âœ¨">
                   <option value="fed_adam" disabled={config.fl_engine_type === 'flower'}>FedAdam (Server Adam)</option>
                   <option value="fed_adagrad" disabled={config.fl_engine_type === 'flower'}>FedAdagrad (Server AdaGrad)</option>
-                  <option value="fed_yogi" disabled={config.fl_engine_type === 'flower'}>FedYogi (Slow variance decay) ✨</option>
+                  <option value="fed_yogi" disabled={config.fl_engine_type === 'flower'}>FedYogi (Slow variance decay) âœ¨</option>
                 </optgroup>
-                <optgroup label="Client-Drift Correction ✨">
-                  <option value="scaffold" disabled={config.fl_engine_type === 'flower'}>SCAFFOLD (Control variates) ✨</option>
-                  <option value="fed_prox" disabled={config.fl_engine_type === 'flower'}>FedProx (Proximal Regularization) ✨</option>
+                <optgroup label="Client-Drift Correction âœ¨">
+                  <option value="scaffold" disabled={config.fl_engine_type === 'flower'}>SCAFFOLD (Control variates) âœ¨</option>
+                  <option value="fed_prox" disabled={config.fl_engine_type === 'flower'}>FedProx (Proximal Regularization) âœ¨</option>
                 </optgroup>
                 <optgroup label="Byzantine-Robust">
                   <option value="krum" disabled={config.fl_engine_type === 'flower'}>Krum</option>
@@ -653,7 +653,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                   </div>
                   <div>
                     <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-                      Perturbation Noise (ε): {config.adversarial_epsilon ?? 0.05}
+                      Perturbation Noise (Îµ): {config.adversarial_epsilon ?? 0.05}
                     </label>
                     <input
                       type="range"
@@ -824,7 +824,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       >
         {createMutation.isPending ? (
           <span className="flex items-center justify-center gap-2">
-            <span className="animate-spin">⟳</span> Starting...
+            <span className="animate-spin">âŸ³</span> Starting...
           </span>
         ) : (
           'Start Federated Training'
@@ -839,3 +839,4 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
     </motion.div>
   );
 }
+

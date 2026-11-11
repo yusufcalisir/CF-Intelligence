@@ -64,7 +64,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-600 text-xs flex items-start gap-2.5">
+        <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Preflight Verification Error</div>
@@ -97,7 +97,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
       )}
 
       {hasChecks && hasFailures && (
-        <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-600 text-xs flex items-center gap-3">
+        <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-center gap-3">
           <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <div>
             <div className="font-semibold">Preflight Verification Failed</div>
@@ -134,7 +134,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
                       className={`text-[10px] font-mono px-2 py-0.5 rounded ${
                         check.passed
                           ? 'bg-emerald-50/50 text-emerald-600 border border-emerald-800/40'
-                          : 'bg-rose-950/50 text-rose-600 border border-rose-800/40'
+                          : 'bg-rose-50 text-rose-600 border border-rose-200'
                       }`}
                     >
                       {check.passed ? 'PASSED' : 'FAILED'}
@@ -156,4 +156,5 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
     </div>
   );
 }
+
 

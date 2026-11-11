@@ -237,7 +237,7 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
       </div>
 
       {errorMessage && (
-        <div className="p-3 rounded-xl bg-rose-100 border border-rose-500/40 text-rose-600 text-xs flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-rose-100 border border-rose-300 text-rose-600 text-xs flex items-center gap-2">
           <AlertTriangle size={15} className="shrink-0" />
           <span>{errorMessage}</span>
         </div>
@@ -289,4 +289,5 @@ export const DatasetDropzone: React.FC<DatasetDropzoneProps> = ({ onFileLoaded, 
     </div>
   );
 };
+
 

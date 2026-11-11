@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BankResult } from '../../api/types';
 
 // Lightweight self-contained inline SVG icon components
@@ -120,7 +120,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
     <div className="glass-card p-4 sm:p-6 shadow-2xl text-slate-900 mb-8 overflow-hidden relative border border-[var(--color-border)]">
       {/* Decorative gradient overlay */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50 rounded-full blur-3xl -z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-100 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] pb-5 mb-6">
@@ -147,7 +147,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 flex items-start gap-3">
           <ShieldAlertIcon className="h-6 w-6 text-rose-600 shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-bold text-rose-200">Security Alert: Client Isolation Triggered</h3>
+            <h3 className="text-sm font-bold text-rose-700">Security Alert: Client Isolation Triggered</h3>
             <p className="text-xs text-rose-600/80 mt-1 leading-relaxed">
               Automated contribution auditing has flagged adversarial or zero-variance training behavior. One or more clients have been isolated (quarantined) and excluded from the network to prevent gradient poisoning and free-riding.
             </p>
@@ -177,7 +177,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
                 key={bank.id}
                 className={`bg-slate-50/40 border p-3.5 sm:p-4 rounded-xl transition-all duration-300 hover:bg-slate-50/60 min-w-0 ${
                   isQuarantined
-                    ? 'border-rose-900/50 bg-rose-950/10'
+                    ? 'border-rose-200 bg-rose-50'
                     : 'border-slate-200/80'
                 }`}
               >
@@ -305,3 +305,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
     </div>
   );
 };
+
+
+
+

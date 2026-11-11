@@ -26,7 +26,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
 
   if (error || !telemetry) {
     return (
-      <div className="p-5 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-600 text-xs space-y-2">
+      <div className="p-5 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs space-y-2">
         <div className="flex items-center gap-2 font-semibold">
           <AlertCircle className="w-4 h-4 text-rose-600" />
           Telemetry Unavailable
@@ -75,7 +75,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
               telemetry.bilateral_authorization_valid
                 ? 'bg-emerald-50/40 text-emerald-600 border-emerald-600/40'
-                : 'bg-rose-950/40 text-rose-600 border-rose-600/40'
+                : 'bg-rose-50 text-rose-600 border-rose-600/40'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -203,4 +203,5 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
     </div>
   );
 }
+
 

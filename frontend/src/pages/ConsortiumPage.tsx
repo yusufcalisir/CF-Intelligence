@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -49,7 +49,7 @@ export default function ConsortiumPage() {
           <button
             type="button"
             onClick={() => setIsReportOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-slate-800 to-slate-850 px-3.5 py-2 text-xs font-semibold text-cyan-600 hover:border-cyan-400 hover:text-slate-900 hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-50 to-white px-3.5 py-2 text-xs font-semibold text-cyan-600 hover:border-cyan-400 hover:text-slate-900 hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
           >
             <FileText className="h-3.5 w-3.5 text-cyan-600 group-hover:scale-110 transition-transform" />
             <span>Technical Report</span>
@@ -124,7 +124,7 @@ export default function ConsortiumPage() {
             +100.0%
           </div>
           <div className="text-xs text-emerald-600 flex items-center gap-1 mt-1 font-medium">
-            0.0% isolated ➔ 100.0% federated
+            0.0% isolated â” 100.0% federated
           </div>
           <span className="text-[11px] text-slate-500 mt-2 block">
             Bank Gamma zero-positive transfer
@@ -179,14 +179,14 @@ export default function ConsortiumPage() {
             <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
               <ShieldCheck className="h-5 w-5 text-indigo-600 shrink-0" />
               <span>Canonical Scenarios Empirical Matrix</span>
-              <span className="text-xs font-mono text-slate-500 font-normal">(Scenarios 1–7)</span>
+              <span className="text-xs font-mono text-slate-500 font-normal">(Scenarios 1â€“7)</span>
             </h3>
             <p className="text-xs text-slate-500 mt-1">
               Empirical evaluation comparing Isolated Local Silos vs Federated Consensus (FedAvg) vs Theoretical Pooled Oracle.
             </p>
           </div>
           <span className="text-[11px] font-mono text-cyan-600/80 sm:hidden flex items-center gap-1 shrink-0">
-            ← Swipe table horizontally to inspect all metrics →
+            â† Swipe table horizontally to inspect all metrics â†’
           </span>
         </div>
 
@@ -212,7 +212,7 @@ export default function ConsortiumPage() {
                     onClick={() => setSelectedScenario(scId)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-cyan-50 text-cyan-200'
+                        ? 'bg-cyan-50 text-cyan-700'
                         : 'hover:bg-slate-50/40 text-slate-600'
                     }`}
                   >
@@ -288,3 +288,5 @@ export default function ConsortiumPage() {
     </div>
   );
 }
+
+

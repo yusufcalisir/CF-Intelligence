@@ -69,7 +69,7 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/scenarios')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-950/40 to-slate-900/60 border border-rose-500/25 hover:border-rose-500/50 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 hover:border-rose-400 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-rose-600 flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/operations?openIngest=true')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-900/60 border border-indigo-500/25 hover:border-indigo-500/50 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 hover:border-indigo-400 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-indigo-600 flex items-center gap-2">
@@ -103,7 +103,7 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/developer')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50 to-slate-900/60 border border-cyan-500/25 hover:border-cyan-500/50 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 hover:border-cyan-400 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-cyan-600 flex items-center gap-2">
@@ -294,5 +294,6 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+
 
 
