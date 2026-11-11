@@ -75,8 +75,8 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-purple-400" />
-            <h3 className="text-sm font-semibold text-white tracking-wide">
+            <Key className="w-5 h-5 text-purple-600" />
+            <h3 className="text-sm font-semibold text-slate-900 tracking-wide">
               Independent Bilateral & Operator Approvals
             </h3>
           </div>
@@ -102,7 +102,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
 
       {submitError && (
         <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-300 text-xs flex items-start gap-2.5">
-          <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Approval Submission Failed</div>
             <div className="mt-0.5">{submitError}</div>
@@ -129,16 +129,16 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               } space-y-3`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold tracking-wider uppercase text-white">
+                <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-900">
                   {entityId === 'OPERATOR' ? 'Consortium Operator' : entityId.toUpperCase()}
                 </span>
                 {isApproved && !isStale && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-semibold">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5" /> APPROVED
                   </span>
                 )}
                 {isStale && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-400 font-semibold">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 font-semibold">
                     <AlertTriangle className="w-3.5 h-3.5" /> STALE REVISION
                   </span>
                 )}
@@ -153,7 +153,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 <div className="space-y-1.5 text-[11px] font-mono text-slate-600">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Approver ID:</span>
-                    <span className="text-white truncate max-w-[140px]">{approval.approver_id}</span>
+                    <span className="text-slate-900 truncate max-w-[140px]">{approval.approver_id}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Role:</span>
@@ -191,7 +191,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       {canApprove ? (
         <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-4">
           <div className="flex items-center gap-2">
-            <Send className="w-4 h-4 text-cyan-400" />
+            <Send className="w-4 h-4 text-cyan-600" />
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
               Submit Authorized Institutional Approval
             </h4>
@@ -206,7 +206,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 <select
                   value={approvingInstitution}
                   onChange={(e) => setApprovingInstitution(e.target.value)}
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 >
                   {approvableOptions.map((inst) => (
                     <option key={inst} value={inst}>
@@ -228,7 +228,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. Approved per Q4 Cross-Border AML Enclave Authorization"
-                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -254,7 +254,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
                 placeholder="128-char hex Ed25519 signature computed over canonical approval bytes above"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -262,7 +262,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               <button
                 type="submit"
                 disabled={approvePilotMutation.isPending}
-                className="px-5 py-2.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-slate-900 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {approvePilotMutation.isPending ? 'Recording Approval...' : 'Record Authorized Approval'}
               </button>

@@ -232,7 +232,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                       </button>
                     </div>
                   </div>
-                  <p className={`text-[10px] mt-1 ${effectiveMode === 'real' ? (hasRealFiles ? 'text-[var(--color-accent-emerald)]' : 'text-amber-400') : 'text-[var(--color-accent-indigo)]'}`}>
+                  <p className={`text-[10px] mt-1 ${effectiveMode === 'real' ? (hasRealFiles ? 'text-[var(--color-accent-emerald)]' : 'text-amber-600') : 'text-[var(--color-accent-indigo)]'}`}>
                     {effectiveMode === 'real'
                       ? hasRealFiles
                         ? '✓ Real Kaggle benchmark dataset files verified on disk. Partitioned Non-IID across banks with dynamic PyTorch model sizing.'
@@ -242,16 +242,16 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
 
                   {/* Benchmark Downloader Card for Hugging Face Spaces & Cloud/Container environments */}
                   {selectedDataset && !hasRealFiles && (
-                    <div className="mt-2.5 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2">
+                    <div className="mt-2.5 p-2.5 rounded-lg border border-amber-200 bg-amber-500/5 space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                           <span>⚠️ Real files missing on server</span>
                         </div>
                         {!isDownloading && (
                           <button
                             type="button"
                             onClick={() => setShowDownloadPanel((prev) => !prev)}
-                            className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-white hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                            className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-slate-900 hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
                           >
                             <span>📥</span>
                             <span>{showDownloadPanel ? 'Close Downloader' : 'Download to Server'}</span>
@@ -284,7 +284,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
 
                       {/* Failure Alert */}
                       {downloadStatus?.status === 'failed' && (
-                        <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs space-y-1">
+                        <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-600 text-xs space-y-1">
                           <p className="font-medium">Download Error:</p>
                           <p className="text-[11px] font-mono break-all">{downloadStatus.error || downloadStatus.message}</p>
                         </div>
@@ -817,7 +817,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
         type="button"
         onClick={handleStart}
         disabled={createMutation.isPending || isSubmittingRef.current}
-        className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-slate-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           background: 'linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-teal))',
         }}

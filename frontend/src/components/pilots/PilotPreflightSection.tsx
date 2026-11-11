@@ -36,8 +36,8 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-sm font-semibold text-white tracking-wide">
+            <ShieldCheck className="w-5 h-5 text-indigo-600" />
+            <h3 className="text-sm font-semibold text-slate-900 tracking-wide">
               Authoritative Preflight Verification Probes
             </h3>
           </div>
@@ -53,7 +53,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
             disabled={!canRunPreflight || runPreflightMutation.isPending}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm ${
               canRunPreflight && !runPreflightMutation.isPending
-                ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer'
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-slate-900 cursor-pointer'
                 : 'bg-slate-50 text-slate-500 border border-slate-200/50 cursor-not-allowed'
             }`}
           >
@@ -65,7 +65,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
 
       {errorMsg && (
         <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/30 text-rose-300 text-xs flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Preflight Verification Error</div>
             <div className="mt-0.5">{errorMsg}</div>
@@ -86,7 +86,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
 
       {hasChecks && allPassed && (
         <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <div>
             <div className="font-semibold">All Preflight Readiness Probes Passed</div>
             <div className="text-slate-500 mt-0.5">
@@ -98,7 +98,7 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
 
       {hasChecks && hasFailures && (
         <div className="p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-300 text-xs flex items-center gap-3">
-          <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <div>
             <div className="font-semibold">Preflight Verification Failed</div>
             <div className="text-slate-500 mt-0.5">
@@ -123,11 +123,11 @@ export default function PilotPreflightSection({ pilot }: PilotPreflightSectionPr
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     {check.passed ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                     )}
-                    <span className="text-xs font-mono font-semibold text-white">
+                    <span className="text-xs font-mono font-semibold text-slate-900">
                       {check.check_name}
                     </span>
                     <span

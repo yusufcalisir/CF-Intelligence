@@ -119,14 +119,14 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
   return (
     <div className="glass-card p-4 sm:p-6 shadow-2xl text-slate-900 mb-8 overflow-hidden relative border border-[var(--color-border)]">
       {/* Decorative gradient overlay */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50 rounded-full blur-3xl -z-10 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] pb-5 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <AwardIcon className="h-6 w-6 text-emerald-400 shrink-0" />
+            <AwardIcon className="h-6 w-6 text-emerald-600 shrink-0" />
             <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Consortium Incentive Registry</h2>
           </div>
           <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">
@@ -134,18 +134,18 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
           </p>
         </div>
         <div className="bg-slate-50/80 border border-slate-200/50 px-3.5 py-2 rounded-xl flex items-center gap-3 shrink-0 self-start md:self-auto">
-          <UsersIcon className="h-5 w-5 text-indigo-400 shrink-0" />
+          <UsersIcon className="h-5 w-5 text-indigo-600 shrink-0" />
           <div>
             <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Consortium Members</div>
-            <div className="text-xs sm:text-sm font-bold text-white">{activeBanks.length} Nodes Registered</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-900">{activeBanks.length} Nodes Registered</div>
           </div>
         </div>
       </div>
 
       {/* Warning if any bank is quarantined */}
       {activeBanks.some((b) => b.quarantined) && (
-        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <ShieldAlertIcon className="h-6 w-6 text-rose-400 shrink-0 mt-0.5" />
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <ShieldAlertIcon className="h-6 w-6 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <h3 className="text-sm font-bold text-rose-200">Security Alert: Client Isolation Triggered</h3>
             <p className="text-xs text-rose-300/80 mt-1 leading-relaxed">
@@ -159,7 +159,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
         {/* Main Contribution List & Shapley Values */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
           <h3 className="text-xs font-bold text-[var(--color-text-secondary)] flex items-center gap-1.5 uppercase tracking-wider mb-2">
-            <TrendingUpIcon className="h-4 w-4 text-indigo-400 shrink-0" />
+            <TrendingUpIcon className="h-4 w-4 text-indigo-600 shrink-0" />
             Federated Shapley Contribution
           </h3>
 
@@ -200,9 +200,9 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
                     <span
                       className={`font-mono text-xs sm:text-sm font-bold ${
                         rawScore > 0
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-600'
                           : rawScore < -0.01
-                          ? 'text-rose-400'
+                          ? 'text-rose-600'
                           : 'text-slate-500'
                       }`}
                     >
@@ -226,7 +226,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] sm:text-xs text-slate-500">
                   <span>
                     {isQuarantined ? (
-                      <span className="text-rose-400 font-semibold flex items-center gap-1">
+                      <span className="text-rose-600 font-semibold flex items-center gap-1">
                         <AlertOctagonIcon className="h-3.5 w-3.5" /> Isolated (Quarantined)
                       </span>
                     ) : (
@@ -250,7 +250,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
         <div className="bg-slate-950/60 border border-slate-200/80 rounded-xl p-4 sm:p-5 flex flex-col justify-between min-w-0">
           <div>
             <h3 className="text-xs font-bold text-[var(--color-text-secondary)] flex items-center gap-1.5 uppercase tracking-wider mb-3">
-              <DollarSignIcon className="h-4 w-4 text-emerald-400 shrink-0" />
+              <DollarSignIcon className="h-4 w-4 text-emerald-600 shrink-0" />
               Consortium Clearing Ledger
             </h3>
 
@@ -277,7 +277,7 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className={`text-xs sm:text-sm font-bold font-mono ${isQuarantined ? 'text-rose-400/70 line-through' : 'text-emerald-400'}`}>
+                      <div className={`text-xs sm:text-sm font-bold font-mono ${isQuarantined ? 'text-rose-600/70 line-through' : 'text-emerald-600'}`}>
                         ${payoutShare.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                       <div className="text-[9px] text-slate-500">USD Equivalent</div>
@@ -291,11 +291,11 @@ export const IncentiveRegistryPanel: React.FC<IncentiveRegistryPanelProps> = ({ 
           <div className="border-t border-slate-900 pt-4 mt-6 space-y-2">
             <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-slate-500">Total Clearing Pool:</span>
-              <span className="font-mono text-emerald-400 font-bold text-sm">${totalPoolUSD.toLocaleString()} USD</span>
+              <span className="font-mono text-emerald-600 font-bold text-sm">${totalPoolUSD.toLocaleString()} USD</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-slate-500">Audit Ledger Log:</span>
-              <span className="text-emerald-400 font-semibold text-xs flex items-center gap-1">
+              <span className="text-emerald-600 font-semibold text-xs flex items-center gap-1">
                 <CheckCircleIcon className="h-3.5 w-3.5" /> SHA-256 Signed
               </span>
             </div>

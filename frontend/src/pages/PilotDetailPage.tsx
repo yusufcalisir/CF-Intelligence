@@ -100,10 +100,10 @@ export default function PilotDetailPage() {
   if (isError || !pilot) {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-8">
-        <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-6 text-center">
-          <AlertCircle className="mx-auto h-8 w-8 text-rose-400 mb-2" />
+        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-6 text-center">
+          <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
           <h2 className="text-base font-semibold text-rose-300">Consortium Pilot Not Accessible</h2>
-          <p className="text-xs text-rose-400/80 mt-1 max-w-md mx-auto">
+          <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
             {error instanceof Error
               ? error.message
               : 'Pilot could not be loaded. Please ensure the pilot ID is valid and your institution is authorized to view this record.'}
@@ -118,7 +118,7 @@ export default function PilotDetailPage() {
             </button>
             <Link
               to="/pilots"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-indigo-500 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Back to Pilots</span>
@@ -192,8 +192,8 @@ export default function PilotDetailPage() {
 
       {/* Alert Notices */}
       {pilot.status === 'PAUSED' && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-xs text-amber-200 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-amber-200 bg-amber-950/20 p-4 text-xs text-amber-200 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-amber-300">Pilot Execution Paused</div>
             <div className="text-amber-200/80 mt-0.5">
@@ -205,8 +205,8 @@ export default function PilotDetailPage() {
       )}
 
       {pilot.status === 'ABORTED' && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-300">Pilot Permanently Aborted</div>
             <div className="text-rose-200/80 mt-0.5">
@@ -217,8 +217,8 @@ export default function PilotDetailPage() {
       )}
 
       {isExpired && pilot.status !== 'ABORTED' && pilot.status !== 'COMPLETED' && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
-          <Clock className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-rose-200 bg-rose-950/20 p-4 text-xs text-rose-200 flex items-start gap-3">
+          <Clock className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-300">Pilot Scope Expired</div>
             <div className="text-rose-200/80 mt-0.5">
@@ -240,18 +240,18 @@ export default function PilotDetailPage() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-all ${
                   isActive
-                    ? 'border-indigo-500 text-indigo-400'
+                    ? 'border-indigo-500 text-indigo-600'
                     : 'border-transparent text-[var(--color-text-muted)] hover:border-slate-500 hover:text-[var(--color-text-primary)]'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-600' : 'text-slate-500'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
                   <span
                     className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-medium ${
                       tab.badgeColor === 'emerald'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-600 border border-amber-200'
                     }`}
                   >
                     {tab.badge}

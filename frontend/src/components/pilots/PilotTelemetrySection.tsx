@@ -28,7 +28,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
     return (
       <div className="p-5 rounded-xl border border-rose-500/40 bg-rose-950/20 text-rose-300 text-xs space-y-2">
         <div className="flex items-center gap-2 font-semibold">
-          <AlertCircle className="w-4 h-4 text-rose-400" />
+          <AlertCircle className="w-4 h-4 text-rose-600" />
           Telemetry Unavailable
         </div>
         <p className="text-slate-500">
@@ -37,7 +37,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         </p>
         <button
           onClick={() => refetch()}
-          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-white text-xs border border-slate-200 font-medium"
+          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-900 text-xs border border-slate-200 font-medium"
         >
           Retry Telemetry Poll
         </button>
@@ -59,7 +59,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       {/* Telemetry Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
         <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-cyan-400" />
+          <Activity className="w-5 h-5 text-cyan-600" />
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-800">
               Live Two-Bank Operational Telemetry
@@ -87,7 +87,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
             className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors border border-slate-200 cursor-pointer"
             title="Refresh Telemetry"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-cyan-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-cyan-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -97,14 +97,14 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         {/* Executed Queries */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Executed Queries</div>
-          <div className="text-2xl font-mono font-bold text-emerald-400">{telemetry.queries_executed}</div>
+          <div className="text-2xl font-mono font-bold text-emerald-600">{telemetry.queries_executed}</div>
           <div className="text-[10px] text-slate-500 font-mono">Successful PSI enclaves</div>
         </div>
 
         {/* Denied Queries */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Denied Queries</div>
-          <div className="text-2xl font-mono font-bold text-rose-400">{telemetry.queries_denied}</div>
+          <div className="text-2xl font-mono font-bold text-rose-600">{telemetry.queries_denied}</div>
           <div className="text-[10px] text-slate-500 font-mono">Policy/Quota blocks</div>
         </div>
 
@@ -145,11 +145,11 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-            <Database className="w-4 h-4 text-amber-400" />
+            <Database className="w-4 h-4 text-amber-600" />
             Enclave Quota Reservation ({telemetry.queries_executed} / {telemetry.query_quota_total})
           </div>
           <span className="text-xs font-mono text-slate-500">
-            Remaining: <strong className="text-white">{telemetry.quota_remaining}</strong>
+            Remaining: <strong className="text-slate-900">{telemetry.quota_remaining}</strong>
           </span>
         </div>
 

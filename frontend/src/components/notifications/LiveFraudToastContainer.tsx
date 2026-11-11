@@ -56,8 +56,8 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
           <div
             className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
               isCritical
-                ? 'bg-red-500/20 border-red-500/50 text-red-400'
-                : 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                ? 'bg-red-500/20 border-red-500/50 text-red-600'
+                : 'bg-amber-500/20 border-amber-500/50 text-amber-600'
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
@@ -104,14 +104,14 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-[11px]">
         <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-          <Zap className="w-3 h-3 text-cyan-400 animate-pulse" /> Live Scoring Stream
+          <Zap className="w-3 h-3 text-cyan-600 animate-pulse" /> Live Scoring Stream
         </span>
         <button
           onClick={() => {
             onDismiss();
             navigate('/alerts');
           }}
-          className="flex items-center gap-1 font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+          className="flex items-center gap-1 font-semibold text-cyan-600 hover:text-cyan-300 transition-colors"
         >
           <span>Investigate</span>
           <ArrowRight className="w-3 h-3" />

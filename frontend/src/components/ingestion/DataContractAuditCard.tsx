@@ -32,7 +32,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
           <div className="flex items-center gap-3">
             <div
               className={`p-2.5 rounded-xl shrink-0 ${
-                isPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                isPassed ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'
               }`}
             >
               {isPassed ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
@@ -45,8 +45,8 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
                 <span
                   className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                     isPassed
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-600 border border-amber-500/40'
                   }`}
                 >
                   {auditResult.status}
@@ -74,21 +74,21 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-3.5 border-t border-white/5">
           <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-              <FileCheck2 size={11} className="text-indigo-400" /> Compliance Score
+              <FileCheck2 size={11} className="text-indigo-600" /> Compliance Score
             </span>
-            <p className="text-base font-bold font-mono text-emerald-400 mt-0.5">
+            <p className="text-base font-bold font-mono text-emerald-600 mt-0.5">
               {compliancePct}%
             </p>
           </div>
 
           <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-              <Layers size={11} className="text-amber-400" /> Records Partition
+              <Layers size={11} className="text-amber-600" /> Records Partition
             </span>
             <p className="text-xs font-bold font-mono text-slate-800 mt-1">
-              <span className="text-emerald-400">{auditResult.passed_records} OK</span>
+              <span className="text-emerald-600">{auditResult.passed_records} OK</span>
               {auditResult.quarantined_records > 0 && (
-                <span className="text-rose-400 ml-1.5 font-bold">
+                <span className="text-rose-600 ml-1.5 font-bold">
                   / {auditResult.quarantined_records} Quarantined
                 </span>
               )}
@@ -97,18 +97,18 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
 
           <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-              <Gauge size={11} className="text-cyan-400" /> Dirichlet Non-IID (α)
+              <Gauge size={11} className="text-cyan-600" /> Dirichlet Non-IID (α)
             </span>
-            <p className="text-base font-bold font-mono text-cyan-400 mt-0.5">
+            <p className="text-base font-bold font-mono text-cyan-600 mt-0.5">
               α = {auditResult.dirichlet_alpha_estimate.toFixed(2)}
             </p>
           </div>
 
           <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
             <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-              <Activity size={11} className="text-purple-400" /> Drift (KS Metric)
+              <Activity size={11} className="text-purple-600" /> Drift (KS Metric)
             </span>
-            <p className="text-base font-bold font-mono text-purple-400 mt-0.5">
+            <p className="text-base font-bold font-mono text-purple-600 mt-0.5">
               {auditResult.drift_ks_score.toFixed(3)}
             </p>
           </div>
@@ -131,7 +131,7 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
                   <span className="font-mono font-bold text-slate-800">
                     {check.expectation_name}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-indigo-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 text-indigo-300">
                     col: {check.column}
                   </span>
                 </div>
@@ -141,8 +141,8 @@ export const DataContractAuditCard: React.FC<DataContractAuditCardProps> = ({ au
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                   check.status === 'passed'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                    ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-600 border border-rose-500/40'
                 }`}
               >
                 {check.status.toUpperCase()}

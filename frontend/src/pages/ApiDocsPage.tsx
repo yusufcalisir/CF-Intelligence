@@ -737,15 +737,15 @@ export default function ApiDocsPage() {
       {/* Top Banner */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-slate-200 bg-white/80 shadow-2xl min-w-0">
         <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-slate-900 shadow-lg shadow-indigo-500/20 shrink-0">
             <Code2 className="w-6 h-6" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 Developer & API Reference Portal
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0 whitespace-nowrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-200 shrink-0 whitespace-nowrap">
                 OpenAPI 3.1
               </span>
             </div>
@@ -758,7 +758,7 @@ export default function ApiDocsPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             onClick={handleDownloadSpec}
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export OpenAPI JSON</span>
@@ -767,7 +767,7 @@ export default function ApiDocsPage() {
             href={scalarUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all whitespace-nowrap"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-slate-900 text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all whitespace-nowrap"
           >
             <span>Scalar Portal</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -811,17 +811,17 @@ export default function ApiDocsPage() {
                   }}
                   className={`w-full p-3 rounded-xl transition-all border text-left flex items-start gap-2.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 shadow-md shadow-indigo-600/15'
-                      : 'bg-white/3 border-white/5 text-slate-600 hover:bg-white/5 hover:text-slate-900'
+                      ? 'bg-indigo-100 border-indigo-500/50 text-indigo-200 shadow-md shadow-indigo-600/15'
+                      : 'bg-slate-50 border-white/5 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   <span
                     className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 mt-0.5 ${
                       endpoint.method === 'POST'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
                         : endpoint.method === 'GET'
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                        : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                        : 'bg-purple-500/20 text-purple-600 border border-purple-200'
                     }`}
                   >
                     {endpoint.method}
@@ -845,10 +845,10 @@ export default function ApiDocsPage() {
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-mono font-black ${
                     selectedEndpoint.method === 'POST'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
                       : selectedEndpoint.method === 'GET'
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                      : 'bg-purple-500/20 text-purple-600 border border-purple-200'
                   }`}
                 >
                   {selectedEndpoint.method}
@@ -860,11 +860,11 @@ export default function ApiDocsPage() {
 
               <div className="flex items-center gap-2">
                 {selectedEndpoint.authRequired && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-300 border border-amber-200">
                     <Lock className="w-2.5 h-2.5" /> Bearer Token
                   </span>
                 )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-white/5 border border-slate-200">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-slate-50 border border-slate-200">
                   {selectedEndpoint.rateLimit}
                 </span>
               </div>
@@ -886,8 +886,8 @@ export default function ApiDocsPage() {
                     onClick={() => setSelectedLang(lang)}
                     className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 cursor-pointer ${
                       selectedLang === lang
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/5'
+                        ? 'bg-indigo-600 text-slate-900 shadow-md'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                     }`}
                   >
                     {lang.toUpperCase()}
@@ -899,10 +899,10 @@ export default function ApiDocsPage() {
                 onClick={handleCopyCode}
                 aria-label={copiedCode ? 'Code copied to clipboard' : 'Copy code snippet'}
                 title={copiedCode ? 'Copied!' : 'Copy code'}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-600 hover:text-white transition-all shrink-0 cursor-pointer border border-white/5 active:scale-95"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-white/10 text-slate-600 hover:text-slate-900 transition-all shrink-0 cursor-pointer border border-white/5 active:scale-95"
               >
                 {copiedCode ? (
-                  <Check className="w-4 h-4 text-emerald-400" />
+                  <Check className="w-4 h-4 text-emerald-600" />
                 ) : (
                   <Copy className="w-4 h-4 text-slate-500 hover:text-slate-800" />
                 )}
@@ -916,10 +916,10 @@ export default function ApiDocsPage() {
           </div>
 
           {/* Live Request Playground */}
-          <div className="glass-card p-5 rounded-2xl border border-indigo-500/20 bg-white/70 space-y-4 shadow-xl">
+          <div className="glass-card p-5 rounded-2xl border border-indigo-200 bg-white/70 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
+                <Terminal className="w-4 h-4 text-cyan-600" />
                 <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900">
                   Interactive API Request Runner
                 </h4>
@@ -928,7 +928,7 @@ export default function ApiDocsPage() {
               <button
                 onClick={handleExecuteLiveRequest}
                 disabled={isExecuting}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-900 text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all"
               >
                 {isExecuting ? (
                   <>
@@ -957,7 +957,7 @@ export default function ApiDocsPage() {
                           : ''
                       );
                     }}
-                    className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                    className="text-[10px] font-mono text-indigo-600 hover:text-indigo-300 transition-colors cursor-pointer"
                   >
                     Reset Payload
                   </button>
@@ -986,10 +986,10 @@ export default function ApiDocsPage() {
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                           executionResult.statusCode >= 200 && executionResult.statusCode < 300
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
                             : executionResult.statusCode >= 400 && executionResult.statusCode < 500
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            ? 'bg-amber-500/20 text-amber-600 border border-amber-200'
+                            : 'bg-rose-500/20 text-rose-600 border border-rose-200'
                         }`}
                       >
                         HTTP {executionResult.statusCode}{' '}
@@ -1015,10 +1015,10 @@ export default function ApiDocsPage() {
                   <pre
                     className={`p-3 rounded-xl bg-black/80 border font-mono text-[11px] overflow-x-auto max-h-56 ${
                       executionResult.statusCode >= 200 && executionResult.statusCode < 300
-                        ? 'border-emerald-500/30 text-emerald-300'
+                        ? 'border-emerald-200 text-emerald-300'
                         : executionResult.statusCode >= 400 && executionResult.statusCode < 500
-                        ? 'border-amber-500/30 text-amber-300'
-                        : 'border-rose-500/30 text-rose-300'
+                        ? 'border-amber-200 text-amber-300'
+                        : 'border-rose-200 text-rose-300'
                     }`}
                   >
                     {JSON.stringify(executionResult.data, null, 2)}

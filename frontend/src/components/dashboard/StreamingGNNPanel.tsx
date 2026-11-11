@@ -299,7 +299,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                 Online Training Loss Curve
               </h4>
               {chartData.length > 0 && (
-                <span className="text-xs font-mono text-[var(--color-accent-teal)] px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 whitespace-nowrap w-fit">
+                <span className="text-xs font-mono text-[var(--color-accent-teal)] px-2 py-0.5 rounded bg-teal-50 border border-teal-500/20 whitespace-nowrap w-fit">
                   Latest: {chartData[chartData.length - 1]?.loss ?? 0}
                 </span>
               )}
@@ -356,7 +356,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                 <span>Dynamic GAT Attention ({currentProfile.label})</span>
               </h4>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-300 border border-indigo-200 whitespace-nowrap">
                   4-HEAD GAT
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30 whitespace-nowrap">
@@ -383,7 +383,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
                       <span className="text-[var(--color-text-muted)]">➔</span>
                       <span className="font-semibold text-[var(--color-text-primary)]">{att.target}</span>
                       {att.relation && (
-                        <span className="hidden sm:inline font-mono text-[9px] px-1.5 py-0.2 rounded bg-white/5 border border-slate-200 text-slate-500">
+                        <span className="hidden sm:inline font-mono text-[9px] px-1.5 py-0.2 rounded bg-slate-50 border border-slate-200 text-slate-500">
                           {att.relation}
                         </span>
                       )}

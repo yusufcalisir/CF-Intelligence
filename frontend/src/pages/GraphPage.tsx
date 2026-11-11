@@ -145,15 +145,15 @@ export default function GraphPage() {
         className="p-5 sm:p-6 rounded-2xl bg-[#090a1f]/80 border border-slate-200 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-100 border border-indigo-200 text-indigo-600 shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
             🕸️
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 Entity Relationship Graph
               </h1>
-              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold">
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-300 font-semibold">
                 Federated Identity Mesh
               </span>
             </div>
@@ -164,10 +164,10 @@ export default function GraphPage() {
         </div>
 
         {graphStats?.database_backend && (
-          <div className="self-start sm:self-auto shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-slate-200 text-xs font-mono text-slate-600">
+          <div className="self-start sm:self-auto shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
             <span>Backend:</span>
-            <span className="text-white font-bold">{graphStats.database_backend}</span>
+            <span className="text-slate-900 font-bold">{graphStats.database_backend}</span>
           </div>
         )}
       </motion.div>
@@ -177,7 +177,7 @@ export default function GraphPage() {
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 sm:p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          className="p-4 sm:p-5 rounded-2xl bg-indigo-950/40 border border-indigo-200 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
           <div className="flex items-start sm:items-center gap-3.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-300 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
@@ -188,7 +188,7 @@ export default function GraphPage() {
                 <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
                   Deep-Linked Ego Focus:
                 </span>
-                <span className="text-xs font-mono font-bold text-white bg-indigo-600/40 px-2.5 py-0.5 rounded-lg border border-indigo-400/40">
+                <span className="text-xs font-mono font-bold text-slate-900 bg-indigo-600/40 px-2.5 py-0.5 rounded-lg border border-indigo-400/40">
                   {selectedEntityId}
                 </span>
                 {focusedEntity && (
@@ -196,7 +196,7 @@ export default function GraphPage() {
                     ({focusedEntity.display_label} • {BANK_NAMES[focusedEntity.bank_id] || focusedEntity.bank_id})
                   </span>
                 )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
                   {depth}-Hop Ego Network
                 </span>
               </div>
@@ -207,15 +207,15 @@ export default function GraphPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            <div className="flex items-center bg-white/5 border border-slate-200 rounded-xl p-1 gap-1">
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 gap-1">
               {[1, 2, 3, 4].map((hop) => (
                 <button
                   key={hop}
                   onClick={() => handleDepthChange(hop)}
                   className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
                     depth === hop
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-white'
+                      ? 'bg-indigo-600 text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
                   }`}
                   title={`Traverse ${hop} hops`}
                 >
@@ -225,7 +225,7 @@ export default function GraphPage() {
             </div>
             <button
               onClick={() => updateSelection(undefined)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-white transition cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 hover:text-slate-900 transition cursor-pointer"
             >
               Reset Focus
             </button>
@@ -259,7 +259,7 @@ export default function GraphPage() {
                   </div>
                   <span className="text-sm font-mono" style={{ color: stat.color }}>{stat.icon}</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black font-mono text-white mt-2 mb-0.5">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-slate-900 mt-2 mb-0.5">
                   {stat.value}
                 </div>
               </motion.div>
@@ -284,7 +284,7 @@ export default function GraphPage() {
                 <span>🎯</span>
                 <span>Traversal Hops</span>
               </h3>
-              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-100 text-indigo-300 border border-indigo-200">
                 Depth {depth}
               </span>
             </div>
@@ -300,8 +300,8 @@ export default function GraphPage() {
                 onClick={() => handleDepthChange(hop)}
                 className={`py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 active:scale-95 ${
                   depth === hop
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/40'
-                    : 'bg-white/4 border border-white/8 text-slate-600 hover:text-white hover:bg-white/8'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-900 shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/40'
+                    : 'bg-white/4 border border-white/8 text-slate-600 hover:text-slate-900 hover:bg-white/8'
                 }`}
               >
                 <span>{hop} {hop === 1 ? 'Hop' : 'Hops'}</span>
@@ -326,7 +326,7 @@ export default function GraphPage() {
               <span>Entity Directory & Resolver</span>
             </h3>
             {filteredEntities.length > 0 && (
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-mono bg-white/5 border border-slate-200 text-slate-600">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-mono bg-slate-50 border border-slate-200 text-slate-600">
                 {filteredEntities.length} active entities
               </span>
             )}
@@ -342,7 +342,7 @@ export default function GraphPage() {
               placeholder="Search by display label, entity type, or HMAC privacy ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-slate-200 text-xs font-mono text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
             />
           </div>
 
@@ -357,8 +357,8 @@ export default function GraphPage() {
                   onClick={() => updateSelection(entity.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-indigo-600/30 border-indigo-500/60 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]'
-                      : 'bg-white/4 border-white/8 text-slate-600 hover:text-white hover:bg-white/8'
+                      ? 'bg-indigo-600/30 border-indigo-500/60 text-slate-900 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      : 'bg-white/4 border-white/8 text-slate-600 hover:text-slate-900 hover:bg-white/8'
                   }`}
                 >
                   <span
@@ -372,7 +372,7 @@ export default function GraphPage() {
                     {BANK_NAMES[entity.bank_id] || entity.bank_id}
                   </span>
                   {entity.alert_count > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500/20 border border-rose-200 text-rose-300">
                       {entity.alert_count}
                     </span>
                   )}
@@ -445,7 +445,7 @@ export default function GraphPage() {
               <div className="max-w-md space-y-4">
                 {/* Animated Pulsing Orbit Visual */}
                 <div className="relative w-24 h-24 mx-auto">
-                  <div className="absolute inset-0 rounded-full border border-indigo-500/20 animate-ping" />
+                  <div className="absolute inset-0 rounded-full border border-indigo-200 animate-ping" />
                   <div className="absolute inset-2 rounded-full border border-cyan-500/30 animate-pulse" />
                   <div className="absolute inset-0 flex items-center justify-center text-3xl">
                     🕸️
@@ -453,7 +453,7 @@ export default function GraphPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-1">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1">
                     Select an Entity to Trace Topology
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
@@ -469,7 +469,7 @@ export default function GraphPage() {
                       <button
                         key={e.id}
                         onClick={() => updateSelection(e.id)}
-                        className="px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-white/5 hover:bg-white/10 border border-slate-200 text-indigo-300 hover:text-white transition-all cursor-pointer active:scale-95"
+                        className="px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-slate-50 hover:bg-white/10 border border-slate-200 text-indigo-300 hover:text-slate-900 transition-all cursor-pointer active:scale-95"
                       >
                         {e.display_label}
                       </button>
@@ -488,13 +488,13 @@ export default function GraphPage() {
             >
               <div className="max-w-md space-y-3">
                 <div className="text-4xl">📊</div>
-                <h3 className="text-base font-bold text-white">No Direct Relationships at Depth {depth}</h3>
+                <h3 className="text-base font-bold text-slate-900">No Direct Relationships at Depth {depth}</h3>
                 <p className="text-xs text-slate-500">
                   This entity has no cross-bank connections within {depth} hops. Try increasing traversal hops to 3 or 4.
                 </p>
                 <button
                   onClick={() => handleDepthChange(Math.min(4, depth + 1))}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
                 >
                   Increase to {Math.min(4, depth + 1)} Hops
                 </button>

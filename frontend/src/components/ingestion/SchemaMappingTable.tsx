@@ -45,9 +45,9 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Header & Status bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
+          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-600">
             <SlidersHorizontal size={18} />
           </div>
           <div>
@@ -95,7 +95,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
                     {col}
                   </td>
                   <td className="px-3.5 py-2.5">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 border border-slate-200 text-slate-600">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-50 border border-slate-200 text-slate-600">
                       {mappingItem?.data_type || 'string'}
                     </span>
                   </td>
@@ -124,8 +124,8 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
       </div>
 
       {piiViolationsCount > 0 && (
-        <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-          <HelpCircle size={15} className="shrink-0 text-amber-400" />
+        <div className="p-3 rounded-xl bg-amber-100 border border-amber-200 text-amber-300 text-xs flex items-center gap-2">
+          <HelpCircle size={15} className="shrink-0 text-amber-600" />
           <span>
             Notice: {piiViolationsCount} raw identifier patterns were detected and hashed client-side with bank type salt before transmission.
           </span>

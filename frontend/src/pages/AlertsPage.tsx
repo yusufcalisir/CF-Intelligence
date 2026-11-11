@@ -366,11 +366,11 @@ export default function AlertsPage() {
 
       {/* Escalation Error Toast */}
       {escalationError && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
           <span>❌ {escalationError}</span>
           <button
             onClick={() => setEscalationError(null)}
-            className="text-rose-400 hover:text-white text-xs font-bold p-1 rounded"
+            className="text-rose-600 hover:text-slate-900 text-xs font-bold p-1 rounded"
             aria-label="Dismiss error"
           >
             ✕
@@ -380,14 +380,14 @@ export default function AlertsPage() {
 
       {/* Partial Escalation Warning Toast */}
       {escalationWarning && (
-        <div data-testid="escalation-warning" className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
+        <div data-testid="escalation-warning" className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
           <div className="flex items-center gap-2">
             <span>⚠️</span>
             <span>{escalationWarning}</span>
           </div>
           <button
             onClick={() => setEscalationWarning(null)}
-            className="text-amber-400 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            className="text-amber-600 hover:text-slate-900 text-xs font-bold p-1 rounded transition-colors"
             aria-label="Dismiss warning"
           >
             ✕
@@ -514,7 +514,7 @@ function AlertCard({
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <span
-            className="px-2 py-0.5 rounded-full text-xs font-bold uppercase text-white"
+            className="px-2 py-0.5 rounded-full text-xs font-bold uppercase text-slate-900"
             style={{ backgroundColor: severityColor }}
           >
             {alert.severity}
@@ -574,17 +574,17 @@ function AlertCard({
               <Link
                 to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
                 onClick={(e) => e.stopPropagation()}
-                className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all flex items-center gap-1 group/ent"
+                className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-50 hover:bg-indigo-500/20 text-indigo-300 hover:text-slate-900 border border-indigo-200 transition-all flex items-center gap-1 group/ent"
                 title={`Trace 2-hop ego network for ${entityId}`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover/ent:scale-125 transition-transform" />
                 <span className="truncate max-w-[120px]">{entityId}</span>
-                <span className="text-[9px] text-indigo-400 opacity-70 group-hover/ent:opacity-100">➔</span>
+                <span className="text-[9px] text-indigo-600 opacity-70 group-hover/ent:opacity-100">➔</span>
               </Link>
               <Link
                 to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
                 onClick={(e) => e.stopPropagation()}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-100 border border-emerald-500/30 transition-all flex items-center gap-0.5"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-100 border border-emerald-200 transition-all flex items-center gap-0.5"
                 title={`Check PSI Consortium Intersection for ${entityId}`}
               >
                 <span>🔍 PSI</span>
@@ -598,7 +598,7 @@ function AlertCard({
       <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-[var(--color-border)]/40 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           {alert.status === 'escalated' ? (
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-300 border border-purple-200 flex items-center gap-1">
               <span>⚡</span> Escalated to Case
             </span>
           ) : (
@@ -609,7 +609,7 @@ function AlertCard({
           <Link
             to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-50 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1"
             title="Simulate feature remediation in Counterfactual Workbench"
           >
             <span>🎛️ Simulate</span>
@@ -620,7 +620,7 @@ function AlertCard({
           <Link
             to={`/cases?alert_id=${encodeURIComponent(alert.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/30 transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-200 transition-all flex items-center gap-1.5 shadow-sm"
             title="View investigation case for this alert"
           >
             <span>📁 View Case</span>
@@ -635,7 +635,7 @@ function AlertCard({
                 onEscalate(alert);
               }}
               disabled={isEscalating}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-slate-900 shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               title="Escalate alert into an official AML Investigation Case"
             >
               {isEscalating ? (
@@ -752,7 +752,7 @@ export function ExplainabilityPanel({
           <span className="truncate">AI Explainability Portal</span>
         </h3>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 border border-cyan-500/20 font-bold">
             GDPR Art. 22 Compliant
           </span>
           {onClose && !isModal && (
@@ -772,18 +772,18 @@ export function ExplainabilityPanel({
 
       {/* AML Case Escalation Action Banner */}
       {!hideEscalateButton && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-900/90 rounded-xl border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-900/90 rounded-xl border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1 shrink-0">
+              <span className="text-amber-600 font-bold text-xs uppercase tracking-wider flex items-center gap-1 shrink-0">
                 <span>⚡</span> Triage Action
               </span>
               {alert.status === 'escalated' ? (
-                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-200 shrink-0">
                   ESCALATED TO CASE
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-200 shrink-0">
                   CRITICAL DISPOSITION
                 </span>
               )}
@@ -799,7 +799,7 @@ export function ExplainabilityPanel({
             type="button"
             onClick={() => onEscalate && onEscalate(alert)}
             disabled={isEscalating}
-            className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold text-slate-900 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
             title="Escalate alert to official AML Investigation Case"
           >
             {isEscalating ? (
@@ -825,7 +825,7 @@ export function ExplainabilityPanel({
               <span className="shrink-0">🕸️</span>
               <span className="truncate">Suspect Graph Entities</span>
             </span>
-            <span className="text-[10px] font-mono text-indigo-400 shrink-0">
+            <span className="text-[10px] font-mono text-indigo-600 shrink-0">
               {alert.involved_entity_ids.length} linked
             </span>
           </div>
@@ -887,7 +887,7 @@ export function ExplainabilityPanel({
             onClick={() => setActiveTab(tab.id as any)}
             className={`py-1.5 px-2 rounded-lg transition-all text-[11px] truncate whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
+                ? 'bg-indigo-600 text-slate-900 shadow-md shadow-indigo-600/30 font-bold'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50 font-medium'
             }`}
           >
@@ -912,8 +912,8 @@ export function ExplainabilityPanel({
                 </h4>
                 <ul className="space-y-1.5">
                   {(report.risk_factors ?? []).map((factor, i) => (
-                    <li key={i} className="text-xs flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 p-2 rounded-lg text-rose-200 font-medium leading-normal">
-                      <span className="text-rose-400 font-bold shrink-0 mt-0.5">•</span>
+                    <li key={i} className="text-xs flex items-start gap-2 bg-rose-50 border border-rose-200 p-2 rounded-lg text-rose-200 font-medium leading-normal">
+                      <span className="text-rose-600 font-bold shrink-0 mt-0.5">•</span>
                       <span className="break-words min-w-0">{factor}</span>
                     </li>
                   ))}
@@ -932,7 +932,7 @@ export function ExplainabilityPanel({
                         <span>📊</span> {isFallback ? 'Analytical Fallback Attribution' : 'Kernel SHAP Feature Attribution'}
                       </h4>
                       {isFallback && (
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-50 text-amber-300 border border-amber-200 font-bold">
                           FALLBACK HEURISTIC
                         </span>
                       )}
@@ -959,7 +959,7 @@ export function ExplainabilityPanel({
                           <span className="font-semibold text-slate-800 capitalize truncate min-w-0">
                             {f.feature.replace(/_/g, ' ')}
                           </span>
-                          <span className={`font-mono font-bold shrink-0 ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          <span className={`font-mono font-bold shrink-0 ${isPositive ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {isPositive ? '+' : '-'}{pct.toFixed(0)}%
                           </span>
                         </div>
@@ -999,7 +999,7 @@ export function ExplainabilityPanel({
                             <span className="font-semibold text-slate-800 capitalize truncate min-w-0">
                               {sig.signal_name.replace(/_/g, ' ').replace('rules', '')}
                             </span>
-                            <span className="font-mono text-emerald-400 font-bold shrink-0">
+                            <span className="font-mono text-emerald-600 font-bold shrink-0">
                               {((sig.contribution ?? 0) * 100).toFixed(0)}%
                             </span>
                           </div>
@@ -1029,7 +1029,7 @@ export function ExplainabilityPanel({
               <div>No pre-computed counterfactual report available for this alert.</div>
               <Link
                 to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 transition-colors w-full sm:w-auto"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 transition-colors w-full sm:w-auto"
               >
                 <span>🎛️ Launch Counterfactual Workbench</span>
                 <span className="text-[10px]">➔</span>
@@ -1050,7 +1050,7 @@ export function ExplainabilityPanel({
                 </div>
                 <Link
                   to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
-                  className="w-full sm:w-auto justify-center px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 shadow-md shadow-cyan-600/30 border border-cyan-400/40 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
+                  className="w-full sm:w-auto justify-center px-3 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 shadow-md shadow-cyan-600/30 border border-cyan-400/40 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
                   title="Open Counterfactual Workbench for this alert"
                 >
                   <span>Open Workbench</span>
@@ -1063,7 +1063,7 @@ export function ExplainabilityPanel({
                   <span className="font-bold text-slate-800">Remediation Target</span>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      cfReport.is_cleared ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      cfReport.is_cleared ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200' : 'bg-amber-500/20 text-amber-600 border border-amber-200'
                     }`}
                   >
                     {cfReport.is_cleared ? 'CLEARED (<350 Risk)' : 'ACTION REQUIRED'}
@@ -1071,12 +1071,12 @@ export function ExplainabilityPanel({
                 </div>
                 <div className="flex items-center gap-3 text-center my-2">
                   <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-200">
-                    <div className="text-lg font-bold text-rose-400 font-mono">{cfReport.original_score}</div>
+                    <div className="text-lg font-bold text-rose-600 font-mono">{cfReport.original_score}</div>
                     <div className="text-[9px] uppercase text-slate-500 font-semibold">Current Risk</div>
                   </div>
                   <div className="text-lg text-slate-500">➔</div>
                   <div className="flex-1 bg-slate-950/60 p-2 rounded-lg border border-slate-200">
-                    <div className="text-lg font-bold text-emerald-400 font-mono">{cfReport.remediated_score}</div>
+                    <div className="text-lg font-bold text-emerald-600 font-mono">{cfReport.remediated_score}</div>
                     <div className="text-[9px] uppercase text-slate-500 font-semibold">Target Risk</div>
                   </div>
                 </div>
@@ -1091,7 +1091,7 @@ export function ExplainabilityPanel({
                     <div key={i} className="p-3 bg-white/80 rounded-xl border border-slate-200 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-1.5 font-bold text-slate-800 capitalize">
                         <span className="truncate min-w-0">{change.feature.replace(/_/g, ' ')}</span>
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20 shrink-0">
+                        <span className="text-[10px] font-mono text-cyan-600 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20 shrink-0">
                           {change.original_value} ➔ {change.remediated_value}
                         </span>
                       </div>
@@ -1119,7 +1119,7 @@ export function ExplainabilityPanel({
               <div className="p-3 bg-white/80 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-600">Model Version</span>
-                  <span className="font-mono text-indigo-400 font-bold">{auditReport.model_version}</span>
+                  <span className="font-mono text-indigo-600 font-bold">{auditReport.model_version}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Model Baseline AUC</span>
@@ -1129,7 +1129,7 @@ export function ExplainabilityPanel({
                   <span className="text-slate-500">Inference Audit Match</span>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      auditReport.audit_matched ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      auditReport.audit_matched ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200' : 'bg-rose-500/20 text-rose-600 border border-rose-200'
                     }`}
                   >
                     {auditReport.audit_matched ? '✓ 100% REPRODUCED' : 'MISMATCH'}
@@ -1150,12 +1150,12 @@ export function ExplainabilityPanel({
                             rule.triggered ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
                           }`}
                         />
-                        <span className="font-mono font-bold text-[10px] text-indigo-400 shrink-0">{rule.rule_code}</span>
+                        <span className="font-mono font-bold text-[10px] text-indigo-600 shrink-0">{rule.rule_code}</span>
                         <span className="text-slate-600 capitalize truncate text-xs min-w-0">
                           {rule.signal_name.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <div className="font-mono text-[10px] text-right font-bold text-emerald-400 shrink-0">
+                      <div className="font-mono text-[10px] text-right font-bold text-emerald-600 shrink-0">
                         +{((rule.contribution ?? 0) * 1000).toFixed(0)} pts
                       </div>
                     </div>
@@ -1182,7 +1182,7 @@ export function ExplainabilityPanel({
                   {gnnReport.node_id ? (
                     <Link
                       to={`/graph?entity_id=${encodeURIComponent(gnnReport.node_id)}&depth=2`}
-                      className="font-mono text-cyan-400 hover:text-cyan-200 underline decoration-cyan-500/40 hover:decoration-cyan-300 transition-colors flex items-center gap-1"
+                      className="font-mono text-cyan-600 hover:text-cyan-200 underline decoration-cyan-500/40 hover:decoration-cyan-300 transition-colors flex items-center gap-1"
                       title="Inspect 2-hop ego network in Graph Workbench"
                     >
                       <span>{gnnReport.node_id.slice(0, 16)}</span>
@@ -1210,15 +1210,15 @@ export function ExplainabilityPanel({
                   {(gnnReport.top_contributing_edges ?? []).map((edge, i) => (
                     <div key={i} className="p-2.5 bg-white/80 rounded-xl border border-slate-200 space-y-1.5">
                       <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-800">
-                        <span className="text-indigo-400 capitalize truncate min-w-0">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
-                        <span className="text-emerald-400 font-bold shrink-0 ml-2">
+                        <span className="text-indigo-600 capitalize truncate min-w-0">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
+                        <span className="text-emerald-600 font-bold shrink-0 ml-2">
                           {(edge.contribution_percentage ?? ((edge.weight ?? 0) * 100)).toFixed(0)}%
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-500">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.source)}&depth=2`}
-                          className="truncate max-w-[120px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-200 hover:underline"
                           title={`Trace graph for ${edge.source}`}
                         >
                           {edge.source}
@@ -1226,7 +1226,7 @@ export function ExplainabilityPanel({
                         <span className="text-slate-500 shrink-0">➔</span>
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.target)}&depth=2`}
-                          className="truncate max-w-[120px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-600 hover:text-cyan-200 hover:underline"
                           title={`Trace graph for ${edge.target}`}
                         >
                           {edge.target}
@@ -1243,13 +1243,13 @@ export function ExplainabilityPanel({
       {/* Tab 5: Cross-Bank Consortium Intelligence */}
       {activeTab === 'cross_bank' && (
         <div className="space-y-4 text-xs">
-          <div className="p-3 bg-white/90 rounded-xl border border-indigo-500/30 space-y-2">
+          <div className="p-3 bg-white/90 rounded-xl border border-indigo-200 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold text-slate-800">
               <span className="flex items-center gap-1.5 text-indigo-300">
                 <span>🛡️</span>
                 <span>Authorized Consortium Matching</span>
               </span>
-              <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-indigo-50 text-indigo-300 border border-indigo-200">
                 Zero-Raw-PII Boundary
               </span>
             </div>
@@ -1302,7 +1302,7 @@ export function ExplainabilityPanel({
                 type="button"
                 onClick={handleQueryIntel}
                 disabled={queryIntelMutation.isPending || !alert.involved_entity_ids?.[0]}
-                className="w-full py-2 px-3 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2 px-3 rounded-lg text-xs font-bold text-slate-900 bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {queryIntelMutation.isPending ? (
                   <>
@@ -1337,21 +1337,21 @@ export function ExplainabilityPanel({
                   {intelSignal.execution_mode === 'VERIFIED_OPERATIONAL' ? (
                     <>
                       <span>🛡️</span>
-                      <span className="text-emerald-400">Verified Operational Enclave (OpenMined PSI)</span>
+                      <span className="text-emerald-600">Verified Operational Enclave (OpenMined PSI)</span>
                     </>
                   ) : (
                     <>
                       <span>📡</span>
-                      <span className="text-amber-400">Research Prototype Simulation (Non-Operational)</span>
+                      <span className="text-amber-600">Research Prototype Simulation (Non-Operational)</span>
                     </>
                   )}
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                     intelSignal.match_category === 'EXACT_MATCH'
-                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      ? 'bg-emerald-100 text-emerald-300 border border-emerald-200'
                       : intelSignal.match_category === 'PROBABILISTIC_FUZZY'
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      ? 'bg-amber-100 text-amber-300 border border-amber-200'
                       : 'bg-slate-50 text-slate-500 border border-slate-200'
                   }`}
                 >
@@ -1369,11 +1369,11 @@ export function ExplainabilityPanel({
                   <span
                     className={`font-mono font-bold ${
                       intelSignal.sanitized_risk_level === 'CRITICAL'
-                        ? 'text-rose-400'
+                        ? 'text-rose-600'
                         : intelSignal.sanitized_risk_level === 'HIGH'
                         ? 'text-orange-400'
                         : intelSignal.sanitized_risk_level === 'MEDIUM'
-                        ? 'text-amber-400'
+                        ? 'text-amber-600'
                         : 'text-slate-600'
                     }`}
                   >
@@ -1417,7 +1417,7 @@ export function ExplainabilityPanel({
                     {intelSignal.sanitized_typology_indicators.map((ind) => (
                       <span
                         key={ind}
-                        className="px-2 py-0.5 rounded text-[9.5px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+                        className="px-2 py-0.5 rounded text-[9.5px] font-mono bg-indigo-50 text-indigo-300 border border-indigo-200"
                       >
                         {ind}
                       </span>
@@ -1438,7 +1438,7 @@ export function ExplainabilityPanel({
                       type="button"
                       onClick={() => handleAttachEvidence(linkedCase.id)}
                       disabled={attachEvidenceMutation.isPending || !!attachSuccessHash}
-                      className="w-full py-1.5 px-3 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-1.5 px-3 rounded-lg text-xs font-bold text-slate-900 bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {attachEvidenceMutation.isPending ? (
                         <>
@@ -1475,7 +1475,7 @@ export function ExplainabilityPanel({
                         type="button"
                         onClick={() => manualCaseId && handleAttachEvidence(manualCaseId)}
                         disabled={!manualCaseId || attachEvidenceMutation.isPending || !!attachSuccessHash}
-                        className="py-1.5 px-3 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                        className="py-1.5 px-3 rounded-lg text-xs font-bold text-slate-900 bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
                       >
                         {attachEvidenceMutation.isPending ? 'Anchoring...' : 'Attach'}
                       </button>
@@ -1488,7 +1488,7 @@ export function ExplainabilityPanel({
                     <div className="font-bold flex items-center gap-1">
                       <span>🔒 SHA-256 Content Hash Anchored:</span>
                     </div>
-                    <div className="truncate text-emerald-400 font-mono mt-0.5" title={attachSuccessHash}>
+                    <div className="truncate text-emerald-600 font-mono mt-0.5" title={attachSuccessHash}>
                       {attachSuccessHash}
                     </div>
                   </div>

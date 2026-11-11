@@ -25,11 +25,11 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
   return (
     <div className="space-y-6">
       {/* Scope Digest Banner */}
-      <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 md:p-5">
+      <div className="rounded-xl border border-indigo-200 bg-indigo-950/20 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-indigo-400" />
+              <Shield className="w-4 h-4 text-indigo-600" />
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
                 Authoritative Scope Digest (SHA-256)
               </span>
@@ -46,14 +46,14 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             <button
               onClick={handleCopyDigest}
               title="Copy full 64-character SHA-256 scope digest"
-              className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-white transition-colors border border-slate-200"
+              className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200"
             >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
         </div>
         {pilot.scope_digest && (
-          <div className="mt-3 pt-3 border-t border-indigo-500/20">
+          <div className="mt-3 pt-3 border-t border-indigo-200">
             <span className="text-[11px] font-mono text-slate-500 break-all select-all">
               Full digest: {pilot.scope_digest}
             </span>
@@ -66,7 +66,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
         {/* Participating Institutions */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <Server className="w-4 h-4 text-cyan-400" />
+            <Server className="w-4 h-4 text-cyan-600" />
             Participating Institutions
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
@@ -87,21 +87,21 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
         {/* Quota & Operational Bounds */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <Database className="w-4 h-4 text-amber-400" />
+            <Database className="w-4 h-4 text-amber-600" />
             Authorized Query Quotas
           </div>
           <div className="grid grid-cols-2 gap-2 pt-1">
             <div>
               <div className="text-[11px] text-slate-500">Total Enclave Quota</div>
-              <div className="text-lg font-mono font-bold text-white">
+              <div className="text-lg font-mono font-bold text-slate-900">
                 {pilot.queries_total_quota} <span className="text-xs text-slate-500">queries</span>
               </div>
             </div>
             <div>
               <div className="text-[11px] text-slate-500">Executed / Denied</div>
               <div className="text-lg font-mono font-bold text-slate-800">
-                <span className="text-emerald-400">{pilot.queries_executed}</span> /{' '}
-                <span className="text-rose-400">{pilot.queries_denied}</span>
+                <span className="text-emerald-600">{pilot.queries_executed}</span> /{' '}
+                <span className="text-rose-600">{pilot.queries_denied}</span>
               </div>
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
         {/* Schedule & Retention */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <Calendar className="w-4 h-4 text-emerald-400" />
+            <Calendar className="w-4 h-4 text-emerald-600" />
             Operational Window
           </div>
           <div className="space-y-1.5 text-xs font-mono pt-1">
@@ -128,13 +128,13 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Expires:</span>
-              <span className={`font-semibold ${isExpired ? 'text-rose-400' : 'text-slate-800'}`}>
+              <span className={`font-semibold ${isExpired ? 'text-rose-600' : 'text-slate-800'}`}>
                 {pilot.expires_at ? new Date(pilot.expires_at).toLocaleString() : 'Unbounded'}
               </span>
             </div>
             <div className="flex justify-between pt-1 border-t border-[var(--color-border)]">
               <span className="text-slate-500">Status:</span>
-              <span className={isExpired ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+              <span className={isExpired ? 'text-rose-600 font-bold' : 'text-emerald-600'}>
                 {isExpired ? 'EXPIRED' : 'VALID / UNEXPIRED'}
               </span>
             </div>
@@ -146,7 +146,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <FileText className="w-4 h-4 text-purple-400" />
+            <FileText className="w-4 h-4 text-purple-600" />
             Governance & Regulatory Gating
           </div>
           <div className="space-y-2 text-xs">
@@ -181,7 +181,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
 
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <Server className="w-4 h-4 text-indigo-400" />
+            <Server className="w-4 h-4 text-indigo-600" />
             Execution Boundary & Architectural Scope
           </div>
           <div className="space-y-2 text-xs text-slate-600">

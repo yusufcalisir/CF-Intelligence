@@ -154,28 +154,28 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <div className="hidden sm:flex items-center gap-2">
             {status === 'connected' ? (
               streamSource === 'LIVE_CONNECTOR' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title={`Live Ingestion Provider: ${streamProvenance}`}>
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200" title={`Live Ingestion Provider: ${streamProvenance}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   Live Connector WS ({latencyMs}ms)
                 </span>
               ) : streamSource === 'SIMULATED' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
-                  <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
+                  <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                   Simulated Feed ({latencyMs}ms)
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30" title="WebSocket connected, but no live telemetry provider is currently configured.">
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-300 border border-amber-200" title="WebSocket connected, but no live telemetry provider is currently configured.">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   Telemetry Standby ({latencyMs}ms)
                 </span>
               )
             ) : status === 'mock_active' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
-                <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
+                <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                 Simulated Stream (Offline)
               </span>
             ) : status === 'connecting' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-600 border border-amber-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 Connecting...
               </span>
@@ -187,7 +187,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             {/* Live streamed transactions ticker */}
             <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-500">
-              <Activity className="w-3 h-3 text-cyan-400" />
+              <Activity className="w-3 h-3 text-cyan-600" />
               <span>{totalStreamedTransactions.toLocaleString()} txns</span>
             </span>
           </div>
@@ -198,11 +198,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-2">
               <span
                 data-testid="active-institutional-session"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-300 border border-emerald-200"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{sessionUser.username}</span>
-                <span className="text-emerald-400/70">·</span>
+                <span className="text-emerald-600/70">·</span>
                 <span data-testid="active-session-tenant">{sessionUser.bank_id.toUpperCase()}</span>
               </span>
               <button
@@ -339,7 +339,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   type="submit"
                   data-testid="btn-submit-institutional-login"
                   disabled={isSubmitting || !username.trim() || !password}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-slate-900 hover:bg-indigo-500 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Authenticating...' : 'Sign In'}
                 </button>

@@ -40,20 +40,20 @@ export default function DriftMetricsCard({
     if (isCritical) {
       return {
         label: 'CRITICAL DRIFT',
-        bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+        bg: 'bg-rose-50 text-rose-600 border-rose-200',
         dot: 'bg-rose-400 animate-pulse',
       };
     }
     if (isWarning) {
       return {
         label: 'MODERATE DRIFT',
-        bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+        bg: 'bg-amber-50 text-amber-600 border-amber-200',
         dot: 'bg-amber-400',
       };
     }
     return {
       label: 'STABLE / HEALTHY',
-      bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      bg: 'bg-emerald-50 text-emerald-600 border-emerald-200',
       dot: 'bg-emerald-400',
     };
   }, [isCritical, isWarning]);
@@ -124,7 +124,7 @@ export default function DriftMetricsCard({
       {/* Background radial glow */}
       <div
         className={`absolute -top-32 -right-32 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
-          isCritical ? 'bg-rose-500/10' : isWarning ? 'bg-amber-500/10' : 'bg-emerald-500/10'
+          isCritical ? 'bg-rose-50' : isWarning ? 'bg-amber-50' : 'bg-emerald-50'
         }`}
       />
 
@@ -167,7 +167,7 @@ export default function DriftMetricsCard({
             <span
               data-testid="max-psi-value"
               className={`text-2xl font-bold font-mono tracking-tight ${
-                isCritical ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
+                isCritical ? 'text-rose-600' : isWarning ? 'text-amber-600' : 'text-emerald-600'
               }`}
             >
               {data?.max_psi !== undefined ? data.max_psi.toFixed(4) : '0.0000'}
@@ -194,9 +194,9 @@ export default function DriftMetricsCard({
               data-testid="concept-psi-value"
               className={`text-2xl font-bold font-mono tracking-tight ${
                 (data?.concept_drift_psi ?? 0) >= 0.20
-                  ? 'text-rose-400'
+                  ? 'text-rose-600'
                   : (data?.concept_drift_psi ?? 0) >= 0.10
-                  ? 'text-amber-400'
+                  ? 'text-amber-600'
                   : 'text-slate-800'
               }`}
             >
@@ -223,10 +223,10 @@ export default function DriftMetricsCard({
               data-testid="ks-pvalue-value"
               className={`text-2xl font-bold font-mono tracking-tight ${
                 (data?.mean_ks_p_value ?? 1.0) < 0.01
-                  ? 'text-rose-400'
+                  ? 'text-rose-600'
                   : (data?.mean_ks_p_value ?? 1.0) < 0.05
-                  ? 'text-amber-400'
-                  : 'text-emerald-400'
+                  ? 'text-amber-600'
+                  : 'text-emerald-600'
               }`}
             >
               {data?.mean_ks_p_value !== undefined ? data.mean_ks_p_value.toFixed(4) : '1.0000'}
@@ -247,7 +247,7 @@ export default function DriftMetricsCard({
             <span
               data-testid="retrain-status-text"
               className={`text-base font-semibold tracking-tight ${
-                data?.auto_retrain_triggered ? 'text-rose-400 flex items-center gap-1.5' : 'text-slate-600'
+                data?.auto_retrain_triggered ? 'text-rose-600 flex items-center gap-1.5' : 'text-slate-600'
               }`}
             >
               {data?.auto_retrain_triggered ? (
@@ -276,7 +276,7 @@ export default function DriftMetricsCard({
             <button
               type="button"
               onClick={handleSelectAllDrifted}
-              className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
+              className="text-xs text-indigo-600 hover:text-indigo-300 underline underline-offset-2 transition-colors"
             >
               Select All Drifted ({driftedFeatures.length})
             </button>
@@ -325,7 +325,7 @@ export default function DriftMetricsCard({
                       </td>
                       <td className="py-2.5 px-3">{feat.ks_statistic.toFixed(4)}</td>
                       <td className="py-2.5 px-3">
-                        <span className={feat.ks_p_value < 0.05 ? 'text-amber-400 font-semibold' : ''}>
+                        <span className={feat.ks_p_value < 0.05 ? 'text-amber-600 font-semibold' : ''}>
                           {feat.ks_p_value.toFixed(4)}
                         </span>
                       </td>
@@ -335,9 +335,9 @@ export default function DriftMetricsCard({
                           <span
                             className={
                               isFeatSevere
-                                ? 'text-rose-400 font-bold'
+                                ? 'text-rose-600 font-bold'
                                 : isFeatModerate
-                                ? 'text-amber-400 font-semibold'
+                                ? 'text-amber-600 font-semibold'
                                 : 'text-slate-600'
                             }
                           >
@@ -357,10 +357,10 @@ export default function DriftMetricsCard({
                         <span
                           className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
                             isFeatSevere
-                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              ? 'bg-rose-500/20 text-rose-600 border border-rose-200'
                               : isFeatModerate
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                              ? 'bg-amber-500/20 text-amber-600 border border-amber-200'
+                              : 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                           }`}
                         >
                           {feat.status}
@@ -389,7 +389,7 @@ export default function DriftMetricsCard({
               <strong className="text-slate-800">{selectedFeatures.length}</strong> feature(s) targeted for retraining.
             </span>
           ) : isCritical ? (
-            <span className="text-rose-400 font-medium">
+            <span className="text-rose-600 font-medium">
               Critical drift threshold exceeded. Automated retraining dispatch recommended.
             </span>
           ) : (
@@ -407,13 +407,13 @@ export default function DriftMetricsCard({
             onClick={handleExecuteRetrain}
             className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all shadow-lg flex items-center gap-2 ${
               isCritical
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/40'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40'
+                ? 'bg-rose-600 hover:bg-rose-500 text-slate-900 shadow-rose-900/40'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-indigo-900/40'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {isSubmitting || triggerRetrainMutation.isPending ? (
               <>
-                <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                <svg className="animate-spin h-3.5 w-3.5 text-slate-900" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
@@ -430,7 +430,7 @@ export default function DriftMetricsCard({
       {triggerSuccessMsg && (
         <div
           data-testid="retrain-feedback-msg"
-          className="mt-3 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-mono"
+          className="mt-3 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-300 text-xs font-mono"
         >
           {triggerSuccessMsg}
         </div>

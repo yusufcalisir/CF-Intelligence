@@ -1112,7 +1112,7 @@ export default function LiveOperationsView() {
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5 min-w-0">
           {/* Title & Live Status */}
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-white/5 border border-slate-200 shadow-xs">
+            <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-slate-50 border border-slate-200 shadow-xs">
               📡
             </span>
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
@@ -1122,9 +1122,9 @@ export default function LiveOperationsView() {
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                   wsStatus === 'CONNECTED' && !isOfflineDemoMode
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
                     : wsStatus === 'RECONNECTING'
-                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    ? 'bg-amber-100 text-amber-600 border border-amber-200'
                     : 'bg-slate-500/15 text-slate-500 border border-slate-500/30'
                 }`}
               >
@@ -1144,7 +1144,7 @@ export default function LiveOperationsView() {
                   id="offline-demo-mode-badge"
                   className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
                 >
-                  <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                  <AlertTriangle size={12} className="text-amber-600 shrink-0" />
                   <span>Offline Demo Mode (Connection Lost - Simulated)</span>
                 </span>
               )}
@@ -1170,16 +1170,16 @@ export default function LiveOperationsView() {
                 <button
                   id="import-custom-dataset-btn"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-slate-900 bg-indigo-50 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
                 >
-                  <FileUp size={14} className="text-indigo-400" />
+                  <FileUp size={14} className="text-indigo-600" />
                   <span>Import Dataset</span>
                 </button>
                 {/* Configure Dataset button */}
                 <button
                   id="configure-dataset-btn"
                   onClick={() => setIsConfigOpen((v) => !v)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-white/5 transition-all active:scale-95 whitespace-nowrap shrink-0"
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-slate-50 transition-all active:scale-95 whitespace-nowrap shrink-0"
                 >
                   <Settings2 size={14} />
                   <span className="hidden sm:inline">Configure</span>
@@ -1191,7 +1191,7 @@ export default function LiveOperationsView() {
                   whileTap={{ scale: 0.96 }}
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                     boxShadow: `0 4px 16px ${selectedProfile.color}35`,
@@ -1205,7 +1205,7 @@ export default function LiveOperationsView() {
               <button
                 id="reset-simulation-btn"
                 onClick={resetTraining}
-                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
+                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
                   trainingPhase === 'failed'
                     ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-90'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'
@@ -1244,18 +1244,18 @@ export default function LiveOperationsView() {
             {/* Training Mode Tag */}
             <span
               className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${trainingMode === 'mock'
-                  ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
-                  : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                  ? 'text-indigo-600 border-indigo-500/40 bg-indigo-50'
+                  : 'text-amber-600 border-amber-500/40 bg-amber-50'
                 }`}
             >
               {trainingMode === 'mock' ? (
                 <>
-                  <FlaskConical size={11} className="text-indigo-400" />
+                  <FlaskConical size={11} className="text-indigo-600" />
                   <span>Simulated Sandbox (Demo Mode)</span>
                 </>
               ) : (
                 <>
-                  <Zap size={11} className="text-amber-400" />
+                  <Zap size={11} className="text-amber-600" />
                   <span>Live Backend Orchestration</span>
                 </>
               )}
@@ -1275,9 +1275,9 @@ export default function LiveOperationsView() {
 
       {/* Offline Fallback Banner */}
       {isOfflineDemoMode && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-300 text-xs font-medium shadow-sm">
           <div className="flex items-center gap-2.5 min-w-0">
-            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
             <span className="leading-relaxed">
               <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker - this data is illustrative and not live production telemetry.
             </span>
@@ -1299,9 +1299,9 @@ export default function LiveOperationsView() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300 flex items-start gap-3 shadow-sm"
+          className="p-4 rounded-xl border border-rose-500/40 bg-rose-50 text-rose-300 flex items-start gap-3 shadow-sm"
         >
-          <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+          <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-rose-200">Federated Training Failed</h4>
             <p className="text-xs text-rose-300/90 mt-0.5 break-words">
@@ -1318,7 +1318,7 @@ export default function LiveOperationsView() {
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
             {bankNodes.filter((b) => b.status === 'ACTIVE').length} / {bankNodes.length}
           </p>
-          <p className="text-xs text-emerald-400 mt-1">100% Quorum Reached</p>
+          <p className="text-xs text-emerald-600 mt-1">100% Quorum Reached</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
@@ -1334,7 +1334,7 @@ export default function LiveOperationsView() {
         {/* Dataset-specific KPI: Fraud Rate */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Dataset Fraud Rate</p>
-          <p className="text-2xl font-bold font-mono text-rose-400 mt-1">
+          <p className="text-2xl font-bold font-mono text-rose-600 mt-1">
             {selectedProfile.fraudRatio < 0.001
               ? `${(selectedProfile.fraudRatio * 100).toFixed(3)}%`
               : `${(selectedProfile.fraudRatio * 100).toFixed(2)}%`}
@@ -1346,7 +1346,7 @@ export default function LiveOperationsView() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">DP Epsilon Consumed</p>
-          <p className="text-2xl font-bold font-mono text-amber-400 mt-1">2.10 / 8.00</p>
+          <p className="text-2xl font-bold font-mono text-amber-600 mt-1">2.10 / 8.00</p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">73.7% Privacy Budget Left</p>
         </motion.div>
       </div>
@@ -1377,7 +1377,7 @@ export default function LiveOperationsView() {
 
           {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
-              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600">
                 <span className="text-3xl">📊</span>
               </div>
               <div className="max-w-xs space-y-1">
@@ -1397,7 +1397,7 @@ export default function LiveOperationsView() {
                   type="button"
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FlaskConical size={14} />
                   <span>Start Training Run ({selectedProfile.label})</span>
@@ -1479,7 +1479,7 @@ export default function LiveOperationsView() {
               <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/hour)</p>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
               LIVE AGGREGATION
             </span>
           </div>
@@ -1540,10 +1540,10 @@ export default function LiveOperationsView() {
                   </div>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${bank.status === 'ACTIVE'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
                         : bank.status === 'QUARANTINED'
                           ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
-                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          : 'bg-rose-500/20 text-rose-600 border border-rose-200'
                       }`}
                   >
                     ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
@@ -1571,8 +1571,8 @@ export default function LiveOperationsView() {
       <div className="glass-card p-3.5 sm:p-5 md:p-6 space-y-6 min-w-0 border border-slate-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
-              <span className="p-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">🔬</span>
+            <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
+              <span className="p-1 rounded-lg bg-indigo-50 border border-indigo-200">🔬</span>
               Model Telemetry & Empirical Validation
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
@@ -1611,7 +1611,7 @@ export default function LiveOperationsView() {
                 type="button"
                 onClick={() => setRocModelType('federated')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'federated'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-slate-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-800'
                   }`}
               >
@@ -1621,7 +1621,7 @@ export default function LiveOperationsView() {
                 type="button"
                 onClick={() => setRocModelType('local')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'local'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-slate-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-800'
                   }`}
               >
@@ -1671,7 +1671,7 @@ export default function LiveOperationsView() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mt-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-cyan-950/20 p-5 shadow-[0_0_40px_rgba(16,185,129,0.08)]"
+          className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-cyan-950/20 p-5 shadow-[0_0_40px_rgba(16,185,129,0.08)]"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -1681,7 +1681,7 @@ export default function LiveOperationsView() {
                 Asset Recovery &amp; FININT Operational Hub
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-mono text-slate-500 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
               LIVE · {arSummary.total_events} events
             </span>
           </div>
@@ -1712,11 +1712,11 @@ export default function LiveOperationsView() {
 
           {/* Sub-metrics bar */}
           <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.active_provisional_holds} active holds</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-slate-200">{arSummary.consortium_banks_active} consortium nodes</span>
+            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
+            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">{arSummary.active_provisional_holds} active holds</span>
+            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">{arSummary.consortium_banks_active} consortium nodes</span>
           </div>
         </motion.div>
       )}

@@ -271,7 +271,7 @@ export default function CasesPage() {
               <button
                 type="button"
                 onClick={() => handleSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 cursor-pointer"
                 aria-label="Clear search"
               >
                 <X size={12} />
@@ -331,7 +331,7 @@ export default function CasesPage() {
                 type="button"
                 id="clear-all-case-filters-btn"
                 onClick={handleClearAllFilters}
-                className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
+                className="text-[11px] sm:text-xs text-indigo-600 hover:text-indigo-300 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-50 hover:bg-indigo-500/20 border border-indigo-200 transition-all shrink-0 cursor-pointer"
               >
                 Clear Filters
               </button>
@@ -339,7 +339,7 @@ export default function CasesPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
           >
             + New Case
           </button>
@@ -355,7 +355,7 @@ export default function CasesPage() {
         </div>
       ) : !filteredCases || filteredCases.length === 0 ? (
         <div className="glass-card p-12 text-center text-[var(--color-text-muted)] space-y-3">
-          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 inline-block">
+          <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 inline-block">
             <span className="text-3xl">📁</span>
           </div>
           {statusFilter || priorityFilter || searchQuery ? (
@@ -386,7 +386,7 @@ export default function CasesPage() {
                 type="button"
                 id="create-first-case-btn"
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-sm transition-all cursor-pointer"
               >
                 + Create First Case
               </button>
@@ -431,7 +431,7 @@ export default function CasesPage() {
 
       {/* Inbound Alert Escalation Banner */}
       {fromAlertId && !showCreateModal && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-950/80 via-purple-950/70 to-slate-900/80 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-950/80 via-purple-950/70 to-slate-900/80 rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2">
             <span className="text-base">⚡</span>
             <span className="text-slate-800">
@@ -445,7 +445,7 @@ export default function CasesPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-sm transition-colors cursor-pointer"
           >
             Open Escalation Wizard
           </button>
@@ -517,32 +517,32 @@ function CreateCaseModal({
       >
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
           <div className="flex items-center gap-2">
-            <span className="text-indigo-400 text-lg">⚡</span>
+            <span className="text-indigo-600 text-lg">⚡</span>
             <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
           </div>
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-[var(--color-text-muted)] hover:text-white p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            className="text-[var(--color-text-muted)] hover:text-slate-900 p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             ✕
           </button>
         </div>
 
         {fromAlertId && (
-          <div className="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 rounded-lg border border-indigo-500/30 text-xs space-y-1">
+          <div className="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 rounded-lg border border-indigo-200 text-xs space-y-1">
             <div className="flex items-center justify-between font-semibold text-indigo-300">
               <span className="flex items-center gap-1.5">
                 <span>⚡</span> Escalating from Inbound Alert
               </span>
               {riskScore !== undefined && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-200">
                   Risk: {riskScore.toFixed(1)} / 1000
                 </span>
               )}
             </div>
             <div className="font-mono text-[11px] text-slate-600 truncate">
-              Alert ID: <span className="text-white font-bold">{fromAlertId}</span>
+              Alert ID: <span className="text-slate-900 font-bold">{fromAlertId}</span>
             </div>
           </div>
         )}
@@ -605,7 +605,7 @@ function CreateCaseModal({
               )
             }
             disabled={!title || isLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-sm transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             {isLoading ? 'Creating...' : 'Create Case'}
           </button>

@@ -167,7 +167,7 @@ export default function ScenariosPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-5 border border-indigo-500/30 shadow-lg"
+          className="glass-card p-5 border border-indigo-200 shadow-lg"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold flex items-center gap-2">
@@ -181,7 +181,7 @@ export default function ScenariosPage() {
             <div className="flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                 isRunning
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30 animate-pulse'
+                  ? 'bg-green-500/20 text-green-600 border border-green-500/30 animate-pulse'
                   : 'bg-gray-500/20 text-slate-500 border border-gray-500/30'
               }`}>
                 {status.status}
@@ -305,7 +305,7 @@ export default function ScenariosPage() {
                     <button
                       onClick={() => handleStart(scenarioType)}
                       disabled={startScenario.isPending || isRunning}
-                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-white hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-slate-900 hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                       style={{ background: SCENARIO_GRADIENTS[scenarioType] || SCENARIO_GRADIENTS.fraud_ring }}
                     >
                       {startScenario.isPending ? (

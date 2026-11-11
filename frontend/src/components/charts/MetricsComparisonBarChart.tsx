@@ -35,7 +35,7 @@ export default function MetricsComparisonBarChart({ banks }: MetricsComparisonBa
             Grouped evaluation metrics comparing siloed local baselines vs collaborative federated models
           </p>
         </div>
-        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
           Grouped Bar Chart
         </span>
       </div>

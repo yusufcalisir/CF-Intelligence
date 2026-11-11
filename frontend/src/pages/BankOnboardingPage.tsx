@@ -204,11 +204,11 @@ export default function BankOnboardingPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden min-w-0"
+        className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-200 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden min-w-0"
       >
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
             <Building2 className="w-6 h-6 text-indigo-300" />
           </div>
           <div className="min-w-0">
@@ -216,7 +216,7 @@ export default function BankOnboardingPage() {
               <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
                 Bank Node Onboarding Wizard
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200">
                 mTLS 1.3 Quorum
               </span>
             </div>
@@ -228,7 +228,7 @@ export default function BankOnboardingPage() {
 
         <Link
           to="/operations"
-          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-slate-200 hover:bg-white/10 text-slate-600 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 border border-slate-200 hover:bg-white/10 text-slate-600 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Operations</span>
@@ -236,11 +236,11 @@ export default function BankOnboardingPage() {
       </motion.div>
 
       {/* Responsive Stepper Container (Zero Horizontal Scroll) */}
-      <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-[#07091e]/90 shadow-xl space-y-3.5 min-w-0">
+      <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-[#07091e]/90 shadow-xl space-y-3.5 min-w-0">
         {/* Mobile View: Progress Header & Segmented Track (< 768px) */}
         <div className="block md:hidden space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">
+            <span className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider">
               Step {step} of 5
             </span>
             <span className="text-xs font-bold text-slate-800">
@@ -276,9 +276,9 @@ export default function BankOnboardingPage() {
                   onClick={() => s.num < step && setStep(s.num as any)}
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all border ${
                     isPast
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 cursor-pointer'
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-600 cursor-pointer'
                       : isCurrent
-                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/40 scale-110'
+                      ? 'bg-indigo-600 border-indigo-400 text-slate-900 shadow-lg shadow-indigo-500/40 scale-110'
                       : 'bg-slate-50/50 border-white/5 text-slate-500 cursor-not-allowed'
                   }`}
                 >
@@ -300,9 +300,9 @@ export default function BankOnboardingPage() {
                 onClick={() => isPast && setStep(item.num as any)}
                 className={`p-3 rounded-xl transition-all border relative flex flex-col justify-between min-h-[72px] ${
                   isCurrent
-                    ? 'bg-indigo-600/20 border-indigo-500/70 text-slate-900 shadow-lg shadow-indigo-600/15'
+                    ? 'bg-indigo-100 border-indigo-500/70 text-slate-900 shadow-lg shadow-indigo-600/15'
                     : isPast
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-600 cursor-pointer hover:bg-emerald-500/15'
+                    ? 'bg-emerald-50 border-emerald-200 text-slate-600 cursor-pointer hover:bg-emerald-100'
                     : 'bg-white/[0.02] border-white/5 text-slate-500'
                 }`}
               >
@@ -314,7 +314,7 @@ export default function BankOnboardingPage() {
                   <span
                     className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
                       isPast
-                        ? 'bg-emerald-500/20 text-emerald-400'
+                        ? 'bg-emerald-500/20 text-emerald-600'
                         : isCurrent
                         ? 'bg-indigo-500/30 text-indigo-300'
                         : 'bg-slate-50 text-slate-500'
@@ -335,7 +335,7 @@ export default function BankOnboardingPage() {
 
       {/* STEP 1: Legal Info Form */}
       {step === 1 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-200 shadow-xl min-w-0">
           <div className="border-b border-slate-200 pb-3">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🏛️</span>
@@ -355,7 +355,7 @@ export default function BankOnboardingPage() {
                 <button
                   type="button"
                   onClick={handleGenerateUniqueBankId}
-                  className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1"
+                  className="text-[10px] font-mono text-indigo-600 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1"
                 >
                   <span>🎲 Generate Unique ID</span>
                 </button>
@@ -398,7 +398,7 @@ export default function BankOnboardingPage() {
                 <span className="truncate">
                   {JURISDICTION_OPTIONS.find((o) => o.value === formData.jurisdiction)?.label ?? formData.jurisdiction}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openJurisdictionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openJurisdictionDropdown ? 'rotate-180 text-indigo-600' : ''}`} />
               </button>
 
               {openJurisdictionDropdown && (
@@ -413,12 +413,12 @@ export default function BankOnboardingPage() {
                       }}
                       className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
                         formData.jurisdiction === opt.value
-                          ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
-                          : 'text-slate-600 hover:bg-white/5 hover:text-white'
+                          ? 'bg-indigo-100 text-indigo-300 font-bold border border-indigo-200'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
                       <span className="truncate">{opt.label}</span>
-                      {formData.jurisdiction === opt.value && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                      {formData.jurisdiction === opt.value && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -454,7 +454,7 @@ export default function BankOnboardingPage() {
                 <span className="truncate">
                   {REGION_OPTIONS.find((o) => o.value === formData.data_residency_region)?.label ?? formData.data_residency_region}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openRegionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ml-2 transition-transform duration-200 ${openRegionDropdown ? 'rotate-180 text-indigo-600' : ''}`} />
               </button>
 
               {openRegionDropdown && (
@@ -469,12 +469,12 @@ export default function BankOnboardingPage() {
                       }}
                       className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
                         formData.data_residency_region === opt.value
-                          ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
-                          : 'text-slate-600 hover:bg-white/5 hover:text-white'
+                          ? 'bg-indigo-100 text-indigo-300 font-bold border border-indigo-200'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
                       <span className="truncate">{opt.label}</span>
-                      {formData.data_residency_region === opt.value && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                      {formData.data_residency_region === opt.value && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -485,7 +485,7 @@ export default function BankOnboardingPage() {
           <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(2)}
-              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <span>Continue to Step 2</span>
               <ArrowRight className="w-4 h-4" />
@@ -496,7 +496,7 @@ export default function BankOnboardingPage() {
 
       {/* STEP 2: Review & Submit */}
       {step === 2 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-200 shadow-xl min-w-0">
           <div className="border-b border-slate-200 pb-3">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>📋</span>
@@ -510,7 +510,7 @@ export default function BankOnboardingPage() {
           <div className="p-4 rounded-xl bg-[#03040d]/80 border border-slate-200 space-y-2.5 text-xs sm:text-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Consortium Bank ID:</span>
-              <span className="font-mono font-bold text-indigo-400">{formData.bank_id}</span>
+              <span className="font-mono font-bold text-indigo-600">{formData.bank_id}</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Legal Entity Name:</span>
@@ -518,7 +518,7 @@ export default function BankOnboardingPage() {
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">Jurisdiction & Standard:</span>
-              <span className="font-bold text-emerald-400">{formData.jurisdiction} Compliance</span>
+              <span className="font-bold text-emerald-600">{formData.jurisdiction} Compliance</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
               <span className="text-slate-500 font-semibold">SecOps Contact:</span>
@@ -531,9 +531,9 @@ export default function BankOnboardingPage() {
           </div>
 
           {errorMessage && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm flex flex-col gap-3">
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-300 text-xs sm:text-sm flex flex-col gap-3">
               <div className="flex items-start gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <div className="font-bold text-amber-200">
                     {isConflict ? 'Registration Conflict (HTTP 409)' : 'Registration Error'}
@@ -542,7 +542,7 @@ export default function BankOnboardingPage() {
                 </div>
               </div>
               {isConflict && (
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20">
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-200">
                   <button
                     type="button"
                     onClick={handleLoadExistingBundle}
@@ -554,7 +554,7 @@ export default function BankOnboardingPage() {
                   <button
                     type="button"
                     onClick={handleGenerateUniqueBankId}
-                    className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-50 hover:bg-white/10 border border-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>🔄 Generate New Unique Bank ID</span>
                   </button>
@@ -566,7 +566,7 @@ export default function BankOnboardingPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(1)}
-              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-600 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 shrink-0 whitespace-nowrap"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 shrink-0 whitespace-nowrap"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Step 1</span>
@@ -574,7 +574,7 @@ export default function BankOnboardingPage() {
             <button
               onClick={handleRegisterSubmit}
               disabled={isSubmitting}
-              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
             >
               {isSubmitting ? (
                 <>
@@ -594,7 +594,7 @@ export default function BankOnboardingPage() {
 
       {/* STEP 3: Download Certificates */}
       {step === 3 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-200 shadow-xl min-w-0">
           <div className="border-b border-slate-200 pb-3">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🔑</span>
@@ -606,13 +606,13 @@ export default function BankOnboardingPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-emerald-500/20 space-y-2">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-emerald-200 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold font-mono text-emerald-400 flex items-center gap-1.5">
+                <span className="text-xs font-bold font-mono text-emerald-600 flex items-center gap-1.5">
                   <FileCode className="w-3.5 h-3.5" />
                   X.509 Public Certificate ({formData.bank_id}.crt)
                 </span>
-                <span className="text-[9.5px] font-mono text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded">
+                <span className="text-[9.5px] font-mono text-emerald-600/80 bg-emerald-50 px-2 py-0.5 rounded">
                   2048-bit RSA
                 </span>
               </div>
@@ -621,20 +621,20 @@ export default function BankOnboardingPage() {
               </pre>
               <button
                 onClick={() => downloadFile(`${formData.bank_id}.crt`, generatedCert)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-200 hover:bg-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download {formData.bank_id}.crt</span>
               </button>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-amber-500/20 space-y-2">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-amber-200 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold font-mono text-amber-400 flex items-center gap-1.5">
+                <span className="text-xs font-bold font-mono text-amber-600 flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" />
                   RSA Private Key ({formData.bank_id}.key)
                 </span>
-                <span className="text-[9.5px] font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded">
+                <span className="text-[9.5px] font-mono text-amber-600/80 bg-amber-50 px-2 py-0.5 rounded">
                   CONFIDENTIAL
                 </span>
               </div>
@@ -643,7 +643,7 @@ export default function BankOnboardingPage() {
               </pre>
               <button
                 onClick={() => downloadFile(`${formData.bank_id}.key`, generatedKey)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-200 hover:bg-amber-600/30 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download {formData.bank_id}.key</span>
@@ -654,7 +654,7 @@ export default function BankOnboardingPage() {
           <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(4)}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Continue to Step 4</span>
               <ArrowRight className="w-4 h-4" />
@@ -665,7 +665,7 @@ export default function BankOnboardingPage() {
 
       {/* STEP 4: Download Connector Config */}
       {step === 4 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-200 shadow-xl min-w-0">
           <div className="border-b border-slate-200 pb-3">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>📄</span>
@@ -676,9 +676,9 @@ export default function BankOnboardingPage() {
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-indigo-500/20 space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-indigo-200 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold font-mono text-indigo-400 flex items-center gap-1.5">
+              <span className="text-xs font-bold font-mono text-indigo-600 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5" />
                 Generated config.yaml
               </span>
@@ -688,7 +688,7 @@ export default function BankOnboardingPage() {
             </pre>
             <button
               onClick={() => downloadFile('config.yaml', generatedYaml)}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-300 border border-indigo-200 hover:bg-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download config.yaml</span>
@@ -698,7 +698,7 @@ export default function BankOnboardingPage() {
           <div className="p-4 rounded-xl bg-[#03040d] border border-slate-200 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 CLI Command for Bank IT Operations Team
               </span>
               <button
@@ -707,13 +707,13 @@ export default function BankOnboardingPage() {
                   setIsCliCopied(true);
                   setTimeout(() => setIsCliCopied(false), 2000);
                 }}
-                className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-white bg-white/5 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
               >
-                {isCliCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {isCliCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                 <span>{isCliCopied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <code className="block p-2.5 bg-black/60 rounded-lg text-xs font-mono text-emerald-400 border border-emerald-500/20 overflow-x-auto">
+            <code className="block p-2.5 bg-black/60 rounded-lg text-xs font-mono text-emerald-600 border border-emerald-200 overflow-x-auto">
               cfi-cli join --config config.yaml --cert {formData.bank_id}.crt --key {formData.bank_id}.key
             </code>
           </div>
@@ -721,7 +721,7 @@ export default function BankOnboardingPage() {
           <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               onClick={() => setStep(5)}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Proceed to Quorum Verification</span>
               <ArrowRight className="w-4 h-4" />
@@ -732,11 +732,11 @@ export default function BankOnboardingPage() {
 
       {/* STEP 5: Verify Connection */}
       {step === 5 && (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-6 sm:p-10 text-center space-y-6 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-6 sm:p-10 text-center space-y-6 rounded-2xl bg-[#080a21]/90 border border-indigo-200 shadow-xl min-w-0">
           {nodeStatus === 'PENDING' ? (
             <div className="space-y-4 max-w-md mx-auto">
-              <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/30 mx-auto">
-                <Radio className="w-8 h-8 text-indigo-400 animate-pulse" />
+              <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 border border-indigo-200 mx-auto">
+                <Radio className="w-8 h-8 text-indigo-600 animate-pulse" />
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-20" />
               </div>
               <div>
@@ -744,7 +744,7 @@ export default function BankOnboardingPage() {
                   Listening for Bank Node Heartbeat...
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                  Awaiting initial gRPC mTLS 1.3 handshake from <span className="font-mono text-indigo-400 font-bold">{formData.bank_id}</span> on port 50051.
+                  Awaiting initial gRPC mTLS 1.3 handshake from <span className="font-mono text-indigo-600 font-bold">{formData.bank_id}</span> on port 50051.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 text-xs font-mono text-slate-500">
@@ -754,19 +754,19 @@ export default function BankOnboardingPage() {
             </div>
           ) : (
             <div className="space-y-5 max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.3)]">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-[0_0_25px_rgba(16,185,129,0.3)]">
                 <ShieldCheck className="w-9 h-9" />
               </div>
               <div>
-                <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-400 tracking-tight">
+                <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-600 tracking-tight">
                   Bank Node Successfully Onboarded!
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
-                  <span className="font-bold text-white">{formData.legal_name}</span> is now fully verified and registered as an active node in the Privacy-Preserving FL Consortium.
+                  <span className="font-bold text-slate-900">{formData.legal_name}</span> is now fully verified and registered as an active node in the Privacy-Preserving FL Consortium.
                 </p>
               </div>
 
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-mono text-emerald-300 flex items-center justify-between">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-mono text-emerald-300 flex items-center justify-between">
                 <span>Node Quorum Status:</span>
                 <span className="font-bold">ACTIVE (100% HEALTHY)</span>
               </div>
@@ -776,14 +776,14 @@ export default function BankOnboardingPage() {
                   type="button"
                   id="onboarding-import-dataset-btn"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <FileText className="w-4 h-4" />
                   <span>Import Bank Transactions (CSV / Parquet)</span>
                 </button>
                 <Link
                   to="/operations"
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>View Live Operations</span>
                   <ArrowRight className="w-4 h-4" />

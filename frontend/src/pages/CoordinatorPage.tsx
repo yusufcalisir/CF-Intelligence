@@ -93,11 +93,11 @@ export default function CoordinatorPage() {
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-900 w-full min-w-0">
       {/* Top Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
+            <div className="p-2.5 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
               <Server className="w-6 h-6 text-indigo-300" />
             </div>
             <div className="min-w-0 flex-1">
@@ -105,7 +105,7 @@ export default function CoordinatorPage() {
                 <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">
                   Federated Coordinator Suite
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200 whitespace-nowrap">
                   gRPC 50051
                 </span>
               </div>
@@ -124,7 +124,7 @@ export default function CoordinatorPage() {
               onClick={() => setViewMode('all')}
               className={`px-2.5 py-1 rounded-lg transition-all text-xs cursor-pointer ${
                 viewMode === 'all'
-                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  ? 'bg-indigo-600 text-slate-900 font-bold shadow'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -135,7 +135,7 @@ export default function CoordinatorPage() {
               onClick={() => setViewMode('cuda')}
               className={`px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'cuda'
-                  ? 'bg-purple-600 text-white font-bold shadow'
+                  ? 'bg-purple-600 text-slate-900 font-bold shadow'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -147,7 +147,7 @@ export default function CoordinatorPage() {
               onClick={() => setViewMode('cpu')}
               className={`px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1 cursor-pointer ${
                 viewMode === 'cpu'
-                  ? 'bg-blue-600 text-white font-bold shadow'
+                  ? 'bg-blue-600 text-slate-900 font-bold shadow'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -156,7 +156,7 @@ export default function CoordinatorPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold bg-emerald-500/10 border-emerald-500/25 text-emerald-400">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold bg-emerald-50 border-emerald-500/25 text-emerald-600">
             <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
             <span>
               {rawClients.length > 0
@@ -167,7 +167,7 @@ export default function CoordinatorPage() {
 
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-200 text-xs font-semibold text-slate-800 transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-white/10 border border-slate-200 text-xs font-semibold text-slate-800 transition-all cursor-pointer whitespace-nowrap"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh Registry</span>
@@ -186,13 +186,13 @@ export default function CoordinatorPage() {
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Online Clients</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{onlineClients.length}</span>
-            <span className="text-xs font-bold text-emerald-400">/ {displayClients.length} Nodes</span>
+            <span className="text-xs font-bold text-emerald-600">/ {displayClients.length} Nodes</span>
           </div>
           <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
@@ -209,7 +209,7 @@ export default function CoordinatorPage() {
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Offline / Timed Out</span>
-            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
@@ -231,13 +231,13 @@ export default function CoordinatorPage() {
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">GPU Accelerated</span>
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
               <Zap className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{gpuClients.length}</span>
-            <span className="text-xs font-bold text-purple-400">CUDA Enabled</span>
+            <span className="text-xs font-bold text-purple-600">CUDA Enabled</span>
           </div>
           <p className="text-xs text-slate-500 mt-1.5">NVIDIA Tensor Core acceleration</p>
         </motion.div>
@@ -251,13 +251,13 @@ export default function CoordinatorPage() {
         >
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total RAM Pool</span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-500/20">
               <HardDrive className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{totalRamGb}</span>
-            <span className="text-xs font-bold text-blue-400">GB System Memory</span>
+            <span className="text-xs font-bold text-blue-600">GB System Memory</span>
           </div>
           <p className="text-xs text-slate-500 mt-1.5">Distributed memory capacity</p>
         </motion.div>
@@ -268,7 +268,7 @@ export default function CoordinatorPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.25 }}
-        className="glass-card border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 shadow-xl overflow-hidden min-w-0"
+        className="glass-card border border-indigo-200 rounded-2xl bg-[#080a21]/90 shadow-xl overflow-hidden min-w-0"
       >
         <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[#03040d]/60">
           <div>
@@ -280,7 +280,7 @@ export default function CoordinatorPage() {
               Participating consortium banking nodes registered via REST handshake (/api/v1/coordinator/handshake) and gRPC daemon
             </p>
           </div>
-          <div className="text-[11px] text-indigo-300 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20 self-start sm:self-auto font-mono">
+          <div className="text-[11px] text-indigo-300 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto font-mono">
             Auto-ping interval: 5.0s
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function CoordinatorPage() {
         {/* Empty State: When 0 Registered Edge Daemons */}
         {displayClients.length === 0 ? (
           <div className="p-6 sm:p-8 text-center space-y-4">
-            <div className="inline-flex p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-400">
+            <div className="inline-flex p-3.5 rounded-2xl bg-indigo-50 border border-indigo-500/25 text-indigo-600">
               <Server className="w-8 h-8 animate-pulse" />
             </div>
             <div className="max-w-md mx-auto space-y-1.5">
@@ -305,10 +305,10 @@ export default function CoordinatorPage() {
                 <button
                   type="button"
                   onClick={() => handleCopyCurl('python scripts/cfi_cli.py init --bank-id bank_alpha --coordinator localhost:50051', 'CLI')}
-                  className="hover:text-white transition flex items-center gap-1 cursor-pointer"
+                  className="hover:text-slate-900 transition flex items-center gap-1 cursor-pointer"
                 >
                   {copiedPath === 'python scripts/cfi_cli.py init --bank-id bank_alpha --coordinator localhost:50051' ? (
-                    <Check className="w-3 h-3 text-emerald-400" />
+                    <Check className="w-3 h-3 text-emerald-600" />
                   ) : (
                     <Copy className="w-3 h-3" />
                   )}
@@ -321,7 +321,7 @@ export default function CoordinatorPage() {
               <button
                 type="button"
                 onClick={handleRefresh}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white/5 hover:bg-white/10 border border-slate-200 transition cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-white/10 border border-slate-200 transition cursor-pointer flex items-center gap-1.5"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span>Check Status</span>
@@ -344,13 +344,13 @@ export default function CoordinatorPage() {
                 key={client.bank_id}
                 className={`p-3.5 rounded-xl border transition-all space-y-3 ${
                   isSelected
-                    ? 'bg-indigo-600/15 border-indigo-500/60 shadow-md shadow-indigo-600/10'
+                    ? 'bg-indigo-100 border-indigo-500/60 shadow-md shadow-indigo-600/10'
                     : 'bg-[#03040d]/70 border-white/5'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-500/20 border border-indigo-200 text-indigo-300 flex items-center justify-center font-mono text-xs font-bold shrink-0">
                       {displayName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
@@ -367,8 +367,8 @@ export default function CoordinatorPage() {
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         isOnline
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                          : 'bg-rose-100 text-rose-600 border border-rose-200'
                       }`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
@@ -378,8 +378,8 @@ export default function CoordinatorPage() {
                       onClick={() => setSelectedBankId(client.bank_id)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
                         isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-400'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-600 border-slate-200'
+                          ? 'bg-indigo-600 text-slate-900 border-indigo-400'
+                          : 'bg-slate-50 hover:bg-white/10 text-slate-600 border-slate-200'
                       }`}
                     >
                       {isSelected ? 'Active' : 'Select'}
@@ -439,12 +439,12 @@ export default function CoordinatorPage() {
                   <tr
                     key={client.bank_id}
                     className={`transition-colors duration-150 hover:bg-slate-50/40 ${
-                      isSelected ? 'bg-indigo-500/10' : ''
+                      isSelected ? 'bg-indigo-50' : ''
                     }`}
                   >
                     <td className="py-3.5 px-4 font-bold text-slate-900">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-mono text-xs font-bold">
+                        <div className="h-7 w-7 rounded-lg bg-indigo-500/20 border border-indigo-200 text-indigo-600 flex items-center justify-center font-mono text-xs font-bold">
                           {displayName.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -457,8 +457,8 @@ export default function CoordinatorPage() {
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
                           isOnline
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                            ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                            : 'bg-rose-100 text-rose-600 border border-rose-200'
                         }`}
                       >
                         <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
@@ -469,7 +469,7 @@ export default function CoordinatorPage() {
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-semibold ${
                           isCuda
-                            ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                            ? 'bg-purple-100 text-purple-300 border border-purple-200'
                             : 'bg-slate-50 text-slate-600 border border-slate-200'
                         }`}
                       >
@@ -481,13 +481,13 @@ export default function CoordinatorPage() {
                     <td className="py-3.5 px-4 font-bold text-slate-800">{client.ram_gb.toFixed(1)} GB</td>
                     <td className="py-3.5 px-4 text-slate-600">
                       {client.device_count > 0 ? (
-                        <span className="text-purple-400 font-bold">{client.device_count}x GPU</span>
+                        <span className="text-purple-600 font-bold">{client.device_count}x GPU</span>
                       ) : (
                         <span className="text-slate-500">0 (CPU Host)</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className={client.last_heartbeat_ago_seconds > 10 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                      <span className={client.last_heartbeat_ago_seconds > 10 ? 'text-rose-600 font-bold' : 'text-emerald-600'}>
                         {client.last_heartbeat_ago_seconds.toFixed(1)}s ago
                       </span>
                     </td>
@@ -496,7 +496,7 @@ export default function CoordinatorPage() {
                         onClick={() => setSelectedBankId(client.bank_id)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border cursor-pointer ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                            ? 'bg-indigo-600 text-slate-900 border-indigo-500 shadow-md shadow-indigo-600/30'
                             : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
                         }`}
                       >
@@ -520,7 +520,7 @@ export default function CoordinatorPage() {
         transition={{ duration: 0.4, delay: 0.3 }}
         className="glass-card border border-indigo-500/25 rounded-2xl bg-gradient-to-b from-[#080a24]/95 via-[#06081c]/90 to-[#03040e]/95 p-4 sm:p-6 shadow-2xl relative overflow-hidden min-w-0"
       >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
 
         {/* Card Header & Node Selector */}
@@ -528,7 +528,7 @@ export default function CoordinatorPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
                   Active Playground
                 </span>
@@ -564,7 +564,7 @@ export default function CoordinatorPage() {
                     onClick={() => setSelectedBankId(c.bank_id)}
                     className={`p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 cursor-pointer min-w-0 flex flex-col justify-center border ${
                       isSelected
-                        ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                        ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500 text-slate-900 shadow-lg shadow-indigo-600/20'
                         : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 text-slate-500'
                     }`}
                   >
@@ -586,7 +586,7 @@ export default function CoordinatorPage() {
               })}
             </div>
           ) : (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-300 text-xs flex items-center justify-between">
               <span>No live edge nodes connected for hyperparameter tuning.</span>
               <button
                 type="button"
@@ -609,7 +609,7 @@ export default function CoordinatorPage() {
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                   Base Batch Size
                 </label>
-                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-200">
                   {baseBatchSize} samples
                 </span>
               </div>
@@ -632,8 +632,8 @@ export default function CoordinatorPage() {
                     onClick={() => setBaseBatchSize(val)}
                     className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
                       baseBatchSize === val
-                        ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-500 border-white/5'
+                        ? 'bg-indigo-600 text-slate-900 border-indigo-400 shadow-sm'
+                        : 'bg-slate-50 hover:bg-white/10 text-slate-500 border-white/5'
                     }`}
                   >
                     {val}
@@ -648,7 +648,7 @@ export default function CoordinatorPage() {
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                   Base Local Epochs
                 </label>
-                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-200">
                   {baseEpochs} epochs
                 </span>
               </div>
@@ -671,8 +671,8 @@ export default function CoordinatorPage() {
                     onClick={() => setBaseEpochs(val)}
                     className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
                       baseEpochs === val
-                        ? 'bg-purple-600 text-white border-purple-400 shadow-sm'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-500 border-white/5'
+                        ? 'bg-purple-600 text-slate-900 border-purple-400 shadow-sm'
+                        : 'bg-slate-50 hover:bg-white/10 text-slate-500 border-white/5'
                     }`}
                   >
                     {val}
@@ -716,19 +716,19 @@ export default function CoordinatorPage() {
           {/* Right Column: 4 Negotiated Telemetry Cards */}
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             {/* Metric 1: Scaled Batch Size */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-indigo-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-indigo-200 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scaled Batch Size</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-300 border border-indigo-200">
                     VRAM Fit
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">Adjusted for client VRAM & memory ceiling</p>
               </div>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-black text-indigo-400 font-mono">
+                <span className="text-3xl font-black text-indigo-600 font-mono">
                   {negotiatedData?.batch_size ??
                     (activeClient?.hardware_type === 'cuda' ? baseBatchSize : Math.max(16, Math.floor(baseBatchSize / 2)))}
                 </span>
@@ -737,19 +737,19 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Metric 2: Scaled Epochs */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-purple-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-purple-200 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-purple-500" />
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scaled Epochs</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-50 text-purple-300 border border-purple-200">
                     Anti-Straggler
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">Prevents slower nodes from blocking global rounds</p>
               </div>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-black text-purple-400 font-mono">
+                <span className="text-3xl font-black text-purple-600 font-mono">
                   {negotiatedData?.local_epochs ??
                     (activeClient && activeClient.ram_gb >= 32 ? baseEpochs : Math.max(1, baseEpochs - 1))}
                 </span>
@@ -758,19 +758,19 @@ export default function CoordinatorPage() {
             </div>
 
             {/* Metric 3: Gradient Accumulation */}
-            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-emerald-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/50 transition-all min-w-0">
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-emerald-200 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/50 transition-all min-w-0">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gradient Accumulation</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
                     Throughput
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">Emulates large batch convergence on constrained nodes</p>
               </div>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-black text-emerald-400 font-mono">
+                <span className="text-3xl font-black text-emerald-600 font-mono">
                   {negotiatedData?.gradient_accumulation_steps ?? (activeClient?.hardware_type === 'cuda' ? 1 : 2)}x
                 </span>
                 <span className="text-xs text-slate-500 font-mono">accum steps</span>
@@ -783,14 +783,14 @@ export default function CoordinatorPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Est. Step Latency</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-500/20">
                     Realtime SLA
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">Benchmarked per local training step</p>
               </div>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-black text-blue-400 font-mono">
+                <span className="text-3xl font-black text-blue-600 font-mono">
                   {activeClient?.hardware_type === 'cuda' ? '14.2 ms' : '82.6 ms'}
                 </span>
                 <span className="text-xs text-slate-500 font-mono">per step</span>
@@ -803,14 +803,14 @@ export default function CoordinatorPage() {
       {/* Architecture Highlights & REST API Reference */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
         {/* Architectural Pillars */}
-        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-400" />
+            <Layers className="w-4 h-4 text-indigo-600" />
             <span>Coordinator Architectural Specifications</span>
           </h3>
 
           <div className="space-y-3">
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">🤝</span>
                 <h4 className="text-xs font-bold text-slate-800">Dynamic Handshake & Compatibility</h4>
@@ -820,7 +820,7 @@ export default function CoordinatorPage() {
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-emerald-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-emerald-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">💓</span>
                 <h4 className="text-xs font-bold text-slate-800">Heartbeat Monitoring & SLA Isolation</h4>
@@ -830,7 +830,7 @@ export default function CoordinatorPage() {
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-purple-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-purple-200 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">⚖️</span>
                 <h4 className="text-xs font-bold text-slate-800">Heterogeneous Parameter Scaling</h4>
@@ -843,10 +843,10 @@ export default function CoordinatorPage() {
         </div>
 
         {/* REST API Reference Card */}
-        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-200 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-400" />
+              <Activity className="w-4 h-4 text-emerald-600" />
               <span>REST API Endpoint Blueprints</span>
             </h3>
             <span className="text-[10px] font-mono text-slate-500">Click path to copy cURL</span>
@@ -902,8 +902,8 @@ export default function CoordinatorPage() {
                     <span
                       className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider shrink-0 ${
                         method === 'POST'
-                          ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-200'
+                          : 'bg-emerald-500/20 text-emerald-600 border border-emerald-200'
                       }`}
                     >
                       {method}
@@ -918,8 +918,8 @@ export default function CoordinatorPage() {
 
                   <div className="text-[10px] font-mono text-slate-500 group-hover:text-slate-800 transition-colors shrink-0 ml-2">
                     {isCopied ? (
-                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                        <Check className="w-3 h-3 text-emerald-400" /> Copied!
+                      <span className="flex items-center gap-1 text-emerald-600 font-bold">
+                        <Check className="w-3 h-3 text-emerald-600" /> Copied!
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
