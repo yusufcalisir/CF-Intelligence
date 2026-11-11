@@ -76,7 +76,7 @@ export default function ConfusionMatrix({
           {heading}
         </h3>
         {matrix?.threshold != null && !isNaN(matrix.threshold) && (
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
             τ = {matrix.threshold.toFixed(2)}
           </span>
         )}
@@ -139,11 +139,11 @@ export default function ConfusionMatrix({
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">FPR</div>
-            <div className="font-mono font-bold text-rose-400">{((matrix.fpr ?? 0) * 100).toFixed(3)}%</div>
+            <div className="font-mono font-bold text-rose-600">{((matrix.fpr ?? 0) * 100).toFixed(3)}%</div>
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">F1 Score</div>
-            <div className="font-mono font-bold text-indigo-400">{(matrix.f1_score ?? 0).toFixed(4)}</div>
+            <div className="font-mono font-bold text-indigo-600">{(matrix.f1_score ?? 0).toFixed(4)}</div>
           </div>
         </div>
       )}

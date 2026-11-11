@@ -46,29 +46,29 @@ const RISK_CONFIG: Record<
 > = {
   safe: {
     label: 'Safe (0.0% Leakage)',
-    bg: 'bg-emerald-500/15',
-    text: 'text-emerald-400',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-600',
     border: 'border-emerald-500/30',
     glow: 'shadow-[0_0_12px_rgba(16,185,129,0.25)]',
   },
   low_risk: {
     label: 'Low Risk',
-    bg: 'bg-emerald-500/10',
+    bg: 'bg-emerald-50',
     text: 'text-emerald-700',
-    border: 'border-emerald-500/20',
+    border: 'border-emerald-200',
     glow: 'shadow-[0_0_8px_rgba(16,185,129,0.15)]',
   },
   moderate_risk: {
     label: 'Moderate Risk',
     bg: 'bg-amber-500/15',
-    text: 'text-amber-400',
+    text: 'text-amber-600',
     border: 'border-amber-500/30',
     glow: 'shadow-[0_0_12px_rgba(245,158,11,0.2)]',
   },
   high_risk: {
     label: 'High Risk (Alert)',
     bg: 'bg-rose-500/15',
-    text: 'text-rose-400',
+    text: 'text-rose-600',
     border: 'border-rose-300',
     glow: 'shadow-[0_0_12px_rgba(244,63,94,0.25)]',
   },
@@ -90,7 +90,7 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
   const pct = Math.min(100, Math.max(0, Math.round((value / max) * 100)));
   const barColor =
     pct < 30
-      ? 'from-emerald-500 to-teal-400 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
+      ? 'from-emerald-500 to-teal-600 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
       : pct < 60
       ? 'from-amber-500 to-yellow-400 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
       : 'from-rose-500 to-red-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]';
@@ -98,7 +98,7 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
   return (
     <div className="space-y-1.5 w-full min-w-0">
       <div className="flex items-center justify-between gap-2 text-xs min-w-0">
-        <span className="text-slate-400 font-mono text-[11px] truncate min-w-0 flex-1" title={label}>
+        <span className="text-slate-500 font-mono text-[11px] truncate min-w-0 flex-1" title={label}>
           {label}
         </span>
         <span className="font-mono font-bold text-slate-700 shrink-0 whitespace-nowrap text-right">
@@ -125,14 +125,14 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-indigo-400" />
+            <ShieldCheck className="w-5 h-5 text-indigo-600" />
             <span>Byzantine-Robust Aggregation Catalog</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Mathematical defense proofs against malicious gradient poisoning, label flipping, and colluding Sybil nodes
           </p>
         </div>
-        <span className="text-xs font-mono text-indigo-700 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20 self-start sm:self-auto">
+        <span className="text-xs font-mono text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 self-start sm:self-auto">
           {methods.length} Active Algorithms
         </span>
       </div>
@@ -149,7 +149,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
               className={`glass-card p-4 sm:p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between relative overflow-hidden min-w-0 group ${
                 isMultiAttacker
                   ? 'bg-gradient-to-b from-white to-white border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                  : 'bg-white border-slate-200/80 hover:border-indigo-500/30'
+                  : 'bg-white border-slate-200/80 hover:border-indigo-200'
               }`}
             >
               {isMultiAttacker && (
@@ -162,7 +162,7 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                     <span className="font-bold text-slate-800 text-sm leading-snug block truncate group-hover:text-indigo-700 transition-colors">
                       {m.label}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                    <span className="text-[10px] font-mono text-slate-500">{m.id}</span>
                   </div>
 
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -172,23 +172,23 @@ function DefenseSuiteSection({ methods }: { methods: AggregationMethodInfo[] }) 
                       </span>
                     )}
                     {m.colluding_defense && (
-                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 border border-indigo-500/40 whitespace-nowrap flex items-center gap-1 shadow-sm">
-                        <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                      <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-500/40 whitespace-nowrap flex items-center gap-1 shadow-sm">
+                        <Sparkles className="w-2.5 h-2.5 text-indigo-600" />
                         Multi-Attacker ✨
                       </span>
                     )}
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed">{m.description}</p>
+                <p className="text-xs text-slate-500 leading-relaxed">{m.description}</p>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 truncate">
-                  <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 truncate">
+                  <FileText className="w-3 h-3 text-slate-500 shrink-0" />
                   <span className="truncate">{m.paper}</span>
                 </div>
-                <span className="text-[10px] font-mono text-indigo-400 group-hover:text-indigo-700 transition-colors shrink-0">
+                <span className="text-[10px] font-mono text-indigo-600 group-hover:text-indigo-700 transition-colors shrink-0">
                   {isSelected ? 'Active' : 'Inspect'}
                 </span>
               </div>
@@ -222,23 +222,23 @@ function MIASimulationVisualizer() {
   ];
 
   return (
-    <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-500/30 bg-white shadow-xl space-y-5 min-w-0">
+    <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-200 bg-white shadow-xl space-y-5 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-700">
+            <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
               <Sliders className="w-4 h-4" />
             </div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">
               Membership Inference Attack (MIA) Empirical Simulator
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Simulate shadow model transaction loss distributions and observe empirical ROC-AUC / ASR under Rényi DP
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
             Shokri / Yeom Model
           </span>
         </div>
@@ -249,7 +249,7 @@ function MIASimulationVisualizer() {
         <div className="space-y-2">
           <label className="text-xs font-mono text-slate-600 flex justify-between">
             <span>Differential Privacy Noise Level (Target ε):</span>
-            <span className="font-bold text-indigo-400">
+            <span className="font-bold text-indigo-600">
               {testEps >= 50.0 ? '∞ (No DP)' : `ε = ${testEps.toFixed(2)}`}
             </span>
           </label>
@@ -282,7 +282,7 @@ function MIASimulationVisualizer() {
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="w-full sm:w-auto flex-1 space-y-1">
-            <span className="text-xs font-mono text-slate-400 block">Shadow Samples:</span>
+            <span className="text-xs font-mono text-slate-500 block">Shadow Samples:</span>
             <select
               value={numSamples}
               onChange={(e) => setNumSamples(parseInt(e.target.value, 10))}
@@ -320,7 +320,7 @@ function MIASimulationVisualizer() {
         <div className="space-y-4 pt-3 border-t border-slate-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">Attack Success Rate (ASR)</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Attack Success Rate (ASR)</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold font-mono text-slate-800">
                   {(simData.membership_leakage_asr * 100).toFixed(1)}%
@@ -331,10 +331,10 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">MIA ROC-AUC Score</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">MIA ROC-AUC Score</span>
               <div className="flex items-baseline gap-2">
                 <span className={`text-xl font-bold font-mono ${
-                  simData.mia_roc_auc < 0.6 ? 'text-emerald-400' : simData.mia_roc_auc < 0.75 ? 'text-amber-400' : 'text-rose-400'
+                  simData.mia_roc_auc < 0.6 ? 'text-emerald-600' : simData.mia_roc_auc < 0.75 ? 'text-amber-600' : 'text-rose-600'
                 }`}>
                   {simData.mia_roc_auc.toFixed(3)}
                 </span>
@@ -346,25 +346,25 @@ function MIASimulationVisualizer() {
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">Loss Disparity Gap (ΔL)</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Loss Disparity Gap (ΔL)</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold font-mono text-indigo-700">
                   {simData.loss_gap.toFixed(4)}
                 </span>
                 <span className="text-[10px] font-mono text-slate-500">(L_test - L_train)</span>
               </div>
-              <p className="text-[10.5px] text-slate-400 font-mono">
+              <p className="text-[10.5px] text-slate-500 font-mono">
                 Train: {simData.mean_train_loss.toFixed(3)} | Test: {simData.mean_test_loss.toFixed(3)}
               </p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-1 flex flex-col justify-between">
-              <span className="text-[10px] font-mono text-slate-400 uppercase">DP Defense Status</span>
+              <span className="text-[10px] font-mono text-slate-500 uppercase">DP Defense Status</span>
               <div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1.5 ${
                   simData.is_dp_enabled
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-rose-500/15 text-rose-400 border border-rose-300'
+                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-500/30'
+                    : 'bg-rose-500/15 text-rose-600 border border-rose-300'
                 }`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                   {simData.is_dp_enabled ? 'Active Noise Defense' : 'Unconstrained Overfit'}
@@ -380,16 +380,16 @@ function MIASimulationVisualizer() {
           <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                <Activity className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Member vs Non-Member Empirical Loss Overlap</span>
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500">
                 {simData.loss_gap < 0.1 ? '🟢 High Overlap (Indistinguishable)' : '🔴 Distinct Clusters (Vulnerable)'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
-              <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+              <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-200">
                 <div className="flex justify-between text-emerald-700">
                   <span>Training Set Samples (Members):</span>
                   <span>μ = {simData.mean_train_loss.toFixed(3)}</span>
@@ -424,7 +424,7 @@ function MIASimulationVisualizer() {
               </div>
             </div>
 
-            <p className="text-xs text-indigo-700/90 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 leading-relaxed font-mono">
+            <p className="text-xs text-indigo-700/90 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 leading-relaxed font-mono">
               💡 {simData.attack_summary}
             </p>
           </div>
@@ -448,33 +448,33 @@ function AttackAuditPanel() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-rose-400" />
+            <ShieldAlert className="w-5 h-5 text-rose-600" />
             <span>Adversarial Privacy Attack Evaluators</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Empirical stress testing: Membership Inference, Model Inversion, and Deep Gradient Leakage
           </p>
         </div>
-        <span className="text-xs font-mono text-rose-700 bg-rose-500/10 px-3 py-1 rounded-lg border border-rose-300 self-start sm:self-auto">
+        <span className="text-xs font-mono text-rose-700 bg-rose-50 px-3 py-1 rounded-lg border border-rose-300 self-start sm:self-auto">
           Audit Suite v2.4
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
         {/* Card 1: MIA */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all h-full">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 font-bold whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-600 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 1
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Shokri et al.</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Shokri et al.</span>
             </div>
             <h3 className="font-bold text-slate-800 text-sm leading-snug h-10 flex items-center">
               Membership Inference Attack (MIA)
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Assesses whether an adversary can infer if a specific bank transaction was present in local training datasets via shadow loss disparities.
             </p>
           </div>
@@ -483,10 +483,10 @@ function AttackAuditPanel() {
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Classification:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Classification:</span>
                 <RiskBadge tier={miaResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-slate-200 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Train: {miaResult.num_train_samples_audited} samples</span>
                 <span>Test: {miaResult.num_test_samples_audited} samples</span>
               </div>
@@ -494,7 +494,7 @@ function AttackAuditPanel() {
           ) : (
             <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -524,15 +524,15 @@ function AttackAuditPanel() {
           <div className="absolute top-0 inset-x-0 h-0.5 bg-sky-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-sky-600 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 2
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Fredrikson et al.</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Fredrikson et al.</span>
             </div>
             <h3 className="font-bold text-slate-800 text-sm leading-snug h-10 flex items-center">
               Model Inversion & Reconstruction
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Audits if shared gradient norms allow adversaries to reconstruct sensitive transaction feature distributions and client account balances.
             </p>
           </div>
@@ -541,10 +541,10 @@ function AttackAuditPanel() {
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Risk Tier:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Risk Tier:</span>
                 <RiskBadge tier={invResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-slate-200 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Mean Norm: {invResult.mean_gradient_norm.toFixed(3)}</span>
                 <span>σ: {invResult.std_gradient_norm.toFixed(3)}</span>
               </div>
@@ -552,7 +552,7 @@ function AttackAuditPanel() {
           ) : (
             <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -578,19 +578,19 @@ function AttackAuditPanel() {
         </div>
 
         {/* Card 3: DLG */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all h-full">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 min-w-0">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-600 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 3
               </span>
-              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Zhu et al. (NeurIPS)</span>
+              <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap shrink-0">Zhu et al. (NeurIPS)</span>
             </div>
             <h3 className="font-bold text-slate-800 text-sm leading-snug h-10 flex items-center">
               Deep Leakage from Gradients (DLG)
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Verifies whether shared gradient vectors correlate closely enough to synthesize exact transaction raw data without DP noise injection.
             </p>
           </div>
@@ -599,10 +599,10 @@ function AttackAuditPanel() {
             <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between">
               <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage" />
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 min-w-0">
-                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Status:</span>
+                <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Audit Status:</span>
                 <RiskBadge tier={dlgResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-slate-200 min-w-0">
+              <div className="text-[10px] font-mono text-slate-500 flex justify-between pt-1 border-t border-slate-200 min-w-0">
                 <span>Audited Weights:</span>
                 <span className="text-emerald-700 font-bold">{dlgResult.params_audited} params</span>
               </div>
@@ -610,7 +610,7 @@ function AttackAuditPanel() {
           ) : (
             <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
               <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
-              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-xs font-mono font-medium text-slate-500">Audit Not Executed</span>
               <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
@@ -657,15 +657,15 @@ function BudgetLogSection() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-400" />
+            <Database className="w-5 h-5 text-indigo-600" />
             <span>Enterprise Privacy Budget Audit Log (DP-SGD ε)</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Rényi Differential Privacy (RDP) cumulative ε-consumption tracker with per-bank accountants and automated safety circuit-breaker
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-emerald-700 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
+          <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
             Consortium Target: ε ≤ {bankBudgets?.consortium_target_epsilon ?? 4.0}, δ = {bankBudgets?.consortium_target_delta?.toExponential(1) ?? '1.0e-5'}
           </span>
         </div>
@@ -677,7 +677,7 @@ function BudgetLogSection() {
           ? 'bg-rose-500/15 border-rose-300 shadow-xl shadow-rose-500/20 text-rose-700'
           : anyExceeded
           ? 'bg-amber-500/15 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-700'
-          : 'bg-white border-indigo-500/30 shadow-lg shadow-indigo-500/10 text-slate-700'
+          : 'bg-white border-indigo-200 shadow-lg shadow-indigo-500/10 text-slate-700'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
@@ -702,7 +702,7 @@ function BudgetLogSection() {
                   {isFrozen ? '🚨 TRAINING CIRCUIT-BREAKER ENGAGED' : '🛡️ CONSORTIUM SAFETY LOCK ACTIVE'}
                 </span>
                 {bankBudgets?.frozen_by_node && (
-                  <span className="text-[11px] font-mono text-slate-400">
+                  <span className="text-[11px] font-mono text-slate-500">
                     Halted by: <span className="font-bold text-slate-700">{bankBudgets.frozen_by_node}</span>
                   </span>
                 )}
@@ -713,7 +713,7 @@ function BudgetLogSection() {
                   : 'Automated Rényi DP accountant monitors cumulative epsilon across all participating bank nodes. Training freezes instantly if any bank depletes ε_max.'}
               </p>
               {bankBudgets?.frozen_at && (
-                <span className="text-[10px] font-mono text-slate-400 block">
+                <span className="text-[10px] font-mono text-slate-500 block">
                   Lock Engaged At: {new Date(bankBudgets.frozen_at).toLocaleString()}
                 </span>
               )}
@@ -749,7 +749,7 @@ function BudgetLogSection() {
               disabled={circuitBreakerAction.isPending}
               className="h-10 min-h-[40px] px-3.5 rounded-xl text-xs font-mono font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-600 border border-slate-200 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
               <span>Reset All Budgets</span>
             </button>
           </div>
@@ -760,16 +760,16 @@ function BudgetLogSection() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-indigo-400" />
+            <Activity className="w-4 h-4 text-indigo-600" />
             <span>Bank-Level Rényi DP Accountants (Live State)</span>
           </h3>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono text-slate-500">
             {nodes.length} Participating Bank Nodes
           </span>
         </div>
 
         {isBudgetsLoading ? (
-          <div className="glass-card p-8 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+          <div className="glass-card p-8 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
             Querying per-bank Rényi DP accountants...
           </div>
         ) : (
@@ -783,10 +783,10 @@ function BudgetLogSection() {
                   key={node.node_id}
                   className={`glass-card p-4 rounded-2xl border flex flex-col justify-between gap-3 relative overflow-hidden transition-all duration-200 ${
                     isExceeded
-                      ? 'bg-rose-500/10 border-rose-300 shadow-lg shadow-rose-500/10'
+                      ? 'bg-rose-50 border-rose-300 shadow-lg shadow-rose-500/10'
                       : isWarning
-                      ? 'bg-amber-500/10 border-amber-500/40 shadow-md shadow-amber-500/10'
-                      : 'bg-white border-slate-200/80 hover:border-indigo-500/30'
+                      ? 'bg-amber-50 border-amber-500/40 shadow-md shadow-amber-500/10'
+                      : 'bg-white border-slate-200/80 hover:border-indigo-200'
                   }`}
                 >
                   <div className="space-y-2.5">
@@ -796,8 +796,8 @@ function BudgetLogSection() {
                           {node.bank_name}
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-mono text-slate-400">{node.node_id}</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-50 text-slate-400">
+                          <span className="text-[10px] font-mono text-slate-500">{node.node_id}</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-50 text-slate-500">
                             {node.tier}
                           </span>
                         </div>
@@ -807,7 +807,7 @@ function BudgetLogSection() {
                           ? 'bg-rose-500/20 text-rose-700 border border-rose-300'
                           : isWarning
                           ? 'bg-amber-500/20 text-amber-700 border border-amber-500/40'
-                          : 'bg-emerald-500/15 text-emerald-700 border border-emerald-500/30'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-500/30'
                       }`}>
                         {node.risk_tier}
                       </span>
@@ -815,7 +815,7 @@ function BudgetLogSection() {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-400">Cumulative ε:</span>
+                        <span className="text-slate-500">Cumulative ε:</span>
                         <span className="font-bold text-slate-700">
                           {node.cumulative_epsilon.toFixed(3)} / {node.target_epsilon.toFixed(1)}
                         </span>
@@ -827,12 +827,12 @@ function BudgetLogSection() {
                               ? 'bg-gradient-to-r from-rose-500 to-red-400 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
                               : isWarning
                               ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
-                              : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : 'bg-gradient-to-r from-emerald-500 to-teal-600'
                           }`}
                           style={{ width: `${Math.min(100, Math.max(0, node.budget_exhaustion_pct))}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-0.5">
+                      <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-0.5">
                         <span>Exhaustion: {node.budget_exhaustion_pct.toFixed(1)}%</span>
                         <span>δ = {node.target_delta.toExponential(1)}</span>
                       </div>
@@ -840,15 +840,15 @@ function BudgetLogSection() {
 
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs font-mono">
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
-                        <span className="text-[9px] text-slate-400 block">Rényi α*</span>
+                        <span className="text-[9px] text-slate-500 block">Rényi α*</span>
                         <span className="text-slate-700 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
-                        <span className="text-[9px] text-slate-400 block">Noise σ</span>
+                        <span className="text-[9px] text-slate-500 block">Noise σ</span>
                         <span className="text-indigo-700 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
                       </div>
                       <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 text-center">
-                        <span className="text-[9px] text-slate-400 block">Rounds</span>
+                        <span className="text-[9px] text-slate-500 block">Rounds</span>
                         <span className="text-slate-700 font-bold">{node.rounds_completed}</span>
                       </div>
                     </div>
@@ -861,7 +861,7 @@ function BudgetLogSection() {
                     <button
                       onClick={() => circuitBreakerAction.mutate({ action: 'reset_budget', node_id: node.node_id })}
                       disabled={circuitBreakerAction.isPending}
-                      className="text-[10.5px] font-mono text-indigo-400 hover:text-indigo-700 cursor-pointer transition-colors"
+                      className="text-[10.5px] font-mono text-indigo-600 hover:text-indigo-700 cursor-pointer transition-colors"
                     >
                       Reset Node
                     </button>
@@ -879,13 +879,13 @@ function BudgetLogSection() {
       {/* 4. Global Simulation Runs Audit Ledger */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Database className="w-4 h-4 text-indigo-400" />
+          <Database className="w-4 h-4 text-indigo-600" />
           <span>Simulation Ledger (Historical DP Runs)</span>
         </h3>
 
         {anyExceeded && (
-          <div className="rounded-2xl border border-rose-300 bg-rose-500/10 p-4 text-xs text-rose-700 flex items-start gap-3 shadow-lg shadow-rose-500/10">
-            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-3 shadow-lg shadow-rose-500/10">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <strong className="text-rose-700 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
               <p className="text-rose-700/90 leading-relaxed">
@@ -896,11 +896,11 @@ function BudgetLogSection() {
         )}
 
         {isLoading ? (
-          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+          <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
             Querying enterprise DP budget ledger...
           </div>
         ) : entries.length === 0 ? (
-          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono rounded-2xl border border-dashed border-slate-200">
+          <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono rounded-2xl border border-dashed border-slate-200">
             No training runs recorded in the current session. Run a federated round to initiate ε-tracking.
           </div>
         ) : (
@@ -921,7 +921,7 @@ function BudgetLogSection() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="text-[10px] font-mono text-slate-400 block truncate">Simulation ID</span>
+                      <span className="text-[10px] font-mono text-slate-500 block truncate">Simulation ID</span>
                       <span className="font-mono text-xs font-bold text-slate-800 truncate block">
                         {entry.simulation_id}
                       </span>
@@ -930,8 +930,8 @@ function BudgetLogSection() {
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                         entry.budget_exhausted
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-300'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          ? 'bg-rose-500/20 text-rose-600 border border-rose-300'
+                          : 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                       }`}
                     >
                       {entry.budget_exhausted ? 'EXHAUSTED' : 'BUDGET OK'}
@@ -941,7 +941,7 @@ function BudgetLogSection() {
                   {/* Budget bar */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-mono">
-                      <span className="text-slate-400">Total ε Consumed:</span>
+                      <span className="text-slate-500">Total ε Consumed:</span>
                       <span
                         className="font-bold"
                         style={{
@@ -961,15 +961,15 @@ function BudgetLogSection() {
 
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs font-mono">
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
-                      <div className="text-[10px] text-slate-400">Delta (δ)</div>
+                      <div className="text-[10px] text-slate-500">Delta (δ)</div>
                       <div className="text-slate-700 font-bold">{entry.delta?.toExponential?.(1) ?? '1e-5'}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
-                      <div className="text-[10px] text-slate-400">Rounds</div>
+                      <div className="text-[10px] text-slate-500">Rounds</div>
                       <div className="text-slate-700 font-bold">{entry.rounds_spent}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-white/[0.02] border border-slate-200">
-                      <div className="text-[10px] text-slate-400">ε / Round</div>
+                      <div className="text-[10px] text-slate-500">ε / Round</div>
                       <div className="text-indigo-700 font-bold">{entry.epsilon_per_round?.toFixed(3) ?? '0.120'}</div>
                     </div>
                   </div>
@@ -979,11 +979,11 @@ function BudgetLogSection() {
           </div>
 
           {/* Desktop Table View (>= 768px) */}
-          <div className="hidden md:block glass-card rounded-2xl border border-indigo-500/20 bg-white overflow-hidden shadow-xl">
+          <div className="hidden md:block glass-card rounded-2xl border border-indigo-200 bg-white overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 font-semibold uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                     <th className="py-3.5 px-4">Simulation ID</th>
                     <th className="py-3.5 px-4 text-right">Total ε Spent</th>
                     <th className="py-3.5 px-4 text-right">Target δ</th>
@@ -1011,7 +1011,7 @@ function BudgetLogSection() {
                       >
                         {entry.total_epsilon.toFixed(4)}
                       </td>
-                      <td className="py-3.5 px-4 text-right text-slate-400">
+                      <td className="py-3.5 px-4 text-right text-slate-500">
                         {entry.delta?.toExponential?.(1) ?? '1.0e-5'}
                       </td>
                       <td className="py-3.5 px-4 text-right text-slate-700 font-bold">{entry.rounds_spent}</td>
@@ -1020,11 +1020,11 @@ function BudgetLogSection() {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {entry.budget_exhausted ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-300">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-600 border border-rose-300">
                             EXHAUSTED
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-600 border border-emerald-500/30">
                             BUDGET OK
                           </span>
                         )}
@@ -1072,11 +1072,11 @@ export default function PrivacyDefensePage() {
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-800 w-full min-w-0">
       {/* Top Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start sm:items-center gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-700 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0 mt-0.5 sm:mt-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0 mt-0.5 sm:mt-0">
               <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-700" />
             </div>
             <div className="min-w-0 flex-1">
@@ -1084,7 +1084,7 @@ export default function PrivacyDefensePage() {
                 <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-tight">
                   Privacy Defense & Byzantine Suite
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-500/15 text-indigo-700 border border-indigo-500/30 whitespace-nowrap">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
                   Opacus DP + TenSEAL CKKS
                 </span>
               </div>
@@ -1096,7 +1096,7 @@ export default function PrivacyDefensePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold whitespace-nowrap">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-500/25 text-emerald-600 text-xs font-semibold whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span>Zero Raw PII Verified</span>
           </div>
@@ -1104,7 +1104,7 @@ export default function PrivacyDefensePage() {
       </div>
 
       {/* Segmented 3-Tab Selector (Zero Scroll, Mobile Perfected) */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-white border border-indigo-500/20 shadow-lg min-w-0">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-white border border-indigo-200 shadow-lg min-w-0">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -1117,12 +1117,12 @@ export default function PrivacyDefensePage() {
               className={`px-1.5 py-2 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer min-w-0 w-full flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 border ${
                 isActive
                   ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500/60 text-white shadow-md shadow-indigo-600/15'
-                  : 'bg-white/[0.02] hover:bg-white/[0.05] border-slate-200 text-slate-400 hover:text-slate-700'
+                  : 'bg-white/[0.02] hover:bg-white/[0.05] border-slate-200 text-slate-500 hover:text-slate-700'
               }`}
             >
               <div
                 className={`p-1.5 rounded-lg shrink-0 ${
-                  isActive ? 'bg-indigo-500/20 text-indigo-700' : 'bg-slate-50 text-slate-400'
+                  isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-50 text-slate-500'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -1131,7 +1131,7 @@ export default function PrivacyDefensePage() {
                 <span className="text-[11px] sm:text-sm font-bold block text-center sm:text-left leading-tight sm:leading-normal sm:whitespace-nowrap">
                   {tab.label}
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 hidden sm:block truncate mt-0.5">
+                <span className="text-[10px] font-mono text-slate-500 hidden sm:block truncate mt-0.5">
                   {tab.desc}
                 </span>
               </div>
@@ -1152,7 +1152,7 @@ export default function PrivacyDefensePage() {
         >
           {activeTab === 'defense' && (
             methodsLoading ? (
-              <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+              <div className="glass-card p-12 text-center text-slate-500 text-xs font-mono animate-pulse rounded-2xl">
                 Loading Byzantine algorithm catalog...
               </div>
             ) : (

@@ -51,10 +51,10 @@ export default function PilotActionModal({
   };
 
   const iconMap = {
-    pause: <PauseCircle className="w-5 h-5 text-amber-400" />,
-    resume: <PlayCircle className="w-5 h-5 text-emerald-400" />,
-    abort: <Ban className="w-5 h-5 text-rose-400" />,
-    complete: <CheckCircle className="w-5 h-5 text-cyan-400" />,
+    pause: <PauseCircle className="w-5 h-5 text-amber-600" />,
+    resume: <PlayCircle className="w-5 h-5 text-emerald-600" />,
+    abort: <Ban className="w-5 h-5 text-rose-600" />,
+    complete: <CheckCircle className="w-5 h-5 text-cyan-600" />,
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,7 +87,7 @@ export default function PilotActionModal({
           <button
             onClick={onClose}
             disabled={isPending}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -96,14 +96,14 @@ export default function PilotActionModal({
         {/* Description */}
         <div className="text-xs text-slate-600 space-y-2">
           <p>{descriptionMap[actionType]}</p>
-          <div className="font-mono text-[11px] text-slate-400 bg-slate-50 p-2 rounded border border-slate-200">
+          <div className="font-mono text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
             Target Pilot: <span className="text-white font-semibold">{pilotId}</span>
           </div>
         </div>
 
         {actionType === 'abort' && (
           <div className="p-3 rounded-lg border border-rose-300 bg-rose-50 text-rose-700 text-xs flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>CRITICAL: Aborting is permanent and cannot be undone by operator resume.</span>
           </div>
         )}
@@ -119,7 +119,7 @@ export default function PilotActionModal({
           {requiresReason && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Operational Rationale / Mandatory Audit Reason <span className="text-rose-400">*</span>
+                Operational Rationale / Mandatory Audit Reason <span className="text-rose-600">*</span>
               </label>
               <textarea
                 value={reason}
@@ -137,7 +137,7 @@ export default function PilotActionModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-100 transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
             >
               Cancel
             </button>

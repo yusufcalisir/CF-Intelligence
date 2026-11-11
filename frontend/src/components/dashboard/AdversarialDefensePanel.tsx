@@ -38,7 +38,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+          <div className="p-2.5 rounded-lg bg-cyan-50 border border-cyan-500/30 text-cyan-600">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
@@ -50,7 +50,7 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
                 L_inf Noise Bounds (ε = {epsilon})
               </span>
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Hardens local node decision boundaries against FGSM & PGD evasion attacks
             </p>
           </div>
@@ -59,8 +59,8 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
         {/* Status Badge */}
         <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 border ${
           isEnabled
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40'
-            : 'bg-amber-500/10 text-amber-400 border-amber-500/40'
+            ? 'bg-emerald-50 text-emerald-600 border-emerald-500/40'
+            : 'bg-amber-50 text-amber-600 border-amber-500/40'
         }`}>
           <span className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
           {isEnabled ? `ADV-TRAINING ENABLED (${attackType.toUpperCase()})` : 'BASELINE (NO ADV DEFENSE)'}
@@ -71,8 +71,8 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         {/* Robustness Score */}
         <div className="bg-slate-100/50 rounded-lg p-3 border border-slate-200/50">
-          <span className="text-xs text-slate-400 font-medium">Robustness Score</span>
-          <div className="text-xl font-bold font-mono text-cyan-400 mt-1">
+          <span className="text-xs text-slate-500 font-medium">Robustness Score</span>
+          <div className="text-xl font-bold font-mono text-cyan-600 mt-1">
             {robustnessScore !== null ? `${(robustnessScore * 100).toFixed(1)}%` : '-'}
           </div>
           <p className="text-[10px] text-slate-500 mt-1">Overall Evasion Immunity</p>
@@ -80,13 +80,13 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
 
         {/* Clean vs Robust Acc */}
         <div className="bg-slate-100/50 rounded-lg p-3 border border-slate-200/50">
-          <span className="text-xs text-slate-400 font-medium">Clean vs Robust Accuracy</span>
+          <span className="text-xs text-slate-500 font-medium">Clean vs Robust Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1 font-mono">
             <span className="text-lg font-bold text-slate-700">
               {cleanAcc !== null ? `${(cleanAcc * 100).toFixed(1)}%` : '-'}
             </span>
             <span className="text-xs text-slate-500">/</span>
-            <span className={`text-lg font-bold ${isEnabled ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className={`text-lg font-bold ${isEnabled ? 'text-emerald-600' : 'text-rose-600'}`}>
               {robustAcc !== null ? `${(robustAcc * 100).toFixed(1)}%` : '-'}
             </span>
           </div>
@@ -95,8 +95,8 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
 
         {/* FGSM Defense */}
         <div className="bg-slate-100/50 rounded-lg p-3 border border-slate-200/50">
-          <span className="text-xs text-slate-400 font-medium">FGSM Evasion Blocked</span>
-          <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+          <span className="text-xs text-slate-500 font-medium">FGSM Evasion Blocked</span>
+          <div className="text-xl font-bold font-mono text-emerald-600 mt-1">
             {fgsmRejection !== null ? `${fgsmRejection}%` : '-'}
           </div>
           <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
@@ -109,8 +109,8 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
 
         {/* PGD Defense */}
         <div className="bg-slate-100/50 rounded-lg p-3 border border-slate-200/50">
-          <span className="text-xs text-slate-400 font-medium">PGD Evasion Blocked</span>
-          <div className="text-xl font-bold font-mono text-cyan-400 mt-1">
+          <span className="text-xs text-slate-500 font-medium">PGD Evasion Blocked</span>
+          <div className="text-xl font-bold font-mono text-cyan-600 mt-1">
             {pgdRejection !== null ? `${pgdRejection}%` : '-'}
           </div>
           <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
@@ -123,8 +123,8 @@ export const AdversarialDefensePanel: React.FC<AdversarialDefensePanelProps> = (
       </div>
 
       {/* Info Banner */}
-      <div className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3 border border-slate-200 flex items-start gap-2">
-        <svg className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3 border border-slate-200 flex items-start gap-2">
+        <svg className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>

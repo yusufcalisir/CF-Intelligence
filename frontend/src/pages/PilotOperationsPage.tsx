@@ -92,7 +92,7 @@ export default function PilotOperationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-border)] pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
+            <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
               <Shield className="h-6 w-6" />
             </div>
             <div>
@@ -134,7 +134,7 @@ export default function PilotOperationsPage() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
             <span>Total Pilots</span>
-            <Layers className="h-4 w-4 text-indigo-400" />
+            <Layers className="h-4 w-4 text-indigo-600" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-[var(--color-text-primary)]">
             {isLoading ? '...' : metrics.total}
@@ -147,7 +147,7 @@ export default function PilotOperationsPage() {
             <span>Active Pilots</span>
             <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-emerald-400">
+          <div className="mt-2 text-2xl font-bold font-mono text-emerald-600">
             {isLoading ? '...' : metrics.active}
           </div>
           <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">Executing live query traffic</div>
@@ -156,9 +156,9 @@ export default function PilotOperationsPage() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
             <span>Pending Governance</span>
-            <Clock className="h-4 w-4 text-amber-400" />
+            <Clock className="h-4 w-4 text-amber-600" />
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-amber-400">
+          <div className="mt-2 text-2xl font-bold font-mono text-amber-600">
             {isLoading ? '...' : metrics.pending}
           </div>
           <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">Draft, approvals or preflight</div>
@@ -167,7 +167,7 @@ export default function PilotOperationsPage() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
             <span>Halted / Finished</span>
-            <AlertCircle className="h-4 w-4 text-slate-400" />
+            <AlertCircle className="h-4 w-4 text-slate-500" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-[var(--color-text-primary)]">
             {isLoading ? '...' : metrics.halted}
@@ -215,9 +215,9 @@ export default function PilotOperationsPage() {
         </div>
       ) : isError ? (
         <div className="rounded-xl border border-rose-300 bg-rose-50 p-6 text-center">
-          <AlertCircle className="mx-auto h-8 w-8 text-rose-400 mb-2" />
+          <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
           <h3 className="text-sm font-semibold text-rose-700">Failed to Load Consortium Pilots</h3>
-          <p className="text-xs text-rose-400/80 mt-1 max-w-md mx-auto">
+          <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
             {error instanceof Error ? error.message : 'An unexpected error occurred while communicating with the pilot registry.'}
           </p>
           <button
@@ -231,7 +231,7 @@ export default function PilotOperationsPage() {
       ) : pilots && pilots.length === 0 ? (
         /* Honest empty state when caller's tenant participates in no pilots */
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-16 px-4 text-center">
-          <div className="rounded-full bg-indigo-500/10 p-4 text-indigo-400 mb-3">
+          <div className="rounded-full bg-indigo-50 p-4 text-indigo-600 mb-3">
             <Shield className="h-10 w-10 stroke-1" />
           </div>
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
@@ -262,7 +262,7 @@ export default function PilotOperationsPage() {
               setSearchQuery('');
               setStatusFilter('ALL');
             }}
-            className="mt-3 text-xs text-indigo-400 hover:text-indigo-700 underline"
+            className="mt-3 text-xs text-indigo-600 hover:text-indigo-700 underline"
           >
             Clear Filters
           </button>
@@ -286,7 +286,7 @@ export default function PilotOperationsPage() {
                   {/* Card Header: Pilot ID & Status */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-mono text-xs font-bold text-indigo-400 truncate group-hover:text-indigo-700">
+                      <div className="font-mono text-xs font-bold text-indigo-600 truncate group-hover:text-indigo-700">
                         {pilot.pilot_id}
                       </div>
                       <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 truncate">
@@ -298,7 +298,7 @@ export default function PilotOperationsPage() {
 
                   {/* Institutions Badge Strip */}
                   <div className="mt-4 flex items-center gap-1.5 text-xs text-[var(--color-text-primary)]">
-                    <Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <Building className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                     <span className="font-mono text-[11px] bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200">
                       {pilot.participating_institutions?.[0] || 'Bank A'}
                     </span>
@@ -312,7 +312,7 @@ export default function PilotOperationsPage() {
                   <div className="mt-3.5 pt-3 border-t border-[var(--color-border)] text-[11px] text-[var(--color-text-muted)] space-y-1">
                     <div className="flex items-center justify-between font-mono">
                       <span>Scope Digest:</span>
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {pilot.scope_digest ? `${pilot.scope_digest.slice(0, 10)}...` : 'N/A'}
                       </span>
                     </div>
@@ -346,7 +346,7 @@ export default function PilotOperationsPage() {
                   <span className="text-[10px] text-[var(--color-text-muted)] font-mono">
                     {pilot.created_at ? new Date(pilot.created_at).toLocaleDateString() : ''}
                   </span>
-                  <div className="flex items-center gap-1 font-medium text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+                  <div className="flex items-center gap-1 font-medium text-indigo-600 group-hover:translate-x-0.5 transition-transform">
                     <span>Manage Pilot</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </div>

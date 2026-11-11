@@ -167,7 +167,7 @@ export default function ScenariosPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-5 border border-indigo-500/30 shadow-lg"
+          className="glass-card p-5 border border-indigo-200 shadow-lg"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold flex items-center gap-2">
@@ -181,7 +181,7 @@ export default function ScenariosPage() {
             <div className="flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                 isRunning
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30 animate-pulse'
+                  ? 'bg-green-500/20 text-green-600 border border-green-500/30 animate-pulse'
                   : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
               }`}>
                 {status.status}

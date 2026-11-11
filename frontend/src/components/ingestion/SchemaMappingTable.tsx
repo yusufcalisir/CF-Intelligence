@@ -47,7 +47,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
       {/* Header & Status bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
+          <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
             <SlidersHorizontal size={18} />
           </div>
           <div>
@@ -65,7 +65,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
             <CheckCircle2 size={13} />
             <span>{mappedCanonicalCount}/9 Canonical Signals</span>
           </div>
-          <div className="px-3 py-1 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-700 text-xs font-mono font-bold flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-xl bg-indigo-100 border border-indigo-500/40 text-indigo-700 text-xs font-mono font-bold flex items-center gap-1.5">
             <ShieldCheck size={13} />
             <span>{piiMaskedReceipt}</span>
           </div>
@@ -125,7 +125,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
 
       {piiViolationsCount > 0 && (
         <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 text-xs flex items-center gap-2">
-          <HelpCircle size={15} className="shrink-0 text-amber-400" />
+          <HelpCircle size={15} className="shrink-0 text-amber-600" />
           <span>
             Notice: {piiViolationsCount} raw identifier patterns were detected and hashed client-side with bank type salt before transmission.
           </span>

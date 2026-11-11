@@ -267,13 +267,13 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
   return (
     <div
-      className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-50 to-indigo-50 border border-indigo-500/30 backdrop-blur-md shadow-2xl space-y-6"
+      className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-50 via-slate-50 to-indigo-50 border border-indigo-200 backdrop-blur-md shadow-2xl space-y-6"
       data-testid="cross-bank-intelligence-workspace"
     >
       {/* Workspace Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-indigo-500/20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-indigo-200">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400">
+          <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-200 text-indigo-600">
             <ShieldAlert className="w-5 h-5" />
           </div>
           <div>
@@ -281,11 +281,11 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               <h2 className="text-base sm:text-lg font-bold text-slate-800 tracking-wide">
                 Cross-Bank Consortium Intelligence Workspace
               </h2>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
                 CROSS-BANK VERIFIED
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Multi-Counterparty Private Set Intersection (PSI) & Authoritative Case Evidence Assembly
             </p>
           </div>
@@ -299,8 +299,8 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             OPERATIONAL ASSURANCE
           </span>
-          <span className="px-2.5 py-1 rounded-lg text-xs font-mono text-slate-400 bg-slate-50 border border-slate-200 flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+          <span className="px-2.5 py-1 rounded-lg text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
             24h Bounded Lifecycle
           </span>
         </div>
@@ -309,7 +309,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
       {/* Tenant Context Warning if unauthenticated / missing bankId */}
       {(!bankId || bankId.trim() === '') && (
         <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-500/40 text-amber-700 text-xs flex items-center gap-2.5" data-testid="unauthenticated-warning">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
             Tenant Context Required: An authenticated institution bank ID is required to query cross-bank intelligence and view authorized capabilities.
           </span>
@@ -320,10 +320,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sub-Panel 1: Query Builder (5 Cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-indigo-500/20 space-y-4">
+          <div className="p-4 rounded-xl bg-slate-50 border border-indigo-200 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                <Database className="w-4 h-4 text-indigo-400" />
+                <Database className="w-4 h-4 text-indigo-600" />
                 Authorized Query Builder
               </h3>
               <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     refetchCapabilities();
                   }}
                   disabled={isLoadingEntities || isLoadingCapabilities}
-                  className="text-[11px] font-mono text-indigo-400 hover:text-indigo-700 flex items-center gap-1 transition"
+                  className="text-[11px] font-mono text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition"
                   title="Refresh authorized case entities and consortium capabilities"
                 >
                   <RefreshCw className={`w-3 h-3 ${(isLoadingEntities || isLoadingCapabilities) ? 'animate-spin' : ''}`} />
@@ -346,10 +346,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             {/* Entity Selector (Strictly alert-linked entities only; no arbitrary inventory probing) */}
             <div className="space-y-1.5">
               <label htmlFor="eligible-entity-select" className="text-xs font-semibold text-slate-600">
-                Suspect Investigation Entity <span className="text-rose-400">*</span>
+                Suspect Investigation Entity <span className="text-rose-600">*</span>
               </label>
               {isLoadingEntities ? (
-                <div className="p-2.5 rounded-lg bg-white text-xs font-mono text-slate-400 border border-slate-200 animate-pulse">
+                <div className="p-2.5 rounded-lg bg-white text-xs font-mono text-slate-500 border border-slate-200 animate-pulse">
                   Loading authorized case entities...
                 </div>
               ) : entitiesError ? (
@@ -384,10 +384,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             {/* Consortium Selector (Derived strictly from server-authoritative capabilities) */}
             <div className="space-y-1.5">
               <label htmlFor="consortium-select" className="text-xs font-semibold text-slate-600">
-                Governing Consortium <span className="text-rose-400">*</span>
+                Governing Consortium <span className="text-rose-600">*</span>
               </label>
               {isLoadingCapabilities ? (
-                <div className="p-2.5 rounded-lg bg-white text-xs font-mono text-slate-400 border border-slate-200 animate-pulse">
+                <div className="p-2.5 rounded-lg bg-white text-xs font-mono text-slate-500 border border-slate-200 animate-pulse">
                   Loading authorized consortium capabilities...
                 </div>
               ) : capabilitiesError ? (
@@ -418,10 +418,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             {/* Target Counterparty Selection (Derived strictly from real pairwise grants) */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-600">
-                Target Counterparty Institutions <span className="text-rose-400">*</span>
+                Target Counterparty Institutions <span className="text-rose-600">*</span>
               </label>
               {availableCounterparts.length === 0 ? (
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-mono" data-testid="empty-counterparts-callout">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 text-xs font-mono" data-testid="empty-counterparts-callout">
                   No counterpart institutions available in this consortium.
                 </div>
               ) : (
@@ -440,16 +440,16 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                           isChecked
                             ? 'bg-indigo-600/30 border-indigo-500 text-indigo-700'
                             : isAuth
-                            ? 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-200'
+                            ? 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
                             : 'bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed opacity-60'
                         }`}
                         data-testid={`target-toggle-${bankKey}`}
                       >
                         <div className="flex items-center justify-between w-full">
                           <span>{cp.display_name || bankKey.toUpperCase()}</span>
-                          {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : null}
+                          {isChecked ? <Check className="w-3.5 h-3.5 text-indigo-600" /> : null}
                         </div>
-                        <span className={`text-[9px] mt-1 font-mono ${isAuth ? (cp.execution_readiness === 'OPERATIONAL' ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'}`}>
+                        <span className={`text-[9px] mt-1 font-mono ${isAuth ? (cp.execution_readiness === 'OPERATIONAL' ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-500'}`}>
                           {isAuth ? cp.execution_readiness : cp.governance_status}
                         </span>
                       </button>
@@ -465,10 +465,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             {/* Purpose Selector (Derived strictly from consortium authorized purposes) */}
             <div className="space-y-1.5">
               <label htmlFor="purpose-select" className="text-xs font-semibold text-slate-600">
-                Regulatory & Investigative Purpose <span className="text-rose-400">*</span>
+                Regulatory & Investigative Purpose <span className="text-rose-600">*</span>
               </label>
               {permittedPurposes.length === 0 ? (
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-mono" data-testid="empty-purposes-callout">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 text-xs font-mono" data-testid="empty-purposes-callout">
                   No regulatory purposes authorized for this consortium.
                 </div>
               ) : (
@@ -489,12 +489,12 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             </div>
 
             {/* Assurance Guarantees Indicator */}
-            <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-500/20 text-[11px] text-indigo-700 space-y-1">
+            <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-700 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
-                <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                <Lock className="w-3.5 h-3.5 text-indigo-600" />
                 Operational Assurance Guarantees
               </div>
-              <p className="text-[10px] text-slate-400 leading-normal">
+              <p className="text-[10px] text-slate-500 leading-normal">
                 Strict multi-party Diffie-Hellman / ECDH PSI protocol. Counterparties execute isolated queries without learning raw query identifiers. Anonymous counterparty masking enforced by default policy.
               </p>
             </div>
@@ -502,7 +502,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             {/* Query Dispatch Error */}
             {queryError && (
               <div className="p-3 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 text-xs flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="break-all">{queryError}</div>
               </div>
             )}
@@ -532,10 +532,10 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
         {/* Sub-Panel 2: Execution Results & Truthful Partial Outcomes (7 Cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-indigo-500/20 space-y-4">
+          <div className="p-4 rounded-xl bg-slate-50 border border-indigo-200 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-purple-400" />
+                <Layers className="w-4 h-4 text-purple-600" />
                 Execution Results & Partial Outcomes
               </h3>
               {queryResponse && (
@@ -556,7 +556,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             </div>
 
             {!queryResponse && !queryMultiMutation.isPending ? (
-              <div className="py-12 px-4 text-center rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
+              <div className="py-12 px-4 text-center rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs">
                 <Search className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                 <p className="font-semibold text-slate-600">No active query execution results</p>
                 <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
@@ -564,12 +564,12 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 </p>
               </div>
             ) : queryMultiMutation.isPending ? (
-              <div className="py-12 px-4 text-center rounded-xl bg-slate-50 border border-indigo-500/20 space-y-3">
-                <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
+              <div className="py-12 px-4 text-center rounded-xl bg-slate-50 border border-indigo-200 space-y-3">
+                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
                 <div className="text-xs text-indigo-700 font-semibold">
                   Executing Server-Authoritative Multi-Counterparty PSI...
                 </div>
-                <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                <p className="text-[11px] text-slate-500 max-w-md mx-auto">
                   Coordinating cryptographic zero-knowledge intersection protocols across requested counterpart institutions.
                 </p>
               </div>
@@ -578,22 +578,22 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 {/* Batch Query Metadata */}
                 <div className="p-3 rounded-lg bg-white border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400 font-mono">BATCH ID:</span>
-                    <span className="font-mono text-cyan-400 font-bold">{queryResponse.query_id}</span>
+                    <span className="text-slate-500 font-mono">BATCH ID:</span>
+                    <span className="font-mono text-cyan-600 font-bold">{queryResponse.query_id}</span>
                     <button
                       type="button"
                       onClick={() => handleCopy(queryResponse.query_id, 'batch-id')}
-                      className="p-1 text-slate-400 hover:text-slate-700 transition"
+                      className="p-1 text-slate-500 hover:text-slate-700 transition"
                       title="Copy batch query ID"
                     >
                       {copiedHash === 'batch-id' ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>
-                  <div className="text-[11px] font-mono text-slate-400">
+                  <div className="text-[11px] font-mono text-slate-500">
                     {new Date(queryResponse.executed_at).toLocaleTimeString()} · Counterparts:{' '}
                     {queryResponse.counterpart_count}
                   </div>
@@ -654,17 +654,17 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                           {signal?.match_confirmed ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-700 border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               MATCH CONFIRMED ({signal.match_category})
                             </span>
                           ) : signal ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3 text-slate-400" />
+                              <ShieldCheck className="w-3 h-3 text-slate-500" />
                               VERIFIED NO MATCH
                             </span>
                           ) : failure ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-700 border border-rose-300 flex items-center gap-1">
-                              <XCircle className="w-3 h-3 text-rose-400" />
+                              <XCircle className="w-3 h-3 text-rose-600" />
                               {failure.error_category}
                             </span>
                           ) : (
@@ -676,7 +676,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                         {/* Signal Match Details */}
                         {signal?.match_confirmed && (
-                          <div className="mt-2.5 pt-2.5 border-t border-emerald-500/20 flex flex-wrap items-center gap-3 text-xs">
+                          <div className="mt-2.5 pt-2.5 border-t border-emerald-200 flex flex-wrap items-center gap-3 text-xs">
                             <div className="text-slate-600 font-mono">
                               Confidence: <span className="font-bold text-emerald-700">{(signal.match_confidence * 100).toFixed(0)}%</span>
                             </div>
@@ -710,13 +710,13 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                 </div>
 
                 {/* Batch Evidence Attachment Action */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-indigo-500/30 space-y-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-indigo-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
                       Assemble Verified Signals into Case Dossier
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">
+                    <span className="text-[10px] font-mono text-slate-500">
                       Single-Case Binding Enforced
                     </span>
                   </div>
@@ -737,7 +737,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                   {attachError && (
                     <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 text-xs flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                       <span>{attachError}</span>
                     </div>
                   )}
@@ -748,7 +748,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                       data-testid="attach-success-banner"
                     >
                       <div className="font-bold flex items-center gap-1.5 text-emerald-700">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                         Batch Evidence Assembly: {attachResponse.assembly_status}
                       </div>
                       <div className="text-[11px] font-mono text-slate-600 flex items-center gap-3">
@@ -757,7 +757,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                         <span>Omitted/Failed: {attachResponse.failed_count}</span>
                       </div>
                       {attachResponse.omitted_or_failed && attachResponse.omitted_or_failed.length > 0 && (
-                        <div className="pt-1.5 border-t border-emerald-500/20 text-[10px] font-mono text-amber-700 space-y-0.5">
+                        <div className="pt-1.5 border-t border-emerald-200 text-[10px] font-mono text-amber-700 space-y-0.5">
                           {attachResponse.omitted_or_failed.map((fail, idx) => (
                             <div key={idx}>
                               [{fail.category}] {fail.reason}
@@ -795,14 +795,14 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
       </div>
 
       {/* Sub-Panel 3: Persisted Case Intelligence Evidence Trail */}
-      <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-indigo-500/20 space-y-4">
+      <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-indigo-200 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               Persisted Authoritative Intelligence Evidence Trail
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Cryptographically verified evidence items permanently committed to this investigation dossier
             </p>
           </div>
@@ -810,7 +810,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
             type="button"
             onClick={() => refetchEvidence()}
             disabled={isLoadingEvidence}
-            className="px-2.5 py-1 rounded-lg text-xs font-mono text-indigo-400 hover:text-indigo-700 bg-white border border-slate-200 flex items-center gap-1 transition"
+            className="px-2.5 py-1 rounded-lg text-xs font-mono text-indigo-600 hover:text-indigo-700 bg-white border border-slate-200 flex items-center gap-1 transition"
           >
             <RefreshCw className={`w-3 h-3 ${isLoadingEvidence ? 'animate-spin' : ''}`} />
             Refresh Ledger
@@ -823,7 +823,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
           </div>
         ) : persistedEvidence.length === 0 ? (
           <div
-            className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs font-mono"
+            className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs font-mono"
             data-testid="no-persisted-evidence"
           >
             No cross-bank intelligence evidence registered on this case yet.
@@ -845,13 +845,13 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
               return (
                 <div
                   key={ev.evidence_id}
-                  className="p-3.5 rounded-xl bg-slate-50 border border-indigo-500/20 hover:border-indigo-500/40 transition space-y-2.5"
+                  className="p-3.5 rounded-xl bg-slate-50 border border-indigo-200 hover:border-indigo-500/40 transition space-y-2.5"
                   data-testid={`evidence-item-${ev.evidence_id}`}
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-slate-800">{ev.title}</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-700 border border-indigo-500/30">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
                         {isAnonymized ? 'ANONYMOUS MASKED' : ev.target_bank_id?.toUpperCase()}
                       </span>
                       <span
@@ -862,7 +862,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                             ? 'bg-amber-500/20 text-amber-700 border-amber-500/40'
                             : ev.verification_state === 'FAILED_VERIFICATION'
                             ? 'bg-rose-500/20 text-rose-700 border-rose-300'
-                            : 'bg-slate-100 text-slate-400 border-slate-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
                         }`}
                       >
                         {ev.verification_state}
@@ -872,15 +872,15 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     <div className="flex items-center gap-2">
                       {isExpired ? (
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-400 border border-slate-200 flex items-center gap-1"
+                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1"
                           title="Intermediate query batch record expired per 24h retention policy; evidence remains permanently in this case ledger."
                         >
-                          <Clock className="w-3 h-3 text-slate-400" />
+                          <Clock className="w-3 h-3 text-slate-500" />
                           Batch Record Purged (Retention Bounded)
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-500/30 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                           Batch Active
                         </span>
                       )}
@@ -895,7 +895,7 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
                     </div>
                     <div className="p-2 rounded-lg bg-slate-50 border border-slate-200/80">
                       <span className="text-[10px] uppercase font-mono text-slate-500 block">Match Status</span>
-                      <span className="font-mono text-emerald-400 font-semibold">
+                      <span className="font-mono text-emerald-600 font-semibold">
                         {ev.match_confirmed ? `MATCH CONFIRMED (${ev.match_category || 'EXACT'})` : 'NO MATCH'}
                       </span>
                     </div>
@@ -915,25 +915,25 @@ export const CrossBankIntelligenceWorkspace: FC<CrossBankIntelligenceWorkspacePr
 
                   {/* Verification Explanation */}
                   {ev.explanation && (
-                    <div className="text-[11px] font-mono text-slate-400 bg-slate-50 p-2 rounded border border-slate-200/80">
+                    <div className="text-[11px] font-mono text-slate-500 bg-slate-50 p-2 rounded border border-slate-200/80">
                       <span className="text-slate-500 block mb-0.5">Verification Detail:</span>
                       {ev.explanation}
                     </div>
                   )}
 
                   {/* Cryptographic SHA-256 Digest & Audit Footer */}
-                  <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400">
+                  <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500">
                     <div className="flex items-center gap-1.5">
                       <span>SHA-256 Digest:</span>
-                      <span className="text-cyan-400 font-bold break-all">{ev.content_hash}</span>
+                      <span className="text-cyan-600 font-bold break-all">{ev.content_hash}</span>
                       <button
                         type="button"
                         onClick={() => handleCopy(ev.content_hash, ev.evidence_id)}
-                        className="p-1 text-slate-400 hover:text-slate-700 transition"
+                        className="p-1 text-slate-500 hover:text-slate-700 transition"
                         title="Copy cryptographic digest"
                       >
                         {copiedHash === ev.evidence_id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" />
                         )}

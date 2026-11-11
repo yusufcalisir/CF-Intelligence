@@ -317,14 +317,14 @@ export default function SecurityPage() {
   return (
     <div className="space-y-6 min-w-0">
       {/* Page Header Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden min-w-0">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-white border border-indigo-200 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="space-y-2 min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 shrink-0">
+            <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-500/25 text-indigo-600 shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <h1 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-purple-300 tracking-tight truncate">
+            <h1 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-200 to-purple-300 tracking-tight truncate">
               Enterprise Security & Identity Control Suite
             </h1>
           </div>
@@ -342,7 +342,7 @@ export default function SecurityPage() {
                 key={badge}
                 className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold border ${
                   badge.includes('Software Emulated')
-                    ? 'bg-amber-500/10 border-amber-500/25 text-amber-700'
+                    ? 'bg-amber-50 border-amber-500/25 text-amber-700'
                     : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
               >
@@ -380,7 +380,7 @@ export default function SecurityPage() {
           animate={{ opacity: 1, y: 0 }}
           className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 ${
             verifyChain.data.is_valid
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              ? 'bg-emerald-50 border-emerald-500/30 text-emerald-600'
               : 'bg-red-500/10 border-red-500/30 text-red-400'
           }`}
         >
@@ -418,7 +418,7 @@ export default function SecurityPage() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer border ${
                   isCatActive
                     ? 'bg-indigo-600/25 border-indigo-500/50 text-indigo-700 shadow-sm'
-                    : 'bg-white/[0.03] border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-white/[0.06]'
+                    : 'bg-white/[0.03] border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-white/[0.06]'
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -440,11 +440,11 @@ export default function SecurityPage() {
                 className={`p-2.5 sm:p-3 rounded-xl transition-all flex flex-col justify-between text-left border min-h-[58px] cursor-pointer relative overflow-hidden group ${
                   isActive
                     ? 'bg-indigo-600/20 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-700'
-                    : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-200 hover:bg-white'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-200 hover:bg-white'
                 }`}
               >
                 {isActive && (
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-600" />
                 )}
                 <div className="flex items-center justify-between w-full">
                   <span className="text-base sm:text-lg">{tab.icon}</span>
@@ -475,7 +475,7 @@ export default function SecurityPage() {
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
                     <span className="text-[var(--color-text-muted)]">mTLS Status</span>
-                    <span className="font-mono text-emerald-400 font-bold">
+                    <span className="font-mono text-emerald-600 font-bold">
                       {status?.mtls.enabled ? 'ACTIVE (CERT_REQUIRED)' : 'DEVELOPMENT'}
                     </span>
                   </div>
@@ -489,7 +489,7 @@ export default function SecurityPage() {
                   </div>
                   <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
                     <span className="text-[var(--color-text-muted)]">Peer SAN Validation</span>
-                    <span className="font-mono text-emerald-400 font-bold">{status?.mtls.peer_verification}</span>
+                    <span className="font-mono text-emerald-600 font-bold">{status?.mtls.peer_verification}</span>
                   </div>
                 </div>
               </div>
@@ -687,7 +687,7 @@ export default function SecurityPage() {
                   <div
                     className={`p-3 rounded-lg border text-xs ${
                       evaluateABAC.data.allowed
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        ? 'bg-emerald-50 border-emerald-500/30 text-emerald-600'
                         : 'bg-red-500/10 border-red-500/30 text-red-400'
                     }`}
                   >
@@ -706,7 +706,7 @@ export default function SecurityPage() {
                   {status?.abac?.enforced_policies?.map((pol, i) => (
                     <div key={i} className="p-2 rounded bg-[var(--color-surface-alt)] font-mono font-bold flex items-center justify-between">
                       <span>{pol}</span>
-                      <span className="text-emerald-400">ENFORCED</span>
+                      <span className="text-emerald-600">ENFORCED</span>
                     </div>
                   ))}
                 </div>
@@ -726,8 +726,8 @@ export default function SecurityPage() {
                     <span
                       className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full border ${
                         !vaultStatus.sealed
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                          : 'bg-rose-500/15 text-rose-400 border-rose-300'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-600 border-rose-300'
                       }`}
                     >
                       {vaultStatus.sealed ? 'SEALED' : '✓ UNSEALED & HEALTHY'} (HA: {vaultStatus.ha_enabled ? 'ACTIVE' : 'STANDALONE'})
@@ -745,13 +745,13 @@ export default function SecurityPage() {
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)]">Secret Injection Source</div>
-                    <div className="font-mono text-emerald-400 font-bold">{status?.vault.sample_secret_source}</div>
+                    <div className="font-mono text-emerald-600 font-bold">{status?.vault.sample_secret_source}</div>
                   </div>
                 </div>
               </div>
 
               {/* HSM Root CA Binding Card */}
-              <div className="glass-card p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
+              <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                     <span>🛡️ Vault PKI Root CA - PKCS#11 Hardware HSM Interface</span>
@@ -759,7 +759,7 @@ export default function SecurityPage() {
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                       isHsmHw
-                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-500/30'
                         : 'bg-amber-500/15 text-amber-700 border-amber-500/30'
                     }`}
                   >
@@ -778,7 +778,7 @@ export default function SecurityPage() {
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Private Key Guarantee</div>
-                    <div className="font-mono font-bold text-emerald-400">
+                    <div className="font-mono font-bold text-emerald-600">
                       {isHsmHw ? '🔒 Hardware Non-Exportable (Zero-Disk)' : '🔒 Process Memory Sandbox (Emulated)'}
                     </div>
                   </div>
@@ -794,7 +794,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-xs space-y-1 text-indigo-700">
+                <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50 text-xs space-y-1 text-indigo-700">
                   <div className="font-bold">Hardware-Anchored Root CA Key Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
                     {isHsmHw
@@ -810,7 +810,7 @@ export default function SecurityPage() {
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                     <span>⚡ On-Chain Governance - Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 border border-purple-500/30">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-500/30">
                     2/3 THRESHOLD GOVERNANCE
                   </span>
                 </div>
@@ -818,7 +818,7 @@ export default function SecurityPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #1 (Central Bank / Regulator)</div>
-                    <div className="font-mono text-[10px] font-bold text-emerald-400 truncate">0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266</div>
+                    <div className="font-mono text-[10px] font-bold text-emerald-600 truncate">0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266</div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #2 (Consortium Trustee Alpha)</div>
@@ -830,7 +830,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/10 text-xs space-y-2 text-purple-700">
+                <div className="p-3 rounded-lg border border-purple-200 bg-purple-50 text-xs space-y-2 text-purple-700">
                   <div className="font-bold">Multi-Sig State Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
                     Single-wallet EOA coordinator centralization risk is eliminated. Critical smart contract functions (Incentive Settlement, Participant Quarantine, and Token Pool Deposits) require at least 2 valid cryptographic signatures from authorized consortium trustees.
@@ -853,7 +853,7 @@ export default function SecurityPage() {
                   </p>
                 </div>
                 <div className="text-right font-mono text-xs">
-                  <div className="text-emerald-400 font-bold">Chain Status: INTACT</div>
+                  <div className="text-emerald-600 font-bold">Chain Status: INTACT</div>
                   <div className="text-[var(--color-text-muted)]">{status?.audit_chain.total_events} Total Events Recorded</div>
                 </div>
               </div>
@@ -875,7 +875,7 @@ export default function SecurityPage() {
                         </div>
                         <div className="flex justify-between font-mono text-[9px] text-[var(--color-text-muted)] pt-1 border-t border-[var(--color-border)]">
                           <span>Prev: {entry.prev_hash.slice(0, 16)}...</span>
-                          <span className="text-emerald-400">Curr: {entry.curr_hash.slice(0, 16)}...</span>
+                          <span className="text-emerald-600">Curr: {entry.curr_hash.slice(0, 16)}...</span>
                         </div>
                       </div>
                     ))}
@@ -897,8 +897,8 @@ export default function SecurityPage() {
                   <span
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                       quorumReady
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
                     }`}
                   >
                     {quorumReady ? `✓ QUORUM MET (${broadcastCount}/4)` : `⏳ AWAITING QUORUM (${broadcastCount}/4)`}
@@ -992,7 +992,7 @@ export default function SecurityPage() {
                         key={node.id}
                         className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
                           node.broadcast
-                            ? 'bg-indigo-500/5 border-indigo-500/20'
+                            ? 'bg-indigo-500/5 border-indigo-200'
                             : 'bg-slate-100/40 border-slate-200/30'
                         }`}
                       >
@@ -1003,16 +1003,16 @@ export default function SecurityPage() {
                             <span
                               className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                                 node.broadcast
-                                  ? 'bg-emerald-500/15 text-emerald-400'
-                                  : 'bg-amber-500/15 text-amber-400'
+                                  ? 'bg-emerald-50 text-emerald-600'
+                                  : 'bg-amber-500/15 text-amber-600'
                               }`}
                             >
                               {node.broadcast ? 'BROADCAST' : 'PENDING'}
                             </span>
                           </div>
                           <div className="font-mono text-[10px] text-[var(--color-text-muted)] mt-1 space-y-0.5">
-                            <div>PK  <span className="text-indigo-400">{node.pkHex}</span></div>
-                            <div>SIG <span className="text-purple-400">{node.hmacHex}</span></div>
+                            <div>PK  <span className="text-indigo-600">{node.pkHex}</span></div>
+                            <div>SIG <span className="text-purple-600">{node.hmacHex}</span></div>
                           </div>
                         </div>
                       </div>
@@ -1045,7 +1045,7 @@ export default function SecurityPage() {
                 </div>
 
                 {/* Shamir (t, n) Threshold & Node Dropout Simulator */}
-                <div className="glass-card p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
+                <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-500/5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                       <span>🧮 Shamir (t, n) Dropout Reconstruction</span>
@@ -1083,8 +1083,8 @@ export default function SecurityPage() {
                             onClick={() => toggleDropout(bank.id)}
                             className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between border transition-all ${
                               isDropped
-                                ? 'bg-rose-500/15 border-rose-300 text-rose-400'
-                                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                ? 'bg-rose-500/15 border-rose-300 text-rose-600'
+                                : 'bg-emerald-50 border-emerald-500/30 text-emerald-600'
                             }`}
                           >
                             <span>{bank.label}</span>
@@ -1101,8 +1101,8 @@ export default function SecurityPage() {
                   <div
                     className={`p-3 rounded-lg border text-xs space-y-1 ${
                       quorumReady
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
-                        : 'bg-rose-500/10 border-rose-300 text-rose-700'
+                        ? 'bg-emerald-50 border-emerald-500/30 text-emerald-700'
+                        : 'bg-rose-50 border-rose-300 text-rose-700'
                     }`}
                   >
                     <div className="flex items-center justify-between font-bold">
@@ -1136,7 +1136,7 @@ export default function SecurityPage() {
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] flex items-center gap-2">
                     <span>⚡ Groth16 zk-SNARK Model Weight Attestation</span>
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 font-mono">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 font-mono">
                     {zkStatus?.curve ?? 'BN254'} ELLIPTIC CURVE
                   </span>
                 </div>
@@ -1148,13 +1148,13 @@ export default function SecurityPage() {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Verification Scheme</span>
-                    <span className="font-mono font-bold text-emerald-400">
+                    <span className="font-mono font-bold text-emerald-600">
                       {zkStatus?.proving_system ?? 'Groth16'} / PlonKish (O(1) Bilinear Pairing)
                     </span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Circuit R1CS Constraints</span>
-                    <span className="font-mono font-bold text-cyan-400">
+                    <span className="font-mono font-bold text-cyan-600">
                       {zkStatus?.constraint_count ? `${zkStatus.constraint_count.toLocaleString()} R1CS Constraints` : '142,850 R1CS Constraints'}
                     </span>
                   </div>
@@ -1216,7 +1216,7 @@ export default function SecurityPage() {
                     <div
                       className={`p-3 rounded-lg border space-y-1 mb-4 ${
                         verifyZKProof.data.is_valid
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          ? 'bg-emerald-50 border-emerald-500/30 text-emerald-600'
                           : 'bg-red-500/10 border-red-500/30 text-red-400'
                       }`}
                     >
@@ -1235,7 +1235,7 @@ export default function SecurityPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1 mb-4">
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-500/30 text-emerald-600 space-y-1 mb-4">
                       <div className="flex justify-between font-bold text-xs">
                         <span>✓ BILINEAR PAIRING CHECK PASSED</span>
                         <span className="font-mono text-[10px]">e(A, B) = e(α, β) · e(C, δ)</span>
@@ -1278,7 +1278,7 @@ export default function SecurityPage() {
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] flex items-center gap-2">
                     <span>♻️ Bank Revocation & Gradient Erasure Console</span>
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 border border-purple-500/30 font-mono">
                     EXACT RE-AGGREGATION
                   </span>
                 </div>
@@ -1332,7 +1332,7 @@ export default function SecurityPage() {
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Verification Guarantee</span>
-                    <span className="font-mono font-bold text-emerald-400">Structural Exclusion (Target Absent)</span>
+                    <span className="font-mono font-bold text-emerald-600">Structural Exclusion (Target Absent)</span>
                   </div>
                 </div>
               </div>
@@ -1345,7 +1345,7 @@ export default function SecurityPage() {
 
                   {unlearnResult ? (
                     <div className="space-y-3 text-xs font-mono">
-                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1">
+                      <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-500/30 text-emerald-600 space-y-1">
                         <div className="flex justify-between font-bold">
                           <span>✓ WEIGHT ERASURE VERIFIED</span>
                           <span>Latency: {unlearnResult.execution_time_ms.toFixed(2)} ms</span>
@@ -1361,7 +1361,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Parameter Drift Delta (||Δw||_2):</span>
-                        <span className="text-amber-400 font-bold">{unlearnResult.parameter_drift_delta.toFixed(4)}</span>
+                        <span className="text-amber-600 font-bold">{unlearnResult.parameter_drift_delta.toFixed(4)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Spectral Radius Bound (λ_max):</span>
@@ -1369,7 +1369,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">MIA Empirical Risk:</span>
-                        <span className="text-emerald-400 font-bold">
+                        <span className="text-emerald-600 font-bold">
                           {unlearnResult.mia_membership_probability !== null && unlearnResult.mia_membership_probability !== undefined
                             ? `${(unlearnResult.mia_membership_probability * 100).toFixed(1)}%`
                             : 'Not empirically measured (structural exclusion)'}
@@ -1403,7 +1403,7 @@ export default function SecurityPage() {
                     NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) & FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe SecAgg
                   </p>
                 </div>
-                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200">
                   NIST Level 3 (256-bit Lattice Security)
                 </span>
               </div>
@@ -1476,7 +1476,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Kyber Public Key:</span>
-                        <span className="text-amber-400 font-bold truncate max-w-[200px]">{pqcResult.kyber_public_key_hex}</span>
+                        <span className="text-amber-600 font-bold truncate max-w-[200px]">{pqcResult.kyber_public_key_hex}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Signature Algorithm:</span>
@@ -1484,7 +1484,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Dilithium Public Key:</span>
-                        <span className="text-emerald-400 font-bold truncate max-w-[200px]">{pqcResult.dilithium_public_key_hex}</span>
+                        <span className="text-emerald-600 font-bold truncate max-w-[200px]">{pqcResult.dilithium_public_key_hex}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Quantum Security Level:</span>
@@ -1521,7 +1521,7 @@ export default function SecurityPage() {
                     Chainlink CCIP & LayerZero V2 multi-ledger Shapley incentive routing for CBDC and Tokenized Deposits
                   </p>
                 </div>
-                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
                   L2 Sub-Second Finality (&lt;1s)
                 </span>
               </div>
@@ -1589,11 +1589,11 @@ export default function SecurityPage() {
                       <div className="p-3 rounded-xl bg-slate-100 border border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono gap-2">
                         <div>
                           <span className="text-[var(--color-text-muted)]">Total Disbursed: </span>
-                          <span className="text-emerald-400 font-bold">{bridgeResult.total_pool_amount.toLocaleString()} {bridgeResult.pool_currency}</span>
+                          <span className="text-emerald-600 font-bold">{bridgeResult.total_pool_amount.toLocaleString()} {bridgeResult.pool_currency}</span>
                         </div>
                         <div>
                           <span className="text-[var(--color-text-muted)]">L2 Gas Fees: </span>
-                          <span className="text-amber-400 font-bold">${bridgeResult.total_gas_fees_usd.toFixed(4)} USD</span>
+                          <span className="text-amber-600 font-bold">${bridgeResult.total_gas_fees_usd.toFixed(4)} USD</span>
                         </div>
                         <div>
                           <span className="text-[var(--color-text-muted)]">Audit: </span>
@@ -1619,9 +1619,9 @@ export default function SecurityPage() {
                                 <td className="p-2.5 font-bold text-slate-700">{route.bank_id}</td>
                                 <td className="p-2.5 text-indigo-700">{route.network}</td>
                                 <td className="p-2.5 text-[var(--color-text-muted)]">{route.protocol}</td>
-                                <td className="p-2.5 text-emerald-400 font-bold">{route.amount.toLocaleString()} {route.token_symbol}</td>
+                                <td className="p-2.5 text-emerald-600 font-bold">{route.amount.toLocaleString()} {route.token_symbol}</td>
                                 <td className="p-2.5 text-amber-700 truncate max-w-[120px]">{route.message_id}</td>
-                                <td className="p-2.5 text-emerald-400 font-bold">{route.status}</td>
+                                <td className="p-2.5 text-emerald-600 font-bold">{route.status}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1658,7 +1658,7 @@ export default function SecurityPage() {
                     Rényi Differential Privacy (RDP) & PRV numerical accountant with dynamic noise calibration (σ_t)
                   </p>
                 </div>
-                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-cyan-50 text-cyan-600 border border-cyan-200">
                   Rényi Divergence (16 Orders)
                 </span>
               </div>
@@ -1739,11 +1739,11 @@ export default function SecurityPage() {
                     <div className="p-4 rounded-xl bg-slate-100 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Calibrated Noise Multiplier (σ_t):</span>
-                        <span className="text-cyan-400 font-bold">{rdpResult.calibrated_sigma.toFixed(3)}</span>
+                        <span className="text-cyan-600 font-bold">{rdpResult.calibrated_sigma.toFixed(3)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Dynamic Gradient Clip (C_t):</span>
-                        <span className="text-amber-400 font-bold">{rdpResult.gradient_clip_c.toFixed(2)}</span>
+                        <span className="text-amber-600 font-bold">{rdpResult.gradient_clip_c.toFixed(2)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Optimal RDP Order (α*):</span>
@@ -1751,7 +1751,7 @@ export default function SecurityPage() {
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Cumulative Privacy Loss (ε):</span>
-                        <span className="text-emerald-400 font-bold">{rdpResult.cumulative_epsilon.toFixed(3)} / {rdpResult.target_epsilon.toFixed(1)}</span>
+                        <span className="text-emerald-600 font-bold">{rdpResult.cumulative_epsilon.toFixed(3)} / {rdpResult.target_epsilon.toFixed(1)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Budget Exhaustion:</span>
@@ -1778,7 +1778,7 @@ export default function SecurityPage() {
 
           {activeTab === 'webhooks' && (
             <div className="space-y-6">
-              <div className="glass-card p-6 rounded-2xl border border-purple-500/20 bg-gradient-to-br from-white via-slate-50 to-white space-y-6">
+              <div className="glass-card p-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-white via-slate-50 to-white space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
                   <div>
                     <div className="flex items-center gap-2">
@@ -1786,7 +1786,7 @@ export default function SecurityPage() {
                       <h3 className="text-base font-bold text-slate-800">
                         Webhook Gateway & Real-Time Alert Dispatcher
                       </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-500/30">
                         HMAC-SHA256 Signed
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-700 border border-cyan-500/30">
@@ -1809,7 +1809,7 @@ export default function SecurityPage() {
                 </div>
 
                 {testDispatchStatus && (
-                  <div className="p-3 rounded-lg text-xs font-mono bg-purple-500/10 border border-purple-500/30 text-purple-700">
+                  <div className="p-3 rounded-lg text-xs font-mono bg-purple-50 border border-purple-500/30 text-purple-700">
                     {testDispatchStatus}
                   </div>
                 )}
@@ -1821,7 +1821,7 @@ export default function SecurityPage() {
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                         Register Webhook Endpoint
                       </h4>
-                      <span className="text-[10px] text-amber-400 font-mono">
+                      <span className="text-[10px] text-amber-600 font-mono">
                         RFC 1918 / 127.0.0.1 Blocked
                       </span>
                     </div>
@@ -1853,7 +1853,7 @@ export default function SecurityPage() {
                           placeholder="https://api.partnerbank.com/cfi-webhook"
                           className="w-full px-3 py-1.5 text-xs rounded bg-slate-100 border border-[var(--color-border)] text-slate-700 focus:outline-none focus:border-purple-500/50"
                         />
-                        <span className="text-[10px] text-slate-400 mt-1 block">
+                        <span className="text-[10px] text-slate-500 mt-1 block">
                           Strict SSRF filter rejects loopback (127.0.0.1, localhost), private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), AWS metadata (169.254.169.254), and non-HTTP protocols.
                         </span>
                       </div>
@@ -1884,12 +1884,12 @@ export default function SecurityPage() {
                       </div>
 
                       {webhookRegError && (
-                        <div className="p-2.5 rounded bg-rose-500/10 border border-rose-300 text-rose-700 text-xs">
+                        <div className="p-2.5 rounded bg-rose-50 border border-rose-300 text-rose-700 text-xs">
                           {webhookRegError}
                         </div>
                       )}
                       {webhookRegSuccess && (
-                        <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-mono">
+                        <div className="p-2.5 rounded bg-emerald-50 border border-emerald-500/30 text-emerald-700 text-xs font-mono">
                           {webhookRegSuccess}
                         </div>
                       )}
@@ -1911,7 +1911,7 @@ export default function SecurityPage() {
                         <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                           Active Tenant Subscriptions ({webhookSubs?.subscriptions.length || 0})
                         </h4>
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[10px] text-slate-500 font-mono">
                           Tenant: {webhookTenant}
                         </span>
                       </div>
@@ -1928,7 +1928,7 @@ export default function SecurityPage() {
                             <div key={sub.subscription_id} className="p-2.5 rounded bg-slate-100 border border-[var(--color-border)] flex items-start justify-between gap-2 text-xs">
                               <div className="min-w-0 flex-1">
                                 <div className="font-mono text-purple-700 truncate font-semibold">{sub.target_url}</div>
-                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
                                   <span>ID: {sub.subscription_id.slice(0, 8)}...</span>
                                   <span>•</span>
                                   <span>Events: {sub.events.join(', ')}</span>
@@ -1959,7 +1959,7 @@ export default function SecurityPage() {
                     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Recent Outbound Delivery Audit Logs
                     </h4>
-                    <span className="text-[10px] font-mono text-slate-400">
+                    <span className="text-[10px] font-mono text-slate-500">
                       Total Deliveries Logged: {webhookLogs?.total_count || 0}
                     </span>
                   </div>
@@ -1988,7 +1988,7 @@ export default function SecurityPage() {
                             <tr key={item.delivery_id} className="hover:bg-slate-50 transition-colors">
                               <td className="py-2 px-2 text-slate-600">{item.delivery_id.slice(0, 8)}...</td>
                               <td className="py-2 px-2 text-purple-700">{item.event_type}</td>
-                              <td className="py-2 px-2 text-slate-400 max-w-[200px] truncate" title={item.target_url}>
+                              <td className="py-2 px-2 text-slate-500 max-w-[200px] truncate" title={item.target_url}>
                                 {item.target_url}
                               </td>
                               <td className="py-2 px-2">
@@ -2002,8 +2002,8 @@ export default function SecurityPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2 px-2 text-slate-400">{item.attempt_count}</td>
-                              <td className="py-2 px-2 text-slate-400 max-w-[220px] truncate" title={item.error_message || 'OK'}>
+                              <td className="py-2 px-2 text-slate-500">{item.attempt_count}</td>
+                              <td className="py-2 px-2 text-slate-500 max-w-[220px] truncate" title={item.error_message || 'OK'}>
                                 {item.error_message || 'Delivered successfully'}
                               </td>
                             </tr>

@@ -271,7 +271,7 @@ export default function CasesPage() {
               <button
                 type="button"
                 onClick={() => handleSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                 aria-label="Clear search"
               >
                 <X size={12} />
@@ -331,7 +331,7 @@ export default function CasesPage() {
                 type="button"
                 id="clear-all-case-filters-btn"
                 onClick={handleClearAllFilters}
-                className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-700 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
+                className="text-[11px] sm:text-xs text-indigo-600 hover:text-indigo-700 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all shrink-0 cursor-pointer"
               >
                 Clear Filters
               </button>
@@ -355,7 +355,7 @@ export default function CasesPage() {
         </div>
       ) : !filteredCases || filteredCases.length === 0 ? (
         <div className="glass-card p-12 text-center text-[var(--color-text-muted)] space-y-3">
-          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 inline-block">
+          <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 inline-block">
             <span className="text-3xl">📁</span>
           </div>
           {statusFilter || priorityFilter || searchQuery ? (
@@ -363,7 +363,7 @@ export default function CasesPage() {
               <p className="text-base font-semibold text-slate-700 mb-1">
                 No cases matching filter criteria
               </p>
-              <p className="text-xs text-slate-400 mb-4 max-w-md mx-auto">
+              <p className="text-xs text-slate-500 mb-4 max-w-md mx-auto">
                 {statusFilter && `Status: ${CASE_STATUS_LABELS[statusFilter] || statusFilter}. `}
                 {priorityFilter && `Priority: ${PRIORITY_LABELS[priorityFilter] || priorityFilter}. `}
                 {searchQuery && `Search: "${searchQuery}". `}
@@ -381,7 +381,7 @@ export default function CasesPage() {
           ) : (
             <div>
               <p className="text-base font-semibold text-slate-700 mb-1">No cases yet</p>
-              <p className="text-xs text-slate-400 mb-4">Create a case to start tracking investigations.</p>
+              <p className="text-xs text-slate-500 mb-4">Create a case to start tracking investigations.</p>
               <button
                 type="button"
                 id="create-first-case-btn"
@@ -431,7 +431,7 @@ export default function CasesPage() {
 
       {/* Inbound Alert Escalation Banner */}
       {fromAlertId && !showCreateModal && (
-        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
+        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 rounded-xl border border-indigo-200 flex items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2">
             <span className="text-base">⚡</span>
             <span className="text-slate-700">
@@ -517,7 +517,7 @@ function CreateCaseModal({
       >
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
           <div className="flex items-center gap-2">
-            <span className="text-indigo-400 text-lg">⚡</span>
+            <span className="text-indigo-600 text-lg">⚡</span>
             <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
           </div>
           <button
@@ -530,7 +530,7 @@ function CreateCaseModal({
         </div>
 
         {fromAlertId && (
-          <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 rounded-lg border border-indigo-500/30 text-xs space-y-1">
+          <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 rounded-lg border border-indigo-200 text-xs space-y-1">
             <div className="flex items-center justify-between font-semibold text-indigo-700">
               <span className="flex items-center gap-1.5">
                 <span>⚡</span> Escalating from Inbound Alert

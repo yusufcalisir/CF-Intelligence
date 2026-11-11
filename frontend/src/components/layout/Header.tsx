@@ -154,13 +154,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <div className="hidden sm:flex items-center gap-2">
             {status === 'connected' ? (
               streamSource === 'LIVE_CONNECTOR' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title={`Live Ingestion Provider: ${streamProvenance}`}>
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-600 border border-emerald-500/30" title={`Live Ingestion Provider: ${streamProvenance}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   Live Connector WS ({latencyMs}ms)
                 </span>
               ) : streamSource === 'SIMULATED' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-700 border border-indigo-500/30" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
-                  <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
+                  <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                   Simulated Feed ({latencyMs}ms)
                 </span>
               ) : (
@@ -170,24 +170,24 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </span>
               )
             ) : status === 'mock_active' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-700 border border-indigo-500/30" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
-                <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
+                <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
                 Simulated Stream (Offline)
               </span>
             ) : status === 'connecting' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-600 border border-amber-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 Connecting...
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-500 border border-slate-500/30">
                 WS Offline
               </span>
             )}
 
             {/* Live streamed transactions ticker */}
-            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-400">
-              <Activity className="w-3 h-3 text-cyan-400" />
+            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-500">
+              <Activity className="w-3 h-3 text-cyan-600" />
               <span>{totalStreamedTransactions.toLocaleString()} txns</span>
             </span>
           </div>
@@ -198,11 +198,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-2">
               <span
                 data-testid="active-institutional-session"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-500/30"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{sessionUser.username}</span>
-                <span className="text-emerald-400/70">·</span>
+                <span className="text-emerald-600/70">·</span>
                 <span data-testid="active-session-tenant">{sessionUser.bank_id.toUpperCase()}</span>
               </span>
               <button
@@ -220,7 +220,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 type="button"
                 data-testid="institutional-sign-out-btn"
                 onClick={handleSignOut}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
                 title="Sign out of institutional session"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -263,14 +263,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-800">Institutional Session Authentication</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Authenticate with your sovereign institutional credentials to bind tenant context.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsLoginModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 text-sm"
+                className="text-slate-500 hover:text-slate-700 text-sm"
               >
                 ✕
               </button>

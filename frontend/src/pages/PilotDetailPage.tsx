@@ -101,9 +101,9 @@ export default function PilotDetailPage() {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-8">
         <div className="rounded-xl border border-rose-300 bg-rose-50 p-6 text-center">
-          <AlertCircle className="mx-auto h-8 w-8 text-rose-400 mb-2" />
+          <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
           <h2 className="text-base font-semibold text-rose-700">Consortium Pilot Not Accessible</h2>
-          <p className="text-xs text-rose-400/80 mt-1 max-w-md mx-auto">
+          <p className="text-xs text-rose-600/80 mt-1 max-w-md mx-auto">
             {error instanceof Error
               ? error.message
               : 'Pilot could not be loaded. Please ensure the pilot ID is valid and your institution is authorized to view this record.'}
@@ -173,7 +173,7 @@ export default function PilotDetailPage() {
             </span>
             <span>•</span>
             <div className="flex items-center gap-1">
-              <Building className="h-3 w-3 text-slate-400" />
+              <Building className="h-3 w-3 text-slate-500" />
               <span className="font-mono text-slate-600">{pilot.participating_institutions?.[0] || 'Bank A'}</span>
               <span className="text-[10px] text-slate-500 font-bold">⇄</span>
               <span className="font-mono text-slate-600">{pilot.participating_institutions?.[1] || 'Bank B'}</span>
@@ -193,7 +193,7 @@ export default function PilotDetailPage() {
       {/* Alert Notices */}
       {pilot.status === 'PAUSED' && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-50 p-4 text-xs text-amber-700 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-amber-700">Pilot Execution Paused</div>
             <div className="text-amber-700/80 mt-0.5">
@@ -206,7 +206,7 @@ export default function PilotDetailPage() {
 
       {pilot.status === 'ABORTED' && (
         <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+          <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-700">Pilot Permanently Aborted</div>
             <div className="text-rose-700/80 mt-0.5">
@@ -218,7 +218,7 @@ export default function PilotDetailPage() {
 
       {isExpired && pilot.status !== 'ABORTED' && pilot.status !== 'COMPLETED' && (
         <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-3">
-          <Clock className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+          <Clock className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-rose-700">Pilot Scope Expired</div>
             <div className="text-rose-700/80 mt-0.5">
@@ -240,18 +240,18 @@ export default function PilotDetailPage() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-all ${
                   isActive
-                    ? 'border-indigo-500 text-indigo-400'
+                    ? 'border-indigo-500 text-indigo-600'
                     : 'border-transparent text-[var(--color-text-muted)] hover:border-slate-500 hover:text-[var(--color-text-primary)]'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-600' : 'text-slate-500'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
                   <span
                     className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-medium ${
                       tab.badgeColor === 'emerald'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-500/30'
+                        : 'bg-amber-50 text-amber-600 border border-amber-500/30'
                     }`}
                   >
                     {tab.badge}

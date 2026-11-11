@@ -745,11 +745,11 @@ export default function ApiDocsPage() {
               <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                 Developer & API Reference Portal
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-700 border border-indigo-500/30 shrink-0 whitespace-nowrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 whitespace-nowrap">
                 OpenAPI 3.1
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
               Bank Integration SDK generator, multi-language code snippets, and live interactive API request sandbox
             </p>
           </div>
@@ -797,7 +797,7 @@ export default function ApiDocsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Endpoints Index */}
         <div className="lg:col-span-4 glass-card p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">
+          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 px-2 mb-2">
             Consortium Endpoints
           </h3>
           <div className="space-y-1.5">
@@ -818,17 +818,17 @@ export default function ApiDocsPage() {
                   <span
                     className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 mt-0.5 ${
                       endpoint.method === 'POST'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                         : endpoint.method === 'GET'
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                        : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                        : 'bg-purple-500/20 text-purple-600 border border-purple-500/30'
                     }`}
                   >
                     {endpoint.method}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold truncate">{endpoint.title}</div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">{endpoint.path}</div>
+                    <div className="text-[10px] font-mono text-slate-500 truncate mt-0.5">{endpoint.path}</div>
                   </div>
                 </button>
               );
@@ -845,10 +845,10 @@ export default function ApiDocsPage() {
                 <span
                   className={`px-2 py-0.5 rounded text-xs font-mono font-black ${
                     selectedEndpoint.method === 'POST'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                       : selectedEndpoint.method === 'GET'
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                      : 'bg-purple-500/20 text-purple-600 border border-purple-500/30'
                   }`}
                 >
                   {selectedEndpoint.method}
@@ -864,7 +864,7 @@ export default function ApiDocsPage() {
                     <Lock className="w-2.5 h-2.5" /> Bearer Token
                   </span>
                 )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-200">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-slate-50 border border-slate-200">
                   {selectedEndpoint.rateLimit}
                 </span>
               </div>
@@ -887,7 +887,7 @@ export default function ApiDocsPage() {
                     className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 cursor-pointer ${
                       selectedLang === lang
                         ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {lang.toUpperCase()}
@@ -902,9 +902,9 @@ export default function ApiDocsPage() {
                 className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-white transition-all shrink-0 cursor-pointer border border-slate-200 active:scale-95"
               >
                 {copiedCode ? (
-                  <Check className="w-4 h-4 text-emerald-400" />
+                  <Check className="w-4 h-4 text-emerald-600" />
                 ) : (
-                  <Copy className="w-4 h-4 text-slate-400 hover:text-slate-700" />
+                  <Copy className="w-4 h-4 text-slate-500 hover:text-slate-700" />
                 )}
               </button>
             </div>
@@ -916,10 +916,10 @@ export default function ApiDocsPage() {
           </div>
 
           {/* Live Request Playground */}
-          <div className="glass-card p-5 rounded-2xl border border-indigo-500/20 bg-slate-50 space-y-4 shadow-xl">
+          <div className="glass-card p-5 rounded-2xl border border-indigo-200 bg-slate-50 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
+                <Terminal className="w-4 h-4 text-cyan-600" />
                 <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800">
                   Interactive API Request Runner
                 </h4>
@@ -948,7 +948,7 @@ export default function ApiDocsPage() {
             {selectedEndpoint.requestBodySample && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">Request Body (Editable JSON)</span>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">Request Body (Editable JSON)</span>
                   <button
                     onClick={() => {
                       setRequestPayloadText(
@@ -957,7 +957,7 @@ export default function ApiDocsPage() {
                           : ''
                       );
                     }}
-                    className="text-[10px] font-mono text-indigo-400 hover:text-indigo-700 transition-colors cursor-pointer"
+                    className="text-[10px] font-mono text-indigo-600 hover:text-indigo-700 transition-colors cursor-pointer"
                   >
                     Reset Payload
                   </button>
@@ -981,15 +981,15 @@ export default function ApiDocsPage() {
                   className="space-y-2 pt-3 border-t border-slate-200"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Live Server Response</span>
+                    <span className="text-[10px] font-mono text-slate-500 uppercase">Live Server Response</span>
                     <div className="flex items-center gap-2">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                           executionResult.statusCode >= 200 && executionResult.statusCode < 300
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                             : executionResult.statusCode >= 400 && executionResult.statusCode < 500
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-rose-500/20 text-rose-400 border border-rose-300'
+                            ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30'
+                            : 'bg-rose-500/20 text-rose-600 border border-rose-300'
                         }`}
                       >
                         HTTP {executionResult.statusCode}{' '}

@@ -46,14 +46,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent truncate">
+              <h1 className="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-cyan-600 via-sky-300 to-purple-600 bg-clip-text text-transparent truncate">
                 Cross-Bank FL Fraud Intelligence
               </h1>
-              <span className="hidden sm:inline-block text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold">
+              <span className="hidden sm:inline-block text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 border border-cyan-200 font-semibold">
                 {health?.version ? `v${health.version}` : 'v2.4.0'}
               </span>
             </div>
-            <p className="hidden sm:block text-xs text-slate-400">
+            <p className="hidden sm:block text-xs text-slate-500">
               Privacy-Preserving Federated Graph Neural Networks & Differential Privacy
             </p>
           </div>
@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Desktop Tenant Selector & System Health Badge */}
         <div className="hidden md:flex items-center gap-4">
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600">
-            <Building2 className="h-4 w-4 text-cyan-400" />
+            <Building2 className="h-4 w-4 text-cyan-600" />
             <select
               value={selectedBank}
               onChange={(e) => setSelectedBank(e.target.value)}
@@ -79,8 +79,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${
               isOnline
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                : 'bg-amber-50 text-amber-600 border-amber-200'
             }`}
           >
             <span
@@ -115,10 +115,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
                 isActive
                   ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-700 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
-                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100/50'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
               }`}
             >
-              <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+              <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-600' : 'text-slate-500'}`} />
               <span>{tab.label}</span>
             </button>
           );
@@ -130,7 +130,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="md:hidden pt-4 pb-2 border-t border-slate-200/80 mt-3 space-y-3">
           <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-600">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-cyan-400" />
+              <Building2 className="h-4 w-4 text-cyan-600" />
               <span>Tenant:</span>
             </div>
             <select
@@ -160,10 +160,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-medium text-left transition-all ${
                     isActive
                       ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-700 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-white'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-white'
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-600' : 'text-slate-500'}`} />
                   <span>{tab.label}</span>
                 </button>
               );

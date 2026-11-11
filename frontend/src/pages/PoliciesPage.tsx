@@ -332,7 +332,7 @@ export default function PoliciesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--color-border)] pb-6">
         <div>
-          <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
+          <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
             <ShieldCheck className="w-4 h-4" />
             Declarative AML & Fraud Policy Engine
           </div>
@@ -363,10 +363,10 @@ export default function PoliciesPage() {
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                <Shield className="w-5 h-5 text-indigo-400" />
+                <Shield className="w-5 h-5 text-indigo-600" />
                 <span>Active Rules Registry</span>
               </h2>
-              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-500/30 font-semibold">
+              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
                 {rules?.length ?? 0} Configured Rules
               </span>
             </div>
@@ -394,8 +394,8 @@ export default function PoliciesPage() {
                                 : rule.action === 'ESCALATE_TO_SAR'
                                 ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
                                 : rule.action === 'HOLD_FOR_REVIEW'
-                                ? 'bg-purple-500/15 text-purple-700 border-purple-500/30'
-                                : 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30'
+                                ? 'bg-purple-50 text-purple-700 border-purple-500/30'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                             }`}
                           >
                             Action: {rule.action}
@@ -426,7 +426,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleLoadRuleToTester(rule)}
                           aria-label={`Test Rule ${rule.rule_name} in engine`}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-50 text-indigo-700 border border-indigo-500/30 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-50 text-indigo-700 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Load this rule into the dynamic tester panel"
                         >
                           <Zap className="w-3.5 h-3.5" />
@@ -440,7 +440,7 @@ export default function PoliciesPage() {
                           className="px-2.5 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-700 text-slate-700 border border-slate-200 hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Edit rule name, condition AST, or action"
                         >
-                          <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                          <Pencil className="w-3.5 h-3.5 text-indigo-600" />
                           <span>Edit</span>
                         </button>
 
@@ -448,7 +448,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleDeleteRule(rule.id)}
                           aria-label={`Delete Rule ${rule.rule_name}`}
-                          className="p-1.5 rounded-lg hover:bg-rose-500/15 text-rose-400 border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-rose-500/15 text-rose-600 border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
                           title="Delete rule"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -475,7 +475,7 @@ export default function PoliciesPage() {
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
               <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                <Zap className="w-5 h-5 text-amber-400" />
+                <Zap className="w-5 h-5 text-amber-600" />
                 <span>Dynamic Rule Tester</span>
               </h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30 font-bold uppercase">
@@ -492,7 +492,7 @@ export default function PoliciesPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="test-condition-ast" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                    <FileCode className="w-3.5 h-3.5 text-indigo-400" />
+                    <FileCode className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Condition JSON AST</span>
                   </label>
                   <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
@@ -502,7 +502,7 @@ export default function PoliciesPage() {
 
                 {/* Responsive Quick Template Grid */}
                 <div className="space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                     Load Template:
                   </span>
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -534,7 +534,7 @@ export default function PoliciesPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <label htmlFor="test-transaction-payload" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-emerald-400" />
+                    <Database className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Transaction Payload</span>
                   </label>
                   <button
@@ -544,7 +544,7 @@ export default function PoliciesPage() {
                     className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-50 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
                     title="Load highest-risk live alert from real-time ledger into test payload"
                   >
-                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                    <Zap className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Load Live Alert</span>
                   </button>
                 </div>
@@ -561,7 +561,7 @@ export default function PoliciesPage() {
                       type="button"
                       onClick={() => setLoadedAlertInfo(null)}
                       aria-label="Dismiss loaded alert banner"
-                      className="text-slate-400 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
+                      className="text-slate-500 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
                     >
                       ✕
                     </button>
@@ -570,7 +570,7 @@ export default function PoliciesPage() {
 
                 {suspiciousAlerts.length > 1 && (
                   <div className="space-y-1 text-xs">
-                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-400 font-medium block">
+                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-500 font-medium block">
                       Or select from recent alerts:
                     </label>
                     <select
@@ -642,7 +642,7 @@ export default function PoliciesPage() {
                     </div>
                     {testResult.matched_fields && testResult.matched_fields.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-sans">Matched Fields:</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-sans">Matched Fields:</span>
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
@@ -678,14 +678,14 @@ export default function PoliciesPage() {
             >
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                  <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600">
                     {editingRule ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                   </div>
                   <div>
                     <h3 id="rule-modal-title" className="text-lg font-bold text-white">
                       {editingRule ? `Edit Policy Rule: ${editingRule.rule_name}` : 'Create Dynamic Policy Rule'}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       {editingRule
                         ? 'Update declarative AST conditions and triggered policy actions.'
                         : 'Define declarative screening conditions evaluated on transactions in real time.'}
@@ -698,7 +698,7 @@ export default function PoliciesPage() {
                     setEditingRule(null);
                   }}
                   aria-label="Close modal"
-                  className="text-slate-400 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
+                  className="text-slate-500 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
                 >
                   ✕
                 </button>
@@ -708,7 +708,7 @@ export default function PoliciesPage() {
               <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-indigo-700 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Pre-built AML Rule Templates (1-Click Apply)</span>
                   </span>
                   <span className="text-[10px] text-slate-500">Auto-populates AST</span>
@@ -724,11 +724,11 @@ export default function PoliciesPage() {
                     >
                       <div className="font-semibold text-white group-hover:text-indigo-700 flex items-center justify-between">
                         <span className="truncate">{tpl.badge}</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-400 uppercase">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 uppercase">
                           {tpl.action.split('_')[0]}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{tpl.description}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{tpl.description}</p>
                     </button>
                   ))}
                 </div>

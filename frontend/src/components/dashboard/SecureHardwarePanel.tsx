@@ -8,7 +8,7 @@ interface SecureHardwarePanelProps {
 
 // Inline SVGs for self-contained, compile-safe icons
 const CpuIcon = () => (
-  <svg className="h-6 w-6 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="4" y="4" width="16" height="16" rx="2" />
     <rect x="9" y="9" width="6" height="6" />
     <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
@@ -16,20 +16,20 @@ const CpuIcon = () => (
 );
 
 const KeyIcon = () => (
-  <svg className="h-6 w-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="h-6 w-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
   </svg>
 );
 
 const ShieldCheckIcon = () => (
-  <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     <path d="m9 11 2 2 4-4" />
   </svg>
 );
 
 const LockIcon = () => (
-  <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
@@ -45,7 +45,7 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
           <CpuIcon />
           <div>
             <h3 className="text-base font-bold text-slate-800">Standard CPU/GPU Plaintext Execution</h3>
-            <p className="text-xs text-slate-400">Parameter aggregation processed without specialized hardware isolation.</p>
+            <p className="text-xs text-slate-500">Parameter aggregation processed without specialized hardware isolation.</p>
           </div>
         </div>
       </div>
@@ -84,7 +84,7 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
               {hwMode === 'tee' ? '🛡️ Trusted Execution Environment (TEE)' : '🔑 Fully Homomorphic Encryption (FHE)'}
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {hwMode === 'tee' 
               ? (isHwBacked
                   ? 'Intel SGX / AWS Nitro Enclave secure memory isolation and hardware attestation verification.'
@@ -95,18 +95,18 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
         <div>
           {hwMode === 'tee' ? (
             isHwBacked ? (
-              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 Intel SGX Hardware Active
               </span>
             ) : (
-              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-700 border border-amber-500/30 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-500/30 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
                 Software Emulated TEE Sandbox
               </span>
             )
           ) : (
-            <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+            <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               FHE CKKS Active
             </span>
@@ -141,8 +141,8 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
               </div>
               <div className={`flex items-center gap-2 text-xs font-semibold p-2 rounded border min-w-0 ${
                 isHwBacked
-                  ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10'
-                  : 'text-amber-700 bg-amber-500/5 border-amber-500/20'
+                  ? 'text-emerald-600 bg-emerald-500/5 border-emerald-500/10'
+                  : 'text-amber-700 bg-amber-500/5 border-amber-200'
               }`}>
                 <ShieldCheckIcon />
                 <span className="truncate">
@@ -172,7 +172,7 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
                   {simulation.fhe_key_id || simulation.id}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-blue-400 font-semibold bg-blue-500/5 p-2 rounded border border-blue-500/10 min-w-0">
+              <div className="flex items-center gap-2 text-xs text-blue-600 font-semibold bg-blue-500/5 p-2 rounded border border-blue-500/10 min-w-0">
                 <LockIcon />
                 <span className="truncate">Zero-knowledge plaintext parameter leaks</span>
               </div>
@@ -186,11 +186,11 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
             <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
               Illustrative Overhead Model - Aggregation Latency
             </h4>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/30 whitespace-nowrap w-fit">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-500/30 whitespace-nowrap w-fit">
               THEORETICAL BENCHMARK MODEL (ILLUSTRATIVE)
             </span>
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Illustrative analytical model comparing cryptographic aggregation overhead across Plaintext, TEE Enclave, and FHE CKKS, calibrated to theoretical polynomial degree and memory boundaries.
           </p>
           

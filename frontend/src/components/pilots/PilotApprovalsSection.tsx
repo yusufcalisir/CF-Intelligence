@@ -75,19 +75,19 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-purple-400" />
+            <Key className="w-5 h-5 text-purple-600" />
             <h3 className="text-sm font-semibold text-white tracking-wide">
               Independent Bilateral & Operator Approvals
             </h3>
           </div>
-          <p className="text-xs text-slate-400 max-w-2xl">
+          <p className="text-xs text-slate-500 max-w-2xl">
             Controlled two-bank pilots require independent cryptographic authorization from each participating bank and the consortium operator.
             Approvals are strictly bound to current scope digest <code className="text-indigo-700 font-mono text-[11px]">{currentDigest ? currentDigest.slice(0, 12) + '...' : ''}</code>.
           </p>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-xs">
-          <span className="text-slate-400">Authorization Status:</span>
+          <span className="text-slate-500">Authorization Status:</span>
           <span
             className={`px-3 py-1 rounded-full font-semibold border ${
               pilot.is_fully_approved
@@ -102,7 +102,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
 
       {submitError && (
         <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 text-xs flex items-start gap-2.5">
-          <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Approval Submission Failed</div>
             <div className="mt-0.5">{submitError}</div>
@@ -133,17 +133,17 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
                   {entityId === 'OPERATOR' ? 'Consortium Operator' : entityId.toUpperCase()}
                 </span>
                 {isApproved && !isStale && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-semibold">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5" /> APPROVED
                   </span>
                 )}
                 {isStale && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-400 font-semibold">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 font-semibold">
                     <AlertTriangle className="w-3.5 h-3.5" /> STALE REVISION
                   </span>
                 )}
                 {!isApproved && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500">
                     <Clock className="w-3.5 h-3.5" /> AWAITING
                   </span>
                 )}
@@ -152,31 +152,31 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               {isApproved && approval ? (
                 <div className="space-y-1.5 text-[11px] font-mono text-slate-600">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Approver ID:</span>
+                    <span className="text-slate-500">Approver ID:</span>
                     <span className="text-white truncate max-w-[140px]">{approval.approver_id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Role:</span>
+                    <span className="text-slate-500">Role:</span>
                     <span className="text-indigo-700">{approval.approver_role}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Approved At:</span>
+                    <span className="text-slate-500">Approved At:</span>
                     <span>{new Date(approval.approved_at).toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Signature:</span>
-                    <span className="text-slate-400 truncate max-w-[140px]">
+                    <span className="text-slate-500">Signature:</span>
+                    <span className="text-slate-500 truncate max-w-[140px]">
                       {approval.signature ? `${approval.signature.slice(0, 10)}...` : 'Operator Log Record'}
                     </span>
                   </div>
                   {approval.notes && (
-                    <div className="mt-2 pt-2 border-t border-[var(--color-border)] text-slate-400 text-[10px] italic">
+                    <div className="mt-2 pt-2 border-t border-[var(--color-border)] text-slate-500 text-[10px] italic">
                       "{approval.notes}"
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   {entityId === 'OPERATOR'
                     ? 'Pending authorized consortium operator review and approval.'
                     : `Pending independent authorized sign-off from ${entityId.toUpperCase()} compliance/security.`}
@@ -191,7 +191,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
       {canApprove ? (
         <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-4">
           <div className="flex items-center gap-2">
-            <Send className="w-4 h-4 text-cyan-400" />
+            <Send className="w-4 h-4 text-cyan-600" />
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
               Submit Authorized Institutional Approval
             </h4>
@@ -200,7 +200,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
           <form onSubmit={handleApprove} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 mb-1">
                   Approving Authority (Restricted to Effective Role)
                 </label>
                 <select
@@ -220,7 +220,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 mb-1">
                   Approval Notes / Rationale (Optional)
                 </label>
                 <input
@@ -234,7 +234,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-slate-400">
+              <label className="block text-xs font-medium text-slate-500">
                 Canonical Signing Challenge
               </label>
               <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] font-mono break-all text-cyan-700 select-all">
@@ -246,7 +246,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">
+              <label className="block text-xs font-medium text-slate-500 mb-1">
                 Institutional Ed25519 Signature Hex (Required for Bank Approval)
               </label>
               <input
@@ -270,7 +270,7 @@ export default function PilotApprovalsSection({ pilot }: PilotApprovalsSectionPr
           </form>
         </div>
       ) : (
-        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs flex items-center gap-2.5">
+        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs flex items-center gap-2.5">
           <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" />
           <span>
             {pilot.is_fully_approved

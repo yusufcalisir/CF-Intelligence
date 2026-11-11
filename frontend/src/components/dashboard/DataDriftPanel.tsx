@@ -230,7 +230,7 @@ export default function DataDriftPanel() {
                   <span>Measures distribution change over populations.</span>
                   <br />
                   <span className="inline-block mt-0.5">
-                    Formula: <code className="font-mono text-cyan-400 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[9px]">∑ (A<sub>i</sub> - E<sub>i</sub>) × ln(A<sub>i</sub> / E<sub>i</sub>)</code>
+                    Formula: <code className="font-mono text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 text-[9px]">∑ (A<sub>i</sub> - E<sub>i</sub>) × ln(A<sub>i</sub> / E<sub>i</sub>)</code>
                   </span>
                   <br />
                   <span className="inline-block mt-1">
@@ -242,10 +242,10 @@ export default function DataDriftPanel() {
                 <p className="font-medium text-[var(--color-text-primary)] mb-0.5">🔬 Jensen-Shannon (JS) Divergence</p>
                 <p className="text-[9px] text-[var(--color-text-muted)] leading-relaxed">
                   Symmetric, smooth measure of distribution divergence bounded between{' '}
-                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">0.0</code> (identical) and{' '}
-                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">1.0</code> (disjoint).
+                  <code className="font-mono text-cyan-600 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-200 text-[9px]">0.0</code> (identical) and{' '}
+                  <code className="font-mono text-cyan-600 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-200 text-[9px]">1.0</code> (disjoint).
                   Helps identify local feature alignment. Used directly to capture concept drift on model outputs{' '}
-                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">P(Y|X)</code>.
+                  <code className="font-mono text-cyan-600 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-200 text-[9px]">P(Y|X)</code>.
                 </p>
               </div>
             </div>

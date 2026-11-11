@@ -156,15 +156,15 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 15 }}
           transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-white via-slate-50 to-white border border-indigo-500/30 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden focus:outline-none"
+          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-white via-slate-50 to-white border border-indigo-200 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden focus:outline-none"
         >
           {/* Top Edge Glow */}
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-600" />
 
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-700 shadow-inner shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shadow-inner shrink-0">
                 <BarChart3 className="w-5 h-5 animate-pulse" />
               </div>
               <div className="min-w-0">
@@ -177,13 +177,13 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-700 border border-indigo-500/30">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                 {Math.min(100, Math.round(progress))}%
               </span>
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>
@@ -212,7 +212,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   <CurrentIcon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block truncate">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block truncate">
                     Stage 0{currentStage.id} of 05
                   </span>
                   <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
@@ -249,15 +249,15 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   key={s.id}
                   className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
                     isCurrent
-                      ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-700'
+                      ? 'bg-indigo-600/15 border border-indigo-200 text-indigo-700'
                       : isCompleted
-                      ? 'text-slate-400 opacity-80'
+                      ? 'text-slate-500 opacity-80'
                       : 'text-slate-600 opacity-40'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {isCompleted ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     ) : isCurrent ? (
                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping shrink-0" />
                     ) : (
@@ -277,7 +277,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           <div className="space-y-1.5 pt-1">
             <div className="w-full bg-white rounded-full h-1.5 overflow-hidden p-0.5 border border-slate-200">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 transition-all duration-150"
+                className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-600 transition-all duration-150"
                 style={{ width: `${progress}%` }}
               />
             </div>

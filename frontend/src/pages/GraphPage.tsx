@@ -145,7 +145,7 @@ export default function GraphPage() {
         className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-600/15 border border-indigo-200 text-indigo-600 shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
             🕸️
           </div>
           <div className="min-w-0">
@@ -153,11 +153,11 @@ export default function GraphPage() {
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Entity Relationship Graph
               </h1>
-              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 font-semibold">
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold">
                 Federated Identity Mesh
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
               Interactive multi-bank identity topology across transactions, shared device fingerprints, and confidential risk clusters.
             </p>
           </div>
@@ -177,10 +177,10 @@ export default function GraphPage() {
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 sm:p-5 rounded-2xl bg-indigo-50 border border-indigo-500/30 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          className="p-4 sm:p-5 rounded-2xl bg-indigo-50 border border-indigo-200 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
           <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-700 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
+            <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-700 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
               🎯
             </div>
             <div className="min-w-0">
@@ -196,11 +196,11 @@ export default function GraphPage() {
                     ({focusedEntity.display_label} • {BANK_NAMES[focusedEntity.bank_id] || focusedEntity.bank_id})
                   </span>
                 )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
                   {depth}-Hop Ego Network
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 Visualizing multi-bank transaction paths, shared device fingerprints, and suspicious cluster boundaries centered on this node.
               </p>
             </div>
@@ -215,7 +215,7 @@ export default function GraphPage() {
                   className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
                     depth === hop
                       ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-500 hover:text-white'
                   }`}
                   title={`Traverse ${hop} hops`}
                 >
@@ -254,7 +254,7 @@ export default function GraphPage() {
                   style={{ background: stat.color, opacity: hoveredStat === stat.key ? 0.25 : 0.08 }}
                 />
                 <div className="relative z-10 flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold truncate">
+                  <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold truncate">
                     {stat.label}
                   </div>
                   <span className="text-sm font-mono" style={{ color: stat.color }}>{stat.icon}</span>
@@ -284,11 +284,11 @@ export default function GraphPage() {
                 <span>🎯</span>
                 <span>Traversal Hops</span>
               </h3>
-              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-600/20 text-indigo-700 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-indigo-600/20 text-indigo-700 border border-indigo-200">
                 Depth {depth}
               </span>
             </div>
-            <p className="text-[11.5px] text-slate-400 leading-relaxed mb-4">
+            <p className="text-[11.5px] text-slate-500 leading-relaxed mb-4">
               Number of recursive entity hops analyzed across consortium boundaries.
             </p>
           </div>
@@ -334,7 +334,7 @@ export default function GraphPage() {
 
           {/* Search Input */}
           <div className="relative mb-3">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">
               🔍
             </span>
             <input
@@ -380,7 +380,7 @@ export default function GraphPage() {
               );
             })}
             {!filteredEntities.length && (
-              <div className="w-full py-4 text-center text-xs text-slate-400 font-mono">
+              <div className="w-full py-4 text-center text-xs text-slate-500 font-mono">
                 No matching entities found in current consortium state.
               </div>
             )}
@@ -396,7 +396,7 @@ export default function GraphPage() {
         className="p-4 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono shrink-0">
             Node Types:
           </span>
           {Object.entries(ENTITY_TYPE_COLORS).map(([type, color]) => (
@@ -412,7 +412,7 @@ export default function GraphPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 font-mono border-t md:border-t-0 pt-2 md:pt-0 border-slate-200">
+        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 font-mono border-t md:border-t-0 pt-2 md:pt-0 border-slate-200">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-indigo-500 inline-block" /> Transaction
           </span>
@@ -445,7 +445,7 @@ export default function GraphPage() {
               <div className="max-w-md space-y-4">
                 {/* Animated Pulsing Orbit Visual */}
                 <div className="relative w-24 h-24 mx-auto">
-                  <div className="absolute inset-0 rounded-full border border-indigo-500/20 animate-ping" />
+                  <div className="absolute inset-0 rounded-full border border-indigo-200 animate-ping" />
                   <div className="absolute inset-2 rounded-full border border-cyan-500/30 animate-pulse" />
                   <div className="absolute inset-0 flex items-center justify-center text-3xl">
                     🕸️
@@ -456,7 +456,7 @@ export default function GraphPage() {
                   <h3 className="text-base sm:text-lg font-bold text-white mb-1">
                     Select an Entity to Trace Topology
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
                     Pick a customer, device, card, or merchant from the directory above to visualize cross-bank transaction links and fraud rings.
                   </p>
                 </div>
@@ -489,7 +489,7 @@ export default function GraphPage() {
               <div className="max-w-md space-y-3">
                 <div className="text-4xl">📊</div>
                 <h3 className="text-base font-bold text-white">No Direct Relationships at Depth {depth}</h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   This entity has no cross-bank connections within {depth} hops. Try increasing traversal hops to 3 or 4.
                 </p>
                 <button

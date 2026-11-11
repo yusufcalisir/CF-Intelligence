@@ -73,12 +73,12 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-rose-700 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-rose-500/20 text-rose-400">💥</span>
+              <span className="p-1 rounded-lg bg-rose-500/20 text-rose-600">💥</span>
               Chaos & Attack Simulator
             </span>
-            <span className="text-[10px] font-mono font-bold text-rose-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span className="text-[10px] font-mono font-bold text-rose-600/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Inject 500 tx/s smurfing bursts & Byzantine poisoned gradients to test Multi-Krum shield.
           </p>
         </button>
@@ -90,12 +90,12 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-indigo-700 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400">📁</span>
+              <span className="p-1 rounded-lg bg-indigo-100 text-indigo-600">📁</span>
               Import Bank Dataset
             </span>
-            <span className="text-[10px] font-mono font-bold text-indigo-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span className="text-[10px] font-mono font-bold text-indigo-600/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Client-side Zero-PII sanitization & 12-rule Great Expectations data contract gating.
           </p>
         </button>
@@ -107,12 +107,12 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-cyan-700 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400">🐳</span>
+              <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-600">🐳</span>
               On-Premises Docker Stack
             </span>
-            <span className="text-[10px] font-mono font-bold text-cyan-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span className="text-[10px] font-mono font-bold text-cyan-600/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
+          <p className="text-[11px] text-slate-500 leading-snug">
             Production compose manifests with Same-Origin Gateway, Postgres 16 & Redis 7.2.
           </p>
         </button>
@@ -132,7 +132,7 @@ export default function Dashboard() {
         ) : !banks || banks.length === 0 ? (
           <div className="glass-card p-6 text-center text-[var(--color-text-muted)] border border-dashed border-slate-200 rounded-xl">
             <p className="text-xs font-semibold text-slate-600">No Bank Nodes Registered</p>
-            <p className="text-[11px] text-slate-400 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
+            <p className="text-[11px] text-slate-500 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -242,7 +242,7 @@ export default function Dashboard() {
                         title="Delete simulation"
                         disabled={deletingId === sim.id}
                         onClick={(e) => handleDeleteSimulation(e, sim.id)}
-                        className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-300 transition-all cursor-pointer disabled:opacity-40"
+                        className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-600 hover:bg-rose-500/15 border border-transparent hover:border-rose-300 transition-all cursor-pointer disabled:opacity-40"
                       >
                         {deletingId === sim.id ? (
                           <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />

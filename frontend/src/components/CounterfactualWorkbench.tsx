@@ -248,14 +248,14 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
             <span>Back to Alerts Feed</span>
           </Link>
           <span className="text-xs text-slate-600 shrink-0">/</span>
-          <span className="text-xs font-mono font-semibold text-cyan-400 truncate max-w-[140px] sm:max-w-none">
+          <span className="text-xs font-mono font-semibold text-cyan-600 truncate max-w-[140px] sm:max-w-none">
             {effectiveAlertId || 'Select Target Alert'}
           </span>
         </div>
 
         {/* Quick Alert Switcher Dropdown */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
-          <span className="text-xs text-slate-400 font-medium shrink-0">Target Alert:</span>
+          <span className="text-xs text-slate-500 font-medium shrink-0">Target Alert:</span>
           <div ref={dropdownRef} className="relative w-full sm:w-72 md:w-80 min-w-0">
             {/* Native hidden select for form & automated test query parity */}
             <select
@@ -292,8 +292,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 {displayAlertLabel}
               </span>
               <ChevronDown
-                className={`h-3.5 w-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
-                  isDropdownOpen ? 'rotate-180 text-cyan-400' : ''
+                className={`h-3.5 w-3.5 text-slate-500 shrink-0 transition-transform duration-200 ${
+                  isDropdownOpen ? 'rotate-180 text-cyan-600' : ''
                 }`}
               />
             </button>
@@ -310,10 +310,10 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                     const isSelected = alt.id === effectiveAlertId;
                     const scoreColor =
                       alt.risk_score >= 800
-                        ? 'text-rose-400 bg-rose-500/10 border-rose-300'
+                        ? 'text-rose-600 bg-rose-50 border-rose-300'
                         : alt.risk_score >= 600
-                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                        ? 'text-amber-600 bg-amber-50 border-amber-200'
+                        : 'text-emerald-600 bg-emerald-50 border-emerald-200';
 
                     return (
                       <button
@@ -324,7 +324,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                         onClick={() => handleSelectAlert(alt.id)}
                         className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-cyan-500/10 text-cyan-700'
+                            ? 'bg-cyan-50 text-cyan-700'
                             : 'hover:bg-slate-100/80 text-slate-600 hover:text-white'
                         }`}
                       >
@@ -337,7 +337,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                               <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shrink-0" />
                             )}
                           </div>
-                          <span className="text-[11px] text-slate-400 truncate">
+                          <span className="text-[11px] text-slate-500 truncate">
                             {BANK_NAMES[alt.bank_id] || alt.bank_id}
                           </span>
                         </div>
@@ -349,14 +349,14 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                             Score: {alt.risk_score}
                           </span>
                           {isSelected && (
-                            <Check className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                            <Check className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
                           )}
                         </div>
                       </button>
                     );
                   })
                 ) : (
-                  <div className="px-3 py-2.5 text-xs text-slate-400 font-mono">
+                  <div className="px-3 py-2.5 text-xs text-slate-500 font-mono">
                     {effectiveAlertId || 'alt_1001'} (Current Alert)
                   </div>
                 )}
@@ -369,7 +369,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
       {/* Header Banner */}
       <div className="glass-card p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-xl bg-gradient-to-r from-slate-50 via-slate-50 to-slate-50 min-w-0">
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 via-purple-500/20 to-indigo-500/20 text-cyan-400 border border-cyan-500/30 shadow-inner shrink-0">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 via-purple-500/20 to-indigo-500/20 text-cyan-600 border border-cyan-500/30 shadow-inner shrink-0">
             <Sliders className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0">
@@ -381,7 +381,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 GDPR Art. 22 XAI
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
               Interactive Minimum Remediating Feature Path Simulator - Ingests live alert parameters and derives minimal actionable signal perturbations to clear AML threshold.
             </p>
           </div>
@@ -416,7 +416,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-xs font-bold text-indigo-700 font-mono break-all sm:break-normal">
                 {activeAlert.id}
               </span>
-              <span className="text-xs text-slate-400">•</span>
+              <span className="text-xs text-slate-500">•</span>
               <span className="text-xs font-semibold text-slate-700">
                 {bankName}
               </span>
@@ -430,10 +430,10 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 {activeAlert.severity}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
               <span>Txn: <span className="font-mono text-slate-600 break-all">{activeAlert.transaction_id || 'N/A'}</span></span>
               <span>•</span>
-              <span>Baseline Risk: <span className="font-mono font-bold text-rose-400">{activeAlert.risk_score} / 1000</span></span>
+              <span>Baseline Risk: <span className="font-mono font-bold text-rose-600">{activeAlert.risk_score} / 1000</span></span>
               <span>•</span>
               <span className="break-all sm:break-normal">Triggers: <span className="font-mono text-cyan-700">{(activeAlert.reason_codes || []).join(', ') || 'N/A'}</span></span>
             </div>
@@ -442,7 +442,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
           <div className="flex items-center gap-2 shrink-0 flex-wrap w-full sm:w-auto pt-1 sm:pt-0">
             <Link
               to={`/alerts?alert_id=${encodeURIComponent(activeAlert.id)}`}
-              className="flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-700 border border-indigo-500/30 transition flex items-center gap-1.5"
+              className="flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-700 border border-indigo-200 transition flex items-center gap-1.5"
               title="Inspect alert in full explainability triage portal"
             >
               <span>View Full Alert</span>
@@ -468,17 +468,17 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
         <div className="lg:col-span-5 glass-card rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200 space-y-5 sm:space-y-6 shadow-xl bg-slate-50 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 border-b border-slate-200 pb-3">
             <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
-              <span className="p-1 rounded-md bg-cyan-500/10 text-cyan-400 shrink-0">🎛️</span>
+              <span className="p-1 rounded-md bg-cyan-50 text-cyan-600 shrink-0">🎛️</span>
               <span className="truncate">Adjust Transaction Signals</span>
             </h3>
-            <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 shrink-0">
+            <span className="text-[10px] sm:text-[11px] font-mono text-slate-500 shrink-0">
               Perturbation Matrix
             </span>
           </div>
 
           {/* Quick Preset Buttons */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               Quick Scenario Presets
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -527,7 +527,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>💵</span> Transaction Amount ($)
               </span>
-              <span className="font-mono text-cyan-400 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 ${amount.toLocaleString()}
               </span>
             </div>
@@ -541,7 +541,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Transaction Amount Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono gap-1">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono gap-1">
               <span>$100</span>
               <span className="text-center truncate px-1">
                 <span className="hidden sm:inline">$25,000 (Structuring Limit)</span>
@@ -557,7 +557,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>⚡</span> Hourly Velocity (txns/hr)
               </span>
-              <span className="font-mono text-cyan-400 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 {velocity} txns
               </span>
             </div>
@@ -571,7 +571,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Hourly Velocity Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono gap-1">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono gap-1">
               <span>1 txn/h</span>
               <span className="text-center truncate px-1">
                 <span className="hidden sm:inline">20 txns/h (Burst Cap)</span>
@@ -587,7 +587,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>🏢</span> Merchant Risk Category
               </span>
-              <span className="font-mono text-cyan-400 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 {(merchantRisk * 100).toFixed(0)}% Risk
               </span>
             </div>
@@ -601,7 +601,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Merchant Risk Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono gap-1">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono gap-1">
               <span className="truncate">5% <span className="hidden sm:inline">(Low Risk Groceries)</span></span>
               <span>50%</span>
               <span className="truncate text-right">99% <span className="hidden sm:inline">(Crypto / High Risk MSB)</span></span>
@@ -614,7 +614,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>🎯</span> Remediation Target Score
               </span>
-              <span className="font-mono text-purple-400 font-bold bg-purple-50 px-2 py-0.5 rounded border border-purple-500/30">
+              <span className="font-mono text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded border border-purple-500/30">
                 {targetScore} / 1000
               </span>
             </div>
@@ -628,7 +628,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-purple-400"
               aria-label="Remediation Target Score Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono gap-1">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono gap-1">
               <span>100 <span className="hidden sm:inline">(Ultra Strict)</span></span>
               <span>350 <span className="hidden sm:inline">(Standard Clearing)</span></span>
               <span>600 <span className="hidden sm:inline">(Threshold)</span></span>
@@ -660,29 +660,29 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
           {/* Gauge Status Card */}
           <div className="glass-card rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl bg-slate-50 min-w-0">
             <div className="space-y-2 text-center sm:text-left min-w-0">
-              <span className="text-xs text-slate-400 uppercase font-bold tracking-wider flex items-center justify-center sm:justify-start gap-1.5">
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider flex items-center justify-center sm:justify-start gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                 Live Evaluated Dynamic Risk Score
               </span>
               <div className="flex items-baseline justify-center sm:justify-start gap-2">
                 <span
                   className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${
-                    isSuspicious ? 'text-rose-500' : 'text-emerald-400'
+                    isSuspicious ? 'text-rose-500' : 'text-emerald-600'
                   }`}
                 >
                   {currentScore}
                 </span>
-                <span className="text-slate-400 text-sm font-semibold">/ 1000</span>
+                <span className="text-slate-500 text-sm font-semibold">/ 1000</span>
               </div>
 
               {/* Status and Baseline Delta */}
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 {isSuspicious ? (
-                  <span className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-300 font-bold">
+                  <span className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-300 font-bold">
                     <AlertTriangle className="h-3.5 w-3.5" /> High Risk (Fraud Suspected)
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/25 font-bold">
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-500/25 font-bold">
                     <ShieldCheck className="h-3.5 w-3.5" /> Cleared (Below Threshold)
                   </span>
                 )}
@@ -695,8 +695,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   <span
                     className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
                       scoreDelta > 0
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-400 border border-rose-300'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-600 border border-rose-300'
                     }`}
                   >
                     {scoreDelta > 0 ? `-${scoreDelta} pts` : `+${Math.abs(scoreDelta)} pts`} vs baseline
@@ -724,7 +724,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   stroke="currentColor"
                   strokeWidth="10"
                   className={`transition-all duration-500 ease-out ${
-                    isSuspicious ? 'text-rose-500' : 'text-emerald-400'
+                    isSuspicious ? 'text-rose-500' : 'text-emerald-600'
                   }`}
                   fill="transparent"
                   strokeDasharray={326}
@@ -736,7 +736,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 <span className="font-mono font-black text-slate-800 text-base sm:text-lg">
                   {((currentScore / 1000) * 100).toFixed(0)}%
                 </span>
-                <div className="text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                <div className="text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-500 font-bold">
                   Risk Level
                 </div>
               </div>
@@ -745,8 +745,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
           {/* Error Banner */}
           {error && (
-            <div className="bg-rose-500/10 border border-rose-300 text-rose-700 p-3.5 sm:p-4 rounded-xl text-xs flex items-center gap-3 min-w-0">
-              <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
+            <div className="bg-rose-50 border border-rose-300 text-rose-700 p-3.5 sm:p-4 rounded-xl text-xs flex items-center gap-3 min-w-0">
+              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
               <div className="min-w-0">
                 <p className="font-bold">Counterfactual Simulation Error</p>
                 <p className="text-rose-700/80 mt-0.5 break-words">{error}</p>
@@ -763,13 +763,13 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-2 min-w-0">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                   <div className="min-w-0">
                     <h3 className="font-bold text-xs sm:text-sm text-slate-800 uppercase tracking-wider truncate">
                       Remediation Action Path ({report.changes.length} Required Adjustments)
                     </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Target cleared score: <span className="font-mono font-bold text-emerald-400">{report.remediated_score}</span> (from baseline {report.original_score})
+                    <p className="text-[11px] text-slate-500">
+                      Target cleared score: <span className="font-mono font-bold text-emerald-600">{report.remediated_score}</span> (from baseline {report.original_score})
                     </p>
                   </div>
                 </div>
@@ -777,7 +777,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 <button
                   type="button"
                   onClick={handleApplySuggestedValues}
-                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 hover:text-emerald-700 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-500/25 text-emerald-700 hover:text-emerald-700 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                   title="Update sliders to suggested remediation values to clear risk score"
                 >
                   <Wand2 className="h-3.5 w-3.5" />
@@ -793,7 +793,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                     className="bg-slate-50 p-3.5 sm:p-4 rounded-xl border border-slate-200/80 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0"
                   >
                     <div className="min-w-0">
-                      <span className="font-mono text-cyan-400 font-bold uppercase text-[11px] tracking-wide">
+                      <span className="font-mono text-cyan-600 font-bold uppercase text-[11px] tracking-wide">
                         {c.feature.replace(/_/g, ' ')}
                       </span>
                       <p className="text-slate-600 mt-1 leading-relaxed">
@@ -802,15 +802,15 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                     </div>
                     <div className="text-left sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1">
                       <div>
-                        <span className="text-rose-400 font-mono line-through mr-2 font-semibold">
+                        <span className="text-rose-600 font-mono line-through mr-2 font-semibold">
                           {String(c.original_value)}
                         </span>
-                        <span className="text-emerald-400 font-mono font-black text-sm">
+                        <span className="text-emerald-600 font-mono font-black text-sm">
                           &rarr; {String(c.suggested_value)}
                         </span>
                       </div>
                       {c.delta !== undefined && (
-                        <div className="text-[10px] font-mono text-slate-400">
+                        <div className="text-[10px] font-mono text-slate-500">
                           Delta: {c.delta > 0 ? `+${c.delta}` : c.delta}
                         </div>
                       )}
@@ -821,8 +821,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
               {/* Regulatory Narrative Summary */}
               {report.summary_text && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 p-3.5 rounded-xl text-xs leading-relaxed flex items-start gap-2 min-w-0">
-                  <Sparkles className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3.5 rounded-xl text-xs leading-relaxed flex items-start gap-2 min-w-0">
+                  <Sparkles className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                   <p className="min-w-0">{report.summary_text}</p>
                 </div>
               )}

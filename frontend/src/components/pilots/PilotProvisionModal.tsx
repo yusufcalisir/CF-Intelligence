@@ -104,7 +104,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5">
-            <ShieldPlus className="w-5 h-5 text-indigo-400" />
+            <ShieldPlus className="w-5 h-5 text-indigo-600" />
             <h3 className="text-sm font-bold text-white tracking-wide">
               Provision Governed Two-Bank Controlled Pilot
             </h3>
@@ -112,20 +112,20 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <button
             onClick={onClose}
             disabled={provisionMutation.isPending}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           Provisions an authorized bilateral pilot in <code className="text-indigo-700 font-mono">DRAFT</code> state.
           Calculates the initial immutable scope digest and establishes durable reservation quotas.
         </p>
 
         {formError && (
           <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>{formError}</div>
           </div>
         )}
@@ -134,7 +134,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Pilot Identifier <span className="text-rose-400">*</span>
+                Pilot Identifier <span className="text-rose-600">*</span>
               </label>
               <input
                 type="text"
@@ -150,7 +150,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Governing Consortium ID <span className="text-rose-400">*</span>
+                Governing Consortium ID <span className="text-rose-600">*</span>
               </label>
               <input
                 type="text"
@@ -161,7 +161,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               {cleanConsortiumId && (
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
                   {isConsortiumLoading
                     ? 'Validating consortium...'
                     : consortium
@@ -175,7 +175,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Participating Institution A <span className="text-rose-400">*</span>
+                Participating Institution A <span className="text-rose-600">*</span>
               </label>
               {candidateBanks.length > 0 ? (
                 <select
@@ -205,7 +205,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Participating Institution B <span className="text-rose-400">*</span>
+                Participating Institution B <span className="text-rose-600">*</span>
               </label>
               {candidateBanks.length > 0 ? (
                 <select
@@ -313,14 +313,14 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                <Server className="w-4 h-4 text-cyan-400" />
+                <Server className="w-4 h-4 text-cyan-600" />
                 Operational Topology Endpoints
               </div>
               <span className="text-[10px] text-slate-500">Optional during initial DRAFT</span>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] text-slate-400 flex items-start gap-2">
-              <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
+              <Info className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
               <span>
                 Provide explicit operational hostnames or URLs. If endpoints are not yet configured, the pilot will remain in truthful DRAFT state and preflight will require verified endpoints before approval.
               </span>
@@ -328,7 +328,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">Coordinator URL</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">Coordinator URL</label>
                 <input
                   type="text"
                   value={coordUrl}
@@ -338,7 +338,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
                 <input
                   type="text"
                   value={bankAUrl}
@@ -348,7 +348,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
+                <label className="block text-[10px] text-slate-500 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
                 <input
                   type="text"
                   value={bankBUrl}

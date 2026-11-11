@@ -203,7 +203,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
         {/* Top App Bar Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200 bg-slate-50 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 via-indigo-500/20 to-purple-500/20 text-cyan-400 border border-cyan-500/30 shadow-inner shrink-0">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 via-indigo-500/20 to-purple-500/20 text-cyan-600 border border-cyan-500/30 shadow-inner shrink-0">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -211,10 +211,10 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                 <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 shrink-0">
                   CFI-CrossBank-01
                 </span>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-500/25 shrink-0">
                   ISO 20022 Conformance Passed
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 hidden md:inline">
+                <span className="text-[10px] font-mono text-slate-500 hidden md:inline">
                   NIST & FinCEN Benchmarked
                 </span>
               </div>
@@ -231,7 +231,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
               <button
                 type="button"
                 onClick={() => setIsDownloadOpen(!isDownloadOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-600 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
                 title="Download report formats"
               >
                 <Download className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       className="w-full text-left px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span>Full Technical (.md)</span>
-                      <span className="text-[10px] text-cyan-400 font-bold">2,107 L</span>
+                      <span className="text-[10px] text-cyan-600 font-bold">2,107 L</span>
                     </button>
                     <button
                       type="button"
@@ -261,7 +261,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       className="w-full text-left px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span>Metrics Dossier (.json)</span>
-                      <span className="text-[10px] text-indigo-400 font-bold">Raw Telemetry</span>
+                      <span className="text-[10px] text-indigo-600 font-bold">Raw Telemetry</span>
                     </button>
                     <button
                       type="button"
@@ -269,7 +269,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       className="w-full text-left px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span>Executive Summary (.txt)</span>
-                      <span className="text-[10px] text-emerald-400 font-bold">1-Page SLA</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">1-Page SLA</span>
                     </button>
                   </motion.div>
                 )}
@@ -284,7 +284,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
               title="Copy IEEE/ACM Report Citation"
             >
               {isCopied ? (
-                <Check className="h-4 w-4 text-emerald-400" />
+                <Check className="h-4 w-4 text-emerald-600" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
@@ -308,9 +308,9 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
               title={isFullscreen ? 'Exit Fullscreen' : 'Expand to Fullscreen'}
             >
               {isFullscreen ? (
-                <Minimize2 className="h-4 w-4 text-cyan-400" />
+                <Minimize2 className="h-4 w-4 text-cyan-600" />
               ) : (
-                <Maximize2 className="h-4 w-4 text-cyan-400" />
+                <Maximize2 className="h-4 w-4 text-cyan-600" />
               )}
             </button>
 
@@ -335,7 +335,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center min-w-0 ${
               activeTab === 'overview'
                 ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent'
             }`}
           >
             <Sparkles className="h-3.5 w-3.5 shrink-0" />
@@ -349,7 +349,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center min-w-0 ${
               activeTab === 'latency'
                 ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent'
             }`}
           >
             <Zap className="h-3.5 w-3.5 shrink-0" />
@@ -363,7 +363,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center min-w-0 ${
               activeTab === 'topologies'
                 ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent'
             }`}
           >
             <Layers className="h-3.5 w-3.5 shrink-0" />
@@ -377,7 +377,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center min-w-0 ${
               activeTab === 'baselines'
                 ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent'
             }`}
           >
             <Building2 className="h-3.5 w-3.5 shrink-0" />
@@ -391,7 +391,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             className={`col-span-2 sm:col-span-1 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center min-w-0 ${
               activeTab === 'raw'
                 ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent'
             }`}
           >
             <FileText className="h-3.5 w-3.5 shrink-0" />
@@ -410,48 +410,48 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <span className="p-1 rounded-md bg-cyan-400/20 text-cyan-700 text-xs font-mono font-bold">
                     CORE RESEARCH QUESTION
                   </span>
-                  <span className="text-xs text-slate-400">Section 1.0 Empirical Finding</span>
+                  <span className="text-xs text-slate-500">Section 1.0 Empirical Finding</span>
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-snug">
                   Can collaborative learning detect distributed financial crime that is completely invisible to isolated institutions?
                 </h3>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  <strong>VERDICT: EMPIRICALLY CONFIRMED.</strong> Across 20,000 multi-bank transactions, isolated banking silos achieved a mean detection rate of only <span className="font-mono text-rose-400 font-bold">80.61%</span> due to institutional information horizon blind spots. Collaborative Federated Learning achieved <span className="font-mono text-emerald-400 font-bold">100.00% detection</span> (<span className="text-cyan-400 font-bold">+19.39% mean uplift</span>). In Scenario 7 (Cold-Start Node Gamma), collaborative transfer lifted detection from <span className="font-mono text-rose-400 font-bold">0.0% to 100.0%</span> (<span className="text-emerald-400 font-bold">+100.0% zero-positive transfer uplift</span>), preventing <span className="font-mono text-emerald-700 font-bold">$639,701.40 USD</span> in simulated laundering volume.
+                  <strong>VERDICT: EMPIRICALLY CONFIRMED.</strong> Across 20,000 multi-bank transactions, isolated banking silos achieved a mean detection rate of only <span className="font-mono text-rose-600 font-bold">80.61%</span> due to institutional information horizon blind spots. Collaborative Federated Learning achieved <span className="font-mono text-emerald-600 font-bold">100.00% detection</span> (<span className="text-cyan-600 font-bold">+19.39% mean uplift</span>). In Scenario 7 (Cold-Start Node Gamma), collaborative transfer lifted detection from <span className="font-mono text-rose-600 font-bold">0.0% to 100.0%</span> (<span className="text-emerald-600 font-bold">+100.0% zero-positive transfer uplift</span>), preventing <span className="font-mono text-emerald-700 font-bold">$639,701.40 USD</span> in simulated laundering volume.
                 </p>
               </div>
 
               {/* 4 Flagship Empirical Numbers Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-xs font-mono text-slate-400 uppercase">Peak Throughput</span>
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-cyan-400">
-                    38,064 <span className="text-xs font-normal text-slate-400">tx/s</span>
+                  <span className="text-xs font-mono text-slate-500 uppercase">Peak Throughput</span>
+                  <div className="text-2xl sm:text-3xl font-black font-mono text-cyan-600">
+                    38,064 <span className="text-xs font-normal text-slate-500">tx/s</span>
                   </div>
-                  <p className="text-[11px] text-emerald-400 font-semibold">3.8× SLA Target Requirement</p>
+                  <p className="text-[11px] text-emerald-600 font-semibold">3.8× SLA Target Requirement</p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-xs font-mono text-slate-400 uppercase">Processed Volume</span>
+                  <span className="text-xs font-mono text-slate-500 uppercase">Processed Volume</span>
                   <div className="text-2xl sm:text-3xl font-black font-mono text-white">
-                    76,700 <span className="text-xs font-normal text-slate-400">txns</span>
+                    76,700 <span className="text-xs font-normal text-slate-500">txns</span>
                   </div>
-                  <p className="text-[11px] text-emerald-400 font-semibold">0 Error Drops (0.0000%)</p>
+                  <p className="text-[11px] text-emerald-600 font-semibold">0 Error Drops (0.0000%)</p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-xs font-mono text-slate-400 uppercase">Ingestion Tail Latency</span>
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-indigo-400">
-                    0.160 <span className="text-xs font-normal text-slate-400">ms</span>
+                  <span className="text-xs font-mono text-slate-500 uppercase">Ingestion Tail Latency</span>
+                  <div className="text-2xl sm:text-3xl font-black font-mono text-indigo-600">
+                    0.160 <span className="text-xs font-normal text-slate-500">ms</span>
                   </div>
-                  <p className="text-[11px] text-emerald-400 font-semibold">p99 Sub-Millisecond Speed</p>
+                  <p className="text-[11px] text-emerald-600 font-semibold">p99 Sub-Millisecond Speed</p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-xs font-mono text-slate-400 uppercase">Scenario 7 Transfer</span>
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400">
+                  <span className="text-xs font-mono text-slate-500 uppercase">Scenario 7 Transfer</span>
+                  <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-600">
                     +100.0%
                   </div>
-                  <p className="text-[11px] text-emerald-400 font-semibold">0% Silo ➔ 100% Federated</p>
+                  <p className="text-[11px] text-emerald-600 font-semibold">0% Silo ➔ 100% Federated</p>
                 </div>
               </div>
 
@@ -462,7 +462,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 border border-emerald-500/30">
                       FINANCIAL VaR IMPACT (N=20,000 CORPUS)
                     </span>
-                    <span className="text-xs text-slate-400">Section 3.11 Economic Audit</span>
+                    <span className="text-xs text-slate-500">Section 3.11 Economic Audit</span>
                   </div>
                   <h4 className="text-sm font-bold text-white">
                     $836,303.82 USD Net Illicit Volume Averted across 7 Topologies
@@ -473,29 +473,29 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                 </div>
                 <div className="flex items-center gap-4 shrink-0 font-mono self-start md:self-auto">
                   <div className="text-left md:text-right">
-                    <span className="text-[10px] text-slate-400 block uppercase">Attempted Volume</span>
+                    <span className="text-[10px] text-slate-500 block uppercase">Attempted Volume</span>
                     <span className="text-sm font-bold text-slate-700">$1,504,325.78</span>
                   </div>
                   <div className="text-left md:text-right border-l border-emerald-500/30 pl-4">
-                    <span className="text-[10px] text-emerald-400 block uppercase">Net Averted</span>
-                    <span className="text-base font-black text-emerald-400">+$836,303.82</span>
+                    <span className="text-[10px] text-emerald-600 block uppercase">Net Averted</span>
+                    <span className="text-base font-black text-emerald-600">+$836,303.82</span>
                   </div>
                 </div>
               </div>
 
               {/* Architectural Taxonomy Cards */}
               <div className="space-y-3">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
                   Multi-Paradigm Architectural Comparison
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-                        <Building2 className="h-4 w-4 text-cyan-400" />
+                        <Building2 className="h-4 w-4 text-cyan-600" />
                         Federated Learning Champion (CFI)
                       </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                         LEGAL & COMPLIANT
                       </span>
                     </div>
@@ -507,10 +507,10 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-                        <Lock className="h-4 w-4 text-rose-400" />
+                        <Lock className="h-4 w-4 text-rose-600" />
                         Centralized Upper Bound (Monolith)
                       </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-300">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-300">
                         ILLEGAL POOLING
                       </span>
                     </div>
@@ -528,10 +528,10 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             <div className="space-y-8 max-w-5xl mx-auto font-sans">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-cyan-400" />
+                  <Activity className="h-5 w-5 text-cyan-600" />
                   ISO 20022 High-Throughput Stream Ingestion (pacs.008.001.08)
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Empirical stress testing conducted with 3 concurrent banking nodes ingesting financial credit transfers into tensor pipelines with zero-PII tokenization.
                 </p>
               </div>
@@ -539,7 +539,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
               {/* Ingestion Conformance Table */}
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 shadow-xl">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-50 text-slate-400 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="p-3.5 sm:p-4">Metric Parameter</th>
                       <th className="p-3.5 sm:p-4 text-center">Empirical Measured</th>
@@ -550,33 +550,33 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <tbody className="divide-y divide-slate-800/60 text-slate-600">
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">Total Ingested Messages</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">76,700 txns</td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">&ge; 10,000 txns</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">EXCEEDED</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">76,700 txns</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">&ge; 10,000 txns</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">EXCEEDED</td>
                     </tr>
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">Peak Processing Throughput</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">38,064.52 tx/s</td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">&gt; 10,000 tx/s</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">3.8× TARGET</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">38,064.52 tx/s</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">&gt; 10,000 tx/s</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">3.8× TARGET</td>
                     </tr>
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">Dropped Messages & Errors</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">0 (0.0000%)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">&lt; 0.1000%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">ZERO DROPS</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">0 (0.0000%)</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">&lt; 0.1000%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">ZERO DROPS</td>
                     </tr>
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">Median Ingestion Latency (p50)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">0.000 ms</td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">&lt; 1.000 ms</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">SUB-MS</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">0.000 ms</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">&lt; 1.000 ms</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">SUB-MS</td>
                     </tr>
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">Tail Ingestion Latency (p99)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-indigo-400 font-bold">0.160 ms</td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">&lt; 5.000 ms</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">PASSED</td>
+                      <td className="p-3.5 sm:p-4 text-center text-indigo-600 font-bold">0.160 ms</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">&lt; 5.000 ms</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">PASSED</td>
                     </tr>
                   </tbody>
                 </table>
@@ -584,12 +584,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
 
               {/* Per-Bank Multi-Tenant Ingestion Breakdown */}
               <div className="space-y-3">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
                   Per-Bank Multi-Tenant Ingestion Breakdown
                 </h4>
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 shadow-xl">
                   <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-slate-50 text-slate-400 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="p-3.5 sm:p-4">Institution Node</th>
                         <th className="p-3.5 sm:p-4 text-center">Ingested Volume</th>
@@ -600,21 +600,21 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tbody className="divide-y divide-slate-800/60 text-slate-600">
                       <tr className="hover:bg-slate-100/30">
                         <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">bank_a (JPMorgan Node)</td>
-                        <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">25,300 txns</td>
-                        <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">12,605.46 tx/s</td>
-                        <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">0.00%</td>
+                        <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">25,300 txns</td>
+                        <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">12,605.46 tx/s</td>
+                        <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">0.00%</td>
                       </tr>
                       <tr className="hover:bg-slate-100/30">
                         <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">bank_b (HSBC Node)</td>
-                        <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">25,300 txns</td>
-                        <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">12,605.46 tx/s</td>
-                        <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">0.00%</td>
+                        <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">25,300 txns</td>
+                        <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">12,605.46 tx/s</td>
+                        <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">0.00%</td>
                       </tr>
                       <tr className="hover:bg-slate-100/30">
                         <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">bank_c (Deutsche Bank Node)</td>
-                        <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">26,100 txns</td>
-                        <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">12,853.60 tx/s</td>
-                        <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">0.00%</td>
+                        <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">26,100 txns</td>
+                        <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">12,853.60 tx/s</td>
+                        <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">0.00%</td>
                       </tr>
                     </tbody>
                   </table>
@@ -623,14 +623,14 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
 
               {/* Dual-Tier Real-Time Scoring Latency */}
               <div className="space-y-3">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
                   Dual-Tier Inference Latency Profiles
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-cyan-700">1. Fast-Path Screening</span>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600">
                         p99 = 87.3 ms
                       </span>
                     </div>
@@ -642,7 +642,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-indigo-700">2. Full 9-Signal Ensemble</span>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600">
                         p99 = 308.2 ms
                       </span>
                     </div>
@@ -660,17 +660,17 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             <div className="space-y-6 max-w-5xl mx-auto">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <Layers className="h-5 w-5 text-cyan-400" />
+                  <Layers className="h-5 w-5 text-cyan-600" />
                   7 Canonical Multi-Hop Topologies (CFI-CrossBank-01 Benchmark)
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Synthesized across JPMorgan (Bank A, 50% volume), HSBC (Bank B, 30% volume), and Deutsche Bank (Bank C, 20% volume) nodes to benchmark cross-institution collaborative detection against isolated silos under strict information horizons.
                 </p>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 shadow-xl">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-50 text-slate-400 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="p-3.5 sm:p-4">Topology Scenario & Typology</th>
                       <th className="p-3.5 sm:p-4 text-center">Nodes & Hops</th>
@@ -683,12 +683,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 1: Single-Bank Localized Fraud</div>
-                        <span className="text-[10px] text-slate-400 font-mono">LOCAL_SMURFING &bull; Internal Structuring</span>
+                        <span className="text-[10px] text-slate-500 font-mono">LOCAL_SMURFING &bull; Internal Structuring</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Bank A (2 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
                         <span className="text-slate-600 font-bold">+0.00%</span>
                         <span className="block text-[10px] text-slate-500">$56.5K Vol. Protected</span>
                       </td>
@@ -696,12 +696,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 2: Two-Bank Cross-Institutional Layering Chain</div>
-                        <span className="text-[10px] text-slate-400 font-mono">CROSS_BANK_LAYERING &bull; Rapid Relay</span>
+                        <span className="text-[10px] text-slate-500 font-mono">CROSS_BANK_LAYERING &bull; Rapid Relay</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Banks A, B (2 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
                         <span className="text-slate-600 font-bold">+0.00%</span>
                         <span className="block text-[10px] text-slate-500">$56.5K Vol. Protected</span>
                       </td>
@@ -709,12 +709,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 3: Three-Bank Cyclic Laundering Ring (A &rarr; B &rarr; C &rarr; A)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">CYCLIC_MULE_RING &bull; Multi-Hop Circular Flow</span>
+                        <span className="text-[10px] text-slate-500 font-mono">CYCLIC_MULE_RING &bull; Multi-Hop Circular Flow</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Banks A, B, C (3 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400 font-bold">64.29%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600 font-bold">64.29%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600">
                         <span className="font-bold">+35.71%</span>
                         <span className="block text-[10px] text-emerald-700 font-bold">+$196,602.42 Averted</span>
                       </td>
@@ -722,12 +722,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 4: Behavior-Shifting Multi-Bank Smurfing to Cash-Out</div>
-                        <span className="text-[10px] text-slate-400 font-mono">BEHAVIOR_SHIFTING &bull; Sub-Threshold Structuring</span>
+                        <span className="text-[10px] text-slate-500 font-mono">BEHAVIOR_SHIFTING &bull; Sub-Threshold Structuring</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Banks A, B, C (3 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
                         <span className="text-slate-600 font-bold">+0.00%</span>
                         <span className="block text-[10px] text-slate-500">$139.2K Vol. Protected</span>
                       </td>
@@ -735,12 +735,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 5: Highly Non-IID Institutional Archetypes</div>
-                        <span className="text-[10px] text-slate-400 font-mono">NON_IID_PROFILES &bull; Retail vs Commercial Skew</span>
+                        <span className="text-[10px] text-slate-500 font-mono">NON_IID_PROFILES &bull; Retail vs Commercial Skew</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Banks A, B, C (2 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
                         <span className="text-slate-600 font-bold">+0.00%</span>
                         <span className="block text-[10px] text-slate-500">$45.5K Vol. Protected</span>
                       </td>
@@ -748,12 +748,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Scenario 6: Extreme Positive Sample Rarity at Bank Gamma</div>
-                        <span className="text-[10px] text-slate-400 font-mono">SAMPLE_STARVATION &bull; 0.05% Local Prevalence</span>
+                        <span className="text-[10px] text-slate-500 font-mono">SAMPLE_STARVATION &bull; 0.05% Local Prevalence</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">Banks A, B, C (2 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00%</td>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
                         <span className="text-slate-600 font-bold">+0.00%</span>
                         <span className="block text-[10px] text-slate-500">$16.2K Vol. Protected</span>
                       </td>
@@ -761,15 +761,15 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-emerald-50 bg-emerald-50">
                       <td className="p-3.5 sm:p-4 font-bold text-emerald-700 font-sans">
                         <div className="flex items-center gap-1.5">
-                          <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
                           <span>Scenario 7: Zero Positive Historical Examples at Bank Gamma</span>
                         </div>
-                        <span className="text-[10px] text-emerald-400/80 font-mono">ZERO_SHOT_TRANSFER &bull; Complete Cold-Start</span>
+                        <span className="text-[10px] text-emerald-600/80 font-mono">ZERO_SHOT_TRANSFER &bull; Complete Cold-Start</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-emerald-700">Banks A, B, C (2 Hops)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400 font-bold">0.00% (Blind)</td>
-                      <td className="p-3.5 sm:p-4 text-center text-emerald-400 font-bold">100.00% (2/2)</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600 font-bold">0.00% (Blind)</td>
+                      <td className="p-3.5 sm:p-4 text-center text-emerald-600 font-bold">100.00% (2/2)</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600">
                         <span className="font-extrabold">+100.00% (MAX)</span>
                         <span className="block text-[10px] text-emerald-700 font-bold">+$639,701.40 Averted</span>
                       </td>
@@ -779,12 +779,12 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr>
                       <td className="p-4 font-sans">
                         <div>Consortium Aggregate (Across 20,000 Corpus Transactions)</div>
-                        <span className="text-[10px] text-slate-400 font-normal">7 Canonical Topologies &bull; Total Attempted: $1,504,325.78 USD</span>
+                        <span className="text-[10px] text-slate-500 font-normal">7 Canonical Topologies &bull; Total Attempted: $1,504,325.78 USD</span>
                       </td>
-                      <td className="p-4 text-center text-slate-400">3 Banks</td>
-                      <td className="p-4 text-center text-rose-400">80.61%</td>
-                      <td className="p-4 text-center text-cyan-400">100.00%</td>
-                      <td className="p-4 text-right text-emerald-400">
+                      <td className="p-4 text-center text-slate-500">3 Banks</td>
+                      <td className="p-4 text-center text-rose-600">80.61%</td>
+                      <td className="p-4 text-center text-cyan-600">100.00%</td>
+                      <td className="p-4 text-right text-emerald-600">
                         <div>+19.39% Uplift</div>
                         <span className="text-[10px] text-emerald-700 font-bold block">+$836,303.82 Net Averted (+55.59%)</span>
                       </td>
@@ -800,17 +800,17 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             <div className="space-y-6 max-w-5xl mx-auto">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-cyan-400" />
+                  <Building2 className="h-5 w-5 text-cyan-600" />
                   Multi-Paradigm Benchmark Baselines across Standard Financial Datasets
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Empirical evaluations across Consortium partitions, European Credit Card, PaySim, IEEE-CIS, IBM AMLSim, and Elliptic Bitcoin networks.
                 </p>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 shadow-xl">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-50 text-slate-400 border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="p-3.5 sm:p-4">Dataset & Model Configuration</th>
                       <th className="p-3.5 sm:p-4 text-center">Centralized Upper Bound</th>
@@ -823,21 +823,21 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>CFI Consortium Benchmark (N=45k Test)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">CFI-CrossBank-01 &bull; 0.129% Fraud Prev.</span>
+                        <span className="text-[10px] text-slate-500 font-mono">CFI-CrossBank-01 &bull; 0.129% Fraud Prev.</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span className="font-bold">0.8650</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.9840 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.8420</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">0.9750 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600">
                         <span>0.6940</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.8820 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">
                         <span>+0.1480 PR-AUC</span>
                         <span className="block text-[10px] text-emerald-700/80 font-normal">97.34% Fed. Efficiency</span>
                       </td>
@@ -846,21 +846,21 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Credit Card Extreme Imbalance (N=284,807)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">European Card Corpus &bull; 578:1 Imbalance</span>
+                        <span className="text-[10px] text-slate-500 font-mono">European Card Corpus &bull; 578:1 Imbalance</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span>0.7021</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.9848 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.7750</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">0.9837 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600">
                         <span>0.6522</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">Bank C: 0.6050</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">
                         <span>+0.1228 PR-AUC</span>
                         <span className="block text-[10px] text-emerald-700/80 font-normal">+0.1700 Bank C Rescue</span>
                       </td>
@@ -869,21 +869,21 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>PaySim Mobile Money (N=30,000)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">Dirichlet non-IID (&alpha;=0.50) &bull; 3 Banks</span>
+                        <span className="text-[10px] text-slate-500 font-mono">Dirichlet non-IID (&alpha;=0.50) &bull; 3 Banks</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span>0.6668</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.6677 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.1184</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">0.8700 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600">
                         <span>0.6748</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">Local Blind Transfer</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">
                         <span>100% SecAgg</span>
                         <span className="block text-[10px] text-emerald-700/80 font-normal">10 Rounds Convergence</span>
                       </td>
@@ -892,44 +892,44 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>IEEE-CIS Card Fraud (N=15,000 Partition)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">422 Tabular Features &bull; Strict Temporal</span>
+                        <span className="text-[10px] text-slate-500 font-mono">422 Tabular Features &bull; Strict Temporal</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span>0.2617</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.8401 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.0691</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">FedProx (&mu;=0.01)</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600">
                         <span>0.2411</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0.7725 ROC-AUC</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-slate-400">
-                        <span className="text-emerald-400 font-bold">Zero Feature Leak</span>
-                        <span className="block text-[10px] text-amber-400 font-normal">Full: NOT_EVALUATED</span>
+                      <td className="p-3.5 sm:p-4 text-right text-slate-500">
+                        <span className="text-emerald-600 font-bold">Zero Feature Leak</span>
+                        <span className="block text-[10px] text-amber-600 font-normal">Full: NOT_EVALUATED</span>
                       </td>
                     </tr>
 
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>IBM AMLSim Multi-Hop Stream (N=1.32M)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">1,719 Multi-Hop Alerts &bull; Cycles & Smurfing</span>
+                        <span className="text-[10px] text-slate-500 font-mono">1,719 Multi-Hop Alerts &bull; Cycles & Smurfing</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span>0.6093</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0-Hop Tabular MLP</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.6527</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">GraphSAGE 2-Layer</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">
+                      <td className="p-3.5 sm:p-4 text-center text-rose-600">
                         <span>Local Bound</span>
                         <span className="block text-[10px] text-slate-500">Cycle Blindness</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">
                         <span>+2.08% Cycle Gain</span>
                         <span className="block text-[10px] text-emerald-700/80 font-normal">+5.75% Fan-In Smurfing</span>
                       </td>
@@ -938,23 +938,23 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
                         <div>Elliptic Bitcoin Graph AML (N=203,769)</div>
-                        <span className="text-[10px] text-slate-400 font-mono">Out-of-Time Test 35-49 &bull; Relational GNN</span>
+                        <span className="text-[10px] text-slate-500 font-mono">Out-of-Time Test 35-49 &bull; Relational GNN</span>
                       </td>
                       <td className="p-3.5 sm:p-4 text-center text-slate-600">
                         <span>0.5778</span> PR-AUC
                         <span className="block text-[10px] text-slate-500">0-Hop Tabular MLP</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">
                         <span>0.3761</span> PR-AUC
                         <span className="block text-[10px] text-cyan-700/80 font-normal">GraphSAGE 2-Layer</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">
+                      <td className="p-3.5 sm:p-4 text-center text-slate-500">
                         <span>N/A</span>
                         <span className="block text-[10px] text-slate-500">Strict Temporal</span>
                       </td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-600 font-bold">
                         <span>+60.7% @ 0.1% FPR</span>
-                        <span className="block text-[10px] text-amber-400 font-normal">Fed: NOT_EVALUATED</span>
+                        <span className="block text-[10px] text-amber-600 font-normal">Fed: NOT_EVALUATED</span>
                       </td>
                     </tr>
                   </tbody>
@@ -971,7 +971,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <h3 className="text-sm font-bold text-white font-mono">
                     Full Technical Markdown Source (docs/enterprise_benchmark_report.md)
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     2,107 lines of empirical methodology, KaTeX mathematical formulations, and hardware test specs.
                   </p>
                 </div>
@@ -980,17 +980,17 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   onClick={handleDownloadMarkdown}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-700 text-xs font-semibold text-slate-700 hover:text-white transition-all self-start sm:self-auto cursor-pointer"
                 >
-                  <Download className="h-3.5 w-3.5 text-cyan-400" />
+                  <Download className="h-3.5 w-3.5 text-cyan-600" />
                   <span>Download .md File</span>
                 </button>
               </div>
 
               {/* Formatted Markdown Box */}
               <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 font-mono text-xs text-slate-600 leading-relaxed overflow-x-auto shadow-inner max-h-[60vh] space-y-4">
-                <div className="text-cyan-400 font-bold border-b border-slate-200 pb-2">
+                <div className="text-cyan-600 font-bold border-b border-slate-200 pb-2">
                   # 📊 Enterprise Payment Stream Benchmark & Latency SLA Report
                 </div>
-                <p className="text-slate-400">
+                <p className="text-slate-500">
                   This document records the empirical throughput, latency distributions, and conformance verdicts measured across the Collaborative Fraud Intelligence (CFI) streaming ingestion and dual-tier real-time inference pipelines.
                 </p>
                 <div className="p-3 rounded-lg bg-white border border-slate-200 text-indigo-700">
@@ -1004,7 +1004,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <p>- Peak Throughput: 38,064.52 tx/sec</p>
                   <p>- Ingestion Latency: p50 = 0.000 ms, p99 = 0.160 ms</p>
                 </div>
-                <div className="p-3.5 rounded-xl bg-cyan-50 border border-cyan-500/20 text-cyan-700">
+                <div className="p-3.5 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700">
                   To view or edit the complete 2,107-line scientific audit report, click "Download .md File" above or use the Download Report dropdown in the header.
                 </div>
               </div>
@@ -1013,16 +1013,16 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
         </div>
 
         {/* Footer Bar */}
-        <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 shrink-0">
+        <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-500 shrink-0">
           <div className="flex items-center gap-2 text-[11px]">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
             <span>NIST Special Publication 800-53 Rev. 5 & FinCEN Form 111 Verified</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={handleDownloadJson}
-              className="text-cyan-400 hover:text-cyan-700 underline font-semibold cursor-pointer"
+              className="text-cyan-600 hover:text-cyan-700 underline font-semibold cursor-pointer"
             >
               Export JSON Telemetry
             </button>
@@ -1030,7 +1030,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
             <button
               type="button"
               onClick={onClose}
-              className="text-slate-400 hover:text-white cursor-pointer"
+              className="text-slate-500 hover:text-white cursor-pointer"
             >
               Close Viewer
             </button>

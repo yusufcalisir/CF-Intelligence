@@ -192,7 +192,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+            <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
               <FileCheck size={20} />
             </div>
             <div>
@@ -206,7 +206,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
           </div>
           <button
             onClick={resetModal}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-50 transition-colors"
+            className="p-2 text-slate-500 hover:text-white rounded-lg hover:bg-slate-50 transition-colors"
           >
             <X size={18} />
           </button>
@@ -226,10 +226,10 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
               <div
                 key={s.id}
                 className={`flex items-center gap-1.5 text-xs font-semibold ${
-                  isActive ? 'text-indigo-400' : 'text-[var(--color-text-muted)]'
+                  isActive ? 'text-indigo-600' : 'text-[var(--color-text-muted)]'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-indigo-400' : 'text-slate-500'} />
+                <Icon size={14} className={isActive ? 'text-indigo-600' : 'text-slate-500'} />
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
             );
@@ -240,7 +240,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         <div className="flex-1 overflow-y-auto p-6">
           {enrollSuccess ? (
             <div className="p-6 text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center border border-emerald-500/30">
                 <CheckCircle2 size={32} />
               </div>
               <h4 className="text-lg font-bold text-slate-800">

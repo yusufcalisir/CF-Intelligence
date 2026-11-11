@@ -465,11 +465,11 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 281, fp: 45, fn: 99, tn: 44575, precision: '86.2%', recall: '73.9%', f1: '79.6%', specificity: '99.9%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
-      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
-      { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
-      { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
-      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
+      { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
+      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
+      { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
+      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
     ],
   },
   creditcard: {
@@ -486,11 +486,11 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 83, fp: 56, fn: 15, tn: 56808, precision: '59.7%', recall: '84.7%', f1: '70.1%', specificity: '99.9%' },
     routeDataset: 'creditcard',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8248 ± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
-      { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8219 ± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
-      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.8248 ± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
+      { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.8219 ± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
+      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
     ],
   },
   paysim: {
@@ -507,10 +507,10 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 160, fp: 12, fn: 3, tn: 127077, precision: '93.0%', recall: '98.2%', f1: '95.5%', specificity: '99.99%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg, 3 Seeds)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9545 ± 0.0119', rocauc: '0.9750', recall01: '98.16%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
-      { paradigm: 'Centralized Pooled Baseline (3 Seeds)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9545 ± 0.0073', rocauc: '0.9840', recall01: '98.16%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
-      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', prauc: 'Target (0.8420)', rocauc: 'Target (0.9750)', recall01: 'Target (62.40%)', brier: '0.0040', latency: '0.120 ms', compliance: 'Design Target Spec (Exceeded)', compliant: true },
-      { paradigm: 'Isolated Silo (Single Bank Baseline)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 3 Seeds)', badge: 'Production Champion', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.9545 ± 0.0119', rocauc: '0.9750', recall01: '98.16%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline (3 Seeds)', badge: 'Theoretical Max', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.9545 ± 0.0073', rocauc: '0.9840', recall01: '98.16%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-cyan-600 bg-cyan-50 border-cyan-200', prauc: 'Target (0.8420)', rocauc: 'Target (0.9750)', recall01: 'Target (62.40%)', brier: '0.0040', latency: '0.120 ms', compliance: 'Design Target Spec (Exceeded)', compliant: true },
+      { paradigm: 'Isolated Silo (Single Bank Baseline)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
     ],
   },
   ieee_cis: {
@@ -527,9 +527,9 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 803, fp: 114, fn: 3261, tn: 113930, precision: '87.57%', recall: '19.76%', f1: '32.25%', specificity: '99.90%' },
     routeDataset: 'ieee_cis',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
-      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
-      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-600 bg-indigo-50 border-indigo-200', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
+      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
+      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
     ],
   },
   elliptic: {
@@ -546,10 +546,10 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 550, fp: 1444, fn: 436, tn: 15486, precision: '27.57%', recall: '55.83%', f1: '36.91%', specificity: '91.47%' },
     routeDataset: 'elliptic',
     rows: [
-      { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
-      { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
-      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
-      { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
+      { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
   amlsim: {
@@ -566,9 +566,9 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 742, fp: 189, fn: 312, tn: 394757, precision: '79.7%', recall: '70.4%', f1: '74.8%', specificity: '99.95%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
-      { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
-      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
+      { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
+      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-500 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
     ],
   },
   synthaml: {
@@ -585,9 +585,9 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 248, fp: 2, fn: 2, tn: 4748, precision: '99.2%', recall: '99.2%', f1: '99.2%', specificity: '99.96%' },
     routeDataset: 'creditcard',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9924', rocauc: '0.9980', recall01: '99.20%', brier: '0.0004', latency: '0.042 ms', compliance: 'Zero Raw PII (Rescues Bank Beta)', compliant: true },
-      { paradigm: 'Centralized Pooled Baseline', badge: 'Pooled Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9341', rocauc: '0.9890', recall01: '94.50%', brier: '0.0012', latency: '0.040 ms', compliance: 'Illegal Data Pooling', compliant: false },
-      { paradigm: 'Bank Beta Silo (Starved Small Bank)', badge: 'Collapsed Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.2214', rocauc: '0.7420', recall01: '18.40%', brier: '0.0450', latency: '0.038 ms', compliance: 'Severe Sample Starvation', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Consortium Champion', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '0.9924', rocauc: '0.9980', recall01: '99.20%', brier: '0.0004', latency: '0.042 ms', compliance: 'Zero Raw PII (Rescues Bank Beta)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline', badge: 'Pooled Baseline', badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/20', prauc: '0.9341', rocauc: '0.9890', recall01: '94.50%', brier: '0.0012', latency: '0.040 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Bank Beta Silo (Starved Small Bank)', badge: 'Collapsed Silo', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: '0.2214', rocauc: '0.7420', recall01: '18.40%', brier: '0.0450', latency: '0.038 ms', compliance: 'Severe Sample Starvation', compliant: false },
     ],
   },
   amlnet: {
@@ -604,8 +604,8 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 500, fp: 0, fn: 0, tn: 24500, precision: '100.0%', recall: '100.0%', f1: '100.0%', specificity: '100.0%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Federated Structuring', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '1.0000', rocauc: '1.0000', recall01: '100.0%', brier: '0.0001', latency: '0.038 ms', compliance: 'Zero Raw PII (Smurfing Defense)', compliant: true },
-      { paradigm: 'Isolated Bank Silo (Single Institution)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.7840', rocauc: '0.8920', recall01: '64.20%', brier: '0.0120', latency: '0.035 ms', compliance: 'Blind to Multi-Bank Smurfing', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Federated Structuring', badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200', prauc: '1.0000', rocauc: '1.0000', recall01: '100.0%', brier: '0.0001', latency: '0.038 ms', compliance: 'Zero Raw PII (Smurfing Defense)', compliant: true },
+      { paradigm: 'Isolated Bank Silo (Single Institution)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-500/10 border-rose-300', prauc: '0.7840', rocauc: '0.8920', recall01: '64.20%', brier: '0.0120', latency: '0.035 ms', compliance: 'Blind to Multi-Bank Smurfing', compliant: false },
     ],
   },
 };
@@ -821,17 +821,17 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             type="button"
             onClick={() => navigate(`/${tabUrlPaths[activeTab]}`)}
             title={`Click to open https://cf-intelligence.vercel.app/${tabUrlPaths[activeTab]}`}
-            className="group px-2 sm:px-3 py-0.5 rounded-md bg-slate-50 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1 border border-slate-200 truncate cursor-pointer hover:bg-slate-50 hover:border-indigo-500/40 transition-all text-left"
+            className="group px-2 sm:px-3 py-0.5 rounded-md bg-slate-50 text-[9px] sm:text-[10px] font-mono text-slate-500 flex items-center gap-1 border border-slate-200 truncate cursor-pointer hover:bg-slate-50 hover:border-indigo-500/40 transition-all text-left"
           >
-            <span className="text-emerald-400 text-[10px] shrink-0">🔒</span>
-            <span className="text-slate-400 truncate">https://cf-intelligence.vercel.app/</span>
-            <span className="text-indigo-400 font-bold bg-indigo-500/15 px-1 py-0.5 rounded group-hover:text-indigo-700 shrink-0">
+            <span className="text-emerald-600 text-[10px] shrink-0">🔒</span>
+            <span className="text-slate-500 truncate">https://cf-intelligence.vercel.app/</span>
+            <span className="text-indigo-600 font-bold bg-indigo-50 px-1 py-0.5 rounded group-hover:text-indigo-700 shrink-0">
               {tabUrlPaths[activeTab]}
             </span>
           </button>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20" title="Client-side interactive preview simulating real-time federated convergence">
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+        <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200" title="Client-side interactive preview simulating real-time federated convergence">
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
           <span className="text-[8px] sm:text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-wider">Interactive Simulation</span>
         </div>
       </div>
@@ -848,7 +848,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeTab === btn.id
                   ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
-                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
               {btn.icon}
@@ -863,32 +863,32 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             {activeTab === 'home' && (
               <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-200">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Active FL Round</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-600 mt-0.5">#{flRound}</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-200">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Global Accuracy</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-600 mt-0.5">{accuracy}%</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-200">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Privacy Budget</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-600 mt-0.5">ε = 0.50</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-200">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Stream Speed</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-600 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-400">
+                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-500">
                   <span>* Illustrative simulation preview</span>
                   <span className="text-indigo-700 font-medium">Synthetic Convergence Ticker</span>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 min-w-0">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 bg-slate-50">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
-                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-400">
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-600">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
                     </span>
                   </div>
@@ -896,9 +896,9 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     {alerts.map((a) => (
                       <div key={`${a.id}-${alertTick}`} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 text-[8.5px] sm:text-[9px] font-mono min-w-0">
                         <span className={`w-1 h-3 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <span className="text-slate-400 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
+                        <span className="text-slate-500 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
                         <span className="text-slate-600 flex-1 truncate">${a.amount}</span>
-                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
+                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-600' : 'text-emerald-600'}`}>{a.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -906,8 +906,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-1.5 sm:p-2 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-600">3/3 Nodes Synced</span>
                   </div>
                   <HighEndConsortiumSVG />
                 </div>
@@ -916,56 +916,56 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
             {activeTab === 'gnn' && (
               <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-200 space-y-0.5">
                   <div className="text-purple-700 font-bold">GNN Subgraph Inspection</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Total Alerts</div>
-                    <div className="text-amber-400 font-bold mt-0.5">48 (12 Critical)</div>
+                    <div className="text-slate-500">Total Alerts</div>
+                    <div className="text-amber-600 font-bold mt-0.5">48 (12 Critical)</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Open Cases</div>
-                    <div className="text-indigo-400 font-bold mt-0.5">8 Active Cases</div>
+                    <div className="text-slate-500">Open Cases</div>
+                    <div className="text-indigo-600 font-bold mt-0.5">8 Active Cases</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Entities</div>
-                    <div className="text-teal-400 font-bold mt-0.5">142 Network Nodes</div>
+                    <div className="text-slate-500">Entities</div>
+                    <div className="text-teal-600 font-bold mt-0.5">142 Network Nodes</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Graph Clusters</div>
+                    <div className="text-slate-500">Graph Clusters</div>
                     <div className="text-pink-400 font-bold mt-0.5">5 High-Risk Subgraphs</div>
                   </div>
                 </div>
                 <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <div className="text-slate-400 font-semibold">Detected Circular Smurfing Path:</div>
-                  <div className="text-rose-400 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
+                  <div className="text-slate-500 font-semibold">Detected Circular Smurfing Path:</div>
+                  <div className="text-rose-600 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'privacy' && (
               <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-200 space-y-0.5">
                   <div className="text-emerald-700 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
                   <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="text-slate-400">Deep Leakage Audit (DLG)</span>
-                    <span className="text-emerald-400 font-bold">🟢 Safe (0.021)</span>
+                    <span className="text-slate-500">Deep Leakage Audit (DLG)</span>
+                    <span className="text-emerald-600 font-bold">🟢 Safe (0.021)</span>
                   </div>
                   <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="text-slate-400">Membership Inference (MIA)</span>
-                    <span className="text-emerald-400 font-bold">🟢 Safe (0.048)</span>
+                    <span className="text-slate-500">Membership Inference (MIA)</span>
+                    <span className="text-emerald-600 font-bold">🟢 Safe (0.048)</span>
                   </div>
                   <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="text-slate-400">Model Inversion Attack</span>
-                    <span className="text-emerald-400 font-bold">🟢 Safe (0.015)</span>
+                    <span className="text-slate-500">Model Inversion Attack</span>
+                    <span className="text-emerald-600 font-bold">🟢 Safe (0.015)</span>
                   </div>
                 </div>
-                <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-[8.5px] sm:text-[9px] text-slate-500 truncate">
                   Privacy Accountant: ε = 1.0, δ = 1e-5 (Opacus RDP Bounded)
                 </div>
               </motion.div>
@@ -973,26 +973,26 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
             {activeTab === 'bft' && (
               <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-200 space-y-0.5">
                   <div className="text-cyan-700 font-bold">Byzantine Resilience Monitor</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Live FL Round</div>
-                    <div className="text-cyan-400 font-bold mt-0.5">Round #5 / 10</div>
+                    <div className="text-slate-500">Live FL Round</div>
+                    <div className="text-cyan-600 font-bold mt-0.5">Round #5 / 10</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Champion Model AUC</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">0.885 ROC-AUC</div>
+                    <div className="text-slate-500">Champion Model AUC</div>
+                    <div className="text-emerald-600 font-bold mt-0.5">0.885 ROC-AUC</div>
                   </div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-200 text-emerald-600">
                     <span className="truncate">JPMorgan Node #01</span>
                     <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-200 text-emerald-600">
                     <span className="truncate">HSBC Node #02</span>
                     <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
@@ -1004,22 +1004,22 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-0.5">
                   <div className="text-amber-700 font-bold">FinCEN SAR Automated Compliance</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
                   <div className="p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200 space-y-0.5">
                     <div className="flex items-center justify-between text-slate-700 font-bold">
                       <span>CASE-2026-004</span>
-                      <span className="text-rose-400">P1 Critical</span>
+                      <span className="text-rose-600">P1 Critical</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
+                    <div className="text-slate-500 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200 space-y-0.5">
                     <div className="flex items-center justify-between text-slate-700 font-bold">
                       <span>CASE-2026-001</span>
-                      <span className="text-emerald-400">SAR Filed</span>
+                      <span className="text-emerald-600">SAR Filed</span>
                     </div>
-                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
+                    <div className="text-slate-500 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
                   </div>
                 </div>
               </motion.div>
@@ -1032,16 +1032,16 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="text-rose-700 font-bold">Interactive Chaos & Attack Simulator</span>
                     <span className="text-[8px] bg-rose-500/20 text-rose-700 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
                   </div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-rose-300">
-                    <div className="text-slate-400">Byzantine Vector</div>
-                    <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
+                    <div className="text-slate-500">Byzantine Vector</div>
+                    <div className="text-rose-600 font-bold mt-0.5">Δw × -10.0 Poison</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-emerald-500/20">
-                    <div className="text-slate-400">Defense Filter</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">Krum (Score=48.2)</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-emerald-200">
+                    <div className="text-slate-500">Defense Filter</div>
+                    <div className="text-emerald-600 font-bold mt-0.5">Krum (Score=48.2)</div>
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 flex items-center justify-between text-[8.5px] sm:text-[9px]">
@@ -1049,31 +1049,31 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     Bank Gamma: QUARANTINED BY KRUM
                   </span>
-                  <span className="font-bold text-emerald-400">Robust Filter Active</span>
+                  <span className="font-bold text-emerald-600">Robust Filter Active</span>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'ingest' && (
               <motion.div key="ingest" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-indigo-600/10 border border-indigo-500/20 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-indigo-600/10 border border-indigo-200 space-y-0.5">
                   <div className="flex items-center justify-between">
                     <span className="text-indigo-700 font-bold">Real Dataset Ingestion Studio</span>
-                    <span className="text-[8px] bg-emerald-500/20 text-emerald-700 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
+                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
                   </div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Luhn Algorithm PAN</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">100% Sanitized</div>
+                    <div className="text-slate-500">Luhn Algorithm PAN</div>
+                    <div className="text-emerald-600 font-bold mt-0.5">100% Sanitized</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
-                    <div className="text-slate-400">Data Contract Audit</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">12 / 12 Passed</div>
+                    <div className="text-slate-500">Data Contract Audit</div>
+                    <div className="text-emerald-600 font-bold mt-0.5">12 / 12 Passed</div>
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-500/30 text-indigo-700 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-between text-[8.5px] sm:text-[9px]">
                   <span>Non-IID Dirichlet Skew:</span>
                   <span className="font-bold text-indigo-700">α = 0.524 (Balanced)</span>
                 </div>
@@ -1081,7 +1081,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             )}
           </AnimatePresence>
 
-          <div className="text-[8px] sm:text-[9px] font-mono text-slate-400 text-center border-t border-slate-200 pt-1.5">
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-500 text-center border-t border-slate-200 pt-1.5">
             Click sidebar icons ({sidebarButtons.map(b => b.label).join(' · ')}) to inspect live platform modules
           </div>
         </div>
@@ -1149,14 +1149,14 @@ const ArrowRight = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 );
 const ChevronDown = () => (
-  <svg className="w-3 h-3 text-slate-400 group-hover:text-slate-600 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-600 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
 const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; className?: string }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-400'} ${className}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600' : 'text-slate-500'} ${className}`}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1174,12 +1174,12 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
     <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-white to-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
       <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 sm:pb-4 gap-2 min-w-0">
         <div className="min-w-0">
-          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest">
             {step.badge} of 08
           </span>
           <h3 className="text-base sm:text-xl font-bold text-slate-800 mt-0.5 truncate">{step.label}</h3>
         </div>
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 shrink-0">
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 shrink-0">
           Production Pipeline
         </span>
       </div>
@@ -1190,11 +1190,11 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 
       {/* Highlights Bullet List */}
       <div className="space-y-2 pt-1 min-w-0">
-        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400">Key Engineering & Privacy Highlights</div>
+        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
         <div className="space-y-1.5 font-sans text-xs text-slate-600 min-w-0">
           {step.highlights.map(hl => (
             <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 min-w-0">
-              <span className="text-indigo-400 font-bold shrink-0">✓</span>
+              <span className="text-indigo-600 font-bold shrink-0">✓</span>
               <span className="break-words">{hl}</span>
             </div>
           ))}
@@ -1204,12 +1204,12 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
       {/* Data Input/Output Specifications */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
         <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Input</div>
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
           <div className="text-indigo-700 font-semibold truncate">{step.input}</div>
         </div>
         <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Output</div>
-          <div className="text-emerald-400 font-semibold truncate">{step.output}</div>
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
+          <div className="text-emerald-600 font-semibold truncate">{step.output}</div>
         </div>
       </div>
     </div>
@@ -1225,19 +1225,19 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-200 pb-4 min-w-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+            <span className="text-[9.5px] font-mono font-bold text-indigo-600 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200">
               {mod.category}
             </span>
             <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded ${
               mod.category.includes('Core') 
-                ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
-                : 'text-purple-400 bg-purple-500/10 border border-purple-500/20'
+                ? 'text-emerald-600 bg-emerald-500/10 border border-emerald-200' 
+                : 'text-purple-600 bg-purple-50 border border-purple-200'
             }`}>
               {currentExtra?.statusBadge ?? 'VERIFIED'}
             </span>
           </div>
           <h3 className="text-base sm:text-xl font-bold text-slate-800">{mod.name}</h3>
-          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
+          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
         </div>
 
         {currentExtra && (
@@ -1254,13 +1254,13 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       {/* 4 Core Specification Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs font-mono w-full min-w-0">
         {[
-          { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-500/20 bg-indigo-50' },
-          { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-500/20 bg-cyan-50' },
+          { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-200 bg-indigo-50' },
+          { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-200 bg-cyan-50' },
           { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-500/20 bg-amber-50' },
-          { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-500/20 bg-emerald-50' },
+          { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-200 bg-emerald-50' },
         ].map(row => (
           <div key={row.label} className={`p-3 sm:p-3.5 rounded-xl border ${row.color} min-w-0`}>
-            <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
+            <div className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
             <div className="text-slate-700 text-xs break-words leading-relaxed">{row.value}</div>
           </div>
         ))}
@@ -1269,29 +1269,29 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       {/* Engineering Guarantees & Real-Time SLAs */}
       {currentExtra && (
         <div className="space-y-3 pt-2">
-          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-semibold">
             Engineering Invariants & Operational SLA
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-400 uppercase">Target Execution SLA</div>
+              <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
               <div className="text-slate-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-400 uppercase">Cryptographic Invariant</div>
+              <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
               <div className="text-indigo-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-400 uppercase">Compliance Standard</div>
+              <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
               <div className="text-emerald-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
             </div>
           </div>
 
           {/* Tensor Transformation & Contract Blueprint */}
           <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>Dataflow Transformation Blueprint</span>
-              <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
+              <span className="text-indigo-600 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
             </div>
             <div className="text-indigo-700 text-[11px] sm:text-xs break-all leading-relaxed bg-slate-100 p-2 rounded-lg border border-slate-200">
               {currentExtra.tensorSample}
@@ -1308,18 +1308,18 @@ const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: Ar
   return (
     <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-white to-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
       <div className="border-b border-slate-200 pb-3 sm:pb-4 min-w-0">
-        <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
+        <span className="text-[9.5px] font-mono text-indigo-600 uppercase tracking-wider">Service Node</span>
         <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-0.5 truncate">{node.label}</h3>
-        <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{node.description}</p>
+        <p className="text-xs text-slate-500 leading-relaxed mt-1.5 font-sans">{node.description}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
         {[
-          { label: 'Responsibilities', items: node.responsibilities, dot: 'text-indigo-400' },
-          { label: 'Protocols',        items: node.protocols,       dot: 'text-purple-400' },
-          { label: 'Technology',       items: node.tech,            dot: 'text-cyan-400' },
+          { label: 'Responsibilities', items: node.responsibilities, dot: 'text-indigo-600' },
+          { label: 'Protocols',        items: node.protocols,       dot: 'text-purple-600' },
+          { label: 'Technology',       items: node.tech,            dot: 'text-cyan-600' },
         ].map(col => (
           <div key={col.label} className="min-w-0">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1.5">{col.label}</div>
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
             <ul className="space-y-1">
               {col.items.map(it => (
                 <li key={it} className="text-slate-600 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
@@ -1429,7 +1429,7 @@ export default function LandingPage() {
             </div>
 
             {/* Desktop Navigation with Contextual Dropdowns */}
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-500">
               <a
                 href="#hero"
                 onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
@@ -1455,7 +1455,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Core Platform Suite
                   </div>
                   {[
@@ -1472,9 +1472,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-600 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1500,7 +1500,7 @@ export default function LandingPage() {
                     openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Security & Topology
                   </div>
                   {[
@@ -1516,9 +1516,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-600 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1544,7 +1544,7 @@ export default function LandingPage() {
                     openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Empirical Proof Suite
                   </div>
                   {[
@@ -1560,9 +1560,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-600 text-xs">→</span>
                     </button>
                   ))}
                 </div>
@@ -1588,7 +1588,7 @@ export default function LandingPage() {
                     openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Integration & Contracts
                   </div>
                   {[
@@ -1604,9 +1604,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-500 group-hover/item:text-indigo-600 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1656,7 +1656,7 @@ export default function LandingPage() {
                   <BrandLogo className="w-8 h-8 shrink-0" />
                   <div>
                     <div className="font-bold text-sm text-white tracking-tight">CF-Intelligence</div>
-                    <div className="text-[10px] font-mono text-slate-400">Consortium Fraud Network</div>
+                    <div className="text-[10px] font-mono text-slate-500">Consortium Fraud Network</div>
                   </div>
                 </div>
                 <button
@@ -1690,14 +1690,14 @@ export default function LandingPage() {
                     className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-slate-200 hover:border-indigo-500/40 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <span className="text-xs font-mono font-bold text-indigo-400 group-hover:text-indigo-700 shrink-0">
+                      <span className="text-xs font-mono font-bold text-indigo-600 group-hover:text-indigo-700 shrink-0">
                         {item.num}
                       </span>
                       <span className="text-base font-semibold text-slate-700 group-hover:text-white truncate">
                         {item.label}
                       </span>
                     </div>
-                    <span className="text-slate-400 group-hover:text-indigo-400 transition-colors shrink-0">
+                    <span className="text-slate-500 group-hover:text-indigo-600 transition-colors shrink-0">
                       <ArrowRight />
                     </span>
                   </motion.button>
@@ -1717,9 +1717,9 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1 pt-1">
                   <span>CF-Intelligence Network</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <span className="text-emerald-600 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     v2.4.0 Live
                   </span>
@@ -1738,20 +1738,20 @@ export default function LandingPage() {
             {/* Left Hero Content */}
             <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6}} className="lg:col-span-7 space-y-6 sm:space-y-8 min-w-0">
               <div className="space-y-3 sm:space-y-4 min-w-0">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] sm:text-xs font-mono max-w-full truncate">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] sm:text-xs font-mono max-w-full truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
                   <span className="truncate">Privacy-Preserving Federated Infrastructure</span>
                 </div>
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] break-words">
-                  <span className="bg-gradient-to-r from-slate-100 via-indigo-200 to-slate-300 bg-clip-text text-transparent">
+                  <span className="text-slate-900">
                     Collaborative Cross-Bank
                   </span>
                   <br />
-                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent">
                     Fraud Detection Platform
                   </span>
                 </h1>
-                <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
                   CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies to detect multi-bank money laundering networks without raw customer data exposure.
                 </p>
               </div>
@@ -1759,19 +1759,19 @@ export default function LandingPage() {
               {/* High impact feature highlights */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">+55.59%</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600">+55.59%</div>
+                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε ≤ 1.0</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-indigo-600">ε ≤ 1.0</div>
+                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.70 ms</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-cyan-600">2.70 ms</div>
+                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
+                  <div className="text-[9px] font-mono text-slate-500 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
                 </div>
               </div>
 
@@ -1807,14 +1807,14 @@ export default function LandingPage() {
         <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Problem Statement
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                 The Cross-Bank Blindspot in Money Laundering
               </h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation-missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
               </p>
             </div>
@@ -1842,14 +1842,14 @@ export default function LandingPage() {
               ].map((card) => (
                 <div
                   key={card.label}
-                  className="p-5 sm:p-7 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-3 min-w-0"
+                  className="p-5 sm:p-7 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-200 transition-all space-y-3 min-w-0"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-400">{card.stat}</span>
-                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{card.tag}</span>
+                    <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-600">{card.stat}</span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{card.tag}</span>
                   </div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-700">{card.label}</h3>
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans">{card.desc}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-sans">{card.desc}</p>
                 </div>
               ))}
             </div>
@@ -1862,12 +1862,12 @@ export default function LandingPage() {
         <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Execution Pipeline
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">8-Stage Federated Training Architecture</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any pipeline stage below to view the architectural overview, data input/output specifications, and cryptographic guarantees.
               </p>
             </div>
@@ -1884,12 +1884,12 @@ export default function LandingPage() {
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                           isActive
                             ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
+                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
-                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-400'
+                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500'
                           }`}>
                             {step.id}
                           </span>
@@ -1899,7 +1899,7 @@ export default function LandingPage() {
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isActive} />
                           </span>
-                          <span className="hidden lg:inline text-xs font-mono text-slate-400 group-hover:text-slate-700">
+                          <span className="hidden lg:inline text-xs font-mono text-slate-500 group-hover:text-slate-700">
                             {isActive ? '→' : ''}
                           </span>
                         </div>
@@ -1941,12 +1941,12 @@ export default function LandingPage() {
           <FadeSection>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 min-w-0">
               <div className="max-w-3xl min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
                   Engine Specifications & Architecture
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Platform Engineering Capabilities</h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   Inspect platform component specifications, mathematical algorithms, tensor input/output contracts, and real-time execution invariants.
                 </p>
               </div>
@@ -1980,7 +1980,7 @@ export default function LandingPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
                       moduleFilter === tab.id
                         ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
-                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {tab.label}
@@ -2010,7 +2010,7 @@ export default function LandingPage() {
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
                           isSelected
                             ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
-                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
+                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
@@ -2018,14 +2018,14 @@ export default function LandingPage() {
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
                             <span className="truncate">{mod.name}</span>
                           </div>
-                          <div className="text-[9.5px] font-mono text-slate-400 truncate mt-0.5 ml-3.5">{mod.category}</div>
+                          <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isSelected} />
                           </span>
                           <span className="hidden lg:inline">
-                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-600 translate-x-0.5' : 'text-slate-500 group-hover:text-slate-600'}`} />
                           </span>
                         </div>
                       </button>
@@ -2066,12 +2066,12 @@ export default function LandingPage() {
         <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Architecture
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Simulated Consortium Node Inspector</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Inspect simulated node hardware configurations, PyTorch execution runtimes, and synthetic ISO 20022 message streams across reference bank profiles.
               </p>
             </div>
@@ -2086,14 +2086,14 @@ export default function LandingPage() {
                   className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/40 hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0 active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
-                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400">{bank.latency}</span>
+                    <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-200">READY</span>
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-500">{bank.latency}</span>
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-slate-700 truncate">{bank.name}</h3>
-                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 mt-0.5 truncate">{bank.ticker}</div>
+                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 mt-0.5 truncate">{bank.ticker}</div>
                   </div>
-                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-400 border-t border-slate-200 pt-2 leading-snug break-words">
+                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-500 border-t border-slate-200 pt-2 leading-snug break-words">
                     {bank.hardware}
                   </div>
                 </motion.div>
@@ -2108,12 +2108,12 @@ export default function LandingPage() {
         <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Service Mesh Design
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">System Service Topology</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any service layer node to inspect internal responsibilities, communication protocols, and technology stack.
               </p>
             </div>
@@ -2129,12 +2129,12 @@ export default function LandingPage() {
                       className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                         isSelected
                           ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                          : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold mb-0.5 truncate">{node.label}</div>
-                        <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                        <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                       </div>
                       <AccordionChevron isOpen={isSelected} />
                     </button>
@@ -2167,11 +2167,11 @@ export default function LandingPage() {
                     className={`p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeArchNode?.id === node.id
                         ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                        : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
-                    <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                    <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                   </button>
                 ))}
               </div>
@@ -2189,7 +2189,7 @@ export default function LandingPage() {
         <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Cryptographic Boundaries
               </div>
@@ -2204,7 +2204,7 @@ export default function LandingPage() {
                   className={`px-4 sm:px-5 py-1.5 sm:py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer shrink-0 ${
                     activePrivacyTab === tab.id
                       ? 'bg-indigo-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.5)]'
-                      : 'text-slate-400 hover:text-slate-700'
+                      : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {tab.label}
@@ -2217,13 +2217,13 @@ export default function LandingPage() {
                 {activePrivacyTab === 'flow' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
                     {[
-                      {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'← Strict non-export policy',noteColor:'text-rose-400'},
-                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=1.0, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
-                      {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-400'},
+                      {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'← Strict non-export policy',noteColor:'text-rose-600'},
+                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=1.0, δ=1e-5)-DP guarantee',noteColor:'text-emerald-600'},
+                      {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-600'},
                     ].map(col => (
                       <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 sm:space-y-4 min-w-0">
                         <div className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider truncate">{col.title}</div>
-                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-400 min-w-0">
+                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-500 min-w-0">
                           {col.items.map(item => (
                             <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 break-words">{item}</div>
                           ))}
@@ -2248,10 +2248,10 @@ export default function LandingPage() {
                     ].map(row => (
                       <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 w-full min-w-0">
                         <div className="w-full sm:w-48 shrink-0">
-                          <div className="text-xs font-bold text-rose-400 break-words">{row.threat}</div>
-                          <div className="text-[9.5px] font-mono text-emerald-400 mt-0.5">Mitigated</div>
+                          <div className="text-xs font-bold text-rose-600 break-words">{row.threat}</div>
+                          <div className="text-[9.5px] font-mono text-emerald-600 mt-0.5">Mitigated</div>
                         </div>
-                        <div className="text-xs text-slate-400 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
+                        <div className="text-xs text-slate-500 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
                       </div>
                     ))}
                   </div>
@@ -2271,9 +2271,9 @@ export default function LandingPage() {
                       <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-mono font-bold text-slate-700 truncate">{row.standard}</span>
-                          <span className="text-[9.5px] font-mono font-bold text-emerald-400 shrink-0">{row.status}</span>
+                          <span className="text-[9.5px] font-mono font-bold text-emerald-600 shrink-0">{row.status}</span>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed font-sans">{row.detail}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed font-sans">{row.detail}</p>
                       </div>
                     ))}
                   </div>
@@ -2291,14 +2291,14 @@ export default function LandingPage() {
             {/* Header & Quick Action Buttons */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12">
               <div className="max-w-3xl min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   Empirical Proof-of-Value &amp; 2026 Production Validation
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                   Beyond Synthetic Data: In-the-Wild Financial Benchmarks
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   While marketing claims often cite synthetic lab AUC targets (0.950+), production banking faces extreme 0.01%–0.1% class imbalance, 
                   concept drift, and severe alert fatigue. We evaluate collaborative federated learning against canonical open benchmark standards across 150k+ transactions.
                 </p>
@@ -2312,7 +2312,7 @@ export default function LandingPage() {
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   <span>Technical Report Dossier</span>
-                  <span className="text-[10px] font-mono text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded-full bg-cyan-500/10">.md</span>
+                  <span className="text-[10px] font-mono text-cyan-600 border border-cyan-200 px-1.5 py-0.5 rounded-full bg-cyan-50">.md</span>
                 </button>
                 <button
                   type="button"
@@ -2340,11 +2340,11 @@ export default function LandingPage() {
                     className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
                       isActive
                         ? 'bg-gradient-to-b from-white to-white border-indigo-500/60 shadow-[0_0_20px_rgba(99,102,241,0.25)]'
-                        : 'bg-white border-slate-200 hover:border-slate-200 hover:bg-white text-slate-400'
+                        : 'bg-white border-slate-200 hover:border-slate-200 hover:bg-white text-slate-500'
                     }`}
                   >
                     <div className="flex items-center justify-between text-[8.5px] font-mono mb-1">
-                      <span className={isActive ? 'text-indigo-400 font-bold' : 'text-slate-400'}>
+                      <span className={isActive ? 'text-indigo-600 font-bold' : 'text-slate-500'}>
                         {ds.datasetTag.split(' ')[0]}
                       </span>
                       {isActive && (
@@ -2354,7 +2354,7 @@ export default function LandingPage() {
                     <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-700'}`}>
                       {ds.name.split('(')[0]?.trim()}
                     </div>
-                    <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">
+                    <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">
                       {ds.scope.split('·')[0]?.trim()}
                     </div>
                   </button>
@@ -2370,50 +2370,50 @@ export default function LandingPage() {
                 <div className="space-y-6">
                   {/* Top 4 Key Impact Metric Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-500/20 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-emerald-600 uppercase tracking-wider">
                         Collaborative Gain (Δcollab)
                       </div>
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.uplift}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Against isolated institutional silos
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-white border border-cyan-500/20 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-white border border-cyan-200 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-cyan-600 uppercase tracking-wider">
                         False Alarm Reduction
                       </div>
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.fpReduction}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Eliminates compliance triage burnout
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-500/20 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-200 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-indigo-600 uppercase tracking-wider">
                         Sub-ms Inference Latency
                       </div>
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.latency}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         SLA &lt; 15ms payment rail authorization
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-white border border-purple-500/20 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-purple-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-white border border-purple-200 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-purple-600 uppercase tracking-wider">
                         Net Economic Advantage
                       </div>
                       <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.roi}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-500 mt-1 font-mono">
                         Chargeback recovery &amp; operational savings
                       </div>
                     </div>
@@ -2425,7 +2425,7 @@ export default function LandingPage() {
                       <div>
                         <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                           <span>{activeDs.name}</span>
-                          <span className="text-xs font-mono font-normal text-indigo-400 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                          <span className="text-xs font-mono font-normal text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200">
                             {activeDs.scope}
                           </span>
                         </h3>
@@ -2433,7 +2433,7 @@ export default function LandingPage() {
                           {activeDs.description}
                         </p>
                       </div>
-                      <div className="text-xs font-mono text-slate-400 shrink-0">
+                      <div className="text-xs font-mono text-slate-500 shrink-0">
                         Prevalence: <strong className="text-slate-700">{activeDs.prevalence}</strong>
                       </div>
                     </div>
@@ -2441,7 +2441,7 @@ export default function LandingPage() {
                     <div className="overflow-x-auto -mx-2 sm:mx-0">
                       <table className="w-full text-left text-xs font-mono">
                         <thead>
-                          <tr className="border-b border-slate-200 text-[11px] text-slate-400">
+                          <tr className="border-b border-slate-200 text-[11px] text-slate-500">
                             <th className="py-2.5 px-3">Evaluation Paradigm</th>
                             <th className="py-2.5 px-3">PR-AUC</th>
                             <th className="py-2.5 px-3">ROC-AUC</th>
@@ -2489,8 +2489,8 @@ export default function LandingPage() {
                               <td className="py-3 px-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans ${
                                   r.compliant
-                                    ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-semibold'
-                                    : 'bg-slate-100 text-slate-400'
+                                    ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200 font-semibold'
+                                    : 'bg-slate-100 text-slate-500'
                                 }`}>
                                   {r.compliance}
                                 </span>
@@ -2504,54 +2504,54 @@ export default function LandingPage() {
                     {/* Confusion Matrix & Calibration Summary Box */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-slate-200">
                       <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 font-mono text-xs">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
+                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
                           <span>Empirical Confusion Matrix @ τ=0.50 Threshold</span>
-                          <span className="text-emerald-400 font-normal">Holistic Holdout</span>
+                          <span className="text-emerald-600 font-normal">Holistic Holdout</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-500/20">
-                            <div className="text-[10px] text-emerald-400">True Positives (TP)</div>
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                            <div className="text-[10px] text-emerald-600">True Positives (TP)</div>
                             <div className="text-base font-bold text-white mt-0.5">{activeDs.cm.tp}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Caught Frauds</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Caught Frauds</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300">
-                            <div className="text-[10px] text-rose-400">False Positives (FP)</div>
+                            <div className="text-[10px] text-rose-600">False Positives (FP)</div>
                             <div className="text-base font-bold text-slate-700 mt-0.5">{activeDs.cm.fp}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Benign Alarms</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Benign Alarms</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-500/20">
-                            <div className="text-[10px] text-amber-400">False Negatives (FN)</div>
+                            <div className="text-[10px] text-amber-600">False Negatives (FN)</div>
                             <div className="text-base font-bold text-slate-700 mt-0.5">{activeDs.cm.fn}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Escaped Frauds</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Escaped Frauds</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                            <div className="text-[10px] text-slate-400">True Negatives (TN)</div>
+                            <div className="text-[10px] text-slate-500">True Negatives (TN)</div>
                             <div className="text-base font-bold text-slate-600 mt-0.5">{activeDs.cm.tn}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Valid Clearances</div>
+                            <div className="text-[9px] text-slate-500 mt-0.5">Valid Clearances</div>
                           </div>
                         </div>
                       </div>
 
                       <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 font-bold">
+                          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2 font-bold">
                             Operational Calibration Quality
                           </div>
                           <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-400">Precision</div>
+                              <div className="text-[9px] text-slate-500">Precision</div>
                               <div className="font-bold text-white mt-0.5">{activeDs.cm.precision}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-400">Recall</div>
+                              <div className="text-[9px] text-slate-500">Recall</div>
                               <div className="font-bold text-emerald-700 mt-0.5">{activeDs.cm.recall}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-400">F1 Score</div>
+                              <div className="text-[9px] text-slate-500">F1 Score</div>
                               <div className="font-bold text-cyan-700 mt-0.5">{activeDs.cm.f1}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-400">Specificity</div>
+                              <div className="text-[9px] text-slate-500">Specificity</div>
                               <div className="font-bold text-slate-700 mt-0.5">{activeDs.cm.specificity}</div>
                             </div>
                           </div>
@@ -2561,7 +2561,7 @@ export default function LandingPage() {
                           <button
                             type="button"
                             onClick={() => setIsReportOpen(true)}
-                            className="text-cyan-400 hover:text-cyan-700 flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             <span>Inspect 2,107-Line LaTeX Methodology</span>
                             <span>→</span>
@@ -2569,7 +2569,7 @@ export default function LandingPage() {
                           <button
                             type="button"
                             onClick={() => navigate('/benchmarks?dataset=' + activeDs.routeDataset)}
-                            className="text-indigo-400 hover:text-indigo-700 flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             <span>Open Dedicated Hub</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -2583,9 +2583,9 @@ export default function LandingPage() {
             })()}
 
             {/* Design Partner Pilot Onboarding Callout Banner */}
-            <div className="mt-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 border border-indigo-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-2xl">
+            <div className="mt-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 border border-indigo-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-2xl">
               <div className="space-y-2 max-w-2xl">
-                <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold text-indigo-700 bg-indigo-500/10 border border-indigo-500/20">
+                <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200">
                   DESIGN PARTNER PILOT PROGRAM (2026)
                 </span>
                 <h3 className="text-xl sm:text-2xl font-bold text-white">
@@ -2625,14 +2625,14 @@ export default function LandingPage() {
           <FadeSection>
             {/* Part 1: Target Customer Segments */}
             <div className="max-w-3xl mb-8 sm:mb-12 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-400" />
                 Tailored Institutional Solutions
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                 Designed for Banking Tiers & Compliance Mandates
               </h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Different financial institutions face radically different regulatory overheads and technical constraints. 
                 CF-Intelligence delivers tailored in-perimeter architectures for each institutional tier.
               </p>
@@ -2647,8 +2647,8 @@ export default function LandingPage() {
                   compliance: 'ISO 20022 · MASAK / FinCEN · PCI-DSS',
                   solution: 'Gain Tier-1 detection power via collaborative FL without exposing customer ledgers or trade secrets.',
                   roi: '+19.2% Fraud Recall without raw PII',
-                  borderColor: 'border-indigo-500/30',
-                  badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+                  borderColor: 'border-indigo-200',
+                  badgeColor: 'text-indigo-600 bg-indigo-50 border-indigo-200',
                 },
                 {
                   segment: 'FinTechs & Payment Gateways',
@@ -2658,7 +2658,7 @@ export default function LandingPage() {
                   solution: 'Sub-15ms fast-path scoring (<65ms stream) with on-demand SHAP explanations, cutting false alarms by 65%.',
                   roi: 'Recovers 60%+ checkout conversions',
                   borderColor: 'border-purple-500/30',
-                  badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+                  badgeColor: 'text-purple-600 bg-purple-50 border-purple-200',
                 },
                 {
                   segment: 'Banking Consortia & Switches',
@@ -2668,7 +2668,7 @@ export default function LandingPage() {
                   solution: 'FedGNN multi-hop graph embeddings aggregated inside hardware TEE with zero raw PII sharing.',
                   roi: 'Uncovers cross-bank mule networks',
                   borderColor: 'border-emerald-500/30',
-                  badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                  badgeColor: 'text-emerald-600 bg-emerald-500/10 border-emerald-200',
                 },
               ].map((card) => (
                 <div
@@ -2682,20 +2682,20 @@ export default function LandingPage() {
                     <h3 className="text-lg font-bold text-slate-800">{card.segment}</h3>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Core Pain Point:</span>
+                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Core Pain Point:</span>
                         <p className="text-slate-600 font-sans leading-relaxed">{card.pain}</p>
                       </div>
                       <div>
-                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Compliance Profile:</span>
+                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Compliance Profile:</span>
                         <p className="text-indigo-700 font-mono text-[11px]">{card.compliance}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-200 space-y-2">
-                    <span className="text-slate-400 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
+                    <span className="text-slate-500 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
                     <p className="text-slate-600 text-xs leading-relaxed">{card.solution}</p>
-                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono font-bold text-emerald-400 text-center">
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono font-bold text-emerald-600 text-center">
                       {card.roi}
                     </div>
                   </div>
@@ -2713,14 +2713,14 @@ export default function LandingPage() {
             <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 space-y-6 shadow-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
                 <div>
-                  <div className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
+                  <div className="text-[10px] font-mono font-semibold text-indigo-600 uppercase tracking-widest">
                     Standardized Institutional Contracts
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold text-slate-800 mt-0.5">
                     Institutional Legal Framework & Agreement Suite
                   </h3>
                 </div>
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-50 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
+                <span className="text-xs font-mono text-emerald-600 bg-emerald-50 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
                   Standard B2B Legal Pack (2026)
                 </span>
               </div>
@@ -2760,11 +2760,11 @@ export default function LandingPage() {
                 ].map((item) => (
                   <div key={item.title} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
-                      <span className="text-[9.5px] font-mono text-indigo-400 uppercase">{item.standard}</span>
+                      <span className="text-[9.5px] font-mono text-indigo-600 uppercase">{item.standard}</span>
                       <h4 className="text-xs font-bold text-slate-800">{item.title}</h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{item.desc}</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-sans">{item.desc}</p>
                     </div>
-                    <div className="text-[9px] font-mono text-slate-400 truncate pt-2 border-t border-slate-200">
+                    <div className="text-[9px] font-mono text-slate-500 truncate pt-2 border-t border-slate-200">
                       Ref: {item.ref}
                     </div>
                   </div>
@@ -2781,9 +2781,9 @@ export default function LandingPage() {
           <div id="docs" className="w-full min-w-0">
             <FadeSection>
               <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Enterprise REST API & SDK Specs</h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.1 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-4">
@@ -2801,7 +2801,7 @@ export default function LandingPage() {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-700 font-mono text-xs font-semibold transition-all"
                   >
                     <span>📖 Open Scalar Reference</span>
-                    <span className="text-slate-400">↗</span>
+                    <span className="text-slate-500">↗</span>
                   </a>
                 </div>
               </div>
@@ -2809,17 +2809,17 @@ export default function LandingPage() {
 
               {/* Integration Features Banner */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8 w-full min-w-0">
-                <div className="p-4 sm:p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 min-w-0">
-                  <div className="text-xs font-mono font-bold text-indigo-400 uppercase mb-1">mTLS & API Keys</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
+                <div className="p-4 sm:p-5 rounded-2xl bg-indigo-600/10 border border-indigo-200 min-w-0">
+                  <div className="text-xs font-mono font-bold text-indigo-600 uppercase mb-1">mTLS & API Keys</div>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
                 </div>
-                <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20 min-w-0">
-                  <div className="text-xs font-mono font-bold text-purple-400 uppercase mb-1">WebSocket Telemetry</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
+                <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-200 min-w-0">
+                  <div className="text-xs font-mono font-bold text-purple-600 uppercase mb-1">WebSocket Telemetry</div>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
                 </div>
-                <div className="p-4 sm:p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 min-w-0">
-                  <div className="text-xs font-mono font-bold text-cyan-400 uppercase mb-1">SDK & WebHooks</div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
+                <div className="p-4 sm:p-5 rounded-2xl bg-cyan-600/10 border border-cyan-200 min-w-0">
+                  <div className="text-xs font-mono font-bold text-cyan-600 uppercase mb-1">SDK & WebHooks</div>
+                  <p className="text-xs text-slate-500 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
                 </div>
               </div>
 
@@ -2830,7 +2830,7 @@ export default function LandingPage() {
                     key={tab.id}
                     onClick={() => setActiveApiTab(tab.id as 'curl'|'python'|'ts')}
                     className={`px-3.5 sm:px-4 py-1.5 text-xs font-mono rounded-lg transition-all cursor-pointer shrink-0 ${
-                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'text-slate-400 hover:text-slate-700'
+                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
                     {tab.label}
@@ -2903,7 +2903,7 @@ telemetry.on('round.stage', (evt) => {
               <div className="rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden backdrop-blur-xl w-full min-w-0">
                 <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-mono text-slate-600 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
-                  <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.1 Spec</span>
+                  <span className="text-[9.5px] font-mono text-indigo-600">OpenAPI 3.1 Spec</span>
                 </div>
                 <div className="divide-y divide-white/5 font-mono text-xs min-w-0">
                   {[
@@ -2930,20 +2930,20 @@ telemetry.on('round.stage', (evt) => {
                       <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold shrink-0 ${
-                            row.method === 'GET'  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
-                            row.method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                                    'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                            row.method === 'GET'  ? 'bg-sky-500/10 text-sky-600 border border-sky-500/20' :
+                            row.method === 'POST' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-200' :
+                                                    'bg-purple-50 text-purple-600 border border-purple-200'
                           }`}>
                             {row.method}
                           </span>
                           <span className="text-indigo-700 font-bold text-xs sm:text-sm break-all">{row.path}</span>
                         </div>
-                        <span className="text-[9.5px] text-slate-400 font-mono shrink-0">v1 endpoint</span>
+                        <span className="text-[9.5px] text-slate-500 font-mono shrink-0">v1 endpoint</span>
                       </div>
-                      <p className="text-xs text-slate-400 font-sans leading-relaxed break-words">{row.desc}</p>
-                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-400 pt-1.5 border-t border-slate-200 min-w-0">
-                        <div className="truncate"><span className="text-slate-400">Payload Request:</span> <span className="text-slate-600">{row.req}</span></div>
-                        <div className="truncate"><span className="text-slate-400">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
+                      <p className="text-xs text-slate-500 font-sans leading-relaxed break-words">{row.desc}</p>
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-500 pt-1.5 border-t border-slate-200 min-w-0">
+                        <div className="truncate"><span className="text-slate-500">Payload Request:</span> <span className="text-slate-600">{row.req}</span></div>
+                        <div className="truncate"><span className="text-slate-500">Response Data:</span> <span className="text-emerald-600">{row.res}</span></div>
                       </div>
                     </div>
                   ))}
@@ -2959,32 +2959,32 @@ telemetry.on('round.stage', (evt) => {
         <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Onboarding & Deployment
               </div>
               <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Enterprise Setup & Integration Services</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-500 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 The live platform demo showcases an active 3-bank federated learning environment with SGX TEE hardware aggregation. For custom banking institution deployment, node hardware configuration, and core ledger integration, contact our engineering team.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start w-full min-w-0">
               {/* Left Contact Card */}
-              <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-indigo-50 via-purple-50 to-white border border-indigo-500/30 backdrop-blur-2xl space-y-5 shadow-[0_0_50px_rgba(99,102,241,0.15)] min-w-0">
+              <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-indigo-50 via-purple-50 to-white border border-indigo-200 backdrop-blur-2xl space-y-5 shadow-[0_0_50px_rgba(99,102,241,0.15)] min-w-0">
                 <div className="space-y-2 min-w-0">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-200">
                     DIRECT ENGINEERING CONTACT
                   </span>
                   <h3 className="text-lg sm:text-xl font-bold text-slate-800">Institutional Integration Lead</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                  <p className="text-xs text-slate-500 leading-relaxed font-sans">
                     Reach out directly for custom ISO 20022 connector setup, local HSM key configuration, and production node deployment assistance.
                   </p>
                 </div>
 
                 {/* Email Address Display Box */}
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-2.5 font-mono min-w-0">
-                  <div className="text-[9px] text-slate-400 uppercase tracking-wider">Official Inquiries & Support</div>
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">Official Inquiries & Support</div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <span className="text-indigo-700 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
@@ -3005,7 +3005,7 @@ telemetry.on('round.stage', (evt) => {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </a>
 
-                <div className="text-[10px] font-mono text-slate-400 text-center">
+                <div className="text-[10px] font-mono text-slate-500 text-center">
                   Guaranteed response within 24 hours for banking inquiries & architecture reviews.
                 </div>
               </div>
@@ -3032,19 +3032,19 @@ telemetry.on('round.stage', (evt) => {
                     badge: 'Onboarding & Deployment'
                   },
                 ].map(s => (
-                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-2 min-w-0">
+                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-200 transition-all space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                        <span className="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-200 text-indigo-600 text-xs font-mono font-bold flex items-center justify-center shrink-0">
                           {s.step}
                         </span>
                         <h4 className="text-xs sm:text-sm font-bold text-slate-700 truncate">{s.title}</h4>
                       </div>
-                      <span className="text-[9px] font-mono font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md shrink-0">
+                      <span className="text-[9px] font-mono font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md shrink-0">
                         {s.badge}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
                   </div>
                 ))}
               </div>
@@ -3060,7 +3060,7 @@ telemetry.on('round.stage', (evt) => {
                 <BrandLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-bold text-slate-700 truncate">Federated Intelligence Network</div>
-                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-400 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
+                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-500 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
                 </div>
               </div>
 
@@ -3073,11 +3073,11 @@ telemetry.on('round.stage', (evt) => {
               </button>
             </div>
 
-            <div className="pt-3 border-t border-slate-200 text-[10.5px] sm:text-xs font-mono text-slate-400 break-words text-center">
+            <div className="pt-3 border-t border-slate-200 text-[10.5px] sm:text-xs font-mono text-slate-500 break-words text-center">
               PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
-            <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 text-center">
+            <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 text-center">
               © 2026 Yusuf Çalışır · Collaborative Fraud Intelligence Platform
             </div>
           </div>
@@ -3156,13 +3156,13 @@ function BankDetailsDrawerModal({
       >
         <div className="flex items-start justify-between border-b border-slate-200 pb-4 sm:pb-5 gap-2">
           <div className="min-w-0">
-            <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
+            <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-600 uppercase tracking-wider">
               Institution Node Detail
             </span>
             <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-800 mt-0.5 truncate">
               {bank.name}
             </h3>
-            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-400 mt-0.5 truncate">
+            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-500 mt-0.5 truncate">
               {bank.location}
             </div>
           </div>
@@ -3185,7 +3185,7 @@ function BankDetailsDrawerModal({
             { k: 'Status', v: 'READY (Simulated Local Agent)' },
           ].map((row) => (
             <div key={row.k} className="p-3 rounded-xl bg-slate-50 border border-slate-200 min-w-0">
-              <div className="text-slate-400 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
+              <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
                 {row.k}
               </div>
               <div className="text-slate-700 truncate">{row.v}</div>
@@ -3194,13 +3194,13 @@ function BankDetailsDrawerModal({
         </div>
 
         <div className="min-w-0">
-          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2.5">
+          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">
             ISO 20022 Stream Log
           </div>
-          <div className="rounded-2xl bg-white border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
+          <div className="rounded-2xl bg-white border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-500 overflow-x-auto max-w-full">
             {bank.xmlLogs.map((log, i) => (
               <div key={i} className="flex items-start gap-2 border-b border-slate-200 pb-2 last:border-0 last:pb-0 min-w-0">
-                <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
+                <span className="text-indigo-600 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
                 <span className="break-all leading-relaxed">{log}</span>
               </div>
             ))}

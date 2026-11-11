@@ -57,12 +57,12 @@ export const FLRoundRunner: React.FC = () => {
       {/* Control Banner */}
       <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4 border border-slate-200">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+          <div className="p-2 rounded-lg bg-cyan-50 text-cyan-600 border border-cyan-200">
             <Cpu className="h-5 w-5" />
           </div>
           <div>
             <h2 className="font-semibold text-sm text-slate-800">Live Federated Learning Orchestrator</h2>
-            <p className="text-xs text-slate-400">Ray Parallel Simulation & Multi-Bank Parameter Aggregation</p>
+            <p className="text-xs text-slate-500">Ray Parallel Simulation & Multi-Bank Parameter Aggregation</p>
           </div>
         </div>
 
@@ -82,14 +82,14 @@ export const FLRoundRunner: React.FC = () => {
 
       {error && (
         <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-300 flex items-center gap-3 text-rose-700 text-xs">
-          <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
           <div className="flex-1">
             <span className="font-semibold text-rose-700">Simulation Error: </span>
             <span>{error}</span>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-xs text-rose-400 hover:text-rose-700 cursor-pointer font-bold px-1"
+            className="text-xs text-rose-600 hover:text-rose-700 cursor-pointer font-bold px-1"
           >
             ✕
           </button>
@@ -124,7 +124,7 @@ export const FLRoundRunner: React.FC = () => {
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
               <label className="text-slate-600 font-medium">Training Rounds</label>
-              <span className="font-mono text-cyan-400 font-bold">{numRounds} Rounds</span>
+              <span className="font-mono text-cyan-600 font-bold">{numRounds} Rounds</span>
             </div>
             <input
               type="range"
@@ -140,7 +140,7 @@ export const FLRoundRunner: React.FC = () => {
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
               <label className="text-slate-600 font-medium">DP Privacy Budget (&epsilon;)</label>
-              <span className="font-mono text-cyan-400 font-bold">&epsilon; = {epsilon.toFixed(1)}</span>
+              <span className="font-mono text-cyan-600 font-bold">&epsilon; = {epsilon.toFixed(1)}</span>
             </div>
             <input
               type="range"
@@ -154,13 +154,13 @@ export const FLRoundRunner: React.FC = () => {
           </div>
 
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-2">
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-slate-500">
               <span>Participating Nodes:</span>
               <span className="text-slate-700 font-mono">3 Banks (A, B, C)</span>
             </div>
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-slate-500">
               <span>Security Protocol:</span>
-              <span className="text-cyan-400 font-mono font-medium">SecAgg Pairwise Masks</span>
+              <span className="text-cyan-600 font-mono font-medium">SecAgg Pairwise Masks</span>
             </div>
           </div>
         </div>
@@ -174,7 +174,7 @@ export const FLRoundRunner: React.FC = () => {
                 Cross-Bank Loss Convergence Curves
               </h3>
               {results.length > 0 && (
-                <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
+                <span className="text-xs font-mono text-emerald-600 flex items-center gap-1">
                   <CheckCircle className="h-3.5 w-3.5" /> Global Loss: {results[results.length - 1]?.global_loss}
                 </span>
               )}
@@ -206,18 +206,18 @@ export const FLRoundRunner: React.FC = () => {
           {/* Byzantine Security & Quarantine Feed */}
           <div className="glass-card rounded-xl p-4 border border-slate-200 space-y-2 font-mono text-xs">
             <div className="flex items-center gap-2 text-slate-600 pb-2 border-b border-slate-200">
-              <Terminal className="h-4 w-4 text-cyan-400" />
+              <Terminal className="h-4 w-4 text-cyan-600" />
               <span className="font-semibold text-xs">Byzantine Defense & Execution Log</span>
             </div>
             <div
               tabIndex={0}
               role="region"
               aria-label="Byzantine Defense & Execution Log stream"
-              className="bg-white p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+              className="bg-white p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400"
             >
               {results.map((r, i) => (
                 <div key={i} className="flex justify-between">
-                  <span className="text-cyan-400">[Round {r.round_number}] Aggregated 3 bank models using {algorithm}</span>
+                  <span className="text-cyan-600">[Round {r.round_number}] Aggregated 3 bank models using {algorithm}</span>
                   <span className="text-slate-500">{r.aggregation_time_ms}ms</span>
                 </div>
               ))}

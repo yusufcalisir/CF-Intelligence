@@ -18,7 +18,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
         <div className="flex flex-col items-center gap-3">
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
-          <span className="text-xs font-mono text-slate-400">Loading authoritative telemetry...</span>
+          <span className="text-xs font-mono text-slate-500">Loading authoritative telemetry...</span>
         </div>
       </div>
     );
@@ -28,10 +28,10 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
     return (
       <div className="p-5 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 text-xs space-y-2">
         <div className="flex items-center gap-2 font-semibold">
-          <AlertCircle className="w-4 h-4 text-rose-400" />
+          <AlertCircle className="w-4 h-4 text-rose-600" />
           Telemetry Unavailable
         </div>
-        <p className="text-slate-400">
+        <p className="text-slate-500">
           Failed to load live telemetry for pilot <code className="text-slate-600 font-mono">{pilot.pilot_id}</code>.
           Zero values will not be fabricated in place of server measurement.
         </p>
@@ -59,12 +59,12 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       {/* Telemetry Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
         <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-cyan-400" />
+          <Activity className="w-5 h-5 text-cyan-600" />
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
               Live Two-Bank Operational Telemetry
             </h3>
-            <span className="text-[11px] text-slate-400 font-mono">
+            <span className="text-[11px] text-slate-500 font-mono">
               Last operation: {telemetry.last_operation_at ? new Date(telemetry.last_operation_at).toLocaleTimeString() : 'None observed'}
             </span>
           </div>
@@ -87,7 +87,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
             className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-600 transition-colors border border-slate-200 cursor-pointer"
             title="Refresh Telemetry"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-cyan-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-cyan-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -96,24 +96,24 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Executed Queries */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Executed Queries</div>
-          <div className="text-2xl font-mono font-bold text-emerald-400">{telemetry.queries_executed}</div>
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Executed Queries</div>
+          <div className="text-2xl font-mono font-bold text-emerald-600">{telemetry.queries_executed}</div>
           <div className="text-[10px] text-slate-500 font-mono">Successful PSI enclaves</div>
         </div>
 
         {/* Denied Queries */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Denied Queries</div>
-          <div className="text-2xl font-mono font-bold text-rose-400">{telemetry.queries_denied}</div>
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Denied Queries</div>
+          <div className="text-2xl font-mono font-bold text-rose-600">{telemetry.queries_denied}</div>
           <div className="text-[10px] text-slate-500 font-mono">Policy/Quota blocks</div>
         </div>
 
         {/* Observed Mean Latency */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Mean Latency</div>
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Mean Latency</div>
           {hasLatencySamples && telemetry.mean_latency_ms !== null ? (
             <div className="text-2xl font-mono font-bold text-cyan-700">
-              {telemetry.mean_latency_ms} <span className="text-xs font-normal text-slate-400">ms</span>
+              {telemetry.mean_latency_ms} <span className="text-xs font-normal text-slate-500">ms</span>
             </div>
           ) : (
             <div className="text-xs font-mono font-semibold text-slate-500 pt-1.5">
@@ -127,10 +127,10 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
 
         {/* Observed p95 Latency */}
         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">p95 Latency</div>
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">p95 Latency</div>
           {hasLatencySamples && telemetry.p95_latency_ms !== null ? (
             <div className="text-2xl font-mono font-bold text-indigo-700">
-              {telemetry.p95_latency_ms} <span className="text-xs font-normal text-slate-400">ms</span>
+              {telemetry.p95_latency_ms} <span className="text-xs font-normal text-slate-500">ms</span>
             </div>
           ) : (
             <div className="text-xs font-mono font-semibold text-slate-500 pt-1.5">
@@ -145,10 +145,10 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-            <Database className="w-4 h-4 text-amber-400" />
+            <Database className="w-4 h-4 text-amber-600" />
             Enclave Quota Reservation ({telemetry.queries_executed} / {telemetry.query_quota_total})
           </div>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono text-slate-500">
             Remaining: <strong className="text-white">{telemetry.quota_remaining}</strong>
           </span>
         </div>
@@ -162,7 +162,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
           />
         </div>
 
-        <div className="flex justify-between text-[11px] font-mono text-slate-400 pt-1">
+        <div className="flex justify-between text-[11px] font-mono text-slate-500 pt-1">
           <span>0 queries</span>
           <span>{quotaUsedPct}% Consumed</span>
           <span>{telemetry.query_quota_total} max</span>
@@ -193,7 +193,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
       </div>
 
       {/* Disclaimers & Boundary Note */}
-      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-[11px] text-slate-400 space-y-1">
+      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-[11px] text-slate-500 space-y-1">
         <div className="font-semibold text-slate-600">Architectural Boundary:</div>
         <p>
           Telemetry displayed here reflects the governed two-bank pilot enclave.

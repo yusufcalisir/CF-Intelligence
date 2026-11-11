@@ -29,11 +29,11 @@ export default function InvestigationDashboard() {
       gradient: 'from-amber-500/20 via-amber-500/5 to-transparent',
       borderColor: 'border-amber-500/30 hover:border-amber-400/60',
       textColor: 'from-amber-200 via-amber-400 to-yellow-500',
-      badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      badgeColor: 'bg-amber-50 text-amber-600 border-amber-500/30',
       barColor: 'from-amber-500 to-yellow-400',
       glow: 'rgba(245, 158, 11, 0.15)',
       icon: (
-        <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
@@ -50,11 +50,11 @@ export default function InvestigationDashboard() {
       gradient: 'from-rose-500/20 via-rose-500/5 to-transparent',
       borderColor: 'border-rose-300 hover:border-rose-400/60',
       textColor: 'from-rose-200 via-rose-400 to-red-500',
-      badgeColor: 'bg-rose-500/10 text-rose-400 border-rose-300',
+      badgeColor: 'bg-rose-50 text-rose-600 border-rose-300',
       barColor: 'from-rose-500 to-red-400',
       glow: 'rgba(244, 63, 94, 0.15)',
       icon: (
-        <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-3.5 h-3.5 text-rose-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       ),
@@ -68,13 +68,13 @@ export default function InvestigationDashboard() {
       trend: 'Pending Dual Sig',
       subtext: '6-stage investigation state machine',
       gradient: 'from-indigo-500/20 via-indigo-500/5 to-transparent',
-      borderColor: 'border-indigo-500/30 hover:border-indigo-400/60',
-      textColor: 'from-indigo-200 via-indigo-400 to-purple-400',
-      badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-      barColor: 'from-indigo-500 to-purple-400',
+      borderColor: 'border-indigo-200 hover:border-indigo-400/60',
+      textColor: 'from-indigo-200 via-indigo-600 to-purple-600',
+      badgeColor: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+      barColor: 'from-indigo-500 to-purple-600',
       glow: 'rgba(99, 102, 241, 0.15)',
       icon: (
-        <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-3.5 h-3.5 text-indigo-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
         </svg>
@@ -91,11 +91,11 @@ export default function InvestigationDashboard() {
       gradient: 'from-teal-500/20 via-teal-500/5 to-transparent',
       borderColor: 'border-teal-500/30 hover:border-teal-400/60',
       textColor: 'from-teal-200 via-teal-400 to-emerald-400',
-      badgeColor: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+      badgeColor: 'bg-teal-50 text-teal-600 border-teal-500/30',
       barColor: 'from-teal-500 to-emerald-400',
       glow: 'rgba(20, 184, 166, 0.15)',
       icon: (
-        <svg className="w-3.5 h-3.5 text-teal-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-3.5 h-3.5 text-teal-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
           <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
@@ -113,7 +113,7 @@ export default function InvestigationDashboard() {
       borderColor: 'border-violet-500/30 hover:border-violet-400/60',
       textColor: 'from-violet-200 via-violet-400 to-purple-500',
       badgeColor: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
-      barColor: 'from-violet-500 to-purple-400',
+      barColor: 'from-violet-500 to-purple-600',
       glow: 'rgba(139, 92, 246, 0.15)',
       icon: (
         <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -132,9 +132,9 @@ export default function InvestigationDashboard() {
       subtext: 'Multi-bank transaction ring topologies',
       gradient: 'from-pink-500/20 via-pink-500/5 to-transparent',
       borderColor: 'border-pink-500/30 hover:border-pink-400/60',
-      textColor: 'from-pink-200 via-pink-400 to-rose-400',
+      textColor: 'from-pink-200 via-pink-400 to-rose-600',
       badgeColor: 'bg-pink-500/10 text-pink-400 border-pink-500/30',
-      barColor: 'from-pink-500 to-rose-400',
+      barColor: 'from-pink-500 to-rose-600',
       glow: 'rgba(236, 72, 153, 0.15)',
       icon: (
         <svg className="w-3.5 h-3.5 text-pink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -154,12 +154,12 @@ export default function InvestigationDashboard() {
       subtext: 'Typology simulation scenario generators',
       gradient: 'from-cyan-500/20 via-cyan-500/5 to-transparent',
       borderColor: 'border-cyan-500/30 hover:border-cyan-400/60',
-      textColor: 'from-cyan-200 via-cyan-400 to-blue-400',
-      badgeColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-      barColor: 'from-cyan-500 to-blue-400',
+      textColor: 'from-cyan-200 via-cyan-400 to-blue-600',
+      badgeColor: 'bg-cyan-50 text-cyan-600 border-cyan-500/30',
+      barColor: 'from-cyan-500 to-blue-600',
       glow: 'rgba(6, 182, 212, 0.15)',
       icon: (
-        <svg className="w-3.5 h-3.5 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-3.5 h-3.5 text-cyan-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
       ),
@@ -174,9 +174,9 @@ export default function InvestigationDashboard() {
       subtext: 'Simultaneous velocity & layering hits',
       gradient: 'from-orange-500/20 via-orange-500/5 to-transparent',
       borderColor: 'border-orange-500/30 hover:border-orange-400/60',
-      textColor: 'from-orange-200 via-orange-400 to-amber-400',
+      textColor: 'from-orange-200 via-orange-400 to-amber-600',
       badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-      barColor: 'from-orange-500 to-amber-400',
+      barColor: 'from-orange-500 to-amber-600',
       glow: 'rgba(249, 115, 22, 0.15)',
       icon: (
         <svg className="w-3.5 h-3.5 text-orange-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -199,7 +199,7 @@ export default function InvestigationDashboard() {
       >
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 uppercase tracking-widest">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 uppercase tracking-widest">
               AML Intelligence Control
             </span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -207,7 +207,7 @@ export default function InvestigationDashboard() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
             Investigation Dashboard
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 max-w-2xl mt-1 leading-relaxed">
             Aggregated real-time metrics across multi-bank alerts, cases, entities, and privacy-preserving federated intelligence feeds.
           </p>
         </div>
@@ -230,7 +230,7 @@ export default function InvestigationDashboard() {
 
       {/* High-Impact Stat Cards */}
       {isLoading ? (
-        <div className="p-12 text-center text-slate-400 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl">
+        <div className="p-12 text-center text-slate-500 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl">
           <div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2" />
           <div className="text-xs font-mono">Synchronizing consortium intelligence metrics...</div>
         </div>
@@ -277,7 +277,7 @@ export default function InvestigationDashboard() {
                 </div>
 
                 {/* Subtext description */}
-                <div className="text-[10.5px] font-mono text-slate-400 line-clamp-1 relative z-10 mt-1">
+                <div className="text-[10.5px] font-mono text-slate-500 line-clamp-1 relative z-10 mt-1">
                   {card.subtext}
                 </div>
 
@@ -430,19 +430,19 @@ export default function InvestigationDashboard() {
                   <div className="text-xl sm:text-2xl font-black font-mono text-violet-300 truncate">
                     {intelStats.total_items.toLocaleString()}
                   </div>
-                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Total Shared Items</div>
+                  <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">Total Shared Items</div>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 overflow-hidden">
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 overflow-hidden">
                   <div className="text-lg sm:text-xl font-black font-mono text-emerald-700 truncate">
                     {(intelStats.avg_risk_indicator * 100).toFixed(1)}%
                   </div>
-                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Avg Risk Indicator</div>
+                  <div className="text-[9.5px] font-mono text-slate-500 mt-0.5 truncate">Avg Risk Indicator</div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-[10px] font-mono uppercase text-slate-400 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
+                <h4 className="text-[10px] font-mono uppercase text-slate-500 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
                 <div className="space-y-1.5">
                   {Object.entries(intelStats.items_by_type).map(([type, count]) => (
                     <div key={type} className="flex justify-between items-center text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">
@@ -458,7 +458,7 @@ export default function InvestigationDashboard() {
           ) : (
             <div className="text-center py-6 space-y-2">
               <div className="text-3xl">🔗</div>
-              <p className="text-xs text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 font-mono">
                 No shared intelligence yet. Trigger a scenario to generate cross-bank threat objects.
               </p>
             </div>
@@ -517,7 +517,7 @@ export default function InvestigationDashboard() {
             <span>Investigator Activity Audit Trail</span>
             <span className="text-slate-500 text-[10px] font-normal font-mono">(Immutable Log Chain)</span>
           </h3>
-          <span className="self-start sm:self-auto text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 flex items-center gap-1">
+          <span className="self-start sm:self-auto text-[10px] font-mono font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             SHA-256 Verified
           </span>
@@ -536,23 +536,23 @@ export default function InvestigationDashboard() {
                 className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 font-mono text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-indigo-400">{log.investigator}</span>
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 text-[10px] font-bold uppercase">
+                  <span className="font-bold text-indigo-600">{log.investigator}</span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold uppercase">
                     {log.action.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 text-[11px] text-slate-400 border-t border-slate-200 pt-2">
+                <div className="flex flex-col gap-1 text-[11px] text-slate-500 border-t border-slate-200 pt-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-500">Target ID:</span>
                     <span className="text-slate-700 font-semibold truncate max-w-[180px]">{log.target_id}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10px]">
                     <span className="text-slate-500">Timestamp:</span>
-                    <span className="text-slate-400">{new Date(log.timestamp).toLocaleString()}</span>
+                    <span className="text-slate-500">{new Date(log.timestamp).toLocaleString()}</span>
                   </div>
                 </div>
                 {log.metadata && (
-                  <div className="text-[10px] text-slate-400 bg-slate-100 p-2 rounded border border-slate-200 break-all mt-1">
+                  <div className="text-[10px] text-slate-500 bg-slate-100 p-2 rounded border border-slate-200 break-all mt-1">
                     <span className="text-slate-500 font-semibold block mb-0.5">Details:</span>
                     {typeof log.metadata === 'object' ? JSON.stringify(log.metadata) : String(log.metadata)}
                   </div>
@@ -566,7 +566,7 @@ export default function InvestigationDashboard() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-400 font-mono text-[11px]">
+              <tr className="border-b border-slate-200 text-slate-500 font-mono text-[11px]">
                 <th className="py-2.5 px-3">Investigator</th>
                 <th className="py-2.5 px-3">Action</th>
                 <th className="py-2.5 px-3">Target ID</th>
@@ -584,9 +584,9 @@ export default function InvestigationDashboard() {
               ) : (
                 auditLogs.map((log: any) => (
                   <tr key={log.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors font-mono text-[11px]">
-                    <td className="py-2.5 px-3 font-semibold text-indigo-400">{log.investigator}</td>
+                    <td className="py-2.5 px-3 font-semibold text-indigo-600">{log.investigator}</td>
                     <td className="py-2.5 px-3 uppercase font-bold text-slate-700">{log.action.replace(/_/g, ' ')}</td>
-                    <td className="py-2.5 px-3 text-slate-400">{log.target_id.slice(0, 10)}...</td>
+                    <td className="py-2.5 px-3 text-slate-500">{log.target_id.slice(0, 10)}...</td>
                     <td className="py-2.5 px-3 text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right text-[10px] text-slate-500 max-w-xs truncate">
                       {JSON.stringify(log.metadata)}

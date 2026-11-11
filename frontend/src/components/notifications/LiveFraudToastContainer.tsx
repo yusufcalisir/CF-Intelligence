@@ -57,13 +57,13 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
             className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
               isCritical
                 ? 'bg-red-500/20 border-red-500/50 text-red-400'
-                : 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                : 'bg-amber-500/20 border-amber-500/50 text-amber-600'
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block truncate">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 block truncate">
               {bankName}
             </span>
           </div>
@@ -81,7 +81,7 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
           </span>
           <button
             onClick={onDismiss}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
             aria-label="Dismiss notification"
           >
             <X className="w-3.5 h-3.5" />
@@ -94,7 +94,7 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
         <h5 className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight leading-snug">
           {toast.description || toast.typology}
         </h5>
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 font-mono">
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
           <span>{toast.currency} {toast.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           <span>•</span>
           <span className="truncate">{toast.transaction_id}</span>
@@ -103,15 +103,15 @@ function LiveToastItem({ toast, onDismiss }: { toast: LiveAlertToast; onDismiss:
 
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-[11px]">
-        <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-          <Zap className="w-3 h-3 text-cyan-400 animate-pulse" /> Live Scoring Stream
+        <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+          <Zap className="w-3 h-3 text-cyan-600 animate-pulse" /> Live Scoring Stream
         </span>
         <button
           onClick={() => {
             onDismiss();
             navigate('/alerts');
           }}
-          className="flex items-center gap-1 font-semibold text-cyan-400 hover:text-cyan-700 transition-colors"
+          className="flex items-center gap-1 font-semibold text-cyan-600 hover:text-cyan-700 transition-colors"
         >
           <span>Investigate</span>
           <ArrowRight className="w-3 h-3" />

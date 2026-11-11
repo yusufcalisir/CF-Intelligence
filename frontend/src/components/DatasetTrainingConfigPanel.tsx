@@ -108,24 +108,24 @@ export default function DatasetTrainingConfigPanel({
                   onClick={() => setMode('real')}
                   className={`relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border-2 transition-all text-left ${
                     mode === 'real'
-                      ? 'border-amber-500 bg-amber-500/10'
+                      ? 'border-amber-500 bg-amber-50'
                       : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)] bg-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <Zap
                       size={16}
-                      className={mode === 'real' ? 'text-amber-400' : 'text-[var(--color-text-muted)]'}
+                      className={mode === 'real' ? 'text-amber-600' : 'text-[var(--color-text-muted)]'}
                     />
                     <span
                       className={`text-sm font-bold ${
-                        mode === 'real' ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'
+                        mode === 'real' ? 'text-amber-600' : 'text-[var(--color-text-secondary)]'
                       }`}
                     >
                       Live Backend Engine
                     </span>
                     {mode === 'real' && (
-                      <CheckCircle2 size={14} className="text-amber-400 ml-auto shrink-0" />
+                      <CheckCircle2 size={14} className="text-amber-600 ml-auto shrink-0" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed text-[var(--color-text-muted)]">
@@ -224,7 +224,7 @@ export default function DatasetTrainingConfigPanel({
                           <p className="text-[9px] text-[var(--color-text-muted)] uppercase tracking-wide leading-none mb-0.5">
                             Fraud%
                           </p>
-                          <p className="text-xs font-bold font-mono text-rose-400">
+                          <p className="text-xs font-bold font-mono text-rose-600">
                             {fmtFraud(p.fraudRatio)}
                           </p>
                         </div>

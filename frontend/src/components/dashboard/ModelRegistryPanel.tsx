@@ -272,7 +272,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                           ver.status === 'champion'
                             ? 'bg-[var(--color-status-success)]/15 text-[var(--color-status-success)]'
                             : ver.status === 'challenger'
-                            ? 'bg-blue-500/15 text-blue-400'
+                            ? 'bg-blue-500/15 text-blue-600'
                             : 'bg-yellow-500/15 text-yellow-500'
                         }`}
                       >
@@ -511,7 +511,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-[var(--color-text-primary)]">⚖️ Serving Challenger</span>
                   {shadowMetrics?.traffic_share && shadowMetrics.traffic_share > 0 ? (
-                    <span className="px-2 py-0.5 rounded text-[8px] bg-blue-500/15 text-blue-400 font-semibold uppercase animate-pulse">
+                    <span className="px-2 py-0.5 rounded text-[8px] bg-blue-500/15 text-blue-600 font-semibold uppercase animate-pulse">
                       Active
                     </span>
                   ) : (
@@ -557,7 +557,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               </div>
               <div className="mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-[10px] text-[var(--color-text-muted)] flex justify-between">
                 <span>Serving share:</span>
-                <span className="font-bold text-blue-400">
+                <span className="font-bold text-blue-600">
                   {shadowMetrics ? `${(shadowMetrics.traffic_share * 100).toFixed(0)}%` : '0%'}
                 </span>
               </div>
@@ -590,10 +590,10 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               <div
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-all ${
                   feedbackMessage.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
+                    ? 'bg-emerald-50 border-emerald-500/30 text-emerald-700'
                     : feedbackMessage.type === 'info'
                     ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
-                    : 'bg-rose-500/10 border-rose-300 text-rose-700'
+                    : 'bg-rose-50 border-rose-300 text-rose-700'
                 }`}
               >
                 <span>{feedbackMessage.text}</span>

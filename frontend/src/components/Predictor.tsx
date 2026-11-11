@@ -60,12 +60,12 @@ export const Predictor: React.FC = () => {
       {/* Header Banner */}
       <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4 border border-slate-200">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
             <Activity className="h-5 w-5" />
           </div>
           <div>
             <h2 className="font-semibold text-sm text-slate-800">Real-Time Risk Scoring Engine</h2>
-            <p className="text-xs text-slate-400">Evaluate Single ISO 20022 Financial Transaction Payload</p>
+            <p className="text-xs text-slate-500">Evaluate Single ISO 20022 Financial Transaction Payload</p>
           </div>
         </div>
       </div>
@@ -156,23 +156,23 @@ export const Predictor: React.FC = () => {
             <div className="space-y-4 text-xs">
               <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                 <div>
-                  <span className="text-slate-400">Risk Score</span>
+                  <span className="text-slate-500">Risk Score</span>
                   <p className={`font-mono text-2xl font-bold ${
                     result.risk_level === 'UNASSESSED'
-                      ? 'text-amber-400'
+                      ? 'text-amber-600'
                       : result.is_fraud_suspected
                       ? 'text-rose-500'
-                      : 'text-emerald-400'
+                      : 'text-emerald-600'
                   }`}>
                     {result.risk_level === 'UNASSESSED' ? 'UNASSESSED' : `${result.risk_score.toFixed(1)} / 1000`}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full font-bold uppercase text-[11px] ${
                   result.policy_action === 'HOLD_FOR_REVIEW'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30'
                     : result.is_fraud_suspected
-                    ? 'bg-rose-500/20 text-rose-400 border border-rose-300'
-                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-rose-500/20 text-rose-600 border border-rose-300'
+                    : 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                 }`}>
                   {result.policy_action}
                 </span>
@@ -180,14 +180,14 @@ export const Predictor: React.FC = () => {
 
               {result.alert_details && (
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                  <span className="text-slate-400 font-medium">SHAP Feature Contributions</span>
+                  <span className="text-slate-500 font-medium">SHAP Feature Contributions</span>
                   {(result.alert_details.top_features || []).map((f, i) => {
                     const isPositive = f.contribution >= 0;
                     const pct = Math.abs(f.contribution * 100).toFixed(0);
                     return (
                       <div key={i} className="flex justify-between items-center text-[11px]">
                         <span className="text-slate-600 font-mono">{f.feature}</span>
-                        <span className={`font-mono font-medium ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        <span className={`font-mono font-medium ${isPositive ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {isPositive ? '+' : '-'}{pct}%
                         </span>
                       </div>

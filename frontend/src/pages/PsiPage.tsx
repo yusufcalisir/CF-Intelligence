@@ -281,16 +281,16 @@ export default function PsiPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass-card rounded-2xl bg-gradient-to-r from-slate-50 to-indigo-50 border border-indigo-500/20">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass-card rounded-2xl bg-gradient-to-r from-slate-50 to-indigo-50 border border-indigo-200">
         <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-indigo-200 to-indigo-600 bg-clip-text text-transparent">
             Private Set Intersection (PSI)
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             Reconcile customer & entity identities across banks without exposing PII.
           </p>
         </div>
-        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs font-semibold">
+        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-amber-50 border border-amber-500/30 text-amber-700 text-xs font-semibold">
           <span className="relative flex h-2 w-2">
             <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
           </span>
@@ -300,7 +300,7 @@ export default function PsiPage() {
 
       {/* Research & Simulation Disclaimer Banner */}
       <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-800/40 flex items-start gap-3 text-xs text-amber-700/90">
-        <span className="text-amber-400 font-bold text-sm mt-0.5">ℹ️</span>
+        <span className="text-amber-600 font-bold text-sm mt-0.5">ℹ️</span>
         <div>
           <span className="font-semibold text-amber-700">Research & Benchmark Simulation Environment:</span>{' '}
           This interactive playground evaluates blinded Diffie-Hellman and MinHash fuzzy set intersection in software emulation.
@@ -316,7 +316,7 @@ export default function PsiPage() {
         <div className="glass-card p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-indigo-50 to-slate-50 border border-emerald-500/30 shadow-xl space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-lg">
+              <span className="p-2 rounded-xl bg-emerald-50 border border-emerald-500/30 text-emerald-600 text-lg">
                 🔍
               </span>
               <div>
@@ -324,17 +324,17 @@ export default function PsiPage() {
                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                     Deep-Linked Entity Investigation Active
                   </h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-700 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-500/30">
                     {searchType}
                   </span>
                   {shouldAutoMatch && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/15 text-indigo-700 border border-indigo-500/30 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
                       Auto-Matched
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Blind intersection query loaded across consortium institutions under zero-raw-PII guarantee.
                 </p>
               </div>
@@ -361,12 +361,12 @@ export default function PsiPage() {
           </div>
 
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-100 border border-slate-200/80 font-mono text-xs flex-wrap">
-            <span className="text-slate-400 text-[11px] uppercase font-bold">Target Identifier:</span>
-            <span className="text-emerald-700 font-bold px-2 py-0.5 rounded bg-emerald-50 border border-emerald-500/20 truncate max-w-full sm:max-w-md">
+            <span className="text-slate-500 text-[11px] uppercase font-bold">Target Identifier:</span>
+            <span className="text-emerald-700 font-bold px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 truncate max-w-full sm:max-w-md">
               {deepLinkTarget}
             </span>
             <span className="text-slate-500 text-[11px]">•</span>
-            <span className="text-slate-400 text-[11px]">Consortium Mode:</span>
+            <span className="text-slate-500 text-[11px]">Consortium Mode:</span>
             <span className="text-indigo-700 text-[11px] font-semibold">MinHash LSH & ECDH Blind Matching</span>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function PsiPage() {
             <form onSubmit={handleRunPSI} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                     Institution A
                   </label>
                   <select
@@ -397,7 +397,7 @@ export default function PsiPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                     Institution B
                   </label>
                   <select
@@ -414,7 +414,7 @@ export default function PsiPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                     Filter Entity Type
                   </label>
                   <select
@@ -474,8 +474,8 @@ export default function PsiPage() {
                 {enableFuzzy && (
                   <div className="p-3 rounded-lg bg-white border border-indigo-950/60 space-y-2">
                     <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-slate-400">Min Matched Attributes (k):</span>
-                      <span className="text-indigo-400 font-mono">{fuzzyThreshold} / 5</span>
+                      <span className="text-slate-500">Min Matched Attributes (k):</span>
+                      <span className="text-indigo-600 font-mono">{fuzzyThreshold} / 5</span>
                     </div>
                     <input
                       type="range"
@@ -522,7 +522,7 @@ export default function PsiPage() {
                 Secure Enclave Execution Log
               </h2>
               {runPSIMutation.data?.stats.attestation_verified && (
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono uppercase">
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-500/30 text-emerald-600 font-mono uppercase">
                   Attested
                 </span>
               )}
@@ -539,7 +539,7 @@ export default function PsiPage() {
                 ))
               )}
               {logsRunning && (
-                <div className="text-indigo-400 animate-pulse">Running secure enclave calculation...</div>
+                <div className="text-indigo-600 animate-pulse">Running secure enclave calculation...</div>
               )}
             </div>
 
@@ -565,7 +565,7 @@ export default function PsiPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-slate-500 font-semibold uppercase">Accelerator</span>
-                  <span className="text-sm font-bold text-indigo-400 font-mono">
+                  <span className="text-sm font-bold text-indigo-600 font-mono">
                     {runPSIMutation.data.stats.enclave_execution ? 'Emulated TEE (Simulation)' : 'None (DH)'}
                   </span>
                 </div>
@@ -580,7 +580,7 @@ export default function PsiPage() {
             <h2 className="text-md font-bold text-slate-700 mb-3.5 flex items-center gap-2">
               <span>🧬</span> MinHash Spelling Playground
             </h2>
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
               Test spelling normalizations and evaluate name similarity locally. Character 3-gram MinHash signatures are computed below.
             </p>
 
@@ -596,7 +596,7 @@ export default function PsiPage() {
                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-indigo-500"
                 />
                 <span className="text-[10px] text-slate-500 font-mono mt-1 block">
-                  Standardized: <span className="text-indigo-400 font-bold">{localStandardize(name1)}</span>
+                  Standardized: <span className="text-indigo-600 font-bold">{localStandardize(name1)}</span>
                 </span>
               </div>
 
@@ -611,12 +611,12 @@ export default function PsiPage() {
                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-indigo-500"
                 />
                 <span className="text-[10px] text-slate-500 font-mono mt-1 block">
-                  Standardized: <span className="text-indigo-400 font-bold">{localStandardize(name2)}</span>
+                  Standardized: <span className="text-indigo-600 font-bold">{localStandardize(name2)}</span>
                 </span>
               </div>
 
               <div className="p-4 rounded-xl border border-indigo-500/10 bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center gap-4">
-                <div className="relative flex items-center justify-center h-16 w-16 rounded-full border-4 border-indigo-500/20">
+                <div className="relative flex items-center justify-center h-16 w-16 rounded-full border-4 border-indigo-200">
                   <span className="text-md font-bold font-mono text-indigo-700">
                     {Math.round(simScore * 100)}%
                   </span>
@@ -646,8 +646,8 @@ export default function PsiPage() {
                         key={idx}
                         className={`h-6 w-8 rounded flex items-center justify-center font-mono text-[9px] font-bold ${
                           match
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-300'
+                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-500/30'
+                            : 'bg-rose-500/15 text-rose-600 border border-rose-300'
                         }`}
                         title={`Index ${idx}\nSig1: ${val}\nSig2: ${sig2[idx]}`}
                       >
@@ -669,7 +669,7 @@ export default function PsiPage() {
         </h2>
         <form onSubmit={handleFuzzyResolve} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end mb-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
               Query Raw Name/PII
             </label>
             <input
@@ -681,7 +681,7 @@ export default function PsiPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
               Type
             </label>
             <select
@@ -699,8 +699,8 @@ export default function PsiPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-              Sim Threshold: <span className="font-mono text-indigo-400 font-bold">{Math.round(searchThreshold * 100)}%</span>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+              Sim Threshold: <span className="font-mono text-indigo-600 font-bold">{Math.round(searchThreshold * 100)}%</span>
             </label>
             <input
               type="range"
@@ -736,7 +736,7 @@ export default function PsiPage() {
           <div className="overflow-x-auto rounded-xl border border-slate-200 mt-4">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-white border-b border-slate-200 text-slate-400 font-bold">
+                <tr className="bg-white border-b border-slate-200 text-slate-500 font-bold">
                   <th className="p-3">Display Label</th>
                   <th className="p-3">Bank ID</th>
                   <th className="p-3">Risk Level</th>
@@ -773,19 +773,19 @@ export default function PsiPage() {
                         <span
                           className={`font-semibold ${
                             match.risk_level === 'critical' || match.risk_level === 'high'
-                              ? 'text-rose-400'
+                              ? 'text-rose-600'
                               : match.risk_level === 'medium'
-                              ? 'text-amber-400'
-                              : 'text-emerald-400'
+                              ? 'text-amber-600'
+                              : 'text-emerald-600'
                           }`}
                         >
                           {match.risk_level}
                         </span>
                       </td>
-                      <td className="p-3 font-mono font-bold text-indigo-400">
+                      <td className="p-3 font-mono font-bold text-indigo-600">
                         {Math.round(match.similarity * 100)}%
                       </td>
-                      <td className="p-3 font-mono text-slate-400">{match.standardized_stored}</td>
+                      <td className="p-3 font-mono text-slate-500">{match.standardized_stored}</td>
                       <td className="p-3 font-mono text-slate-500 text-[10px]">{match.privacy_id}</td>
                       <td className="p-3 text-right">
                         <Link
@@ -821,7 +821,7 @@ export default function PsiPage() {
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-white border-b border-slate-200 text-slate-400 font-bold">
+                <tr className="bg-white border-b border-slate-200 text-slate-500 font-bold">
                   <th className="p-3">Entity Type</th>
                   <th className="p-3">Display Label (Bank A)</th>
                   <th className="p-3">Display Label (Bank B)</th>
@@ -841,15 +841,15 @@ export default function PsiPage() {
                 ) : (
                   runPSIMutation.data.matches.map((match, index) => (
                     <tr key={index} className="hover:bg-slate-100/40 text-slate-600">
-                      <td className="p-3 uppercase font-semibold text-slate-400">{match.entity_type}</td>
+                      <td className="p-3 uppercase font-semibold text-slate-500">{match.entity_type}</td>
                       <td className="p-3 font-semibold text-indigo-700">{match.display_label_a}</td>
                       <td className="p-3 font-semibold text-emerald-700">{match.display_label_b}</td>
                       <td className="p-3 font-mono">
                         <span
                           className={`font-semibold ${
                             match.risk_level_a === 'critical' || match.risk_level_a === 'high'
-                              ? 'text-rose-400'
-                              : 'text-slate-400'
+                              ? 'text-rose-600'
+                              : 'text-slate-500'
                           }`}
                         >
                           {match.risk_level_a}
@@ -858,8 +858,8 @@ export default function PsiPage() {
                         <span
                           className={`font-semibold ${
                             match.risk_level_b === 'critical' || match.risk_level_b === 'high'
-                              ? 'text-rose-400'
-                              : 'text-slate-400'
+                              ? 'text-rose-600'
+                              : 'text-slate-500'
                           }`}
                         >
                           {match.risk_level_b}
@@ -870,14 +870,14 @@ export default function PsiPage() {
                           {match.matched_attributes.map((attr, aIdx) => (
                             <span
                               key={aIdx}
-                              className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[10px] text-indigo-400 font-mono"
+                              className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-[10px] text-indigo-600 font-mono"
                             >
                               {attr}
                             </span>
                           ))}
                         </div>
                       </td>
-                      <td className="p-3 font-mono font-bold text-indigo-400">
+                      <td className="p-3 font-mono font-bold text-indigo-600">
                         {Math.round(match.similarity_score * 100)}%
                       </td>
                       <td className="p-3 font-mono text-slate-600 text-[10px]">{match.privacy_hash}</td>

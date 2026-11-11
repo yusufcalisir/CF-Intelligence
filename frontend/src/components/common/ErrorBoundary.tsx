@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-[280px] w-full p-6 rounded-2xl bg-white border border-rose-300 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center text-center space-y-4 my-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-300 text-rose-400 flex items-center justify-center text-2xl shadow-[0_0_25px_rgba(244,63,94,0.2)]">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-300 text-rose-600 flex items-center justify-center text-2xl shadow-[0_0_25px_rgba(244,63,94,0.2)]">
             ⚠️
           </div>
 
@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <h3 className="text-base font-bold text-white tracking-tight">
               {this.props.fallbackTitle || 'Component Rendering Error'}
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-mono">
+            <p className="text-xs text-slate-500 leading-relaxed font-mono">
               {this.state.error?.message || 'An unexpected runtime error occurred while rendering this module.'}
             </p>
           </div>

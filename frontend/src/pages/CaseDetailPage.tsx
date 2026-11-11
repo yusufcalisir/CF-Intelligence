@@ -451,7 +451,7 @@ export default function CaseDetailPage() {
       {partialWarning && (
         <div
           data-testid="partial-escalation-warning"
-          className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-700 flex items-center justify-between gap-2 animate-in fade-in"
+          className="p-3 bg-amber-50 border border-amber-500/30 rounded-xl text-xs text-amber-700 flex items-center justify-between gap-2 animate-in fade-in"
           role="alert"
         >
           <div className="flex items-center gap-2">
@@ -460,7 +460,7 @@ export default function CaseDetailPage() {
           </div>
           <button
             onClick={handleDismissWarning}
-            className="text-amber-400 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            className="text-amber-600 hover:text-white text-xs font-bold p-1 rounded transition-colors"
             aria-label="Dismiss warning"
           >
             ✕
@@ -581,7 +581,7 @@ export default function CaseDetailPage() {
           >
             {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
             {!isFincenEligible && (
-              <span className="text-[9px] px-1 py-0.2 bg-white text-slate-400 rounded border border-slate-200 ml-1">
+              <span className="text-[9px] px-1 py-0.2 bg-white text-slate-500 rounded border border-slate-200 ml-1">
                 {caseData.status === 'closed_false_positive' ? 'Ineligible (FP)' : '4-Eyes Reqd'}
               </span>
             )}
@@ -610,7 +610,7 @@ export default function CaseDetailPage() {
 
           {/* XML Export Success Toast */}
           {xmlExportSuccess && (
-            <div className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium animate-in fade-in">
+            <div className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-500/30 text-emerald-600 text-xs font-medium animate-in fade-in">
               {xmlExportSuccess}
             </div>
           )}
@@ -622,15 +622,15 @@ export default function CaseDetailPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-gradient-to-br from-white via-slate-50 to-white border border-purple-500/20 shadow-[0_0_40px_rgba(139,92,246,0.12)] relative overflow-hidden min-w-0"
+        className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-gradient-to-br from-white via-slate-50 to-white border border-purple-200 shadow-[0_0_40px_rgba(139,92,246,0.12)] relative overflow-hidden min-w-0"
       >
         {/* Ambient Top Cyber Strip */}
-        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 opacity-60" />
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-600 opacity-60" />
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
           <div className="flex items-start sm:items-center gap-3 min-w-0">
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-700 shadow-[0_0_15px_rgba(168,85,247,0.25)] shrink-0">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-purple-50 border border-purple-500/30 text-purple-700 shadow-[0_0_15px_rgba(168,85,247,0.25)] shrink-0">
               <Bot className="w-5 h-5 text-purple-700" />
               <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
@@ -642,12 +642,12 @@ export default function CaseDetailPage() {
                 <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
                   Autonomous Agentic AML Copilot & RAG Narrative
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-purple-500/15 text-purple-700 border border-purple-500/30 whitespace-nowrap">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-purple-50 text-purple-700 border border-purple-500/30 whitespace-nowrap">
                   FIN-2007-G003
                 </span>
                 {copilotData && (
                   <span
-                    className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 flex items-center gap-1 whitespace-nowrap"
+                    className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-500/30 flex items-center gap-1 whitespace-nowrap"
                     title={`Session storage persistent cache active (cfi_copilot_case_${caseId})`}
                   >
                     <span>💾</span>
@@ -655,7 +655,7 @@ export default function CaseDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                 Synthesizes FinCEN 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings from Graph Topology
               </p>
             </div>
@@ -665,7 +665,7 @@ export default function CaseDetailPage() {
             {copilotData && (
               <button
                 onClick={handleClearCopilotCache}
-                className="w-full sm:w-auto px-3 py-2 bg-slate-50 hover:bg-rose-500/10 text-slate-600 hover:text-rose-700 rounded-xl text-xs font-semibold transition border border-slate-200 hover:border-rose-300 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                className="w-full sm:w-auto px-3 py-2 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded-xl text-xs font-semibold transition border border-slate-200 hover:border-rose-300 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 title={`Clear cached Copilot narrative from session storage (${getCopilotCaseStorageKey(caseId || '')})`}
               >
                 <span>🗑️</span>
@@ -696,21 +696,21 @@ export default function CaseDetailPage() {
         {copilotData && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-3 border-t border-slate-200 min-w-0">
             {/* FinCEN 5-Paragraph Narrative */}
-            <div className="xl:col-span-2 rounded-xl p-4 space-y-3 bg-white border border-indigo-500/20 shadow-inner flex flex-col justify-between min-w-0">
+            <div className="xl:col-span-2 rounded-xl p-4 space-y-3 bg-white border border-indigo-200 shadow-inner flex flex-col justify-between min-w-0">
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-700 border-b border-slate-200 pb-2.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <span className="truncate">FinCEN 5-Paragraph Regulatory SAR Narrative</span>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                     <span
-                      className="font-mono text-[9px] text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap"
+                      className="font-mono text-[9px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap"
                       title={`Session cache storage key: cfi_copilot_case_${caseId}`}
                     >
                       cfi_copilot_case_{caseId?.slice(0, 8)}
                     </span>
-                    <span className="font-mono text-[9.5px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full whitespace-nowrap">
+                    <span className="font-mono text-[9.5px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-500/25 px-2 py-0.5 rounded-full whitespace-nowrap">
                       ZERO-PII VERIFIED
                     </span>
                     <button
@@ -719,9 +719,9 @@ export default function CaseDetailPage() {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                       }}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
                     >
-                      {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                       <span>{isCopied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
@@ -733,14 +733,14 @@ export default function CaseDetailPage() {
             </div>
 
             {/* 4-Eyes Supervisor Briefing & SHAP Drivers */}
-            <div className="rounded-xl p-4 space-y-3 bg-white border border-purple-500/20 shadow-inner flex flex-col justify-between min-w-0">
+            <div className="rounded-xl p-4 space-y-3 bg-white border border-purple-200 shadow-inner flex flex-col justify-between min-w-0">
               <div>
                 <div className="flex items-center justify-between text-xs font-bold text-purple-700 border-b border-slate-200 pb-2.5 mb-3 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <ShieldAlert className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                     <span className="truncate">BSA/AML 4-Eyes Briefing</span>
                   </div>
-                  <span className="text-[9px] font-mono text-purple-700 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 shrink-0">
+                  <span className="text-[9px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 shrink-0">
                     SUPERVISOR
                   </span>
                 </div>
@@ -748,18 +748,18 @@ export default function CaseDetailPage() {
                   {copilotData.four_eyes_briefing}
                 </div>
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
                   {copilotData.top_risk_drivers.map((d, i) => (
                     <div key={i} className="p-2 rounded-lg bg-white/[0.03] border border-slate-200 text-[11px] flex justify-between items-center font-mono">
                       <span className="text-indigo-700 truncate mr-2">{d.feature}</span>
-                      <span className="text-emerald-400 font-bold shrink-0">+{(d.impact * 100).toFixed(1)}%</span>
+                      <span className="text-emerald-600 font-bold shrink-0">+{(d.impact * 100).toFixed(1)}%</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="text-[9px] font-mono text-slate-400 pt-2.5 border-t border-slate-200 flex justify-between items-center min-w-0">
+              <div className="text-[9px] font-mono text-slate-500 pt-2.5 border-t border-slate-200 flex justify-between items-center min-w-0">
                 <span className="truncate mr-2">Hash: {copilotData.lineage_hash.slice(0, 14)}...</span>
-                <span className="text-indigo-400 font-bold uppercase shrink-0">{copilotData.recommended_action}</span>
+                <span className="text-indigo-600 font-bold uppercase shrink-0">{copilotData.recommended_action}</span>
               </div>
             </div>
           </div>
@@ -876,7 +876,7 @@ export default function CaseDetailPage() {
           </span>
         </div>
 
-        <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
           Direct navigation to the Graph Workbench. Deep link directly into 2-hop ego networks or 3-hop multi-bank fraud rings for suspect accounts and devices identified in this case.
         </p>
 
@@ -885,18 +885,18 @@ export default function CaseDetailPage() {
             {caseSuspectEntities.map((entId) => (
               <div
                 key={entId}
-                className="p-2.5 rounded-xl bg-slate-50 border border-indigo-500/20 flex items-center justify-between gap-2"
+                className="p-2.5 rounded-xl bg-slate-50 border border-indigo-200 flex items-center justify-between gap-2"
               >
                 <div className="min-w-0">
                   <div className="text-xs font-mono font-bold text-indigo-700 truncate" title={entId}>
                     {entId}
                   </div>
-                  <div className="text-[10px] text-slate-400">Suspect Entity Node</div>
+                  <div className="text-[10px] text-slate-500">Suspect Entity Node</div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=2`}
-                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/30 transition flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-200 transition flex items-center gap-1"
                     title={`Trace 2-hop ego network for ${entId}`}
                   >
                     <span>2-Hop</span>
@@ -923,11 +923,11 @@ export default function CaseDetailPage() {
             ))}
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-slate-200 text-xs text-slate-400 font-mono flex items-center justify-between flex-wrap gap-2">
+          <div className="p-3 rounded-xl bg-white/[0.02] border border-slate-200 text-xs text-slate-500 font-mono flex items-center justify-between flex-wrap gap-2">
             <span>No specific entity identifiers registered in evidence yet. Select a linked alert below or register evidence.</span>
             <Link
               to="/graph"
-              className="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-700 border border-indigo-500/30 transition"
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-700 border border-indigo-200 transition"
             >
               Open Graph Directory ➔
             </Link>
@@ -973,7 +973,7 @@ export default function CaseDetailPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-200/80">
                   <div className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
                     <span>Audit Analysis for Linked Alert:</span>
-                    <span className="font-mono text-cyan-400 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/20">{selectedAlertId}</span>
+                    <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">{selectedAlertId}</span>
                   </div>
                   <Link
                     to={`/workbench?alert_id=${encodeURIComponent(selectedAlertId)}`}
@@ -985,7 +985,7 @@ export default function CaseDetailPage() {
                   </Link>
                 </div>
                 {isSelectedAlertLoading ? (
-                  <div className="p-8 text-center text-xs font-mono text-slate-400">
+                  <div className="p-8 text-center text-xs font-mono text-slate-500">
                     <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2" />
                     Loading alert explainability and graph topology...
                   </div>
@@ -995,7 +995,7 @@ export default function CaseDetailPage() {
                     hideEscalateButton={true}
                   />
                 ) : (
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 font-mono flex items-center justify-between">
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-mono flex items-center justify-between">
                     <span>⚠️ Alert evidence unavailable: Alert {selectedAlertId} was not found in intelligence service.</span>
                   </div>
                 )}
@@ -1099,7 +1099,7 @@ export default function CaseDetailPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-slate-800">{ev.title}</span>
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 text-[10px] font-bold capitalize shrink-0">
+                  <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold capitalize shrink-0">
                     {ev.evidence_type.replace('_', ' ')}
                   </span>
                 </div>
@@ -1116,12 +1116,12 @@ export default function CaseDetailPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-200/50">
-                    <span className="text-slate-400">By: <span className="text-slate-700">{ev.uploaded_by}</span></span>
+                    <span className="text-slate-500">By: <span className="text-slate-700">{ev.uploaded_by}</span></span>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-slate-500 mr-1">{new Date(ev.uploaded_at).toLocaleDateString()}</span>
                       <Link
                         to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
-                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/30 transition flex items-center gap-1"
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-200 transition flex items-center gap-1"
                         title="Inspect entity ego network in Graph Workbench"
                       >
                         <span>🕸️ Graph</span>
@@ -1169,17 +1169,17 @@ export default function CaseDetailPage() {
                   <tr key={ev.id} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-alt)]/20 transition-colors font-mono text-[11px]">
                     <td className="py-3 px-3 capitalize font-medium text-slate-600 whitespace-nowrap">{ev.evidence_type.replace('_', ' ')}</td>
                     <td className="py-3 px-3 font-bold text-slate-800 whitespace-nowrap">{ev.title}</td>
-                    <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">{ev.file_path}</td>
-                    <td className="py-3 px-3 font-mono text-cyan-400 text-[10px] break-all">{ev.content_hash}</td>
+                    <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap">{ev.file_path}</td>
+                    <td className="py-3 px-3 font-mono text-cyan-600 text-[10px] break-all">{ev.content_hash}</td>
                     <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{ev.uploaded_by}</td>
-                    <td className="py-3 px-3 text-right text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-3 text-right text-slate-500 whitespace-nowrap">
                       {new Date(ev.uploaded_at).toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-700 hover:text-white border border-indigo-500/30 transition"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-700 hover:text-white border border-indigo-200 transition"
                           title={`Trace 2-hop ego network for ${getEvidenceEntityId(ev)}`}
                         >
                           <span>🕸️ 2-Hop Graph</span>

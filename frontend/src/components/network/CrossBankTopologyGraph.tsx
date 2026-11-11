@@ -475,10 +475,10 @@ export default function CrossBankTopologyGraph({
       {/* Empirical Benchmark Topology Indicator */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200/40 text-[11px] font-mono text-indigo-700">
         <div className="flex items-center gap-2">
-          <span className="font-bold uppercase tracking-wider text-indigo-400">Synthetic Benchmark Topology</span>
-          <span className="text-slate-400 hidden sm:inline">• Empirical multi-hop AML blind-spot scenario evaluation</span>
+          <span className="font-bold uppercase tracking-wider text-indigo-600">Synthetic Benchmark Topology</span>
+          <span className="text-slate-500 hidden sm:inline">• Empirical multi-hop AML blind-spot scenario evaluation</span>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded bg-white text-slate-400 border border-slate-200">
+        <span className="text-[10px] px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">
           Simulation Matrix
         </span>
       </div>
@@ -488,10 +488,10 @@ export default function CrossBankTopologyGraph({
         {/* Scenario Selector Pills - Mobile-friendly responsive 7-column grid without horizontal scrolling */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
           <div className="flex items-center justify-between sm:justify-start shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-cyan-400" /> Scenario:
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-cyan-600" /> Scenario:
             </span>
-            <span className="text-[11px] font-mono text-cyan-400 font-medium sm:hidden">
+            <span className="text-[11px] font-mono text-cyan-600 font-medium sm:hidden">
               {selectedScenario.replace('SCENARIO_', 'S')} Selected
             </span>
           </div>
@@ -506,7 +506,7 @@ export default function CrossBankTopologyGraph({
                   className={`px-1 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-200 text-center flex items-center justify-center ${
                     isSelected
                       ? 'bg-cyan-500/20 text-cyan-700 border border-cyan-500/50 shadow-sm shadow-cyan-500/20 font-bold'
-                      : 'bg-slate-100/60 text-slate-400 border border-slate-200/50 hover:bg-slate-100 hover:text-slate-700'
+                      : 'bg-slate-100/60 text-slate-500 border border-slate-200/50 hover:bg-slate-100 hover:text-slate-700'
                   }`}
                   title={SCENARIO_PREVIEWS[scId]?.title ?? scId}
                 >
@@ -521,10 +521,10 @@ export default function CrossBankTopologyGraph({
         {/* Responsive Information Horizon Filter - Mobile-friendly layout preventing text clipping & overflow */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 rounded-xl bg-slate-50 p-2 sm:p-1 border border-slate-200 w-full lg:w-auto">
           <div className="flex items-center justify-between sm:justify-start px-0.5 sm:px-1 shrink-0">
-            <span className="text-[11px] sm:text-xs font-mono text-slate-400 flex items-center gap-1.5">
-              <Lock className="h-3 w-3 text-amber-400" /> Horizon:
+            <span className="text-[11px] sm:text-xs font-mono text-slate-500 flex items-center gap-1.5">
+              <Lock className="h-3 w-3 text-amber-600" /> Horizon:
             </span>
-            <span className="text-[10px] font-mono text-amber-400/90 sm:hidden">
+            <span className="text-[10px] font-mono text-amber-600/90 sm:hidden">
               {horizon === 'global' ? 'Global View' : horizon === 'bank_a' ? 'Alpha View' : horizon === 'bank_b' ? 'Beta View' : 'Gamma View'}
             </span>
           </div>
@@ -557,7 +557,7 @@ export default function CrossBankTopologyGraph({
                   className={`px-1.5 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-mono transition-all text-center flex items-center justify-center truncate ${
                     isActive
                       ? activeColorClass
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100/50'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
                   }`}
                 >
                   <span className="lg:hidden">{shortLabels[hKey]}</span>
@@ -576,9 +576,9 @@ export default function CrossBankTopologyGraph({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2 text-xs text-amber-700 backdrop-blur-md"
+            className="flex items-center gap-2.5 rounded-xl bg-amber-50 border border-amber-500/30 px-3.5 py-2 text-xs text-amber-700 backdrop-blur-md"
           >
-            <EyeOff className="h-4 w-4 text-amber-400 shrink-0" />
+            <EyeOff className="h-4 w-4 text-amber-600 shrink-0" />
             <div className="leading-snug">
               <strong>Isolated Horizon Mode ({activeHorizonName}):</strong> Multi-hop hops outside this institution's view are masked with{' '}
               <span className="font-semibold text-rose-700 font-mono">🔒 BLIND SPOT</span>. Isolated silos fail to reconstruct the full laundering topology.
@@ -985,16 +985,16 @@ export default function CrossBankTopologyGraph({
         {/* Desktop Scenario Overlay Card (Floating with Collapse/Expand) */}
         <div className="hidden sm:block absolute bottom-3.5 left-3.5 max-w-sm lg:max-w-md rounded-xl border border-slate-200/90 bg-slate-50 p-4 backdrop-blur-md shadow-2xl transition-all">
           <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="text-xs font-mono font-semibold text-cyan-400 uppercase tracking-wider">
+            <span className="text-xs font-mono font-semibold text-cyan-600 uppercase tracking-wider">
               {scenarioData.typology}
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-1.5 py-0.5 font-bold">
+              <span className="text-[10px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 font-bold">
                 +{scenarioData.deltaUplift.toFixed(1)}% Uplift
               </span>
               <button 
                 onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}
-                className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition-colors"
+                className="text-slate-500 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition-colors"
                 title={isDossierCollapsed ? "Expand Details" : "Collapse Details"}
               >
                 {isDossierCollapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -1011,8 +1011,8 @@ export default function CrossBankTopologyGraph({
               exit={{ opacity: 0, height: 0 }}
             >
               <p className="text-xs text-slate-600 leading-relaxed mb-3">{scenarioData.description}</p>
-              <div className="text-[11px] text-amber-700/90 bg-amber-50 border border-amber-500/20 rounded-lg p-2.5 flex items-start gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-amber-700/90 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
                 <span>
                   <strong>Silo Vulnerability:</strong> {scenarioData.vulnerability}
                 </span>
@@ -1031,27 +1031,27 @@ export default function CrossBankTopologyGraph({
               className="absolute top-3.5 right-3.5 max-w-xs rounded-xl border border-cyan-500/40 bg-slate-50 p-3.5 text-xs backdrop-blur-md shadow-2xl"
             >
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
-                <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                <div className="flex items-center gap-1.5 text-cyan-600 font-bold">
                   <Info className="h-3.5 w-3.5" /> Node Inspection
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="text-slate-400 hover:text-white text-xs px-1"
+                  className="text-slate-500 hover:text-white text-xs px-1"
                 >
                   ✕
                 </button>
               </div>
               <div className="space-y-1.5 font-mono">
-                <div><span className="text-slate-400">Node:</span> <span className="text-slate-800 font-bold">{selectedNode.name}</span></div>
-                <div><span className="text-slate-400">Institution:</span> <span className="text-cyan-700">{selectedNode.bankId.replace('_', ' ').toUpperCase()}</span></div>
-                <div><span className="text-slate-400">Classification:</span> <span className="text-amber-700">{selectedNode.role}</span></div>
-                <div><span className="text-slate-400">Est. 24h Volume:</span> <span className="text-emerald-400 font-semibold">{selectedNode.volume}</span></div>
+                <div><span className="text-slate-500">Node:</span> <span className="text-slate-800 font-bold">{selectedNode.name}</span></div>
+                <div><span className="text-slate-500">Institution:</span> <span className="text-cyan-700">{selectedNode.bankId.replace('_', ' ').toUpperCase()}</span></div>
+                <div><span className="text-slate-500">Classification:</span> <span className="text-amber-700">{selectedNode.role}</span></div>
+                <div><span className="text-slate-500">Est. 24h Volume:</span> <span className="text-emerald-600 font-semibold">{selectedNode.volume}</span></div>
                 <div>
-                  <span className="text-slate-400">Horizon Visibility:</span>{' '}
+                  <span className="text-slate-500">Horizon Visibility:</span>{' '}
                   {horizon === 'global' || selectedNode.bankId === horizon ? (
-                    <span className="text-emerald-400 font-semibold">DIRECT (UNMASKED)</span>
+                    <span className="text-emerald-600 font-semibold">DIRECT (UNMASKED)</span>
                   ) : (
-                    <span className="text-rose-400 font-semibold">MASKED / BLIND SPOT</span>
+                    <span className="text-rose-600 font-semibold">MASKED / BLIND SPOT</span>
                   )}
                 </div>
               </div>
@@ -1063,17 +1063,17 @@ export default function CrossBankTopologyGraph({
       {/* Mobile-Only Dedicated Scenario Dossier Card (Never overlaps the graph!) */}
       <div className="sm:hidden rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-xl">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-mono font-semibold text-cyan-400 uppercase tracking-wider">
+          <span className="text-xs font-mono font-semibold text-cyan-600 uppercase tracking-wider">
             {scenarioData.typology}
           </span>
-          <span className="text-[11px] font-mono rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-2 py-0.5 font-bold">
+          <span className="text-[11px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 font-bold">
             +{scenarioData.deltaUplift.toFixed(1)}% Uplift
           </span>
         </div>
         <h4 className="text-sm font-bold text-slate-800 mb-1.5">{scenarioData.title}</h4>
         <p className="text-xs text-slate-600 leading-relaxed mb-3">{scenarioData.description}</p>
-        <div className="text-xs text-amber-700/90 bg-amber-50 border border-amber-500/20 rounded-lg p-2.5 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-amber-700/90 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
           <span>
             <strong>Silo Vulnerability:</strong> {scenarioData.vulnerability}
           </span>
@@ -1085,9 +1085,9 @@ export default function CrossBankTopologyGraph({
         <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <Share2 className="h-3.5 w-3.5 text-cyan-400" /> Multi-Hop Laundering Execution Trail:
+              <Share2 className="h-3.5 w-3.5 text-cyan-600" /> Multi-Hop Laundering Execution Trail:
             </span>
-            <span className="text-[11px] font-mono text-slate-400">
+            <span className="text-[11px] font-mono text-slate-500">
               {launderingHops.length} Laundering Hops
             </span>
           </div>
@@ -1103,15 +1103,15 @@ export default function CrossBankTopologyGraph({
                   key={hop.id} 
                   className={`rounded-lg border p-2.5 text-xs transition-all ${
                     isBlindSpot
-                      ? 'border-slate-200/60 bg-slate-50 text-slate-400'
+                      ? 'border-slate-200/60 bg-slate-50 text-slate-500'
                       : 'border-rose-300 bg-rose-50 text-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between font-mono font-bold text-[11px] mb-1">
-                    <span className={isBlindSpot ? 'text-slate-400' : 'text-rose-400'}>
+                    <span className={isBlindSpot ? 'text-slate-500' : 'text-rose-600'}>
                       HOP {hop.hopIndex ?? 0}
                     </span>
-                    <span className={isBlindSpot ? 'text-slate-400 line-through' : 'text-amber-700'}>
+                    <span className={isBlindSpot ? 'text-slate-500 line-through' : 'text-amber-700'}>
                       ${hop.amount.toLocaleString()}
                     </span>
                   </div>
@@ -1121,11 +1121,11 @@ export default function CrossBankTopologyGraph({
                     <span className="truncate">{tgtNode?.name}</span>
                   </div>
                   {isBlindSpot ? (
-                    <div className="text-[10px] text-rose-400 font-mono font-semibold mt-1 flex items-center gap-1">
+                    <div className="text-[10px] text-rose-600 font-mono font-semibold mt-1 flex items-center gap-1">
                       <EyeOff className="h-3 w-3" /> Blind Spot to {activeHorizonName}
                     </div>
                   ) : (
-                    <div className="text-[10px] text-emerald-400/90 font-mono mt-1">
+                    <div className="text-[10px] text-emerald-600/90 font-mono mt-1">
                       ✓ Observable in this Horizon
                     </div>
                   )}
@@ -1139,43 +1139,43 @@ export default function CrossBankTopologyGraph({
       {/* Metrics HUD: Isolated vs Federated Uplift */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-          <span className="text-xs text-slate-400 flex items-center gap-1.5 mb-1 truncate">
-            <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0" /> Isolated Silo Recall
+          <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-1 truncate">
+            <ShieldCheck className="h-4 w-4 text-rose-600 shrink-0" /> Isolated Silo Recall
           </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-rose-400">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-rose-600">
             {scenarioData.isolatedRecall.toFixed(1)}%
           </div>
-          <span className="text-[11px] text-slate-400 block truncate">Single-institution view</span>
+          <span className="text-[11px] text-slate-500 block truncate">Single-institution view</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-          <span className="text-xs text-slate-400 flex items-center gap-1.5 mb-1 truncate">
-            <Zap className="h-4 w-4 text-cyan-400 shrink-0" /> Federated Consensus
+          <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-1 truncate">
+            <Zap className="h-4 w-4 text-cyan-600 shrink-0" /> Federated Consensus
           </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-400">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-600">
             {scenarioData.federatedRecall.toFixed(1)}%
           </div>
-          <span className="text-[11px] text-slate-400 block truncate">Collaborative model</span>
+          <span className="text-[11px] text-slate-500 block truncate">Collaborative model</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-          <span className="text-xs text-slate-400 flex items-center gap-1.5 mb-1 truncate">
-            <Share2 className="h-4 w-4 text-emerald-400 shrink-0" /> Collaborative Uplift (Δ)
+          <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-1 truncate">
+            <Share2 className="h-4 w-4 text-emerald-600 shrink-0" /> Collaborative Uplift (Δ)
           </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-600">
             +{scenarioData.deltaUplift.toFixed(1)}%
           </div>
-          <span className="text-[11px] text-slate-400 block truncate">Gain over isolated silos</span>
+          <span className="text-[11px] text-slate-500 block truncate">Gain over isolated silos</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-          <span className="text-xs text-slate-400 flex items-center gap-1.5 mb-1 truncate">
-            <Lock className="h-4 w-4 text-indigo-400 shrink-0" /> Information Horizon
+          <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-1 truncate">
+            <Lock className="h-4 w-4 text-indigo-600 shrink-0" /> Information Horizon
           </span>
-          <div className="text-base sm:text-2xl font-bold font-mono text-indigo-400 whitespace-nowrap">
+          <div className="text-base sm:text-2xl font-bold font-mono text-indigo-600 whitespace-nowrap">
             ZERO RAW PII
           </div>
-          <span className="text-[11px] text-slate-400 block truncate">Zero raw PII or cross-bank edge leakage</span>
+          <span className="text-[11px] text-slate-500 block truncate">Zero raw PII or cross-bank edge leakage</span>
         </div>
       </div>
     </div>
