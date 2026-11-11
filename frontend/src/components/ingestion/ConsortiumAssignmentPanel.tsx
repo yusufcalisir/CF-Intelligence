@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Landmark,
   Layers,
@@ -60,19 +60,19 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               onClick={() => setSelectedBank(bank.id)}
               className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-indigo-500 bg-indigo-50 shadow-indigo-100'
-                  : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/70 hover:border-indigo-300'
+                  ? 'border-indigo-500 bg-indigo-50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                  : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)]/70 hover:border-slate-200'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Landmark size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />
-                  <span className="text-xs font-bold text-slate-800">{bank.name}</span>
+                  <Landmark size={16} className={isSelected ? 'text-indigo-400' : 'text-slate-400'} />
+                  <span className="text-xs font-bold text-slate-700">{bank.name}</span>
                 </div>
-                {isSelected && <CheckCircle2 size={15} className="text-indigo-600" />}
+                {isSelected && <CheckCircle2 size={15} className="text-indigo-400" />}
               </div>
               <p className="text-[11px] text-[var(--color-text-muted)] mt-1">{bank.subtitle}</p>
-              <span className="text-[10px] font-mono text-slate-500 mt-2 block">{bank.records}</span>
+              <span className="text-[10px] font-mono text-slate-400 mt-2 block">{bank.records}</span>
             </div>
           );
         })}
@@ -82,7 +82,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
       <div className="p-3.5 rounded-xl bg-white/[0.02] border border-slate-200 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-            <Layers size={13} className="text-indigo-600" /> Partition Allocation Strategy:
+            <Layers size={13} className="text-indigo-400" /> Partition Allocation Strategy:
           </label>
           <div className="flex items-center gap-2">
             <button
@@ -90,8 +90,8 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               onClick={() => setAllocationMode('replace_partition')}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'replace_partition'
-                  ? 'bg-indigo-600 text-slate-900 shadow'
-                  : 'bg-slate-50 text-slate-500 hover:text-slate-900'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-slate-50 text-slate-400 hover:text-white'
               }`}
             >
               Replace Partition
@@ -101,8 +101,8 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
               onClick={() => setAllocationMode('append_partition')}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                 allocationMode === 'append_partition'
-                  ? 'bg-indigo-600 text-slate-900 shadow'
-                  : 'bg-slate-50 text-slate-500 hover:text-slate-900'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-slate-50 text-slate-400 hover:text-white'
               }`}
             >
               Append Records
@@ -112,14 +112,14 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
 
         <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
           <label htmlFor="trigger-fl-toggle" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-pointer">
-            <Zap size={13} className="text-amber-600" /> Trigger Federated Learning Round Automatically
+            <Zap size={13} className="text-amber-400" /> Trigger Federated Learning Round Automatically
           </label>
           <input
             id="trigger-fl-toggle"
             type="checkbox"
             checked={triggerFL}
             onChange={(e) => setTriggerFL(e.target.checked)}
-            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-black/40 border-slate-200 cursor-pointer"
+            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-100 border-slate-200 cursor-pointer"
           />
         </div>
       </div>
@@ -130,7 +130,7 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
         type="button"
         disabled={isSubmitting}
         onClick={handleSubmit}
-        className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-slate-900 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+        className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Play size={14} className="fill-white" />
         <span>Enroll Audited Dataset into {BANK_NODES.find((b) => b.id === selectedBank)?.name}</span>
@@ -138,6 +138,3 @@ export const ConsortiumAssignmentPanel: React.FC<ConsortiumAssignmentPanelProps>
     </div>
   );
 };
-
-
-

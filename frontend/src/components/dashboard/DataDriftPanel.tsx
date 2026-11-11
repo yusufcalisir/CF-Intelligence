@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AreaChart,
@@ -17,9 +17,9 @@ import { BANK_COLORS, BANK_NAMES } from '../../api/types';
 
 // Tab definitions for data distributions
 const DIST_TABS = [
-  { id: 'amount', label: 'Transaction Amount', icon: 'ğŸ’°' },
-  { id: 'hourly', label: 'Hourly Fraud Pattern', icon: 'ğŸ•' },
-  { id: 'merchant', label: 'Merchant Risk', icon: 'ğŸª' },
+  { id: 'amount', label: 'Transaction Amount', icon: '💰' },
+  { id: 'hourly', label: 'Hourly Fraud Pattern', icon: '🕐' },
+  { id: 'merchant', label: 'Merchant Risk', icon: '🏪' },
 ] as const;
 
 type DistTabId = (typeof DIST_TABS)[number]['id'];
@@ -167,7 +167,7 @@ export default function DataDriftPanel() {
               className="text-[10px] px-2 py-0.5 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] transition"
               title="Learn about PSI and JS Divergence"
             >
-              ğŸ“– Guide
+              📖 Guide
             </button>
           </div>
           <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
@@ -220,32 +220,32 @@ export default function DataDriftPanel() {
             className="overflow-hidden bg-[var(--color-bg-primary)] rounded-lg border border-[var(--color-border-subtle)] p-3 text-[10px] leading-relaxed flex flex-col gap-2 text-[var(--color-text-secondary)] shadow-inner"
           >
             <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-1.5 mb-1">
-              <span className="font-semibold text-[var(--color-text-primary)]">ğŸ“Š Statistical Metric Guide</span>
-              <button onClick={() => setShowEduGuide(false)} className="text-[9px] hover:text-[var(--color-text-primary)]">âœ– Close</button>
+              <span className="font-semibold text-[var(--color-text-primary)]">📊 Statistical Metric Guide</span>
+              <button onClick={() => setShowEduGuide(false)} className="text-[9px] hover:text-[var(--color-text-primary)]">✖ Close</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <p className="font-medium text-[var(--color-text-primary)] mb-0.5">ğŸ§  PSI (Population Stability Index)</p>
+                <p className="font-medium text-[var(--color-text-primary)] mb-0.5">🧠 PSI (Population Stability Index)</p>
                 <p className="text-[9px] text-[var(--color-text-muted)] space-y-1">
                   <span>Measures distribution change over populations.</span>
                   <br />
                   <span className="inline-block mt-0.5">
-                    Formula: <code className="font-mono text-cyan-600 bg-cyan-50/40 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[9px]">âˆ‘ (A<sub>i</sub> - E<sub>i</sub>) Ã— ln(A<sub>i</sub> / E<sub>i</sub>)</code>
+                    Formula: <code className="font-mono text-cyan-400 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[9px]">∑ (A<sub>i</sub> - E<sub>i</sub>) × ln(A<sub>i</sub> / E<sub>i</sub>)</code>
                   </span>
                   <br />
                   <span className="inline-block mt-1">
-                    ğŸŸ¢ <span className="text-[#10B981]">&lt;0.10</span> Stable | ğŸŸ¡ <span className="text-[#F59E0B]">0.10â€“0.25</span> Moderate Shift | ğŸ”´ <span className="text-[#EF4444]">&gt;0.25</span> Significant Drift (requires Federated Training).
+                    🟢 <span className="text-[#10B981]">&lt;0.10</span> Stable | 🟡 <span className="text-[#F59E0B]">0.10–0.25</span> Moderate Shift | 🔴 <span className="text-[#EF4444]">&gt;0.25</span> Significant Drift (requires Federated Training).
                   </span>
                 </p>
               </div>
               <div>
-                <p className="font-medium text-[var(--color-text-primary)] mb-0.5">ğŸ”¬ Jensen-Shannon (JS) Divergence</p>
+                <p className="font-medium text-[var(--color-text-primary)] mb-0.5">🔬 Jensen-Shannon (JS) Divergence</p>
                 <p className="text-[9px] text-[var(--color-text-muted)] leading-relaxed">
                   Symmetric, smooth measure of distribution divergence bounded between{' '}
-                  <code className="font-mono text-cyan-600 bg-cyan-50/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">0.0</code> (identical) and{' '}
-                  <code className="font-mono text-cyan-600 bg-cyan-50/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">1.0</code> (disjoint).
+                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">0.0</code> (identical) and{' '}
+                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">1.0</code> (disjoint).
                   Helps identify local feature alignment. Used directly to capture concept drift on model outputs{' '}
-                  <code className="font-mono text-cyan-600 bg-cyan-50/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">P(Y|X)</code>.
+                  <code className="font-mono text-cyan-400 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">P(Y|X)</code>.
                 </p>
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function DataDriftPanel() {
             }`}
           >
             <span>
-              {mode === 'distributions' ? 'ğŸ“Š Distributions' : mode === 'feature_drift' ? 'ğŸ§¬ Feature Drift' : 'ğŸ§  Concept Drift'}
+              {mode === 'distributions' ? '📊 Distributions' : mode === 'feature_drift' ? '🧬 Feature Drift' : '🧠 Concept Drift'}
             </span>
           </button>
         ))}
@@ -337,9 +337,9 @@ export default function DataDriftPanel() {
 
                       <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[var(--color-border-subtle)]/50">
                         {[
-                          { key: 'a_vs_b', label: 'Mer â†” Nex' },
-                          { key: 'a_vs_c', label: 'Mer â†” Her' },
-                          { key: 'b_vs_c', label: 'Nex â†” Her' },
+                          { key: 'a_vs_b', label: 'Mer ↔ Nex' },
+                          { key: 'a_vs_c', label: 'Mer ↔ Her' },
+                          { key: 'b_vs_c', label: 'Nex ↔ Her' },
                         ].map(({ key, label }) => {
                           const val = getCellData(key);
                           const style = getStatusStyle(val.status);
@@ -374,9 +374,9 @@ export default function DataDriftPanel() {
                     <tr className="bg-[var(--color-bg-primary)] border-b border-[var(--color-border-subtle)] text-[var(--color-text-muted)]">
                       <th className="p-2.5 font-semibold">Feature Name</th>
                       <th className="p-2.5 font-semibold">Type</th>
-                      <th className="p-2.5 font-semibold">Meridian â†” Nexus</th>
-                      <th className="p-2.5 font-semibold">Meridian â†” Heritage</th>
-                      <th className="p-2.5 font-semibold">Nexus â†” Heritage</th>
+                      <th className="p-2.5 font-semibold">Meridian ↔ Nexus</th>
+                      <th className="p-2.5 font-semibold">Meridian ↔ Heritage</th>
+                      <th className="p-2.5 font-semibold">Nexus ↔ Heritage</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-border-subtle)]">
@@ -435,10 +435,10 @@ export default function DataDriftPanel() {
                 if (!info) return null;
                 
                 const pairName = pair === 'a_vs_b'
-                  ? 'Meridian â†” Nexus'
+                  ? 'Meridian ↔ Nexus'
                   : pair === 'a_vs_c'
-                  ? 'Meridian â†” Heritage'
-                  : 'Nexus â†” Heritage';
+                  ? 'Meridian ↔ Heritage'
+                  : 'Nexus ↔ Heritage';
                 
                 const predDrift = info.model_prediction_drift;
                 const statusStyle = getStatusStyle(predDrift.status);
@@ -530,7 +530,7 @@ export default function DataDriftPanel() {
   );
 }
 
-// â”€â”€ Sub-Charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sub-Charts ──────────────────────────────────────
 
 function AmountChart({ data }: { data: Record<string, unknown>[] }) {
   return (
@@ -685,5 +685,3 @@ function MerchantChart({ data }: { data: Record<string, unknown>[] }) {
     </ResponsiveContainer>
   );
 }
-
-

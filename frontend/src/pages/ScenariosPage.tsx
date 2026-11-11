@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useScenarios, useStartScenario, useScenarioStatus, useStopScenario, useActiveScenarios } from '../api/queries';
 import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
@@ -102,10 +102,10 @@ export default function ScenariosPage() {
   }, []);
 
   const SCENARIO_ICONS: Record<string, string> = {
-    fraud_ring: 'ğŸ•¸ï¸',
-    account_takeover: 'ğŸ”',
-    money_laundering: 'ğŸ’°',
-    card_testing: 'ğŸ’³',
+    fraud_ring: '🕸️',
+    account_takeover: '🔐',
+    money_laundering: '💰',
+    card_testing: '💳',
   };
 
   const SCENARIO_GRADIENTS: Record<string, string> = {
@@ -167,22 +167,22 @@ export default function ScenariosPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-5 border border-indigo-200 shadow-lg"
+          className="glass-card p-5 border border-indigo-500/30 shadow-lg"
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold flex items-center gap-2">
               <span>
-                {isRunning ? 'â–¶ï¸ Scenario Running' :
-                 isCompleted ? 'âœ… Scenario Complete' :
-                 isStopped ? 'â¹ï¸ Scenario Stopped' :
-                 `â„¹ï¸ Scenario ${status?.status ?? ''}`}
+                {isRunning ? '▶️ Scenario Running' :
+                 isCompleted ? '✅ Scenario Complete' :
+                 isStopped ? '⏹️ Scenario Stopped' :
+                 `ℹ️ Scenario ${status?.status ?? ''}`}
               </span>
             </h3>
             <div className="flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                 isRunning
-                  ? 'bg-green-500/20 text-green-600 border border-green-500/30 animate-pulse'
-                  : 'bg-gray-500/20 text-slate-500 border border-gray-500/30'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30 animate-pulse'
+                  : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
               }`}>
                 {status.status}
               </span>
@@ -190,16 +190,16 @@ export default function ScenariosPage() {
                 <button
                   onClick={handleStop}
                   disabled={stopScenario.isPending}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-100 text-rose-600 hover:bg-rose-100 border border-rose-300 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-rose-500/20 text-rose-700 hover:bg-rose-500/30 border border-rose-300 transition-all cursor-pointer"
                 >
-                  {stopScenario.isPending ? 'Stopping...' : 'â¹ Stop'}
+                  {stopScenario.isPending ? 'Stopping...' : '⏹ Stop'}
                 </button>
               ) : (
                 <button
                   onClick={handleDismiss}
-                  className="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-white/20 border border-slate-200 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-semibold bg-slate-50 text-slate-600 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer"
                 >
-                  âœ• Dismiss
+                  ✕ Dismiss
                 </button>
               )}
             </div>
@@ -277,11 +277,11 @@ export default function ScenariosPage() {
 
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-3xl">{SCENARIO_ICONS[scenarioType] || 'ğŸ¯'}</span>
+                    <span className="text-3xl">{SCENARIO_ICONS[scenarioType] || '🎯'}</span>
                     <div>
                       <h3 className="font-bold">{scenarioName}</h3>
                       <span className="text-xs text-[var(--color-text-muted)]">
-                        {scenarioEvents} events â€¢ ~{scenarioDuration}s
+                        {scenarioEvents} events • ~{scenarioDuration}s
                       </span>
                     </div>
                   </div>
@@ -305,7 +305,7 @@ export default function ScenariosPage() {
                     <button
                       onClick={() => handleStart(scenarioType)}
                       disabled={startScenario.isPending || isRunning}
-                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-slate-900 hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-white hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                       style={{ background: SCENARIO_GRADIENTS[scenarioType] || SCENARIO_GRADIENTS.fraud_ring }}
                     >
                       {startScenario.isPending ? (
@@ -314,7 +314,7 @@ export default function ScenariosPage() {
                           <span>Starting...</span>
                         </>
                       ) : (
-                        <span>â–¶ Run</span>
+                        <span>▶ Run</span>
                       )}
                     </button>
                   </div>
@@ -327,6 +327,3 @@ export default function ScenariosPage() {
     </div>
   );
 }
-
-
-

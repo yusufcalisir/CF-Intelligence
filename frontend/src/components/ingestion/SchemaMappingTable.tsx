@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   SlidersHorizontal,
   CheckCircle2,
@@ -45,9 +45,9 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Header & Status bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
+          <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
             <SlidersHorizontal size={18} />
           </div>
           <div>
@@ -61,11 +61,11 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1 rounded-xl bg-emerald-100 border border-emerald-500/40 text-emerald-600 text-xs font-mono font-bold flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-700 text-xs font-mono font-bold flex items-center gap-1.5">
             <CheckCircle2 size={13} />
             <span>{mappedCanonicalCount}/9 Canonical Signals</span>
           </div>
-          <div className="px-3 py-1 rounded-xl bg-indigo-100 border border-indigo-500/40 text-indigo-600 text-xs font-mono font-bold flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-700 text-xs font-mono font-bold flex items-center gap-1.5">
             <ShieldCheck size={13} />
             <span>{piiMaskedReceipt}</span>
           </div>
@@ -91,7 +91,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
 
               return (
                 <tr key={col} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-3.5 py-2.5 font-mono font-semibold text-slate-800">
+                  <td className="px-3.5 py-2.5 font-mono font-semibold text-slate-700">
                     {col}
                   </td>
                   <td className="px-3.5 py-2.5">
@@ -107,7 +107,7 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
                       id={`mapping-select-${col}`}
                       value={currentTarget}
                       onChange={(e) => onMappingChange(col, e.target.value)}
-                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-indigo-500 font-sans"
+                      className="w-full max-w-xs px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs focus:outline-none focus:border-indigo-500 font-sans"
                     >
                       {CANONICAL_TARGET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -124,8 +124,8 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
       </div>
 
       {piiViolationsCount > 0 && (
-        <div className="p-3 rounded-xl bg-amber-100 border border-amber-200 text-amber-600 text-xs flex items-center gap-2">
-          <HelpCircle size={15} className="shrink-0 text-amber-600" />
+        <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 text-xs flex items-center gap-2">
+          <HelpCircle size={15} className="shrink-0 text-amber-400" />
           <span>
             Notice: {piiViolationsCount} raw identifier patterns were detected and hashed client-side with bank type salt before transmission.
           </span>
@@ -134,4 +134,3 @@ export const SchemaMappingTable: React.FC<SchemaMappingTableProps> = ({
     </div>
   );
 };
-

@@ -32,7 +32,7 @@ const PageFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
     <div className="flex flex-col items-center gap-3">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
-      <span className="text-xs font-mono text-slate-500">Loading module...</span>
+      <span className="text-xs font-mono text-slate-400">Loading module...</span>
     </div>
   </div>
 );

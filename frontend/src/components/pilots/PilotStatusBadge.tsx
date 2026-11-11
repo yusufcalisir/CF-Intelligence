@@ -1,4 +1,4 @@
-﻿import type { PilotStatus } from '../../api/types';
+import type { PilotStatus } from '../../api/types';
 
 interface PilotStatusBadgeProps {
   status: PilotStatus | string;
@@ -8,36 +8,36 @@ interface PilotStatusBadgeProps {
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
   DRAFT: {
     label: 'Draft',
-    bg: 'bg-slate-50/60',
+    bg: 'bg-slate-100/60',
     text: 'text-slate-600',
     border: 'border-slate-200',
     dot: 'bg-slate-400',
   },
   PREFLIGHT: {
     label: 'Preflight Verification',
-    bg: 'bg-purple-100',
-    text: 'text-purple-600',
+    bg: 'bg-purple-50',
+    text: 'text-purple-700',
     border: 'border-purple-600/40',
     dot: 'bg-purple-400 animate-pulse',
   },
   AWAITING_APPROVAL: {
     label: 'Awaiting Approvals',
-    bg: 'bg-amber-100',
-    text: 'text-amber-600',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
     border: 'border-amber-600/40',
     dot: 'bg-amber-400',
   },
   AUTHORIZED: {
     label: 'Fully Authorized',
-    bg: 'bg-cyan-100',
-    text: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+    text: 'text-cyan-700',
     border: 'border-cyan-600/40',
     dot: 'bg-cyan-400',
   },
   ACTIVE: {
     label: 'Operational Active',
-    bg: 'bg-emerald-100',
-    text: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
     border: 'border-emerald-600/40',
     dot: 'bg-emerald-400 animate-ping',
   },
@@ -50,22 +50,22 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
   },
   COMPLETED: {
     label: 'Completed',
-    bg: 'bg-teal-100',
-    text: 'text-teal-600',
+    bg: 'bg-teal-50',
+    text: 'text-teal-700',
     border: 'border-teal-600/40',
     dot: 'bg-teal-400',
   },
   ABORTED: {
     label: 'Aborted (Terminal)',
     bg: 'bg-rose-50',
-    text: 'text-rose-600',
-    border: 'border-rose-600/50',
+    text: 'text-rose-700',
+    border: 'border-rose-300',
     dot: 'bg-rose-500',
   },
   FAILED: {
     label: 'Failed (Terminal)',
     bg: 'bg-red-50',
-    text: 'text-red-600',
+    text: 'text-red-300',
     border: 'border-red-600/50',
     dot: 'bg-red-500',
   },
@@ -75,7 +75,7 @@ export default function PilotStatusBadge({ status, size = 'md' }: PilotStatusBad
   const normalized = (status || 'DRAFT').toUpperCase();
   const conf = STATUS_CONFIG[normalized] || {
     label: normalized,
-    bg: 'bg-slate-50/60',
+    bg: 'bg-slate-100/60',
     text: 'text-slate-600',
     border: 'border-slate-200',
     dot: 'bg-slate-400',
@@ -96,7 +96,3 @@ export default function PilotStatusBadge({ status, size = 'md' }: PilotStatusBad
     </span>
   );
 }
-
-
-
-

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -26,21 +26,21 @@ export default function ConsortiumPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200/80 pb-6">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 border border-cyan-500/20 text-cyan-600 shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
               <Network className="h-4 w-4" />
             </div>
-            <span className="text-xs font-mono font-semibold uppercase tracking-wider text-cyan-600">
+            <span className="text-xs font-mono font-semibold uppercase tracking-wider text-cyan-400">
               Flagship Empirical Benchmark (CFI-CrossBank-01)
             </span>
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-600 border border-emerald-200">
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 border border-emerald-500/20">
               EMPIRICALLY VERIFIED
             </span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
             Cross-Bank Synthetic Consortium Benchmark
           </h1>
           <p className="text-sm text-slate-600 max-w-3xl mt-1 leading-relaxed">
-            Empirically answering the platform's core research question: <strong className="text-slate-900 font-semibold">Can collaborative learning detect distributed financial crime that is invisible to isolated institutions?</strong> Evaluated across 7 canonical multi-hop fraud topologies.
+            Empirically answering the platform's core research question: <strong className="text-slate-800 font-semibold">Can collaborative learning detect distributed financial crime that is invisible to isolated institutions?</strong> Evaluated across 7 canonical multi-hop fraud topologies.
           </p>
         </div>
 
@@ -49,17 +49,17 @@ export default function ConsortiumPage() {
           <button
             type="button"
             onClick={() => setIsReportOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-50 to-white px-3.5 py-2 text-xs font-semibold text-cyan-600 hover:border-cyan-400 hover:text-slate-900 hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-slate-50 to-slate-850 px-3.5 py-2 text-xs font-semibold text-cyan-700 hover:border-cyan-400 hover:text-white hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
           >
-            <FileText className="h-3.5 w-3.5 text-cyan-600 group-hover:scale-110 transition-transform" />
+            <FileText className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
             <span>Technical Report</span>
-            <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-mono font-medium text-cyan-600 border border-cyan-500/20">
+            <span className="rounded-full bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-mono font-medium text-cyan-700 border border-cyan-500/20">
               Interactive
             </span>
           </button>
           <button
             onClick={() => setSelectedScenario('SCENARIO_7')}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 transition-all"
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 transition-all"
           >
             <Sparkles className="h-3.5 w-3.5" /> Inspect Zero-Positive Transfer
           </button>
@@ -72,19 +72,19 @@ export default function ConsortiumPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-md"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-5 backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span>Overall Federated Detection</span>
-            <Zap className="h-4 w-4 text-cyan-600" />
+            <Zap className="h-4 w-4 text-cyan-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono text-cyan-600 tracking-tight">
+          <div className="text-3xl font-extrabold font-mono text-cyan-400 tracking-tight">
             100.0%
           </div>
-          <div className="text-xs text-emerald-600 flex items-center gap-1 mt-1 font-medium">
+          <div className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
             <ArrowUpRight className="h-3.5 w-3.5" /> +19.4% mean uplift vs silos
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">
+          <span className="text-[11px] text-slate-400 mt-2 block">
             Across 20,000 multi-bank transactions
           </span>
         </motion.div>
@@ -93,19 +93,19 @@ export default function ConsortiumPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
-          className="rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-md"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-5 backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span>Isolated Banking Silos Mean</span>
-            <Building2 className="h-4 w-4 text-rose-600" />
+            <Building2 className="h-4 w-4 text-rose-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono text-rose-600 tracking-tight">
+          <div className="text-3xl font-extrabold font-mono text-rose-400 tracking-tight">
             80.6%
           </div>
-          <div className="text-xs text-rose-600/90 flex items-center gap-1 mt-1 font-medium">
+          <div className="text-xs text-rose-400/90 flex items-center gap-1 mt-1 font-medium">
             -19.4% blind spot deficit
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">
+          <span className="text-[11px] text-slate-400 mt-2 block">
             Severe degradation on multi-hop cycles
           </span>
         </motion.div>
@@ -114,19 +114,19 @@ export default function ConsortiumPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-md"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-5 backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span>Scenario 7 Cold-Start Uplift</span>
-            <TrendingUp className="h-4 w-4 text-emerald-600" />
+            <TrendingUp className="h-4 w-4 text-emerald-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono text-emerald-600 tracking-tight">
+          <div className="text-3xl font-extrabold font-mono text-emerald-400 tracking-tight">
             +100.0%
           </div>
-          <div className="text-xs text-emerald-600 flex items-center gap-1 mt-1 font-medium">
-            0.0% isolated â” 100.0% federated
+          <div className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
+            0.0% isolated ➔ 100.0% federated
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">
+          <span className="text-[11px] text-slate-400 mt-2 block">
             Bank Gamma zero-positive transfer
           </span>
         </motion.div>
@@ -135,19 +135,19 @@ export default function ConsortiumPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          className="rounded-2xl border border-slate-200 bg-white/60 p-5 backdrop-blur-md"
+          className="rounded-2xl border border-slate-200 bg-slate-50 p-5 backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span>Information Horizon Guarantee</span>
-            <Lock className="h-4 w-4 text-indigo-600" />
+            <Lock className="h-4 w-4 text-indigo-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono text-indigo-600 tracking-tight">
+          <div className="text-3xl font-extrabold font-mono text-indigo-400 tracking-tight">
             0 LEAKS
           </div>
-          <div className="text-xs text-indigo-600 flex items-center gap-1 mt-1 font-medium">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Zero Raw PII Transmitted
+          <div className="text-xs text-indigo-700 flex items-center gap-1 mt-1 font-medium">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Zero Raw PII Transmitted
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">
+          <span className="text-[11px] text-slate-400 mt-2 block">
             Banks observe only incident local edges
           </span>
         </motion.div>
@@ -157,10 +157,10 @@ export default function ConsortiumPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="h-5 w-5 text-cyan-600" /> Multi-Institution Network Topology & Information Horizons
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Layers className="h-5 w-5 text-cyan-400" /> Multi-Institution Network Topology & Information Horizons
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Select a scenario to visualize multi-hop laundering chains. Switch the Information Horizon to experience the partial visibility of isolated institutions.
             </p>
           </div>
@@ -173,26 +173,26 @@ export default function ConsortiumPage() {
       </div>
 
       {/* 7 Canonical Scenarios Performance Breakdown Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 sm:p-6 backdrop-blur-md shadow-xl shrink-0 w-full min-h-fit">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6 backdrop-blur-md shadow-xl shrink-0 w-full min-h-fit">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
-              <ShieldCheck className="h-5 w-5 text-indigo-600 shrink-0" />
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 flex-wrap">
+              <ShieldCheck className="h-5 w-5 text-indigo-400 shrink-0" />
               <span>Canonical Scenarios Empirical Matrix</span>
-              <span className="text-xs font-mono text-slate-500 font-normal">(Scenarios 1â€“7)</span>
+              <span className="text-xs font-mono text-slate-400 font-normal">(Scenarios 1–7)</span>
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Empirical evaluation comparing Isolated Local Silos vs Federated Consensus (FedAvg) vs Theoretical Pooled Oracle.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-cyan-600/80 sm:hidden flex items-center gap-1 shrink-0">
-            â† Swipe table horizontally to inspect all metrics â†’
+          <span className="text-[11px] font-mono text-cyan-400/80 sm:hidden flex items-center gap-1 shrink-0">
+            ← Swipe table horizontally to inspect all metrics →
           </span>
         </div>
 
         <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
           <table className="w-full text-left text-xs min-w-[700px]">
-            <thead className="border-b border-slate-200 bg-white/60 text-slate-500 uppercase font-mono">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-400 uppercase font-mono">
               <tr>
                 <th className="py-3 px-4 whitespace-nowrap">Scenario</th>
                 <th className="py-3 px-4 whitespace-nowrap">Typology</th>
@@ -203,7 +203,7 @@ export default function ConsortiumPage() {
                 <th className="py-3 px-4 text-right whitespace-nowrap">Collaborative Uplift</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200/60 font-mono">
+            <tbody className="divide-y divide-slate-800/60 font-mono">
               {Object.entries(SCENARIO_PREVIEWS).map(([scId, sc]) => {
                 const isSelected = selectedScenario === scId;
                 return (
@@ -212,34 +212,34 @@ export default function ConsortiumPage() {
                     onClick={() => setSelectedScenario(scId)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-cyan-50 text-cyan-700'
-                        : 'hover:bg-slate-50/40 text-slate-600'
+                        ? 'bg-cyan-500/10 text-cyan-700'
+                        : 'hover:bg-slate-100/40 text-slate-600'
                     }`}
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                    <td className="py-3 px-4 font-semibold text-slate-800 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <span className={`h-2 w-2 rounded-full shrink-0 ${isSelected ? 'bg-cyan-400' : 'bg-slate-600'}`} />
                         <span>{sc.title}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
-                      <span className="rounded bg-slate-50/80 px-2 py-0.5 text-[10px] text-slate-600 border border-slate-200/50">
+                    <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
+                      <span className="rounded bg-slate-100/80 px-2 py-0.5 text-[10px] text-slate-600 border border-slate-200/50">
                         {sc.typology}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 font-sans whitespace-nowrap">
+                    <td className="py-3 px-4 text-slate-400 font-sans whitespace-nowrap">
                       {sc.participatingBanks.map(b => b.replace('_', ' ').toUpperCase()).join(', ')}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-rose-600 whitespace-nowrap">
+                    <td className="py-3 px-4 text-center font-bold text-rose-400 whitespace-nowrap">
                       {sc.isolatedRecall.toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-cyan-600 whitespace-nowrap">
+                    <td className="py-3 px-4 text-center font-bold text-cyan-400 whitespace-nowrap">
                       {sc.federatedRecall.toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 text-center text-emerald-600 font-semibold whitespace-nowrap">
+                    <td className="py-3 px-4 text-center text-emerald-400 font-semibold whitespace-nowrap">
                       100.0%
                     </td>
-                    <td className="py-3 px-4 text-right font-extrabold text-emerald-600 whitespace-nowrap">
+                    <td className="py-3 px-4 text-right font-extrabold text-emerald-400 whitespace-nowrap">
                       +{sc.deltaUplift.toFixed(1)}%
                     </td>
                   </tr>
@@ -252,27 +252,27 @@ export default function ConsortiumPage() {
 
       {/* Research Thesis Deep-Dive Cards */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white/60 p-5">
-          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-2">
-            <Building2 className="h-4 w-4 text-rose-600" /> Why Isolated Banking Silos Fail
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+            <Building2 className="h-4 w-4 text-rose-400" /> Why Isolated Banking Silos Fail
           </h4>
           <p className="text-xs text-slate-600 leading-relaxed">
             In multi-bank networks, individual banks suffer from <strong>hop blindness</strong>. In Scenario 3 ($A \to B \to C \to A$), Bank Alpha sees an exit to B and an entry from C. It cannot observe the $B \to C$ leg, making closed cycle detection mathematically impossible in isolation.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white/60 p-5">
-          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-2">
-            <Zap className="h-4 w-4 text-cyan-600" /> How Federated Learning Solves It
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+            <Zap className="h-4 w-4 text-cyan-400" /> How Federated Learning Solves It
           </h4>
           <p className="text-xs text-slate-600 leading-relaxed">
             Without transmitting raw account numbers or transaction logs, federated parameter aggregation shares discriminative decision boundaries across consortium nodes, allowing models to recognize rapid layering and cyclic balance velocity signatures.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white/60 p-5">
-          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-2">
-            <TrendingUp className="h-4 w-4 text-emerald-600" /> Zero-Positive Cold Start Transfer
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+            <TrendingUp className="h-4 w-4 text-emerald-400" /> Zero-Positive Cold Start Transfer
           </h4>
           <p className="text-xs text-slate-600 leading-relaxed">
             In Scenario 7, Bank Gamma has zero historical fraud incidents ($y = 0$). In isolation, its detection rate is 0.0%. Through federated consensus, Bank Gamma inherits models trained on Banks Alpha & Beta, instantly achieving 100% zero-shot protection.
@@ -288,5 +288,3 @@ export default function ConsortiumPage() {
     </div>
   );
 }
-
-

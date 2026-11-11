@@ -94,7 +94,7 @@ export default function PrivacyMonitor({ simulation, rounds }: PrivacyMonitorPro
           <div className="space-y-4">
             {/* Stats Boxes */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-black/20 border border-[var(--color-border-subtle)]">
+              <div className="p-3.5 rounded-xl bg-slate-100 border border-[var(--color-border-subtle)]">
                 <p className="text-[9px] text-[var(--color-text-muted)] uppercase tracking-wider">Spent Epsilon (ε)</p>
                 <p className="text-xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
                   {currentEpsilon.toFixed(4)}
@@ -102,7 +102,7 @@ export default function PrivacyMonitor({ simulation, rounds }: PrivacyMonitorPro
                 <p className="text-[9px] text-[var(--color-text-muted)] mt-0.5">Limit: {targetEpsilon.toFixed(2)}</p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-black/20 border border-[var(--color-border-subtle)]">
+              <div className="p-3.5 rounded-xl bg-slate-100 border border-[var(--color-border-subtle)]">
                 <p className="text-[9px] text-[var(--color-text-muted)] uppercase tracking-wider">Total Delta (δ)</p>
                 <p className="text-xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
                   {currentDelta === 0 ? '0' : currentDelta.toExponential(2)}
@@ -112,14 +112,14 @@ export default function PrivacyMonitor({ simulation, rounds }: PrivacyMonitorPro
             </div>
 
             {/* Consumption Progress Bar */}
-            <div className="space-y-1.5 p-4 rounded-xl bg-black/10 border border-[var(--color-border-subtle)]/40">
+            <div className="space-y-1.5 p-4 rounded-xl bg-slate-100 border border-[var(--color-border-subtle)]/40">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-[var(--color-text-muted)]">Privacy Budget Spent</span>
                 <span className="font-bold font-mono text-[var(--color-text-primary)]">
                   {consumptionPercentage.toFixed(1)}%
                 </span>
               </div>
-              <div className="w-full h-2 rounded-full bg-black/30 overflow-hidden relative">
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out"
                   style={{

@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useProvisionPilot } from '../../api/pilots';
 import { useConsortium } from '../../api/queries';
 import { formatApiError } from '../../api/client';
@@ -99,33 +99,33 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-100 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-6 shadow-2xl space-y-4 my-8">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5">
-            <ShieldPlus className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900 tracking-wide">
+            <ShieldPlus className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-sm font-bold text-white tracking-wide">
               Provision Governed Two-Bank Controlled Pilot
             </h3>
           </div>
           <button
             onClick={onClose}
             disabled={provisionMutation.isPending}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs text-slate-500">
-          Provisions an authorized bilateral pilot in <code className="text-indigo-600 font-mono">DRAFT</code> state.
+        <p className="text-xs text-slate-400">
+          Provisions an authorized bilateral pilot in <code className="text-indigo-700 font-mono">DRAFT</code> state.
           Calculates the initial immutable scope digest and establishes durable reservation quotas.
         </p>
 
         {formError && (
-          <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <div>{formError}</div>
           </div>
         )}
@@ -134,7 +134,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Pilot Identifier <span className="text-rose-600">*</span>
+                Pilot Identifier <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -143,14 +143,14 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 placeholder="e.g. pilot_bilateral_2026_q4"
                 pattern="^[a-zA-Z0-9_\-]+$"
                 required
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">Alphanumeric, underscores, hyphens only</span>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Governing Consortium ID <span className="text-rose-600">*</span>
+                Governing Consortium ID <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -158,10 +158,10 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 onChange={(e) => setConsortiumId(e.target.value)}
                 placeholder="e.g. cfi-consortium"
                 required
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
               {cleanConsortiumId && (
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
                   {isConsortiumLoading
                     ? 'Validating consortium...'
                     : consortium
@@ -175,14 +175,14 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Participating Institution A <span className="text-rose-600">*</span>
+                Participating Institution A <span className="text-rose-400">*</span>
               </label>
               {candidateBanks.length > 0 ? (
                 <select
                   value={bankA}
                   onChange={(e) => setBankA(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -198,21 +198,21 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankA(e.target.value)}
                   placeholder="e.g. bank_a"
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Participating Institution B <span className="text-rose-600">*</span>
+                Participating Institution B <span className="text-rose-400">*</span>
               </label>
               {candidateBanks.length > 0 ? (
                 <select
                   value={bankB}
                   onChange={(e) => setBankB(e.target.value)}
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Select Member Institution...</option>
                   {candidateBanks.map((b) => (
@@ -228,7 +228,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                   onChange={(e) => setBankB(e.target.value)}
                   placeholder="e.g. bank_b"
                   required
-                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               )}
             </div>
@@ -240,7 +240,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               >
                 {STANDARD_PURPOSES.map((p) => (
                   <option key={p} value={p}>
@@ -257,7 +257,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 value={jurisdiction}
                 onChange={(e) => setJurisdiction(e.target.value)}
                 placeholder="e.g. eu-central-1"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 max="365"
                 value={durationDays}
                 onChange={(e) => setDurationDays(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 min="1"
                 value={quotaTotal}
                 onChange={(e) => setQuotaTotal(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -293,7 +293,7 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 min="1"
                 value={quotaPerBank}
                 onChange={(e) => setQuotaPerBank(Number(e.target.value))}
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -304,23 +304,23 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
                 value={grantId}
                 onChange={(e) => setGrantId(e.target.value)}
                 placeholder="Optional Grant Reference"
-                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
 
           {/* Topology Details */}
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-white/60 space-y-2.5">
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                <Server className="w-4 h-4 text-cyan-600" />
+                <Server className="w-4 h-4 text-cyan-400" />
                 Operational Topology Endpoints
               </div>
               <span className="text-[10px] text-slate-500">Optional during initial DRAFT</span>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-white/60 border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
-              <Info className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] text-slate-400 flex items-start gap-2">
+              <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
               <span>
                 Provide explicit operational hostnames or URLs. If endpoints are not yet configured, the pilot will remain in truthful DRAFT state and preflight will require verified endpoints before approval.
               </span>
@@ -328,33 +328,33 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
               <div>
-                <label className="block text-[10px] text-slate-500 mb-0.5">Coordinator URL</label>
+                <label className="block text-[10px] text-slate-400 mb-0.5">Coordinator URL</label>
                 <input
                   type="text"
                   value={coordUrl}
                   onChange={(e) => setCoordUrl(e.target.value)}
                   placeholder="https://coordinator.consortium..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-500 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
+                <label className="block text-[10px] text-slate-400 mb-0.5">{bankA ? bankA.toUpperCase() : 'Institution A'} Worker</label>
                 <input
                   type="text"
                   value={bankAUrl}
                   onChange={(e) => setBankAUrl(e.target.value)}
                   placeholder="https://worker-a.bank..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-500 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
+                <label className="block text-[10px] text-slate-400 mb-0.5">{bankB ? bankB.toUpperCase() : 'Institution B'} Worker</label>
                 <input
                   type="text"
                   value={bankBUrl}
                   onChange={(e) => setBankBUrl(e.target.value)}
                   placeholder="https://worker-b.bank..."
-                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-slate-900 placeholder-slate-600"
+                  className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 text-white placeholder-slate-600"
                 />
               </div>
             </div>
@@ -365,14 +365,14 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
               type="button"
               onClick={onClose}
               disabled={provisionMutation.isPending}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-white bg-slate-100 hover:bg-slate-700 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={provisionMutation.isPending}
-              className="px-5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-slate-900 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {provisionMutation.isPending ? 'Provisioning...' : 'Provision Controlled Pilot'}
             </button>
@@ -382,4 +382,3 @@ export default function PilotProvisionModal({ isOpen, onClose, onSuccess }: Pilo
     </div>
   );
 }
-

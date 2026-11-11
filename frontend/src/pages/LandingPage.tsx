@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import PlatformLaunchModal from '../components/PlatformLaunchModal';
@@ -6,7 +6,7 @@ import BenchmarkLaunchModal from '../components/BenchmarkLaunchModal';
 import TechnicalReportModal from '../components/TechnicalReportModal';
 import { useModalA11y } from '../hooks/useModalA11y';
 
-// â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TYPES ───────────────────────────────────────────────────────────────────
 export interface BankInfoDetail {
   id: string; name: string; ticker: string; location: string;
   hardware: string; ram: string; pytorch: string; latency: string; xmlLogs: string[];
@@ -14,42 +14,42 @@ export interface BankInfoDetail {
 interface Module { id: string; name: string; category: string; purpose: string; algorithm: string; inputs: string; outputs: string; tech: string; }
 interface ArchNode { id: string; label: string; description: string; tech: string[]; responsibilities: string[]; protocols: string[]; }
 
-// â”€â”€ DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── DATA ────────────────────────────────────────────────────────────────────
 const BANK_NODES: Record<string, BankInfoDetail> = {
-  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8Ã— Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise Ïƒ=0.031 injected. Îµ=1.0, Î´=1e-5. HSM-signed: 0x99F1.'] },
-  hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4Ã— NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
+  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=1.0, δ=1e-5. HSM-signed: 0x99F1.'] },
+  hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
   deutsche: { id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK', location: 'Frankfurt, DE (Node #03)', hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM', pytorch: '2.4.0+cpu', latency: '2.9 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr></FIToFICstmrCdtTrf></Document>', 'Heterogeneous negotiator: batch_size=32, grad_accum_steps=2.', 'CPU straggler quenched. Round latency 342ms.'] },
-  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation / Emulated)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Î£([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (Îµ=1.0, Î´=1e-5). [[W_global]] published to consortium.'] },
+  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation / Emulated)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=1.0, δ=1e-5). [[W_global]] published to consortium.'] },
 };
 
 const PLATFORM_MODULES: Module[] = [
-  // â”€â”€ CORE PRODUCTION ENGINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CORE PRODUCTION ENGINE ────────────────────────────────────────────────
   { id: 'risk-engine', name: 'Real-Time Risk Scoring Engine', category: 'Core Production Engine', purpose: 'Combines GNN graph embeddings with 9-signal tabular velocity and anomaly features to generate calibrated risk scores (<14.2ms p99 latency).', algorithm: '9-Signal Neural Risk Engine + GNN, SHAP KernelExplainer, Platt Calibration', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'PyTorch, 9-Signal Composite Engine, shap.KernelExplainer, Platt Scaling' },
   { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Production Engine', purpose: 'Coordinates distributed GNN model optimization across banking institutions using FedAvg and FedProx with straggler mitigation.', algorithm: 'FedAvg, FedProx, Asynchronous SGD', inputs: 'Local gradient tensors from node agents', outputs: 'Aggregated global GNN model weights', tech: 'PyTorch 2.4, gRPC, Protocol Buffers' },
   { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'Core Production Engine', purpose: 'Constructs dynamic multi-hop transaction graphs from ISO 20022 message streams and computes 512-dim structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 & camt.053 feeds', outputs: '512-dimensional node embeddings', tech: 'PyTorch Geometric 2.6, DGL' },
   { id: 'aml-copilot', name: 'Autonomous Agentic AML Copilot', category: 'Core Production Engine', purpose: 'Synthesizes 5-paragraph FinCEN SAR narratives, 4-Eyes supervisor briefings, and Neo4j visual graph maps from suspicious transactions.', algorithm: 'Local LLM RAG + SHAP Feature Attribution', inputs: 'Neo4j subgraph, ISO 20022 XML, SHAP vectors', outputs: 'SAR Narrative & 4-Eyes Supervisor Briefing', tech: 'LangChain, Ollama / vLLM, Neo4j' },
-  { id: 'adaptive-dp', name: 'Adaptive DP Budget Auto-Scaler', category: 'Core Production Engine', purpose: 'Dynamically optimizes per-round Gaussian noise multipliers (Ïƒ_t) and clipping bounds using RÃ©nyi DP and loss velocity accounting.', algorithm: 'RÃ©nyi Differential Privacy (RDP) & PRV Dual Minimizer', inputs: 'Gradient velocity Î”L_t, batch ratio q_t, target Îµ', outputs: 'Calibrated Ïƒ_t with bounded privacy expenditure (quantified privacy-utility tradeoff)', tech: 'RÃ©nyi DP Accountant, Opacus, Numerical Dual' },
+  { id: 'adaptive-dp', name: 'Adaptive DP Budget Auto-Scaler', category: 'Core Production Engine', purpose: 'Dynamically optimizes per-round Gaussian noise multipliers (σ_t) and clipping bounds using Rényi DP and loss velocity accounting.', algorithm: 'Rényi Differential Privacy (RDP) & PRV Dual Minimizer', inputs: 'Gradient velocity ΔL_t, batch ratio q_t, target ε', outputs: 'Calibrated σ_t with bounded privacy expenditure (quantified privacy-utility tradeoff)', tech: 'Rényi DP Accountant, Opacus, Numerical Dual' },
   { id: 'bft-agg', name: 'Byzantine-Robust Defense Filter', category: 'Core Production Engine', purpose: 'Detects and neutralises gradient poisoning, model replacement, and backdoor attacks from compromised bank nodes.', algorithm: 'Krum, Trimmed Mean, Flame, Cosine Dist', inputs: 'Gradient updates from all consortium nodes', outputs: 'Filtered, verified aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
   { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves (or software-emulated enclaves in development environments).', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
-  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Î”w Ã— -10.0) with real-time defense filter simulation (Krum quarantine demonstration via live interactive scenario proxy).', algorithm: 'Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
+  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time defense filter simulation (Krum quarantine demonstration via live interactive scenario proxy).', algorithm: 'Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
   { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 19 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
   { id: 'db-migrations', name: 'Multi-Tenant Database & Alembic Engine', category: 'Core Production Engine', purpose: 'Executes linear dual-revision migrations (001 -> 002) with dynamic tenant discovery from tenant_configs across PostgreSQL schemas and isolated SQLite databases.', algorithm: 'Alembic Linear Revision, Dynamic Discovery, Auto-Stamping', inputs: 'SQLAlchemy AsyncEngine, active_tenant context', outputs: 'Zero-drift isolated schemas, batch SQLite migration', tech: 'Alembic, SQLAlchemy 2.0 Async, PostgreSQL 16, SQLite' },
   { id: 'tenant-kms', name: 'Multi-Tenant KMS & Key Lifecycle Engine', category: 'Core Production Engine', purpose: 'Enforces versioned envelope encryption (v1/v2) with AES-256-GCM, automated re-encryption, fail-closed revocation, and scheduled rotation cron triggers.', algorithm: 'Envelope AES-256-GCM, Key Rotation Pipeline, HashiCorp Vault', inputs: 'Tenant secret keys, master Vault secret', outputs: 'Versioned ciphertext envelopes, re-encrypted payloads', tech: 'Cryptography (AES-GCM), HashiCorp Vault, Python 3.12' },
   { id: 'operational-federation', name: 'Operational Federation & Bank Worker Mesh', category: 'Core Production Engine', purpose: 'Coordinates production federated learning across isolated bank worker processes (Windows Restricted Token / POSIX fork) with Ed25519 worker receipts and inactive candidate model registration.', algorithm: 'Process-Isolated Attestation + Ed25519 Receipts + Provenance Chaining', inputs: 'Pre-provisioned bank endpoints, server-side authority context, mTLS certs', outputs: 'Signed bank worker receipts, verified aggregated candidate model, TRAINING_RECORDED provenance', tech: 'OperationalFederationService, Windows Restricted Tokens, Ed25519, ModelRegistry' },
   { id: 'dataset-ingestor', name: 'Client-Side Dataset Ingestion Studio', category: 'Core Production Engine', purpose: 'Sanitizes incoming customer PANs via Luhn algorithm, applies type-salted HMAC-SHA256 pseudonymization, and enforces Great Expectations 1.x data contract suites before local training.', algorithm: 'Luhn Algorithm + Type-Salted HMAC-SHA256 + Great Expectations 1.x Schema Gates', inputs: 'Raw CSV / Parquet bank transaction records', outputs: 'Zero-Raw-PII normalized tensors + cryptographic verification receipts', tech: 'Great Expectations 1.x, Pandas, HMAC-SHA256, Python 3.12' },
 
-  // â”€â”€ FRONTIER LAB (ADVANCED R&D TRACK) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── FRONTIER LAB (ADVANCED R&D TRACK) ─────────────────────────────────────
   { id: 'pqc-secagg', name: 'Post-Quantum Cryptography PQC', category: 'Frontier R&D Lab', purpose: 'Researches lattice-based key exchanges for inter-bank P2P SecAgg against future quantum decryption threats (NIST FIPS 203/204).', algorithm: 'CRYSTALS-Kyber-768 KEM + Dilithium-3 Signatures', inputs: 'Lattice public key vectors & encrypted pairwise shares', outputs: 'Quantum-safe decrypted global model gradient', tech: 'NIST FIPS 203/204, liboqs, HKDF-SHA256' },
   { id: 'zk-snark-verifier', name: 'Zero-Knowledge Proof Attestation', category: 'Frontier R&D Lab', purpose: 'Explores O(1) constant-time succinct non-interactive proofs of gradient norm bounds over BN254 elliptic curves without unmasking.', algorithm: 'Groth16 & PlonK Bilinear Pairing', inputs: 'Poseidon commitment hash & encrypted gradient vector', outputs: 'O(1) Constant-time verification proof (<5ms)', tech: 'Circom 2.1, SnarkJS, BN254 Curve' },
   { id: 'unlearning-engine', name: 'Confidential Federated Unlearning', category: 'Frontier R&D Lab', purpose: 'Implements selective gradient footprint erasure for departing or revoked bank nodes via exact re-aggregation across retained participants.', algorithm: 'Exact Re-Aggregation & Lineage Subtraction', inputs: 'Evicted bank historical updates & current checkpoint', outputs: 'Unlearned global model weights (Structural Exclusion)', tech: 'Lineage Subtraction, Retained Participant FedAvg' },
   { id: 'crosschain-bridge', name: 'Cross-Chain Settlement Bridge', category: 'Frontier R&D Lab', purpose: 'Prototyping multi-ledger liquidity routing for Shapley incentive distribution across EVM rollups and institutional CBDC networks.', algorithm: 'Chainlink CCIP EVM2AnyMessage & LayerZero V2', inputs: 'Shapley utility scores & institutional CBDC wallets', outputs: 'Multi-ledger atomic transaction receipts (<1s SLA)', tech: 'Chainlink CCIP, LayerZero, Daml Interop' },
 
-  // â”€â”€ EUROPEAN REGTECH & COLLABORATIVE FININT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── EUROPEAN REGTECH & COLLABORATIVE FININT ─────────────────────────────────
   { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
-  { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation - with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation Â· SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
-  { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms - Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration - with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0â€“100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
+  { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation - with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
+  { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms - Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration - with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
   { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
   { id: 'asset-recovery-hub', name: 'Asset Recovery & Collaborative FININT Operational Hub', category: 'European RegTech & Collaborative FININT', purpose: 'Aggregates real-time EUR asset frozen/recovered KPIs across ISO 20022 camt.056 payment recalls and cross-bank FININT provisional holds. Tracks Mean Time to Response (MTTR) reduction vs. the legacy 48-hour bilateral baseline, cross-bank contagion containment rate, and per-typology ROI breakdown across smurfing, APP fraud mule chains, dormant-burst velocity, and crypto gateway cashout scenarios.', algorithm: 'SHA-256 hash-chained audit trail + MTTR P50/P90/P99 percentile aggregation + contagion containment rate + typology ROI breakdown', inputs: 'camt.056 recall confirmations + cross-bank FININT case ticket closures + provisional hold webhook callbacks', outputs: 'EUR frozen/recovered KPIs + MTTR reduction % vs. 48h baseline + mule chain disruption count + typology risk classification', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, ISO 20022 camt.056 / EPC SCT Inst Rulebook' },
   { id: 'kafka-streaming', name: 'Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus', category: 'European RegTech & Collaborative FININT', purpose: 'Standardises asynchronous transaction and FININT alert streaming using CNCF CloudEvents 1.0 specifications with at-least-once delivery, distributed idempotency deduplication, and automated Dead Letter Queue (DLQ) quarantine for sub-millisecond fraud propagation across European bank nodes.', algorithm: 'CNCF CloudEvents 1.0 + SHA-256 Idempotency Hashing + Monotonic Kafka Offset Commit + DLQ Error Quarantine', inputs: 'Normalized transaction events + cross-bank FININT alerts + camt.056 recalls + bank idempotency tokens', outputs: 'Validated CloudEvent envelopes (specversion 1.0) + partition offset receipts + DLQ isolation records', tech: 'aiokafka, pure asyncio fallback, CloudEvents 1.0, FastAPI, Python 3.12, Apache Kafka 3.7.0' },
@@ -72,7 +72,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'ISO 20022 pacs.008 Screening',
     actionRoute: '/investigation',
     actionLabel: 'Launch Risk Investigation',
-    tensorSample: 'Tensor: [batch, 512] structural embedding âŠ• [batch, 32] velocity features â†’ P(fraud) âˆˆ [0, 1]',
+    tensorSample: 'Tensor: [batch, 512] structural embedding ⊕ [batch, 32] velocity features → P(fraud) ∈ [0, 1]',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'fl-engine': {
@@ -81,7 +81,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'FedAvg / FedProx Convergence',
     actionRoute: '/operations',
     actionLabel: 'Open FL Coordinator',
-    tensorSample: 'Parameter Delta: Î”W_k = W_k^{(t)} - W^{(t-1)} â†’ Aggregated: W^{(t)} = Î£ (n_k/n) Î”W_k',
+    tensorSample: 'Parameter Delta: ΔW_k = W_k^{(t)} - W^{(t-1)} → Aggregated: W^{(t)} = Σ (n_k/n) ΔW_k',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'gnn-engine': {
@@ -90,7 +90,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: '8-Head GATConv (Graph Attention)',
     actionRoute: '/graph',
     actionLabel: 'Inspect Graph Topology',
-    tensorSample: 'Graph Tensor: Adjacency A âˆˆ R^{NÃ—N}, Feature Matrix X âˆˆ R^{NÃ—F} â†’ Node Embedding h_v âˆˆ R^{512}',
+    tensorSample: 'Graph Tensor: Adjacency A ∈ R^{N×N}, Feature Matrix X ∈ R^{N×F} → Node Embedding h_v ∈ R^{512}',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'aml-copilot': {
@@ -99,16 +99,16 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'FinCEN BSA SAR 5-Paragraph Spec',
     actionRoute: '/cases',
     actionLabel: 'Open Case Management',
-    tensorSample: 'Prompt Context: {SubGraph, ISO20022 XML, SHAP Attribution} â†’ Formatted SAR XML + 4-Eyes Briefing',
+    tensorSample: 'Prompt Context: {SubGraph, ISO20022 XML, SHAP Attribution} → Formatted SAR XML + 4-Eyes Briefing',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'adaptive-dp': {
     sla: 'Real-time per-round auto calibration',
-    security: 'RÃ©nyi DP (Îµ=1.0, Î´=1e-5) Guarantee',
+    security: 'Rényi DP (ε=1.0, δ=1e-5) Guarantee',
     compliance: 'PRV Numerical Dual Accountant',
     actionRoute: '/privacy-defense',
     actionLabel: 'Inspect Privacy Budget',
-    tensorSample: 'Noise Calibration: Ïƒ_t = DualMin(Îµ_target, Î”L_t), Perturbation: g_t ~ N(0, Ïƒ_t^2 C^2 I)',
+    tensorSample: 'Noise Calibration: σ_t = DualMin(ε_target, ΔL_t), Perturbation: g_t ~ N(0, σ_t^2 C^2 I)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'bft-agg': {
@@ -117,7 +117,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'Cosine Gradient Anomaly Rejection',
     actionRoute: '/security',
     actionLabel: 'Open Byzantine Defense Lab',
-    tensorSample: 'Distance Score: s_i = Î£_{j âˆˆ S_i} ||g_i - g_j||^2 â†’ Selected Gradient: g* = argmin_{g_i} s_i',
+    tensorSample: 'Distance Score: s_i = Σ_{j ∈ S_i} ||g_i - g_j||^2 → Selected Gradient: g* = argmin_{g_i} s_i',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'secure-agg': {
@@ -126,7 +126,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'Paillier Additive Homomorphic Scheme',
     actionRoute: '/security',
     actionLabel: 'Inspect SGX Enclave Vault',
-    tensorSample: 'Homomorphic Sum: [[W_global]] = [[W_jpm]] âŠ• [[W_hsbc]] âŠ• [[W_db]] (Decrypted only in SGX)',
+    tensorSample: 'Homomorphic Sum: [[W_global]] = [[W_jpm]] ⊕ [[W_hsbc]] ⊕ [[W_db]] (Decrypted only in SGX)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'telemetry': {
@@ -144,7 +144,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'ISO 20022 pacs.008 & camt.053 XML',
     actionRoute: '/onboarding',
     actionLabel: 'View Bank Connectors',
-    tensorSample: 'Raw Ingestion: XML pacs.008.001.08 â†’ Validated NormalizedTransaction Schema (HMAC Tokenized)',
+    tensorSample: 'Raw Ingestion: XML pacs.008.001.08 → Validated NormalizedTransaction Schema (HMAC Tokenized)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'chaos-simulator': {
@@ -153,7 +153,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'Byzantine Fault Tolerance Protocol',
     actionRoute: '/operations',
     actionLabel: 'Launch Chaos Simulator',
-    tensorSample: 'Gradient Distance: ||Î”w_k - Î£ w_j|| = 48.2 > 14.1 â†’ QUARANTINED BY KRUM',
+    tensorSample: 'Gradient Distance: ||Δw_k - Σ w_j|| = 48.2 > 14.1 → QUARANTINED BY KRUM',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'dataset-ingestor': {
@@ -171,7 +171,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'SR 11-7 MRM Model Provenance, SOC 2 Type II Process Isolation',
     actionRoute: '/operations',
     actionLabel: 'Open Operational Federation',
-    tensorSample: 'Receipt: {bank: "BANK_A", round: 1, ed25519_sig: "0x...", pid: 8893, status: "READY"} â†’ CandidateModel(status=INACTIVE)',
+    tensorSample: 'Receipt: {bank: "BANK_A", round: 1, ed25519_sig: "0x...", pid: 8893, status: "READY"} → CandidateModel(status=INACTIVE)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'docker-stack': {
@@ -180,7 +180,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'SOC2 / PCI-DSS On-Premises Isolation',
     actionRoute: '/developer',
     actionLabel: 'View Deployment Specs',
-    tensorSample: 'Compose Mesh: [Gateway :80] â†’ [Frontend :80] âŠ• [FastAPI :8000] âŠ• [Postgres :5432] âŠ• [Redis :6379]',
+    tensorSample: 'Compose Mesh: [Gateway :80] → [Frontend :80] ⊕ [FastAPI :8000] ⊕ [Postgres :5432] ⊕ [Redis :6379]',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'db-migrations': {
@@ -189,7 +189,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'SOC 2 Type II / PCI-DSS Hard Multi-Tenancy',
     actionRoute: '/operations',
     actionLabel: 'Inspect Active Schemas',
-    tensorSample: 'Migration: 001_domain_tables â†’ 002_core_and_aml_tables (Head: Up to date, Drift: 0)',
+    tensorSample: 'Migration: 001_domain_tables → 002_core_and_aml_tables (Head: Up to date, Drift: 0)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'tenant-kms': {
@@ -207,7 +207,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'NIST FIPS 204 (Dilithium-3 Signatures)',
     actionRoute: '/security',
     actionLabel: 'Inspect Post-Quantum Module',
-    tensorSample: 'Quantum KEM: (pk, sk) â† Kyber768.KeyGen(), (c, K) â† Encaps(pk), Pairwise Secret K Established',
+    tensorSample: 'Quantum KEM: (pk, sk) ← Kyber768.KeyGen(), (c, K) ← Encaps(pk), Pairwise Secret K Established',
     statusBadge: 'FRONTIER R&D LAB',
   },
   'zk-snark-verifier': {
@@ -216,7 +216,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'Groth16 Zero-Knowledge Verification',
     actionRoute: '/security',
     actionLabel: 'Inspect zk-SNARK Verifier',
-    tensorSample: 'Bilinear Pairing: e(A, B) = e(Î±, Î²) Â· e(x, Î³) Â· e(C, Î´) (Verifies gradient norm bound â‰¤ C)',
+    tensorSample: 'Bilinear Pairing: e(A, B) = e(α, β) · e(x, γ) · e(C, δ) (Verifies gradient norm bound ≤ C)',
     statusBadge: 'FRONTIER R&D LAB',
   },
   'unlearning-engine': {
@@ -234,7 +234,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'LayerZero V2 Multi-Ledger Standard',
     actionRoute: '/security',
     actionLabel: 'Inspect Cross-Chain Bridge',
-    tensorSample: 'Shapley Settlement: Ï†_i â†’ EVM2AnyMessage(dest: Arbitrum/Optimism, token: wCBDC, amount: Ï†_i * R)',
+    tensorSample: 'Shapley Settlement: φ_i → EVM2AnyMessage(dest: Arbitrum/Optimism, token: wCBDC, amount: φ_i * R)',
     statusBadge: 'FRONTIER R&D LAB',
   },
   'finint-bridge': {
@@ -243,17 +243,17 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'European Collaborative FININT | GDPR Art.6(1)(f) | EU AMLA Single Rulebook',
     actionRoute: '/cases',
     actionLabel: 'Open FININT Case Workbench',
-    tensorSample: 'E2EE: (ephem_priv, recip_pub) â†’ ECDH â†’ HKDF(32B key) â†’ AES-256-GCM(payload) | SHA-256 Hash-Chain: H_n = SHA-256(H_{n-1} || seq || actor || action || ts)',
+    tensorSample: 'E2EE: (ephem_priv, recip_pub) → ECDH → HKDF(32B key) → AES-256-GCM(payload) | SHA-256 Hash-Chain: H_n = SHA-256(H_{n-1} || seq || actor || action || ts)',
     statusBadge: 'EUROPEAN REGTECH',
   },
   'sepa-recall': {
-    sla: 'FRAD: 4h Â· TECH/DUPL/CUST/UPAY/COVR: 10 business days (EPC SCT Inst Rulebook v1.1)',
+    sla: 'FRAD: 4h · TECH/DUPL/CUST/UPAY/COVR: 10 business days (EPC SCT Inst Rulebook v1.1)',
     security: 'SHA-256 BIC hash storage | Zero cleartext IBAN persistence | Hash-chained audit',
     compliance: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 | EPC SCT Inst | EU AMLA',
     actionRoute: '/cases',
     actionLabel: 'Open Recall Workbench',
-    tensorSample: 'camt.056: FIToFIPaymentCancellationRequest(Rsn: FRAD) â†’ pacs.004: PaymentReturn(RtrdAmt) | camt.029: ResolutionOfInvestigation(Conf: NOAS/NOOR/LEGL)',
-    statusBadge: 'ISO 20022 Â· EPC SCT INST',
+    tensorSample: 'camt.056: FIToFIPaymentCancellationRequest(Rsn: FRAD) → pacs.004: PaymentReturn(RtrdAmt) | camt.029: ResolutionOfInvestigation(Conf: NOAS/NOOR/LEGL)',
+    statusBadge: 'ISO 20022 · EPC SCT INST',
   },
   'sanctions-screening': {
     sla: '< 50 ms per entity screen (p99, 5-source, 10k entries) | Portfolio bulk rescreen: async',
@@ -261,8 +261,8 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'EU Council Consolidated Sanctions | UN SC 1267/1989 | OFAC SDN | HM Treasury | EU AMLA Art. 15 | FATF Rec. 10',
     actionRoute: '/cases',
     actionLabel: 'Open Screening Workbench',
-    tensorSample: 'score(q,c) = max(JaroWinkler(q,c), LevenshteinSim(q,c), PhoneticMatch(q,c), TokenOverlap(q,c)) Ã— 100 â†’ alert if score â‰¥ Î¸',
-    statusBadge: 'EU Â· UN Â· OFAC Â· HMT',
+    tensorSample: 'score(q,c) = max(JaroWinkler(q,c), LevenshteinSim(q,c), PhoneticMatch(q,c), TokenOverlap(q,c)) × 100 → alert if score ≥ θ',
+    statusBadge: 'EU · UN · OFAC · HMT',
   },
   'fiu-goaml': {
     sla: '< 12 ms XML export & canonical envelope sealing (p99)',
@@ -270,8 +270,8 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'UNODC goAML 4.0 | EU AMLA Single Rulebook Art. 51 | AMLD6 Art. 33 | GDPR Art. 6(1)(f) & 9(2)(g)',
     actionRoute: '/cases',
     actionLabel: 'Open Regulatory Filing Hub',
-    tensorSample: 'Envelope: HMAC-SHA256(K, SHA256(canonical(XML)) || report_id || status || ts) â†’ Sealed XML Filing',
-    statusBadge: 'UNODC goAML Â· EU AMLA',
+    tensorSample: 'Envelope: HMAC-SHA256(K, SHA256(canonical(XML)) || report_id || status || ts) → Sealed XML Filing',
+    statusBadge: 'UNODC goAML · EU AMLA',
   },
   'asset-recovery-hub': {
     sla: '< 5 ms KPI snapshot aggregation (p99) | Real-time 30s auto-refresh',
@@ -279,8 +279,8 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'ISO 20022 camt.056.001.08 EPC SCT Inst Recall | EU AMLA Art. 20 Provisional Hold | FATF Rec. 1 & 3 Risk-Based Approach',
     actionRoute: '/operations',
     actionLabel: 'Open Operational Hub',
-    tensorSample: 'MTTR: t_freeze âˆ’ t_alert (min) | Reduction: (2880 âˆ’ MTTR_mean) / 2880 Ã— 100% | Containment: |{MTTR < 60min}| / |events|',
-    statusBadge: 'ISO 20022 Â· EU AMLA Â· EPC',
+    tensorSample: 'MTTR: t_freeze − t_alert (min) | Reduction: (2880 − MTTR_mean) / 2880 × 100% | Containment: |{MTTR < 60min}| / |events|',
+    statusBadge: 'ISO 20022 · EU AMLA · EPC',
   },
   'kafka-streaming': {
     sla: '< 1.5 ms event ingestion & dispatch (p99) | At-least-once streaming guarantee',
@@ -289,7 +289,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionRoute: '/operations',
     actionLabel: 'Open Event Streaming Hub',
     tensorSample: 'CloudEvent: {specversion: "1.0", type: "org.cfi.finint.transactions.v1", id: "evt_...", source: "/banks/bank_a", data: {tx_id: "...", amount: 4850.0}}',
-    statusBadge: 'CLOUDEVENTS 1.0 Â· KAFKA',
+    statusBadge: 'CLOUDEVENTS 1.0 · KAFKA',
   },
   'core-banking-gateway': {
     sla: '< 8.5 ms webhook normalization (p99) | < 120 ms outbound hold execution',
@@ -297,8 +297,8 @@ const MODULE_SPECS_EXTRA: Record<string, {
     compliance: 'Mambu Cloud Banking v2 | Thought Machine Vault Core | EPC SCT Inst Provisional Hold | GDPR Art. 6',
     actionRoute: '/operations',
     actionLabel: 'Open Core Banking Console',
-    tensorSample: 'Vault Core PIB: {id: "PIB_...", instructions: [{custom_instruction: {postings: [{acc: "DE_...", amt: 1500, credit: false}]}}]} â†’ pacs.008',
-    statusBadge: 'MAMBU Â· VAULT CORE',
+    tensorSample: 'Vault Core PIB: {id: "PIB_...", instructions: [{custom_instruction: {postings: [{acc: "DE_...", amt: 1500, credit: false}]}}]} → pacs.008',
+    statusBadge: 'MAMBU · VAULT CORE',
   },
   'hsm-key-wrapper': {
     sla: '< 1.8 ms hardware sign (p99) | 0.0 ms key exposure (Zero-Disk)',
@@ -307,7 +307,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionRoute: '/security',
     actionLabel: 'Open HSM Key Console',
     tensorSample: 'HSMAttestation: {provider: "PKCS11", slot: 0, compliance: "FIPS 140-2 Level 3", exportable: false, signature: "sha256_..."}',
-    statusBadge: 'PKCS#11 Â· VAULT TRANSIT',
+    statusBadge: 'PKCS#11 · VAULT TRANSIT',
   },
 };
 
@@ -319,7 +319,7 @@ const ARCH_NODES: ArchNode[] = [
   { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.12', 'gRPC', 'Celery', 'Redis 7.2'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
   { id: 'operational-fed', label: 'Operational Worker Mesh', description: 'Coordinates process-isolated bank worker processes under Windows Restricted Tokens / POSIX fork with Ed25519 receipts.', tech: ['OperationalFederationService', 'Restricted Token', 'Ed25519', 'Alembic 1.13'], responsibilities: ['Worker process isolation', 'Authority resolution', 'Receipt signing', 'Candidate registration'], protocols: ['Internal IPC', 'Process Isolation', 'mTLS'] },
   { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms (FedAvg, FedProx) and gradient aggregation.', tech: ['PyTorch 2.4', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
-  { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies calibrated Gaussian noise and manages cumulative (Îµ, Î´) privacy budget via RDP accountant.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'Îµ audit'], protocols: ['Internal API'] },
+  { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies calibrated Gaussian noise and manages cumulative (ε, δ) privacy budget via RDP accountant.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'ε audit'], protocols: ['Internal API'] },
   { id: 'sgx-enclave', label: 'SGX Enclave', description: 'Hardware-isolated trusted execution environment for homomorphic aggregation of encrypted gradients.', tech: ['Intel SGX SDK', 'LibTorch (C++)', 'OpenEnclave'], responsibilities: ['HE aggregation', 'Remote attestation', 'Enclave verification', 'Key management'], protocols: ['Enclave-to-Enclave', 'ECALL/OCALL'] },
   { id: 'graph-engine', label: 'Graph Engine', description: 'PyTorch Geometric runtime for transaction graph construction and GNN inference from ISO 20022 feeds.', tech: ['PyTorch Geometric 2.6', 'DGL', 'NetworkX'], responsibilities: ['Graph construction', 'GATConv inference', 'Subgraph sampling', 'Embedding store'], protocols: ['Internal gRPC'] },
   { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
@@ -351,8 +351,8 @@ const PRESENTATION_WORKFLOW = [
     id: 3,
     short: 'Diff. Privacy',
     label: 'Differential Privacy Noise Calibration',
-    summary: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The RÃ©nyi DP accountant enforces mathematical (Îµ=1.0, Î´=1e-5) privacy bounds.',
-    highlights: ['Mathematically provable (Îµ=1.0, Î´=1e-5)-DP guarantee', 'RÃ©nyi DP cumulative privacy accountant', 'Gradient clipping prevents sample memorization'],
+    summary: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi DP accountant enforces mathematical (ε=1.0, δ=1e-5) privacy bounds.',
+    highlights: ['Mathematically provable (ε=1.0, δ=1e-5)-DP guarantee', 'Rényi DP cumulative privacy accountant', 'Gradient clipping prevents sample memorization'],
     input: 'Raw model gradients',
     output: 'Differentially private gradient tensors',
     badge: 'Stage 03'
@@ -409,7 +409,7 @@ const PRESENTATION_WORKFLOW = [
   },
 ];
 
-// â”€â”€ EMPIRICAL BENCHMARK SPECIFICATIONS & VERIFIED METRICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── EMPIRICAL BENCHMARK SPECIFICATIONS & VERIFIED METRICS ───────────────────
 export interface BenchmarkRow {
   paradigm: string;
   badge: string;
@@ -455,7 +455,7 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     id: 'master',
     name: 'Consortium Master Benchmark (CFI-CrossBank-01 Prototype)',
     datasetTag: 'Project-Synthetic Consortium Trial',
-    scope: '150,000 Train Â· 45,000 Global Holdout Test',
+    scope: '150,000 Train · 45,000 Global Holdout Test',
     prevalence: '0.129% Fraud Prevalence',
     uplift: '+0.1480 PR-AUC (+21.3%)',
     fpReduction: '-64.7% False Alarms',
@@ -465,61 +465,61 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 281, fp: 45, fn: 99, tn: 44575, precision: '86.2%', recall: '73.9%', f1: '79.6%', specificity: '99.9%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
-      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
-      { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
-      { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
-      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
+      { paradigm: 'Centralized Upper Bound (GBDT)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8650', rocauc: '0.9840', recall01: '66.50%', brier: '0.0120', latency: '0.045 ms', compliance: 'Non-Compliant (Illegal Pooling)', compliant: false },
+      { paradigm: 'Centralized Deep MLP (Neural)', badge: 'Monolithic Deep', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.8520', rocauc: '0.9780', recall01: '64.10%', brier: '0.0145', latency: '0.260 ms', compliance: 'Non-Compliant (GDPR Breach)', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg/FedProx)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0158', latency: '0.260 ms', compliance: '100% Compliant (Zero Raw PII)', compliant: true },
+      { paradigm: 'Isolated Banking Silos (3-Bank Mean)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.6940', rocauc: '0.8820', recall01: '43.20%', brier: '0.0380', latency: '0.040 ms', compliance: 'Passive (Blind to Multi-Hop)', compliant: false },
+      { paradigm: 'Classical Random Forest (Pooled)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Not Evaluated on Partition', compliant: false },
     ],
   },
   creditcard: {
     id: 'creditcard',
     name: 'European Cardholders (Bank C Starvation Rescue)',
     datasetTag: 'Extreme 578:1 Imbalance',
-    scope: '284,807 Transactions Â· 492 Frauds (0.172%)',
+    scope: '284,807 Transactions · 492 Frauds (0.172%)',
     prevalence: 'Bank C: 2 Frauds in 34k Txns',
     uplift: '+0.2820 PR-AUC (Bank C Rescue)',
     fpReduction: '84.7% Recall @ 0.1% FPR',
     latency: '0.044 ms',
     roi: 'Controlled Budget Parity (0.8248 vs 0.8219)',
-    description: 'Under controlled budget parity (10 dataset passes across 3 seeds), FedAvg (0.8248 Â± 0.0417) matches Centralized (0.8219 Â± 0.0364) while rescuing data-starved Bank C from isolation collapse (0.5428 3-seed mean; 0.2468 on Seed 123) to 0.8248 under federation.',
+    description: 'Under controlled budget parity (10 dataset passes across 3 seeds), FedAvg (0.8248 ± 0.0417) matches Centralized (0.8219 ± 0.0364) while rescuing data-starved Bank C from isolation collapse (0.5428 3-seed mean; 0.2468 on Seed 123) to 0.8248 under federation.',
     cm: { tp: 83, fp: 56, fn: 15, tn: 56808, precision: '59.7%', recall: '84.7%', f1: '70.1%', specificity: '99.9%' },
     routeDataset: 'creditcard',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.8248 Â± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
-      { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.8219 Â± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
-      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8248 ± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
+      { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8219 ± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
+      { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
+      { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
     ],
   },
   paysim: {
     id: 'paysim',
     name: 'PaySim Mobile Money (M-Pesa Multi-Hop)',
     datasetTag: 'Mobile Money Graph',
-    scope: '636,262 Rows (10% Systematic Sample) Â· Dirichlet Î±=0.50',
+    scope: '636,262 Rows (10% Systematic Sample) · Dirichlet α=0.50',
     prevalence: '0.128% Real Sample Fraud (817 Frauds)',
     uplift: '+0.1125 vs Target (0.8420)',
     fpReduction: '98.16% Recall @ 0.1% FPR',
     latency: '0.120 ms',
     roi: '99.99% Centralized Parity (0.9545 vs 0.9545)',
-    description: 'Evaluated on real PaySim CSV (636k systematic 10% sample, 817 fraud, 3 seeds). FedAvg achieves 0.9545 Â± 0.0119 PR-AUC, demonstrating full empirical parity with Centralized baseline (0.9545 Â± 0.0073) and 98.16% Recall @ 0.1% FPR.',
+    description: 'Evaluated on real PaySim CSV (636k systematic 10% sample, 817 fraud, 3 seeds). FedAvg achieves 0.9545 ± 0.0119 PR-AUC, demonstrating full empirical parity with Centralized baseline (0.9545 ± 0.0073) and 98.16% Recall @ 0.1% FPR.',
     cm: { tp: 160, fp: 12, fn: 3, tn: 127077, precision: '93.0%', recall: '98.2%', f1: '95.5%', specificity: '99.99%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg, 3 Seeds)', badge: 'Production Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.9545 Â± 0.0119', rocauc: '0.9750', recall01: '98.16%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
-      { paradigm: 'Centralized Pooled Baseline (3 Seeds)', badge: 'Theoretical Max', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.9545 Â± 0.0073', rocauc: '0.9840', recall01: '98.16%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
-      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-cyan-600 bg-cyan-50 border-cyan-500/20', prauc: 'Target (0.8420)', rocauc: 'Target (0.9750)', recall01: 'Target (62.40%)', brier: '0.0040', latency: '0.120 ms', compliance: 'Design Target Spec (Exceeded)', compliant: true },
-      { paradigm: 'Isolated Silo (Single Bank Baseline)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 3 Seeds)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9545 ± 0.0119', rocauc: '0.9750', recall01: '98.16%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline (3 Seeds)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9545 ± 0.0073', rocauc: '0.9840', recall01: '98.16%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', prauc: 'Target (0.8420)', rocauc: 'Target (0.9750)', recall01: 'Target (62.40%)', brier: '0.0040', latency: '0.120 ms', compliance: 'Design Target Spec (Exceeded)', compliant: true },
+      { paradigm: 'Isolated Silo (Single Bank Baseline)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
     ],
   },
   ieee_cis: {
     id: 'ieee_cis',
     name: 'IEEE-CIS Fraud Detection (Vesta Card)',
     datasetTag: 'Card & E-Commerce (Canonical Real-Data)',
-    scope: '590,540 Transactions Â· 421 Features (Canonical Level 1)',
+    scope: '590,540 Transactions · 421 Features (Canonical Level 1)',
     prevalence: '3.50% Real Fraud Prevalence (4,064 Test Fraud)',
-    uplift: '-0.0527 FL Gap (Paired Î” vs Central)',
+    uplift: '-0.0527 FL Gap (Paired Δ vs Central)',
     fpReduction: '99.90% Specificity (0.1% FPR)',
     latency: '0.048 ms',
     roi: '19.76% Recall @ 0.1% Diagnostic FPR',
@@ -527,36 +527,36 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 803, fp: 114, fn: 3261, tn: 113930, precision: '87.57%', recall: '19.76%', f1: '32.25%', specificity: '99.90%' },
     routeDataset: 'ieee_cis',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-600 bg-indigo-50 border-indigo-200', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
-      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
-      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Canonical FL', badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', prauc: '0.3895', rocauc: '0.8325', recall01: '19.76%', brier: '0.0279', latency: '0.048 ms', compliance: 'Privacy-Preserving FedAvg (3 Simulated Banks)', compliant: true },
+      { paradigm: 'Centralized Pooled Oracle', badge: 'Pooled Baseline', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.4422', rocauc: '0.8536', recall01: '20.04%', brier: '0.0248', latency: '0.045 ms', compliance: 'Centralized Pooled (Hypothetical Bound)', compliant: false },
+      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: 'Target (0.8120)', rocauc: 'Target (0.9120)', recall01: 'Target (58.90%)', brier: 'Target (0.0260)', latency: 'Target (0.044 ms)', compliance: 'Engineering Target (Unachieved Design Goal)', compliant: false },
     ],
   },
   elliptic: {
     id: 'elliptic',
     name: 'Elliptic Bitcoin AML Transaction Graph',
     datasetTag: 'On-Chain AML Graph',
-    scope: '203,769 Nodes Â· 234,355 Directed Edges',
+    scope: '203,769 Nodes · 234,355 Directed Edges',
     prevalence: '4,545 Illicit Entities (2.23%)',
     uplift: '0.3761 PR-AUC (Canonical GraphSAGE)',
     fpReduction: '55.83% Recall @ t*=0.65',
     latency: '0.340 ms',
     roi: 'Strict Temporal 35-49 Evaluation',
-    description: 'Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph (train 1-30, val 31-34, test 35-49). PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 Â± 0.0482 PR-AUC and 0.8325 Â± 0.0078 ROC-AUC. Tabular MLP achieves 0.5778 (architectural negative result preserved). Federated Elliptic is NOT_EVALUATED.',
+    description: 'Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph (train 1-30, val 31-34, test 35-49). PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 ± 0.0482 PR-AUC and 0.8325 ± 0.0078 ROC-AUC. Tabular MLP achieves 0.5778 (architectural negative result preserved). Federated Elliptic is NOT_EVALUATED.',
     cm: { tp: 550, fp: 1444, fn: 436, tn: 15486, precision: '27.57%', recall: '55.83%', f1: '36.91%', specificity: '91.47%' },
     routeDataset: 'elliptic',
     rows: [
-      { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.3761 Â± 0.0482', rocauc: '0.8325 Â± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
-      { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
-      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
-      { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
+      { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '- (NOT_EVALUATED)', rocauc: '-', recall01: '-', brier: '-', latency: '-', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
   amlsim: {
     id: 'amlsim',
     name: 'IBM AMLSim Multi-Hop GraphSAGE',
     datasetTag: 'Multi-Hop Graph Simulation',
-    scope: '1.32M Transactions Â· 10k Accounts (Agent Simulation)',
+    scope: '1.32M Transactions · 10k Accounts (Agent Simulation)',
     prevalence: '0.11% Multi-Hop SAR Patterns',
     uplift: '+0.0434 PR-AUC vs Tabular (0.6527 vs 0.6093)',
     fpReduction: '70.50% Fan-In Recall',
@@ -566,9 +566,9 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 742, fp: 189, fn: 312, tn: 394757, precision: '79.7%', recall: '70.4%', f1: '74.8%', specificity: '99.95%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
-      { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
-      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-600 bg-slate-100 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
+      { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
+      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
     ],
   },
   synthaml: {
@@ -585,9 +585,9 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 248, fp: 2, fn: 2, tn: 4748, precision: '99.2%', recall: '99.2%', f1: '99.2%', specificity: '99.96%' },
     routeDataset: 'creditcard',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Consortium Champion', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '0.9924', rocauc: '0.9980', recall01: '99.20%', brier: '0.0004', latency: '0.042 ms', compliance: 'Zero Raw PII (Rescues Bank Beta)', compliant: true },
-      { paradigm: 'Centralized Pooled Baseline', badge: 'Pooled Baseline', badgeColor: 'text-amber-600 bg-amber-50 border-amber-200', prauc: '0.9341', rocauc: '0.9890', recall01: '94.50%', brier: '0.0012', latency: '0.040 ms', compliance: 'Illegal Data Pooling', compliant: false },
-      { paradigm: 'Bank Beta Silo (Starved Small Bank)', badge: 'Collapsed Silo', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.2214', rocauc: '0.7420', recall01: '18.40%', brier: '0.0450', latency: '0.038 ms', compliance: 'Severe Sample Starvation', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9924', rocauc: '0.9980', recall01: '99.20%', brier: '0.0004', latency: '0.042 ms', compliance: 'Zero Raw PII (Rescues Bank Beta)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline', badge: 'Pooled Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9341', rocauc: '0.9890', recall01: '94.50%', brier: '0.0012', latency: '0.040 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Bank Beta Silo (Starved Small Bank)', badge: 'Collapsed Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.2214', rocauc: '0.7420', recall01: '18.40%', brier: '0.0450', latency: '0.038 ms', compliance: 'Severe Sample Starvation', compliant: false },
     ],
   },
   amlnet: {
@@ -604,8 +604,8 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     cm: { tp: 500, fp: 0, fn: 0, tn: 24500, precision: '100.0%', recall: '100.0%', f1: '100.0%', specificity: '100.0%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Federated Structuring', badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200', prauc: '1.0000', rocauc: '1.0000', recall01: '100.0%', brier: '0.0001', latency: '0.038 ms', compliance: 'Zero Raw PII (Smurfing Defense)', compliant: true },
-      { paradigm: 'Isolated Bank Silo (Single Institution)', badge: 'Silo Baseline', badgeColor: 'text-rose-600 bg-rose-50 border-rose-200', prauc: '0.7840', rocauc: '0.8920', recall01: '64.20%', brier: '0.0120', latency: '0.035 ms', compliance: 'Blind to Multi-Bank Smurfing', compliant: false },
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Federated Structuring', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '1.0000', rocauc: '1.0000', recall01: '100.0%', brier: '0.0001', latency: '0.038 ms', compliance: 'Zero Raw PII (Smurfing Defense)', compliant: true },
+      { paradigm: 'Isolated Bank Silo (Single Institution)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-300', prauc: '0.7840', rocauc: '0.8920', recall01: '64.20%', brier: '0.0120', latency: '0.035 ms', compliance: 'Blind to Multi-Bank Smurfing', compliant: false },
     ],
   },
 };
@@ -620,7 +620,7 @@ const scrollToSection = (id: string) => {
   }
 };
 
-// â”€â”€ 2026 HIGH-END FUTURISTIC CONSORTIUM NETWORK SVG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── 2026 HIGH-END FUTURISTIC CONSORTIUM NETWORK SVG ──────────────────────────
 const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
   const [pulseTick, setPulseTick] = useState(0);
   useEffect(() => {
@@ -697,7 +697,7 @@ const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
   );
 });
 
-// â”€â”€ 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
 const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar' | 'chaos' | 'ingest'>('home');
@@ -808,38 +808,38 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
   ];
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-indigo-100 bg-slate-50 w-full max-w-full min-w-0">
+    <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-white w-full max-w-full min-w-0">
       {/* Browser Chrome Header */}
-      <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-slate-100 border-b border-slate-200 min-w-0">
+      <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-white border-b border-slate-200 min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <div className="flex gap-1 shrink-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-100" />
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-100" />
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-100" />
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
           </div>
           <button
             type="button"
             onClick={() => navigate(`/${tabUrlPaths[activeTab]}`)}
             title={`Click to open https://cf-intelligence.vercel.app/${tabUrlPaths[activeTab]}`}
-            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-600 flex items-center gap-1 border border-slate-200 truncate cursor-pointer hover:bg-slate-100 hover:border-indigo-500/40 transition-all text-left"
+            className="group px-2 sm:px-3 py-0.5 rounded-md bg-slate-50 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1 border border-slate-200 truncate cursor-pointer hover:bg-slate-50 hover:border-indigo-500/40 transition-all text-left"
           >
-            <span className="text-emerald-600 text-[10px] shrink-0">ğŸ”’</span>
-            <span className="text-slate-600 truncate">https://cf-intelligence.vercel.app/</span>
-            <span className="text-indigo-600 font-bold bg-indigo-100 px-1 py-0.5 rounded group-hover:text-indigo-600 shrink-0">
+            <span className="text-emerald-400 text-[10px] shrink-0">🔒</span>
+            <span className="text-slate-400 truncate">https://cf-intelligence.vercel.app/</span>
+            <span className="text-indigo-400 font-bold bg-indigo-500/15 px-1 py-0.5 rounded group-hover:text-indigo-700 shrink-0">
               {tabUrlPaths[activeTab]}
             </span>
           </button>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200" title="Client-side interactive preview simulating real-time federated convergence">
+        <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20" title="Client-side interactive preview simulating real-time federated convergence">
           <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-indigo-600 uppercase tracking-wider">Interactive Simulation</span>
+          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-wider">Interactive Simulation</span>
         </div>
       </div>
 
       {/* Main Body */}
       <div className="flex min-h-[340px] sm:min-h-[360px] w-full min-w-0">
         {/* INTERACTIVE SIDEBAR NAV */}
-        <div className="w-9 sm:w-11 shrink-0 border-r border-slate-200 bg-slate-50 py-2.5 flex flex-col items-center gap-3">
+        <div className="w-9 sm:w-11 shrink-0 border-r border-slate-200 bg-white py-2.5 flex flex-col items-center gap-3">
           {sidebarButtons.map(btn => (
             <button
               key={btn.id}
@@ -847,8 +847,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               title={btn.title}
               className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeTab === btn.id
-                  ? `${btn.color} text-slate-900 shadow-indigo-100 scale-105`
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+                  ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
+                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
               {btn.icon}
@@ -863,32 +863,32 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             {activeTab === 'home' && (
               <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-50 border border-indigo-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-600 uppercase">Active FL Round</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-600 mt-0.5">#{flRound}</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-600 uppercase">Global Accuracy</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-600 mt-0.5">{accuracy}%</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-600 uppercase">Privacy Budget</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-600 mt-0.5">Îµ = 0.50</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-600 uppercase">Stream Speed</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-600 mt-0.5">1.4 GB/s</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-600">
+                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-400">
                   <span>* Illustrative simulation preview</span>
-                  <span className="text-indigo-600 font-medium">Synthetic Convergence Ticker</span>
+                  <span className="text-indigo-700 font-medium">Synthetic Convergence Ticker</span>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white/2 min-w-0">
+                <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 min-w-0">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 bg-slate-50">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-600 uppercase tracking-wider">Risk Alert Feed</span>
-                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-600">
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-400">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
                     </span>
                   </div>
@@ -896,18 +896,18 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     {alerts.map((a) => (
                       <div key={`${a.id}-${alertTick}`} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 text-[8.5px] sm:text-[9px] font-mono min-w-0">
                         <span className={`w-1 h-3 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <span className="text-slate-600 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
+                        <span className="text-slate-400 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
                         <span className="text-slate-600 flex-1 truncate">${a.amount}</span>
-                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-600' : 'text-emerald-600'}`}>{a.score.toFixed(2)}</span>
+                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white/2 p-1.5 sm:p-2 min-w-0">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-1.5 sm:p-2 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-600 uppercase tracking-wider">Consortium Topology</span>
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-600">3/3 Nodes Synced</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
                   </div>
                   <HighEndConsortiumSVG />
                 </div>
@@ -916,57 +916,57 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
             {activeTab === 'gnn' && (
               <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-200 space-y-0.5">
-                  <div className="text-purple-600 font-bold">GNN Subgraph Inspection</div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-0.5">
+                  <div className="text-purple-700 font-bold">GNN Subgraph Inspection</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Total Alerts</div>
-                    <div className="text-amber-600 font-bold mt-0.5">48 (12 Critical)</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Total Alerts</div>
+                    <div className="text-amber-400 font-bold mt-0.5">48 (12 Critical)</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Open Cases</div>
-                    <div className="text-indigo-600 font-bold mt-0.5">8 Active Cases</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Open Cases</div>
+                    <div className="text-indigo-400 font-bold mt-0.5">8 Active Cases</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Entities</div>
-                    <div className="text-teal-600 font-bold mt-0.5">142 Network Nodes</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Entities</div>
+                    <div className="text-teal-400 font-bold mt-0.5">142 Network Nodes</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Graph Clusters</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Graph Clusters</div>
                     <div className="text-pink-400 font-bold mt-0.5">5 High-Risk Subgraphs</div>
                   </div>
                 </div>
                 <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <div className="text-slate-600 font-semibold">Detected Circular Smurfing Path:</div>
-                  <div className="text-rose-600 font-bold break-all">JPM-01 ($1.45M) â†’ HSBC-02 â†’ SGX TEE â†’ DBK-03</div>
+                  <div className="text-slate-400 font-semibold">Detected Circular Smurfing Path:</div>
+                  <div className="text-rose-400 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'privacy' && (
               <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-200 space-y-0.5">
-                  <div className="text-emerald-600 font-bold">Intel SGX & (Îµ, Î´)-DP Engine</div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-0.5">
+                  <div className="text-emerald-700 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-slate-600">Deep Leakage Audit (DLG)</span>
-                    <span className="text-emerald-600 font-bold">ğŸŸ¢ Safe (0.021)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
+                    <span className="text-slate-400">Deep Leakage Audit (DLG)</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.021)</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-slate-600">Membership Inference (MIA)</span>
-                    <span className="text-emerald-600 font-bold">ğŸŸ¢ Safe (0.048)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
+                    <span className="text-slate-400">Membership Inference (MIA)</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.048)</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-slate-600">Model Inversion Attack</span>
-                    <span className="text-emerald-600 font-bold">ğŸŸ¢ Safe (0.015)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200">
+                    <span className="text-slate-400">Model Inversion Attack</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.015)</span>
                   </div>
                 </div>
-                <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[8.5px] sm:text-[9px] text-slate-600 truncate">
-                  Privacy Accountant: Îµ = 1.0, Î´ = 1e-5 (Opacus RDP Bounded)
+                <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
+                  Privacy Accountant: ε = 1.0, δ = 1e-5 (Opacus RDP Bounded)
                 </div>
               </motion.div>
             )}
@@ -974,25 +974,25 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             {activeTab === 'bft' && (
               <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-0.5">
-                  <div className="text-cyan-600 font-bold">Byzantine Resilience Monitor</div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
+                  <div className="text-cyan-700 font-bold">Byzantine Resilience Monitor</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Live FL Round</div>
-                    <div className="text-cyan-600 font-bold mt-0.5">Round #5 / 10</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Live FL Round</div>
+                    <div className="text-cyan-400 font-bold mt-0.5">Round #5 / 10</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Champion Model AUC</div>
-                    <div className="text-emerald-600 font-bold mt-0.5">0.885 ROC-AUC</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Champion Model AUC</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">0.885 ROC-AUC</div>
                   </div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-200 text-emerald-600">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
                     <span className="truncate">JPMorgan Node #01</span>
                     <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-200 text-emerald-600">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
                     <span className="truncate">HSBC Node #02</span>
                     <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
@@ -1002,24 +1002,24 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
             {activeTab === 'sar' && (
               <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-200 space-y-0.5">
-                  <div className="text-amber-600 font-bold">FinCEN SAR Automated Compliance</div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-0.5">
+                  <div className="text-amber-700 font-bold">FinCEN SAR Automated Compliance</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
-                    <div className="flex items-center justify-between text-slate-800 font-bold">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-700 font-bold">
                       <span>CASE-2026-004</span>
-                      <span className="text-rose-600">P1 Critical</span>
+                      <span className="text-rose-400">P1 Critical</span>
                     </div>
-                    <div className="text-slate-600 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring - In Review</div>
                   </div>
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
-                    <div className="flex items-center justify-between text-slate-800 font-bold">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-white border border-slate-200 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-700 font-bold">
                       <span>CASE-2026-001</span>
-                      <span className="text-emerald-600">SAR Filed</span>
+                      <span className="text-emerald-400">SAR Filed</span>
                     </div>
-                    <div className="text-slate-600 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion - FinCEN SAR XML Exported</div>
                   </div>
                 </div>
               </motion.div>
@@ -1027,62 +1027,62 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
             {activeTab === 'chaos' && (
               <motion.div key="chaos" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-600/10 border border-rose-200 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-600/10 border border-rose-300 space-y-0.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-rose-600 font-bold">Interactive Chaos & Attack Simulator</span>
-                    <span className="text-[8px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
+                    <span className="text-rose-700 font-bold">Interactive Chaos & Attack Simulator</span>
+                    <span className="text-[8px] bg-rose-500/20 text-rose-700 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
                   </div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-rose-200">
-                    <div className="text-slate-600">Byzantine Vector</div>
-                    <div className="text-rose-600 font-bold mt-0.5">Î”w Ã— -10.0 Poison</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-rose-300">
+                    <div className="text-slate-400">Byzantine Vector</div>
+                    <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-emerald-200">
-                    <div className="text-slate-600">Defense Filter</div>
-                    <div className="text-emerald-600 font-bold mt-0.5">Krum (Score=48.2)</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-emerald-500/20">
+                    <div className="text-slate-400">Defense Filter</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">Krum (Score=48.2)</div>
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                <div className="p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 flex items-center justify-between text-[8.5px] sm:text-[9px]">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     Bank Gamma: QUARANTINED BY KRUM
                   </span>
-                  <span className="font-bold text-emerald-600">Robust Filter Active</span>
+                  <span className="font-bold text-emerald-400">Robust Filter Active</span>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'ingest' && (
               <motion.div key="ingest" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-xl bg-indigo-50 border border-indigo-200 space-y-0.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-indigo-600/10 border border-indigo-500/20 space-y-0.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-indigo-600 font-bold">Real Dataset Ingestion Studio</span>
-                    <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
+                    <span className="text-indigo-700 font-bold">Real Dataset Ingestion Studio</span>
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-700 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
                   </div>
-                  <div className="text-slate-600 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Luhn Algorithm PAN</div>
-                    <div className="text-emerald-600 font-bold mt-0.5">100% Sanitized</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Luhn Algorithm PAN</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">100% Sanitized</div>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-slate-600">Data Contract Audit</div>
-                    <div className="text-emerald-600 font-bold mt-0.5">12 / 12 Passed</div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="text-slate-400">Data Contract Audit</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">12 / 12 Passed</div>
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-500/30 text-indigo-700 flex items-center justify-between text-[8.5px] sm:text-[9px]">
                   <span>Non-IID Dirichlet Skew:</span>
-                  <span className="font-bold text-indigo-700">Î± = 0.524 (Balanced)</span>
+                  <span className="font-bold text-indigo-700">α = 0.524 (Balanced)</span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="text-[8px] sm:text-[9px] font-mono text-slate-600 text-center border-t border-slate-200 pt-1.5">
-            Click sidebar icons ({sidebarButtons.map(b => b.label).join(' Â· ')}) to inspect live platform modules
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-400 text-center border-t border-slate-200 pt-1.5">
+            Click sidebar icons ({sidebarButtons.map(b => b.label).join(' · ')}) to inspect live platform modules
           </div>
         </div>
       </div>
@@ -1090,7 +1090,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
   );
 });
 
-// â”€â”€ FADE WRAPPER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── FADE WRAPPER ─────────────────────────────────────────────────────────────
 const FadeSection = memo(function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
@@ -1101,13 +1101,13 @@ const FadeSection = memo(function FadeSection({ children, className = '', delay 
   );
 });
 
-// â”€â”€ 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT ────────────────────────
 const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => {
   const [useFallback, setUseFallback] = useState(false);
 
   if (useFallback) {
     return (
-      <div className={`${className} rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-slate-900 text-xs tracking-wider select-none`}>
+      <div className={`${className} rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-white text-xs tracking-wider select-none`}>
         CFI
       </div>
     );
@@ -1149,14 +1149,14 @@ const ArrowRight = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 );
 const ChevronDown = () => (
-  <svg className="w-3 h-3 text-slate-600 group-hover:text-slate-600 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-3 h-3 text-slate-400 group-hover:text-slate-600 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
 const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; className?: string }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600' : 'text-slate-600'} ${className}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-400'} ${className}`}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -1171,15 +1171,15 @@ const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; classNa
 // Helper for Workflow Step Detail Card
 const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { step: typeof PRESENTATION_WORKFLOW[0] }) {
   return (
-    <div className="p-4 sm:p-7 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-white to-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
       <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 sm:pb-4 gap-2 min-w-0">
         <div className="min-w-0">
-          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
             {step.badge} of 08
           </span>
-          <h3 className="text-base sm:text-xl font-bold text-slate-900 mt-0.5 truncate">{step.label}</h3>
+          <h3 className="text-base sm:text-xl font-bold text-slate-800 mt-0.5 truncate">{step.label}</h3>
         </div>
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-50 border border-indigo-200 text-indigo-600 shrink-0">
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 shrink-0">
           Production Pipeline
         </span>
       </div>
@@ -1190,11 +1190,11 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 
       {/* Highlights Bullet List */}
       <div className="space-y-2 pt-1 min-w-0">
-        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-600">Key Engineering & Privacy Highlights</div>
+        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400">Key Engineering & Privacy Highlights</div>
         <div className="space-y-1.5 font-sans text-xs text-slate-600 min-w-0">
           {step.highlights.map(hl => (
             <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 min-w-0">
-              <span className="text-indigo-600 font-bold shrink-0">âœ“</span>
+              <span className="text-indigo-400 font-bold shrink-0">✓</span>
               <span className="break-words">{hl}</span>
             </div>
           ))}
@@ -1203,13 +1203,13 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 
       {/* Data Input/Output Specifications */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Data Input</div>
-          <div className="text-indigo-600 font-semibold truncate">{step.input}</div>
+        <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Input</div>
+          <div className="text-indigo-700 font-semibold truncate">{step.input}</div>
         </div>
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Data Output</div>
-          <div className="text-emerald-600 font-semibold truncate">{step.output}</div>
+        <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Output</div>
+          <div className="text-emerald-400 font-semibold truncate">{step.output}</div>
         </div>
       </div>
     </div>
@@ -1220,30 +1220,30 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { mod: Module; onNavigate: (path: string) => void }) {
   const currentExtra = MODULE_SPECS_EXTRA[mod.id];
   return (
-    <div className="p-4 sm:p-7 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 shadow-2xl">
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-white to-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 shadow-2xl">
       {/* Card Header & Action */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-200 pb-4 min-w-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[9.5px] font-mono font-bold text-indigo-600 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200">
+            <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
               {mod.category}
             </span>
             <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded ${
               mod.category.includes('Core') 
-                ? 'text-emerald-600 bg-emerald-50 border border-emerald-200' 
-                : 'text-purple-600 bg-purple-50 border border-purple-200'
+                ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
+                : 'text-purple-400 bg-purple-500/10 border border-purple-500/20'
             }`}>
               {currentExtra?.statusBadge ?? 'VERIFIED'}
             </span>
           </div>
-          <h3 className="text-base sm:text-xl font-bold text-slate-900">{mod.name}</h3>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
+          <h3 className="text-base sm:text-xl font-bold text-slate-800">{mod.name}</h3>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
         </div>
 
         {currentExtra && (
           <button
             onClick={() => onNavigate(currentExtra.actionRoute)}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-900 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-indigo-100 shrink-0 cursor-pointer self-start sm:self-auto"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] shrink-0 cursor-pointer self-start sm:self-auto"
           >
             <span>{currentExtra.actionLabel}</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -1254,14 +1254,14 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       {/* 4 Core Specification Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs font-mono w-full min-w-0">
         {[
-          { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-200 bg-indigo-50' },
-          { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-500/20 bg-cyan-50/15' },
-          { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-200 bg-amber-50' },
-          { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-200 bg-emerald-50/15' },
+          { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-500/20 bg-indigo-50' },
+          { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-500/20 bg-cyan-50' },
+          { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-500/20 bg-amber-50' },
+          { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-500/20 bg-emerald-50' },
         ].map(row => (
           <div key={row.label} className={`p-3 sm:p-3.5 rounded-xl border ${row.color} min-w-0`}>
-            <div className="text-slate-600 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
-            <div className="text-slate-800 text-xs break-words leading-relaxed">{row.value}</div>
+            <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
+            <div className="text-slate-700 text-xs break-words leading-relaxed">{row.value}</div>
           </div>
         ))}
       </div>
@@ -1269,29 +1269,29 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
       {/* Engineering Guarantees & Real-Time SLAs */}
       {currentExtra && (
         <div className="space-y-3 pt-2">
-          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-wider font-semibold">
+          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
             Engineering Invariants & Operational SLA
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-600 uppercase">Target Execution SLA</div>
-              <div className="text-slate-800 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Target Execution SLA</div>
+              <div className="text-slate-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-600 uppercase">Cryptographic Invariant</div>
-              <div className="text-indigo-600 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Cryptographic Invariant</div>
+              <div className="text-indigo-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[9px] text-slate-600 uppercase">Compliance Standard</div>
-              <div className="text-emerald-600 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Compliance Standard</div>
+              <div className="text-emerald-700 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
             </div>
           </div>
 
           {/* Tensor Transformation & Contract Blueprint */}
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono">
-            <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-white border border-slate-200 font-mono">
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>Dataflow Transformation Blueprint</span>
-              <span className="text-indigo-600 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
+              <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
             </div>
             <div className="text-indigo-700 text-[11px] sm:text-xs break-all leading-relaxed bg-slate-100 p-2 rounded-lg border border-slate-200">
               {currentExtra.tensorSample}
@@ -1306,23 +1306,23 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
 // Helper for Arch Node Detail Card
 const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: ArchNode }) {
   return (
-    <div className="p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
+    <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-white to-white border border-slate-200 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
       <div className="border-b border-slate-200 pb-3 sm:pb-4 min-w-0">
-        <span className="text-[9.5px] font-mono text-indigo-600 uppercase tracking-wider">Service Node</span>
-        <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5 truncate">{node.label}</h3>
-        <p className="text-xs text-slate-600 leading-relaxed mt-1.5 font-sans">{node.description}</p>
+        <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
+        <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-0.5 truncate">{node.label}</h3>
+        <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{node.description}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
         {[
-          { label: 'Responsibilities', items: node.responsibilities, dot: 'text-indigo-600' },
-          { label: 'Protocols',        items: node.protocols,       dot: 'text-purple-600' },
-          { label: 'Technology',       items: node.tech,            dot: 'text-cyan-600' },
+          { label: 'Responsibilities', items: node.responsibilities, dot: 'text-indigo-400' },
+          { label: 'Protocols',        items: node.protocols,       dot: 'text-purple-400' },
+          { label: 'Technology',       items: node.tech,            dot: 'text-cyan-400' },
         ].map(col => (
           <div key={col.label} className="min-w-0">
-            <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1.5">{col.label}</div>
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1.5">{col.label}</div>
             <ul className="space-y-1">
               {col.items.map(it => (
-                <li key={it} className="text-slate-600 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>â€¢</span><span className="truncate">{it}</span></li>
+                <li key={it} className="text-slate-600 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
               ))}
             </ul>
           </div>
@@ -1332,7 +1332,7 @@ const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: Ar
   );
 });
 
-// â”€â”€ MAIN LANDING PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN LANDING PAGE ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -1407,33 +1407,33 @@ export default function LandingPage() {
   const currentWorkflowStep = PRESENTATION_WORKFLOW.find(s => s.id === activeWorkflowStep)!;
 
   return (
-    <div className="min-h-screen bg-white text-slate-700 font-sans antialiased selection:bg-indigo-600 selection:text-slate-900 w-full max-w-full overflow-x-hidden min-w-0">
+    <div className="min-h-screen bg-white text-slate-600 font-sans antialiased selection:bg-indigo-600 selection:text-white w-full max-w-full overflow-x-hidden min-w-0">
 
       {/* 2026 Ambient Fluid Glow background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-100 blur-[140px]" />
-        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-100 blur-[150px]" />
-        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-100 blur-[130px]" />
-        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
+        <div className="absolute -top-72 -left-48 w-[700px] h-[700px] rounded-full bg-indigo-600/15 blur-[140px]" />
+        <div className="absolute top-1/2 -right-72 w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[150px]" />
+        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] rounded-full bg-cyan-600/10 blur-[130px]" />
+        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-full min-w-0">
 
-        {/* â”€â”€ HEADER NAVBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-slate-200 bg-white/90 backdrop-blur-2xl shadow-sm w-full max-w-full">
+        {/* ── HEADER NAVBAR ────────────────────────────────────────── */}
+        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-slate-200 bg-white backdrop-blur-2xl w-full max-w-full">
           <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 flex items-center justify-between min-w-0">
             {/* Brand Logo & Clean Name */}
             <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => navigate('/')}>
               <BrandLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0" />
-              <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight truncate">CF-Intelligence</span>
+              <span className="font-bold text-sm sm:text-base text-slate-800 tracking-tight truncate">CF-Intelligence</span>
             </div>
 
             {/* Desktop Navigation with Contextual Dropdowns */}
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-600">
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
               <a
                 href="#hero"
                 onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
-                className="hover:text-slate-900 transition-colors py-2"
+                className="hover:text-slate-800 transition-colors py-2"
               >
                 Overview
               </a>
@@ -1446,16 +1446,16 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('problem-solution')}
-                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer py-1"
                 >
                   <span>Platform & Engine</span>
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Core Platform Suite
                   </div>
                   {[
@@ -1468,13 +1468,13 @@ export default function LandingPage() {
                       key={sub.target}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-600">{sub.label}</div>
-                        <div className="text-[10px] text-slate-600 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-600 text-xs">â†’</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1488,7 +1488,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('architecture')}
-                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer py-1"
                 >
                   <span>Architecture & Security</span>
                   <ChevronDown />
@@ -1496,29 +1496,29 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'arch'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Security & Topology
                   </div>
                   {[
                     { label: 'System Topology',    desc: 'gRPC & mTLS Service Mesh',   target: 'architecture' },
-                    { label: 'Privacy Boundaries', desc: 'RÃ©nyi DP, HSM & SGX Enclave', target: 'security' },
+                    { label: 'Privacy Boundaries', desc: 'Rényi DP, HSM & SGX Enclave', target: 'security' },
                     { label: 'Threat Model',       desc: 'Byzantine Poisoning Defense', target: 'security' },
                   ].map(sub => (
                     <a
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-600">{sub.label}</div>
-                        <div className="text-[10px] text-slate-600 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-600 text-xs">â†’</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1532,7 +1532,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('benchmarks')}
-                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer py-1"
                 >
                   <span>Benchmarks & Proof</span>
                   <ChevronDown />
@@ -1540,11 +1540,11 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'bench'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Empirical Proof Suite
                   </div>
                   {[
@@ -1556,13 +1556,13 @@ export default function LandingPage() {
                       key={sub.label}
                       type="button"
                       onClick={sub.action}
-                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item text-left cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item text-left cursor-pointer"
                     >
                       <div>
-                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-600">{sub.label}</div>
-                        <div className="text-[10px] text-slate-600 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-600 text-xs">â†’</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </button>
                   ))}
                 </div>
@@ -1576,7 +1576,7 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => handleNavClick('api')}
-                  className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer py-1"
+                  className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer py-1"
                 >
                   <span>Developers & Legal</span>
                   <ChevronDown />
@@ -1584,11 +1584,11 @@ export default function LandingPage() {
 
                 <div
                   aria-hidden={openNavDropdown !== 'dev'}
-                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white/98 backdrop-blur-2xl border border-slate-200 shadow-xl rounded-2xl shadow-2xl transition-all duration-200 ${
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-white backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl transition-all duration-200 ${
                     openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
                   }`}
                 >
-                  <div className="text-[9.5px] font-mono text-slate-600 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-slate-200">
                     Integration & Contracts
                   </div>
                   {[
@@ -1600,13 +1600,13 @@ export default function LandingPage() {
                       key={sub.target + sub.label}
                       href={`#${sub.target}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
-                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors group/item"
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-600 hover:text-white hover:bg-slate-50 rounded-xl transition-colors group/item"
                     >
                       <div>
-                        <div className="font-semibold text-slate-800 group-hover/item:text-indigo-600">{sub.label}</div>
-                        <div className="text-[10px] text-slate-600 font-mono">{sub.desc}</div>
+                        <div className="font-semibold text-slate-700 group-hover/item:text-indigo-700">{sub.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-600 text-xs">â†’</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1615,7 +1615,7 @@ export default function LandingPage() {
               <a
                 href="#contact"
                 onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }}
-                className="hover:text-slate-900 transition-colors py-2"
+                className="hover:text-slate-800 transition-colors py-2"
               >
                 Enterprise Setup
               </a>
@@ -1625,13 +1625,13 @@ export default function LandingPage() {
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 cursor-pointer transition-colors active:scale-95"
+                className="lg:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-white cursor-pointer transition-colors active:scale-95"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
               <button
                 onClick={handleLaunchDemo}
-                className="hidden sm:inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_20px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 group"
+                className="hidden sm:inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_20px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 group"
               >
                 <span>Launch Demo</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
@@ -1640,7 +1640,7 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* â”€â”€ 2026 CLEAN & FOCUSED FULL-SCREEN MOBILE NAVIGATION OVERLAY â”€â”€ */}
+        {/* ── 2026 CLEAN & FOCUSED FULL-SCREEN MOBILE NAVIGATION OVERLAY ── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.div
@@ -1655,14 +1655,14 @@ export default function LandingPage() {
                 <div className="flex items-center gap-3">
                   <BrandLogo className="w-8 h-8 shrink-0" />
                   <div>
-                    <div className="font-bold text-sm text-slate-900 tracking-tight">CF-Intelligence</div>
-                    <div className="text-[10px] font-mono text-slate-600">Consortium Fraud Network</div>
+                    <div className="font-bold text-sm text-white tracking-tight">CF-Intelligence</div>
+                    <div className="text-[10px] font-mono text-slate-400">Consortium Fraud Network</div>
                   </div>
                 </div>
                 <button
                   aria-label="Close Navigation Menu"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
                 >
                   <CloseIcon />
                 </button>
@@ -1687,17 +1687,17 @@ export default function LandingPage() {
                       setIsMobileMenuOpen(false);
                       handleNavClick(item.targetId);
                     }}
-                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-500/40 active:bg-indigo-100 transition-all text-left cursor-pointer group"
+                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-slate-200 hover:border-indigo-500/40 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <span className="text-xs font-mono font-bold text-indigo-600 group-hover:text-indigo-600 shrink-0">
+                      <span className="text-xs font-mono font-bold text-indigo-400 group-hover:text-indigo-700 shrink-0">
                         {item.num}
                       </span>
-                      <span className="text-base font-semibold text-slate-800 group-hover:text-slate-900 truncate">
+                      <span className="text-base font-semibold text-slate-700 group-hover:text-white truncate">
                         {item.label}
                       </span>
                     </div>
-                    <span className="text-slate-600 group-hover:text-indigo-600 transition-colors shrink-0">
+                    <span className="text-slate-400 group-hover:text-indigo-400 transition-colors shrink-0">
                       <ArrowRight />
                     </span>
                   </motion.button>
@@ -1711,15 +1711,15 @@ export default function LandingPage() {
                     setIsMobileMenuOpen(false);
                     handleLaunchDemo();
                   }}
-                  className="w-full min-h-[48px] py-3.5 px-5 rounded-xl font-bold text-sm text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-center group"
+                  className="w-full min-h-[48px] py-3.5 px-5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-center group"
                 >
                   <span>Launch Live Platform Demo</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-600 px-1 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1 pt-1">
                   <span>CF-Intelligence Network</span>
-                  <span className="text-emerald-600 font-semibold flex items-center gap-1.5">
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     v2.4.0 Live
                   </span>
@@ -1729,29 +1729,29 @@ export default function LandingPage() {
           )}
         </AnimatePresence>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 1 - HERO / OVERVIEW (#hero)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="hero" className="relative py-10 sm:py-20 px-3.5 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center min-w-0">
 
             {/* Left Hero Content */}
             <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6}} className="lg:col-span-7 space-y-6 sm:space-y-8 min-w-0">
               <div className="space-y-3 sm:space-y-4 min-w-0">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 text-[11px] sm:text-xs font-mono max-w-full truncate">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] sm:text-xs font-mono max-w-full truncate">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
                   <span className="truncate">Privacy-Preserving Federated Infrastructure</span>
                 </div>
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] break-words">
-                  <span className="text-slate-900">
+                  <span className="bg-gradient-to-r from-slate-100 via-indigo-200 to-slate-300 bg-clip-text text-transparent">
                     Collaborative Cross-Bank
                   </span>
                   <br />
-                  <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
                     Fraud Detection Platform
                   </span>
                 </h1>
-                <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
+                <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
                   CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies to detect multi-bank money laundering networks without raw customer data exposure.
                 </p>
               </div>
@@ -1759,19 +1759,19 @@ export default function LandingPage() {
               {/* High impact feature highlights */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">+55.59%</div>
-                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">+55.59%</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated (Synthetic Trial)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Îµ â‰¤ 1.0</div>
-                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">Measured Îµ = 0.35 (Î´ = 10â»âµ)</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε ≤ 1.0</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">2.70 ms</div>
-                  <div className="text-[11px] text-slate-600 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">p99: 3.21 ms Â· 543 req/s peak HTTP</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.70 ms</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring Latency</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 3.21 ms · 543 req/s peak HTTP</div>
                 </div>
               </div>
 
@@ -1779,7 +1779,7 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0">
                 <button
                   onClick={handleLaunchDemo}
-                  className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_35px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto text-center group"
+                  className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_35px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto text-center group"
                 >
                   <span>Launch Live Platform Demo</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
@@ -1787,7 +1787,7 @@ export default function LandingPage() {
                 <a
                   href="#architecture"
                   onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
-                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
+                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-white bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all duration-200 text-center w-full sm:w-auto active:scale-[0.98] cursor-pointer group"
                 >
                   <span>Explore System Design</span>
                 </a>
@@ -1801,20 +1801,20 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 2 - PROBLEM STATEMENT (#problem-solution)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Problem Statement
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                 The Cross-Bank Blindspot in Money Laundering
               </h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation-missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
               </p>
             </div>
@@ -1842,32 +1842,32 @@ export default function LandingPage() {
               ].map((card) => (
                 <div
                   key={card.label}
-                  className="p-5 sm:p-7 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-200 transition-all space-y-3 min-w-0"
+                  className="p-5 sm:p-7 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-3 min-w-0"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-600">{card.stat}</span>
-                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-600 bg-white/4 px-2 py-0.5 rounded border border-slate-200">{card.tag}</span>
+                    <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-400">{card.stat}</span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{card.tag}</span>
                   </div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-800">{card.label}</h3>
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-sans">{card.desc}</p>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-700">{card.label}</h3>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans">{card.desc}</p>
                 </div>
               ))}
             </div>
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 3 - WORKFLOW / EXECUTION PIPELINE (#how-it-works)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Execution Pipeline
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">8-Stage Federated Training Architecture</h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">8-Stage Federated Training Architecture</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any pipeline stage below to view the architectural overview, data input/output specifications, and cryptographic guarantees.
               </p>
             </div>
@@ -1883,13 +1883,13 @@ export default function LandingPage() {
                         onClick={() => setActiveWorkflowStep(step.id)}
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                           isActive
-                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
-                            isActive ? 'bg-indigo-600 text-slate-900 shadow-sm' : 'bg-slate-50 text-slate-600'
+                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-400'
                           }`}>
                             {step.id}
                           </span>
@@ -1899,8 +1899,8 @@ export default function LandingPage() {
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isActive} />
                           </span>
-                          <span className="hidden lg:inline text-xs font-mono text-slate-600 group-hover:text-slate-800">
-                            {isActive ? 'â†’' : ''}
+                          <span className="hidden lg:inline text-xs font-mono text-slate-400 group-hover:text-slate-700">
+                            {isActive ? '→' : ''}
                           </span>
                         </div>
                       </button>
@@ -1934,25 +1934,25 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 4 - ENGINE CAPABILITIES (#product)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 min-w-0">
               <div className="max-w-3xl min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
                   Engine Specifications & Architecture
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Platform Engineering Capabilities</h2>
-                <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Platform Engineering Capabilities</h2>
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   Inspect platform component specifications, mathematical algorithms, tensor input/output contracts, and real-time execution invariants.
                 </p>
               </div>
 
               {/* Category Filter Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-slate-200 shrink-0 self-start md:self-end">
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-50 border border-slate-200 shrink-0 self-start md:self-end">
                 {[
                   { id: 'ALL', label: `All (${PLATFORM_MODULES.length})` },
                   { id: 'CORE', label: `Core Engine (${PLATFORM_MODULES.filter(m => m.category.includes('Core')).length})` },
@@ -1979,8 +1979,8 @@ export default function LandingPage() {
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
                       moduleFilter === tab.id
-                        ? 'bg-indigo-600 text-slate-900 shadow-indigo-100'
-                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+                        ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {tab.label}
@@ -2009,23 +2009,23 @@ export default function LandingPage() {
                         onClick={() => setActiveModule(mod)}
                         className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
                           isSelected
-                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                            : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
+                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
                           <div className="text-xs font-semibold truncate flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-100' : 'bg-purple-100'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
                             <span className="truncate">{mod.name}</span>
                           </div>
-                          <div className="text-[9.5px] font-mono text-slate-600 truncate mt-0.5 ml-3.5">{mod.category}</div>
+                          <div className="text-[9.5px] font-mono text-slate-400 truncate mt-0.5 ml-3.5">{mod.category}</div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isSelected} />
                           </span>
                           <span className="hidden lg:inline">
-                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-600 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-600'}`} />
+                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-400 group-hover:text-slate-600'}`} />
                           </span>
                         </div>
                       </button>
@@ -2060,18 +2060,18 @@ export default function LandingPage() {
         </section>
 
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 5 - PLATFORM / NODE INSPECTOR (#platform)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Architecture
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Simulated Consortium Node Inspector</h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Simulated Consortium Node Inspector</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Inspect simulated node hardware configurations, PyTorch execution runtimes, and synthetic ISO 20022 message streams across reference bank profiles.
               </p>
             </div>
@@ -2083,17 +2083,17 @@ export default function LandingPage() {
                   initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} transition={{delay:i*0.08}}
                   whileHover={{y:-4}}
                   onClick={() => setActiveBankDrawer(bank)}
-                  className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-500/40 hover:shadow-indigo-100 cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0 active:scale-[0.99]"
+                  className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/40 hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0 active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-200">READY</span>
-                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-600">{bank.latency}</span>
+                    <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400">{bank.latency}</span>
                   </div>
                   <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 truncate">{bank.name}</h3>
-                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-600 mt-0.5 truncate">{bank.ticker}</div>
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-700 truncate">{bank.name}</h3>
+                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 mt-0.5 truncate">{bank.ticker}</div>
                   </div>
-                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-600 border-t border-slate-200 pt-2 leading-snug break-words">
+                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-400 border-t border-slate-200 pt-2 leading-snug break-words">
                     {bank.hardware}
                   </div>
                 </motion.div>
@@ -2102,18 +2102,18 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 6 - ARCHITECTURE (#architecture)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Service Mesh Design
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">System Service Topology</h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">System Service Topology</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any service layer node to inspect internal responsibilities, communication protocols, and technology stack.
               </p>
             </div>
@@ -2128,13 +2128,13 @@ export default function LandingPage() {
                       onClick={() => setActiveArchNode(node)}
                       className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-900 shadow-indigo-100'
-                          : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
+                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                          : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold mb-0.5 truncate">{node.label}</div>
-                        <div className="text-[9.5px] font-mono text-slate-600 leading-snug truncate">{node.tech.slice(0, 2).join(' Â· ')}</div>
+                        <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                       </div>
                       <AccordionChevron isOpen={isSelected} />
                     </button>
@@ -2166,12 +2166,12 @@ export default function LandingPage() {
                     onClick={() => setActiveArchNode(node)}
                     className={`p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeArchNode?.id === node.id
-                        ? 'bg-indigo-100 border-indigo-500/40 text-slate-900 shadow-indigo-100'
-                        : 'bg-white/2 border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-200'
+                        ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-800 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                        : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
-                    <div className="text-[9.5px] font-mono text-slate-600 leading-snug truncate">{node.tech.slice(0, 2).join(' Â· ')}</div>
+                    <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                   </button>
                 ))}
               </div>
@@ -2183,17 +2183,17 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 7 - SECURITY & PRIVACY (#security)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Cryptographic Boundaries
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Privacy & Trust Boundary Model</h2>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Privacy & Trust Boundary Model</h2>
             </div>
 
             <div className="flex gap-1 p-1 bg-slate-50 border border-slate-200 rounded-xl w-full sm:w-fit mb-6 sm:mb-8 overflow-x-auto min-w-0">
@@ -2203,8 +2203,8 @@ export default function LandingPage() {
                   onClick={() => setActivePrivacyTab(tab.id as 'flow'|'threat'|'compliance')}
                   className={`px-4 sm:px-5 py-1.5 sm:py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer shrink-0 ${
                     activePrivacyTab === tab.id
-                      ? 'bg-indigo-600 text-slate-900 shadow-indigo-100'
-                      : 'text-slate-600 hover:text-slate-800'
+                      ? 'bg-indigo-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.5)]'
+                      : 'text-slate-400 hover:text-slate-700'
                   }`}
                 >
                   {tab.label}
@@ -2217,15 +2217,15 @@ export default function LandingPage() {
                 {activePrivacyTab === 'flow' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
                     {[
-                      {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'â† Strict non-export policy',noteColor:'text-rose-600'},
-                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'â† (Îµ=1.0, Î´=1e-5)-DP guarantee',noteColor:'text-emerald-600'},
-                      {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'â† Hardware cryptographic vault',noteColor:'text-purple-600'},
+                      {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'← Strict non-export policy',noteColor:'text-rose-400'},
+                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=1.0, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
+                      {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-400'},
                     ].map(col => (
-                      <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-white/2 border border-slate-200 space-y-3 sm:space-y-4 min-w-0">
+                      <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 sm:space-y-4 min-w-0">
                         <div className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider truncate">{col.title}</div>
-                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-600 min-w-0">
+                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-400 min-w-0">
                           {col.items.map(item => (
-                            <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200 break-words">{item}</div>
+                            <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-white border border-slate-200 break-words">{item}</div>
                           ))}
                         </div>
                         <div className={`text-[10px] font-mono ${col.noteColor} truncate`}>{col.note}</div>
@@ -2240,18 +2240,18 @@ export default function LandingPage() {
                       {threat:'Quantum Decryption Threat',    mitigation:'NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) + FIPS 204 (Dilithium-3) lattice encryption makes inter-bank traffic quantum-safe.'},
                       {threat:'Compromised Bank Footprint',  mitigation:'Confidential Federated Unlearning removes historical contributions via Exact Re-Aggregation and Lineage Subtraction without retraining.'},
                       {threat:'Malicious Weight Tampering',  mitigation:'Groth16 zk-SNARK bilinear pairings over BN254 enforce Poseidon hash commitments and norm bounds in constant time (<5ms).'},
-                      {threat:'Gradient Inversion Attack',    mitigation:'Gaussian DP noise (Ïƒ calibrated dynamically via RÃ©nyi DP) makes gradient inversion mathematically infeasible.'},
+                      {threat:'Gradient Inversion Attack',    mitigation:'Gaussian DP noise (σ calibrated dynamically via Rényi DP) makes gradient inversion mathematically infeasible.'},
                       {threat:'Byzantine Gradient Poisoning', mitigation:'Krum, Trimmed Mean, and Bulyan robust aggregation implementations isolate adversarial updates under algorithm-specific Byzantine tolerance bounds.'},
                       {threat:'Coordinator Compromise',       mitigation:'Intel SGX TEE and P2P Curve25519 SecAgg ensure the coordinator only receives zero-sum masked ciphertexts.'},
-                      {threat:'Membership Inference (MIA)',  mitigation:'Dynamic RDP Auto-Scaler bounds cumulative privacy expenditure, halting unlearning and training if Îµ limit is reached.'},
+                      {threat:'Membership Inference (MIA)',  mitigation:'Dynamic RDP Auto-Scaler bounds cumulative privacy expenditure, halting unlearning and training if ε limit is reached.'},
                       {threat:'Cross-Ledger Settlement Desync',mitigation:'Chainlink CCIP EVM2AnyMessage and LayerZero V2 enforce atomic, programmable multi-ledger liquidity routing.'},
                     ].map(row => (
-                      <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 w-full min-w-0">
+                      <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 w-full min-w-0">
                         <div className="w-full sm:w-48 shrink-0">
-                          <div className="text-xs font-bold text-rose-600 break-words">{row.threat}</div>
-                          <div className="text-[9.5px] font-mono text-emerald-600 mt-0.5">Mitigated</div>
+                          <div className="text-xs font-bold text-rose-400 break-words">{row.threat}</div>
+                          <div className="text-[9.5px] font-mono text-emerald-400 mt-0.5">Mitigated</div>
                         </div>
-                        <div className="text-xs text-slate-600 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
+                        <div className="text-xs text-slate-400 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
                       </div>
                     ))}
                   </div>
@@ -2263,17 +2263,17 @@ export default function LandingPage() {
                       {standard:'GDPR Article 25 & 6(1)(f)', status:'Privacy by Design',  detail:'DP guarantees built into tensor aggregation. Zero customer PII ever exits bank boundary. Legitimate interest basis for FIU reporting.'},
                       {standard:'UNODC goAML & SAR',      status:'goAML 4.0 Standard', detail:'Automated UNODC goAML 4.0 XML and EU AMLA Single Rulebook regulatory report exporter with dual-control supervisory sign-off.'},
                       {standard:'EU AMLA Single Rulebook', status:'Rulebook Aligned',   detail:'AMLD6 Art. 33 and EU AMLA Art. 51 harmonised reporting obligation with GDPR Art. 6(1)(f) legitimate interest justification.'},
-                      {standard:'EU AI Act & SR 11-7 MRM', status:'Annex IV Certified', detail:'Automated regulatory dossier generator compiling Articles 9â€“15 matrices, FedGNN proofs, and SR 11-7 3-Pillars validation.'},
-                      {standard:'NIST SP 800-188 & 207',  status:'Aligned',            detail:'Strict de-identification via RÃ©nyi DP and Zero-Trust mTLS 1.3 architecture.'},
+                      {standard:'EU AI Act & SR 11-7 MRM', status:'Annex IV Certified', detail:'Automated regulatory dossier generator compiling Articles 9–15 matrices, FedGNN proofs, and SR 11-7 3-Pillars validation.'},
+                      {standard:'NIST SP 800-188 & 207',  status:'Aligned',            detail:'Strict de-identification via Rényi DP and Zero-Trust mTLS 1.3 architecture.'},
                       {standard:'ISO 20022 SCT Inst',     status:'Native Schema XSD',  detail:'Parses pacs.008, camt.056, pacs.004, and camt.029 XML messages natively with sub-second hold triggers.'},
                       {standard:'SOC 2 Type II',          status:'Audit-Ready',        detail:'Automated SHA-256 tamper-evident audit trail logging and evidence export pipeline.'},
                     ].map(row => (
-                      <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 space-y-2 min-w-0">
+                      <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-mono font-bold text-slate-800 truncate">{row.standard}</span>
-                          <span className="text-[9.5px] font-mono font-bold text-emerald-600 shrink-0">{row.status}</span>
+                          <span className="text-xs font-mono font-bold text-slate-700 truncate">{row.standard}</span>
+                          <span className="text-[9.5px] font-mono font-bold text-emerald-400 shrink-0">{row.status}</span>
                         </div>
-                        <p className="text-xs text-slate-600 leading-relaxed font-sans">{row.detail}</p>
+                        <p className="text-xs text-slate-400 leading-relaxed font-sans">{row.detail}</p>
                       </div>
                     ))}
                   </div>
@@ -2283,23 +2283,23 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 7.5 - EMPIRICAL BENCHMARKS & PRODUCTION VALIDATION (#benchmarks)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             {/* Header & Quick Action Buttons */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12">
               <div className="max-w-3xl min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   Empirical Proof-of-Value &amp; 2026 Production Validation
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                   Beyond Synthetic Data: In-the-Wild Financial Benchmarks
                 </h2>
-                <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                  While marketing claims often cite synthetic lab AUC targets (0.950+), production banking faces extreme 0.01%â€“0.1% class imbalance, 
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                  While marketing claims often cite synthetic lab AUC targets (0.950+), production banking faces extreme 0.01%–0.1% class imbalance, 
                   concept drift, and severe alert fatigue. We evaluate collaborative federated learning against canonical open benchmark standards across 150k+ transactions.
                 </p>
               </div>
@@ -2308,16 +2308,16 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setIsReportOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-600 bg-cyan-50 border border-cyan-500/30 hover:bg-cyan-100 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-500/30 hover:bg-cyan-50 hover:text-white transition-all shadow-sm cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   <span>Technical Report Dossier</span>
-                  <span className="text-[10px] font-mono text-cyan-600 border border-cyan-500/20 px-1.5 py-0.5 rounded-full bg-cyan-50">.md</span>
+                  <span className="text-[10px] font-mono text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded-full bg-cyan-500/10">.md</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/benchmarks?dataset=' + (BENCHMARK_DATASETS_DETAIL[selectedBenchmarkTab]?.routeDataset ?? 'paysim'))}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-slate-900 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>Open Live Sandbox</span>
@@ -2339,23 +2339,23 @@ export default function LandingPage() {
                     onClick={() => setSelectedBenchmarkTab(tabKey)}
                     className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
                       isActive
-                        ? 'bg-indigo-50 border-indigo-500/60 shadow-indigo-100'
-                        : 'bg-white/80 border-slate-200 hover:border-indigo-300 hover:bg-slate-100/80 text-slate-600'
+                        ? 'bg-gradient-to-b from-white to-white border-indigo-500/60 shadow-[0_0_20px_rgba(99,102,241,0.25)]'
+                        : 'bg-white border-slate-200 hover:border-slate-200 hover:bg-white text-slate-400'
                     }`}
                   >
                     <div className="flex items-center justify-between text-[8.5px] font-mono mb-1">
-                      <span className={isActive ? 'text-indigo-600 font-bold' : 'text-slate-600'}>
+                      <span className={isActive ? 'text-indigo-400 font-bold' : 'text-slate-400'}>
                         {ds.datasetTag.split(' ')[0]}
                       </span>
                       {isActive && (
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                       )}
                     </div>
-                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-slate-900' : 'text-slate-800'}`}>
+                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-700'}`}>
                       {ds.name.split('(')[0]?.trim()}
                     </div>
-                    <div className="text-[9.5px] font-mono text-slate-600 mt-0.5 truncate">
-                      {ds.scope.split('Â·')[0]?.trim()}
+                    <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">
+                      {ds.scope.split('·')[0]?.trim()}
                     </div>
                   </button>
                 );
@@ -2370,50 +2370,50 @@ export default function LandingPage() {
                 <div className="space-y-6">
                   {/* Top 4 Key Impact Metric Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-emerald-600 uppercase tracking-wider">
-                        Collaborative Gain (Î”collab)
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-500/20 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
+                        Collaborative Gain (Δcollab)
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.uplift}
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
                         Against isolated institutional silos
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-cyan-50 border border-cyan-500/20 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-cyan-600 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-white border border-cyan-500/20 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
                         False Alarm Reduction
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.fpReduction}
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
                         Eliminates compliance triage burnout
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-indigo-600 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-500/20 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">
                         Sub-ms Inference Latency
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.latency}
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
                         SLA &lt; 15ms payment rail authorization
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 backdrop-blur-md">
-                      <div className="text-[10px] font-mono text-purple-600 uppercase tracking-wider">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-white border border-purple-500/20 backdrop-blur-md">
+                      <div className="text-[10px] font-mono text-purple-400 uppercase tracking-wider">
                         Net Economic Advantage
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+                      <div className="text-xl sm:text-2xl font-bold text-white mt-1">
                         {activeDs.roi}
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
                         Chargeback recovery &amp; operational savings
                       </div>
                     </div>
@@ -2423,9 +2423,9 @@ export default function LandingPage() {
                   <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 backdrop-blur-xl shadow-2xl space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
                       <div>
-                        <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                           <span>{activeDs.name}</span>
-                          <span className="text-xs font-mono font-normal text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200">
+                          <span className="text-xs font-mono font-normal text-indigo-400 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
                             {activeDs.scope}
                           </span>
                         </h3>
@@ -2433,15 +2433,15 @@ export default function LandingPage() {
                           {activeDs.description}
                         </p>
                       </div>
-                      <div className="text-xs font-mono text-slate-600 shrink-0">
-                        Prevalence: <strong className="text-slate-800">{activeDs.prevalence}</strong>
+                      <div className="text-xs font-mono text-slate-400 shrink-0">
+                        Prevalence: <strong className="text-slate-700">{activeDs.prevalence}</strong>
                       </div>
                     </div>
 
                     <div className="overflow-x-auto -mx-2 sm:mx-0">
                       <table className="w-full text-left text-xs font-mono">
                         <thead>
-                          <tr className="border-b border-slate-200 text-[11px] text-slate-600">
+                          <tr className="border-b border-slate-200 text-[11px] text-slate-400">
                             <th className="py-2.5 px-3">Evaluation Paradigm</th>
                             <th className="py-2.5 px-3">PR-AUC</th>
                             <th className="py-2.5 px-3">ROC-AUC</th>
@@ -2457,26 +2457,26 @@ export default function LandingPage() {
                               key={i}
                               className={`transition-colors ${
                                 r.compliant
-                                  ? 'bg-emerald-50/20 hover:bg-emerald-50'
+                                  ? 'bg-emerald-50 hover:bg-emerald-50'
                                   : 'hover:bg-slate-50'
                               }`}
                             >
                               <td className="py-3 px-3">
-                                <div className="font-semibold text-slate-900 flex items-center gap-2">
+                                <div className="font-semibold text-slate-800 flex items-center gap-2">
                                   <span>{r.paradigm}</span>
                                   <span className={`text-[9px] px-1.5 py-0.5 rounded border ${r.badgeColor}`}>
                                     {r.badge}
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-3 px-3 font-bold text-slate-900">
+                              <td className="py-3 px-3 font-bold text-white">
                                 {r.prauc}
                               </td>
-                              <td className="py-3 px-3 text-slate-800">
+                              <td className="py-3 px-3 text-slate-700">
                                 {r.rocauc}
                               </td>
                               <td className="py-3 px-3">
-                                <span className={r.compliant ? 'text-emerald-600 font-bold' : 'text-slate-600'}>
+                                <span className={r.compliant ? 'text-emerald-700 font-bold' : 'text-slate-600'}>
                                   {r.recall01}
                                 </span>
                               </td>
@@ -2489,8 +2489,8 @@ export default function LandingPage() {
                               <td className="py-3 px-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans ${
                                   r.compliant
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 font-semibold'
-                                    : 'bg-slate-50 text-slate-600'
+                                    ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-semibold'
+                                    : 'bg-slate-100 text-slate-400'
                                 }`}>
                                   {r.compliance}
                                 </span>
@@ -2504,55 +2504,55 @@ export default function LandingPage() {
                     {/* Confusion Matrix & Calibration Summary Box */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-slate-200">
                       <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 font-mono text-xs">
-                        <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
-                          <span>Empirical Confusion Matrix @ Ï„=0.50 Threshold</span>
-                          <span className="text-emerald-600 font-normal">Holistic Holdout</span>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
+                          <span>Empirical Confusion Matrix @ τ=0.50 Threshold</span>
+                          <span className="text-emerald-400 font-normal">Holistic Holdout</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                            <div className="text-[10px] text-emerald-600">True Positives (TP)</div>
-                            <div className="text-base font-bold text-slate-900 mt-0.5">{activeDs.cm.tp}</div>
-                            <div className="text-[9px] text-slate-600 mt-0.5">Caught Frauds</div>
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-500/20">
+                            <div className="text-[10px] text-emerald-400">True Positives (TP)</div>
+                            <div className="text-base font-bold text-white mt-0.5">{activeDs.cm.tp}</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Caught Frauds</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
-                            <div className="text-[10px] text-rose-600">False Positives (FP)</div>
-                            <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fp}</div>
-                            <div className="text-[9px] text-slate-600 mt-0.5">Benign Alarms</div>
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300">
+                            <div className="text-[10px] text-rose-400">False Positives (FP)</div>
+                            <div className="text-base font-bold text-slate-700 mt-0.5">{activeDs.cm.fp}</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Benign Alarms</div>
                           </div>
-                          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                            <div className="text-[10px] text-amber-600">False Negatives (FN)</div>
-                            <div className="text-base font-bold text-slate-800 mt-0.5">{activeDs.cm.fn}</div>
-                            <div className="text-[9px] text-slate-600 mt-0.5">Escaped Frauds</div>
+                          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-500/20">
+                            <div className="text-[10px] text-amber-400">False Negatives (FN)</div>
+                            <div className="text-base font-bold text-slate-700 mt-0.5">{activeDs.cm.fn}</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Escaped Frauds</div>
                           </div>
                           <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                            <div className="text-[10px] text-slate-600">True Negatives (TN)</div>
+                            <div className="text-[10px] text-slate-400">True Negatives (TN)</div>
                             <div className="text-base font-bold text-slate-600 mt-0.5">{activeDs.cm.tn}</div>
-                            <div className="text-[9px] text-slate-600 mt-0.5">Valid Clearances</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Valid Clearances</div>
                           </div>
                         </div>
                       </div>
 
                       <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-wider mb-2 font-bold">
+                          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 font-bold">
                             Operational Calibration Quality
                           </div>
                           <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-600">Precision</div>
-                              <div className="font-bold text-slate-900 mt-0.5">{activeDs.cm.precision}</div>
+                              <div className="text-[9px] text-slate-400">Precision</div>
+                              <div className="font-bold text-white mt-0.5">{activeDs.cm.precision}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-600">Recall</div>
-                              <div className="font-bold text-emerald-600 mt-0.5">{activeDs.cm.recall}</div>
+                              <div className="text-[9px] text-slate-400">Recall</div>
+                              <div className="font-bold text-emerald-700 mt-0.5">{activeDs.cm.recall}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-600">F1 Score</div>
-                              <div className="font-bold text-cyan-600 mt-0.5">{activeDs.cm.f1}</div>
+                              <div className="text-[9px] text-slate-400">F1 Score</div>
+                              <div className="font-bold text-cyan-700 mt-0.5">{activeDs.cm.f1}</div>
                             </div>
                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <div className="text-[9px] text-slate-600">Specificity</div>
-                              <div className="font-bold text-slate-800 mt-0.5">{activeDs.cm.specificity}</div>
+                              <div className="text-[9px] text-slate-400">Specificity</div>
+                              <div className="font-bold text-slate-700 mt-0.5">{activeDs.cm.specificity}</div>
                             </div>
                           </div>
                         </div>
@@ -2561,15 +2561,15 @@ export default function LandingPage() {
                           <button
                             type="button"
                             onClick={() => setIsReportOpen(true)}
-                            className="text-cyan-600 hover:text-cyan-600 flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-cyan-400 hover:text-cyan-700 flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             <span>Inspect 2,107-Line LaTeX Methodology</span>
-                            <span>â†’</span>
+                            <span>→</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => navigate('/benchmarks?dataset=' + activeDs.routeDataset)}
-                            className="text-indigo-600 hover:text-indigo-600 flex items-center gap-1 font-semibold cursor-pointer"
+                            className="text-indigo-400 hover:text-indigo-700 flex items-center gap-1 font-semibold cursor-pointer"
                           >
                             <span>Open Dedicated Hub</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -2583,12 +2583,12 @@ export default function LandingPage() {
             })()}
 
             {/* Design Partner Pilot Onboarding Callout Banner */}
-            <div className="mt-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 border border-indigo-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-2xl">
+            <div className="mt-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-slate-50 border border-indigo-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-2xl">
               <div className="space-y-2 max-w-2xl">
-                <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200">
+                <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold text-indigo-700 bg-indigo-500/10 border border-indigo-500/20">
                   DESIGN PARTNER PILOT PROGRAM (2026)
                 </span>
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                <h3 className="text-xl sm:text-2xl font-bold text-white">
                   Pilot on Your Anonymized Institutional Data with Zero Raw PII Risk
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -2602,14 +2602,14 @@ export default function LandingPage() {
                   type="button"
                   onClick={handleLaunchBenchmark}
                   aria-label="Launch Benchmark Sandbox Modal"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-indigo-100 active:scale-[0.98] transition-all text-center cursor-pointer group"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35)] active:scale-[0.98] transition-all text-center cursor-pointer group"
                 >
                   <span>Launch Benchmark Sandbox</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
                 <a
                   href="mailto:ysfcals@gmail.com?subject=Design%20Partner%20Pilot%20Inquiry"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-700 hover:text-white bg-white hover:bg-white border border-slate-200 hover:border-indigo-500/40 backdrop-blur-xl shadow-lg transition-all text-center active:scale-[0.98] cursor-pointer"
                 >
                   <span>Request Pilot Agreement</span>
                 </a>
@@ -2618,21 +2618,21 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 7.6 - TARGET CUSTOMER PROFILES (#solutions)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             {/* Part 1: Target Customer Segments */}
             <div className="max-w-3xl mb-8 sm:mb-12 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-400" />
                 Tailored Institutional Solutions
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">
                 Designed for Banking Tiers & Compliance Mandates
               </h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Different financial institutions face radically different regulatory overheads and technical constraints. 
                 CF-Intelligence delivers tailored in-perimeter architectures for each institutional tier.
               </p>
@@ -2644,58 +2644,58 @@ export default function LandingPage() {
                   segment: 'Regional & Neobanks',
                   badge: 'Tier-2 / Tier-3 Banks',
                   pain: 'Sparse local fraud data leaves them vulnerable to sophisticated cross-bank syndicates.',
-                  compliance: 'ISO 20022 Â· MASAK / FinCEN Â· PCI-DSS',
+                  compliance: 'ISO 20022 · MASAK / FinCEN · PCI-DSS',
                   solution: 'Gain Tier-1 detection power via collaborative FL without exposing customer ledgers or trade secrets.',
                   roi: '+19.2% Fraud Recall without raw PII',
-                  borderColor: 'border-indigo-200',
-                  badgeColor: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+                  borderColor: 'border-indigo-500/30',
+                  badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
                 },
                 {
                   segment: 'FinTechs & Payment Gateways',
                   badge: 'PSPs & Electronic Money (EMI)',
                   pain: 'High False Positive Rates (>1%) trigger cart abandonment, customer churn, and call center load.',
-                  compliance: 'GDPR Art 6/17 Â· KVKK Â· PSD2 SCA',
+                  compliance: 'GDPR Art 6/17 · KVKK · PSD2 SCA',
                   solution: 'Sub-15ms fast-path scoring (<65ms stream) with on-demand SHAP explanations, cutting false alarms by 65%.',
                   roi: 'Recovers 60%+ checkout conversions',
-                  borderColor: 'border-purple-200',
-                  badgeColor: 'text-purple-600 bg-purple-50 border-purple-200',
+                  borderColor: 'border-purple-500/30',
+                  badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
                 },
                 {
                   segment: 'Banking Consortia & Switches',
                   badge: 'National Clearing Networks',
                   pain: 'Antitrust and privacy laws prevent pooling customer databases to catch multi-bank smurfing.',
-                  compliance: 'Intel SGX TEE Â· Diff. Privacy Â· SOC 2 Pre-Audit',
+                  compliance: 'Intel SGX TEE · Diff. Privacy · SOC 2 Pre-Audit',
                   solution: 'FedGNN multi-hop graph embeddings aggregated inside hardware TEE with zero raw PII sharing.',
                   roi: 'Uncovers cross-bank mule networks',
-                  borderColor: 'border-emerald-200',
-                  badgeColor: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+                  borderColor: 'border-emerald-500/30',
+                  badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
                 },
               ].map((card) => (
                 <div
                   key={card.segment}
-                  className={`p-6 rounded-3xl bg-slate-50 border ${card.borderColor} flex flex-col justify-between space-y-4 shadow-xl`}
+                  className={`p-6 rounded-3xl bg-white border ${card.borderColor} flex flex-col justify-between space-y-4 shadow-xl`}
                 >
                   <div className="space-y-3">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${card.badgeColor}`}>
                       {card.badge}
                     </span>
-                    <h3 className="text-lg font-bold text-slate-900">{card.segment}</h3>
+                    <h3 className="text-lg font-bold text-slate-800">{card.segment}</h3>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <span className="text-slate-600 font-mono text-[10px] uppercase block">Core Pain Point:</span>
+                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Core Pain Point:</span>
                         <p className="text-slate-600 font-sans leading-relaxed">{card.pain}</p>
                       </div>
                       <div>
-                        <span className="text-slate-600 font-mono text-[10px] uppercase block">Compliance Profile:</span>
-                        <p className="text-indigo-600 font-mono text-[11px]">{card.compliance}</p>
+                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Compliance Profile:</span>
+                        <p className="text-indigo-700 font-mono text-[11px]">{card.compliance}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-200 space-y-2">
-                    <span className="text-slate-600 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
+                    <span className="text-slate-400 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
                     <p className="text-slate-600 text-xs leading-relaxed">{card.solution}</p>
-                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono font-bold text-emerald-600 text-center">
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono font-bold text-emerald-400 text-center">
                       {card.roi}
                     </div>
                   </div>
@@ -2705,22 +2705,22 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 7.7 - INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 space-y-6 shadow-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
                 <div>
-                  <div className="text-[10px] font-mono font-semibold text-indigo-600 uppercase tracking-widest">
+                  <div className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
                     Standardized Institutional Contracts
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-800 mt-0.5">
                     Institutional Legal Framework & Agreement Suite
                   </h3>
                 </div>
-                <span className="text-xs font-mono text-emerald-600 bg-emerald-50 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-50 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
                   Standard B2B Legal Pack (2026)
                 </span>
               </div>
@@ -2730,41 +2730,41 @@ export default function LandingPage() {
                   {
                     title: 'Data Processing Agreement (DPA)',
                     ref: 'docs/legal/data_processing_agreement.md',
-                    standard: 'GDPR Art. 28 Â· KVKK Â· CCPA',
+                    standard: 'GDPR Art. 28 · KVKK · CCPA',
                     desc: 'Contractually guarantees Zero Raw PII leakage across bank perimeter with strict controller-processor boundaries.',
                   },
                   {
                     title: 'Terms of Service & Governance (ToS)',
                     ref: 'docs/legal/terms_of_service.md',
-                    standard: 'Consortium Governance Â· IP Protection',
+                    standard: 'Consortium Governance · IP Protection',
                     desc: 'Defines node participation, automated Byzantine poisoning penalties, and collaborative model licensing.',
                   },
                   {
                     title: 'Risk Decision Liability & Safe Harbor',
                     ref: 'docs/legal/liability_and_decision_governance.md',
-                    standard: 'EU AI Act Art. 14 Â· PSD2 Â· UCC',
+                    standard: 'EU AI Act Art. 14 · PSD2 · UCC',
                     desc: 'Allocates statutory liability for False Positives (Wrongful Blocks) & False Negatives, establishing Bank as policy arbiter.',
                   },
                   {
                     title: 'Service Level Agreement (SLA)',
                     ref: 'docs/legal/service_level_agreement.md',
-                    standard: '99.99% Uptime Â· <15ms p99',
+                    standard: '99.99% Uptime · <15ms p99',
                     desc: 'Contractual uptime guarantees with automated monthly invoice Service Credit penalties (up to 100%).',
                   },
                   {
                     title: 'Enterprise Privacy Policy',
                     ref: 'docs/legal/enterprise_privacy_policy.md',
-                    standard: 'RÃ©nyi DP (Îµ=1.0) Â· GDPR Art. 17',
+                    standard: 'Rényi DP (ε=1.0) · GDPR Art. 17',
                     desc: 'Formal mathematical privacy guarantees, unlearning erasure workflows, and PKCS#11 HSM key isolation.',
                   },
                 ].map((item) => (
-                  <div key={item.title} className="p-4 rounded-2xl bg-white/2 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div key={item.title} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
-                      <span className="text-[9.5px] font-mono text-indigo-600 uppercase">{item.standard}</span>
-                      <h4 className="text-xs font-bold text-slate-900">{item.title}</h4>
-                      <p className="text-[11px] text-slate-600 leading-relaxed font-sans">{item.desc}</p>
+                      <span className="text-[9.5px] font-mono text-indigo-400 uppercase">{item.standard}</span>
+                      <h4 className="text-xs font-bold text-slate-800">{item.title}</h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{item.desc}</p>
                     </div>
-                    <div className="text-[9px] font-mono text-slate-600 truncate pt-2 border-t border-slate-200">
+                    <div className="text-[9px] font-mono text-slate-400 truncate pt-2 border-t border-slate-200">
                       Ref: {item.ref}
                     </div>
                   </div>
@@ -2774,34 +2774,34 @@ export default function LandingPage() {
           </FadeSection>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 8 - EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <div id="docs" className="w-full min-w-0">
             <FadeSection>
               <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Enterprise REST API & SDK Specs</h2>
-                <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Enterprise REST API & SDK Specs</h2>
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.1 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-4">
                   <a
                     href="/developer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-slate-900 font-mono text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
                   >
-                    <span>âš¡ Launch Interactive API Playground</span>
-                    <span>â†’</span>
+                    <span>⚡ Launch Interactive API Playground</span>
+                    <span>→</span>
                   </a>
                   <a
                     href="/scalar"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-mono text-xs font-semibold transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-700 font-mono text-xs font-semibold transition-all"
                   >
-                    <span>ğŸ“– Open Scalar Reference</span>
-                    <span className="text-slate-600">â†—</span>
+                    <span>📖 Open Scalar Reference</span>
+                    <span className="text-slate-400">↗</span>
                   </a>
                 </div>
               </div>
@@ -2809,17 +2809,17 @@ export default function LandingPage() {
 
               {/* Integration Features Banner */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8 w-full min-w-0">
-                <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50 border border-indigo-200 min-w-0">
-                  <div className="text-xs font-mono font-bold text-indigo-600 uppercase mb-1">mTLS & API Keys</div>
-                  <p className="text-xs text-slate-600 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
+                <div className="p-4 sm:p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 min-w-0">
+                  <div className="text-xs font-mono font-bold text-indigo-400 uppercase mb-1">mTLS & API Keys</div>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
                 </div>
-                <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-200 min-w-0">
-                  <div className="text-xs font-mono font-bold text-purple-600 uppercase mb-1">WebSocket Telemetry</div>
-                  <p className="text-xs text-slate-600 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
+                <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20 min-w-0">
+                  <div className="text-xs font-mono font-bold text-purple-400 uppercase mb-1">WebSocket Telemetry</div>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
                 </div>
                 <div className="p-4 sm:p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 min-w-0">
-                  <div className="text-xs font-mono font-bold text-cyan-600 uppercase mb-1">SDK & WebHooks</div>
-                  <p className="text-xs text-slate-600 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
+                  <div className="text-xs font-mono font-bold text-cyan-400 uppercase mb-1">SDK & WebHooks</div>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
                 </div>
               </div>
 
@@ -2830,7 +2830,7 @@ export default function LandingPage() {
                     key={tab.id}
                     onClick={() => setActiveApiTab(tab.id as 'curl'|'python'|'ts')}
                     className={`px-3.5 sm:px-4 py-1.5 text-xs font-mono rounded-lg transition-all cursor-pointer shrink-0 ${
-                      activeApiTab === tab.id ? 'bg-indigo-600 text-slate-900 font-bold shadow-indigo-100' : 'text-slate-600 hover:text-slate-800'
+                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'text-slate-400 hover:text-slate-700'
                     }`}
                   >
                     {tab.label}
@@ -2839,7 +2839,7 @@ export default function LandingPage() {
               </div>
 
               {/* Code Display Window */}
-              <div className="rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
+              <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-200 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
                 <pre className="text-[11px] sm:text-xs font-mono text-indigo-700/90 leading-relaxed whitespace-pre min-w-0">
                   {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium bank nodes
 curl -X POST https://cf-intelligence.vercel.app/api/v1/simulations \\
@@ -2903,7 +2903,7 @@ telemetry.on('round.stage', (evt) => {
               <div className="rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden backdrop-blur-xl w-full min-w-0">
                 <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-mono text-slate-600 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
-                  <span className="text-[9.5px] font-mono text-indigo-600">OpenAPI 3.1 Spec</span>
+                  <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.1 Spec</span>
                 </div>
                 <div className="divide-y divide-white/5 font-mono text-xs min-w-0">
                   {[
@@ -2914,12 +2914,12 @@ telemetry.on('round.stage', (evt) => {
                     { method: 'POST', path: '/api/v1/copilot/generate-sar', desc: 'Autonomous Agentic AML Copilot: synthesize 5-paragraph FinCEN SAR narratives & 4-Eyes briefings', req: 'case_id, shap_attributions, graph_nodes', res: 'sar_narrative, supervisor_briefing' },
                     { method: 'POST', path: '/api/v1/onboarding/register', desc: 'Issue bank node onboarding and certificate provisioning request', req: 'bank_id, legal_name, jurisdiction, contact_email', res: 'bank_id, cert_fingerprint, mtls_cert_pem' },
                     { method: 'GET',  path: '/api/v1/onboarding/bundle/{bank_id}', desc: 'Download mTLS X.509 client certificate and pre-rendered daemon config', req: 'bank_id (path parameter)', res: 'cert_fingerprint, config_yaml' },
-                    { method: 'GET',  path: '/api/v1/regulatory/dossier/export', desc: 'Regulatory Dossier Generator: Export EU AI Act Articles 9â€“15 & SR 11-7 model risk management verification package', req: 'format: json | pdf', res: 'dossier JSON payload / PDF artifact stream' },
+                    { method: 'GET',  path: '/api/v1/regulatory/dossier/export', desc: 'Regulatory Dossier Generator: Export EU AI Act Articles 9–15 & SR 11-7 model risk management verification package', req: 'format: json | pdf', res: 'dossier JSON payload / PDF artifact stream' },
                     { method: 'POST', path: '/api/v1/bridge/tickets',     desc: 'Inter-Bank FININT Messaging: Exchange encrypted collaborative case intelligence tickets (Curve25519 ECDH + AES-256-GCM)', req: 'recipient_bic, encrypted_payload, evidence_hash, sla_hours', res: 'ticket_id, delivery_status: ENCRYPTED, timestamp' },
                     { method: 'POST', path: '/api/v1/recalls',            desc: 'SEPA Instant Recall Automation: Dispatch ISO 20022 camt.056 cancellation & trigger sub-second provisional hold webhooks', req: 'msg_id, original_uetr, recall_reason: FRAD/TECH, return_amount', res: 'recall_id, xml_camt056, provisional_hold_status' },
                     { method: 'POST', path: '/api/v1/screening/screen',   desc: 'Sanctions & PEP Screening: Match entity against 5 multi-jurisdiction watchlists (EU/UN/OFAC/HMT/PEP) across 5 phonetic/fuzzy algorithms', req: 'entity_name, entity_type, nationalities, dob', res: 'risk_score, match_status, matched_sources, audit_id' },
                     { method: 'POST', path: '/api/v1/security/bridge/disburse', desc: 'Cross-Chain Settlement: disburse Leave-One-Out Shapley incentive payouts via Chainlink CCIP', req: 'epoch_id, pool_amount, currency', res: 'routes, gas_fees_usd, audit_hash' },
-                    { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier Ïƒ_t via RÃ©nyi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
+                    { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier σ_t via Rényi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
                     { method: 'GET',  path: '/api/v1/security/audit-chain', desc: 'Query immutable SHA-256 cryptographic audit chain records and verify sequence integrity', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
                     { method: 'GET',  path: '/api/v1/diagnostics/connectors', desc: 'Enterprise Connector Diagnostics: probe health for Kafka, Vault, KMS, Splunk, Redis & PostgreSQL', req: 'none (HTTP GET)', res: 'connectors array, latency_ms, status: HEALTHY' },
                     { method: 'POST', path: '/api/v1/cases/export/fincen-xml', desc: 'Regulatory Export: generate validated FinCEN SAR XML package with SHA-256 digital signature', req: 'case_id, filer_id, narrative_override', res: 'xml_payload, sha256_hash, filing_status' },
@@ -2931,19 +2931,19 @@ telemetry.on('round.stage', (evt) => {
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold shrink-0 ${
                             row.method === 'GET'  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
-                            row.method === 'POST' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-                                                    'bg-purple-50 text-purple-600 border border-purple-200'
+                            row.method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                                    'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                           }`}>
                             {row.method}
                           </span>
-                          <span className="text-indigo-600 font-bold text-xs sm:text-sm break-all">{row.path}</span>
+                          <span className="text-indigo-700 font-bold text-xs sm:text-sm break-all">{row.path}</span>
                         </div>
-                        <span className="text-[9.5px] text-slate-600 font-mono shrink-0">v1 endpoint</span>
+                        <span className="text-[9.5px] text-slate-400 font-mono shrink-0">v1 endpoint</span>
                       </div>
-                      <p className="text-xs text-slate-600 font-sans leading-relaxed break-words">{row.desc}</p>
-                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-600 pt-1.5 border-t border-slate-200 min-w-0">
-                        <div className="truncate"><span className="text-slate-600">Payload Request:</span> <span className="text-slate-600">{row.req}</span></div>
-                        <div className="truncate"><span className="text-slate-600">Response Data:</span> <span className="text-emerald-600">{row.res}</span></div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed break-words">{row.desc}</p>
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-400 pt-1.5 border-t border-slate-200 min-w-0">
+                        <div className="truncate"><span className="text-slate-400">Payload Request:</span> <span className="text-slate-600">{row.req}</span></div>
+                        <div className="truncate"><span className="text-slate-400">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
                       </div>
                     </div>
                   ))}
@@ -2953,43 +2953,43 @@ telemetry.on('round.stage', (evt) => {
           </div>
         </section>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        {/* ══════════════════════════════════════════════════════════
             SECTION 9 - ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        ══════════════════════════════════════════════════════════ */}
         <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 Consortium Onboarding & Deployment
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">Enterprise Setup & Integration Services</h2>
-              <p className="text-slate-600 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-800 tracking-tight">Enterprise Setup & Integration Services</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 The live platform demo showcases an active 3-bank federated learning environment with SGX TEE hardware aggregation. For custom banking institution deployment, node hardware configuration, and core ledger integration, contact our engineering team.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start w-full min-w-0">
               {/* Left Contact Card */}
-              <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-indigo-50 via-purple-50 to-white border border-indigo-200 backdrop-blur-2xl space-y-5 shadow-indigo-100 min-w-0">
+              <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-indigo-50 via-purple-50 to-white border border-indigo-500/30 backdrop-blur-2xl space-y-5 shadow-[0_0_50px_rgba(99,102,241,0.15)] min-w-0">
                 <div className="space-y-2 min-w-0">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
                     DIRECT ENGINEERING CONTACT
                   </span>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Institutional Integration Lead</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed font-sans">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-800">Institutional Integration Lead</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
                     Reach out directly for custom ISO 20022 connector setup, local HSM key configuration, and production node deployment assistance.
                   </p>
                 </div>
 
                 {/* Email Address Display Box */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 font-mono min-w-0">
-                  <div className="text-[9px] text-slate-600 uppercase tracking-wider">Official Inquiries & Support</div>
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-2.5 font-mono min-w-0">
+                  <div className="text-[9px] text-slate-400 uppercase tracking-wider">Official Inquiries & Support</div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-indigo-600 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
+                    <span className="text-indigo-700 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
                       onClick={handleCopyEmail}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-mono font-medium bg-slate-50 hover:bg-slate-50 text-slate-600 hover:text-white transition-colors border border-slate-200 shrink-0 cursor-pointer active:scale-95"
                     >
                       {isCopied ? 'Copied!' : 'Copy Email'}
                     </button>
@@ -2999,13 +2999,13 @@ telemetry.on('round.stage', (evt) => {
                 {/* Direct Mailto Button */}
                 <a
                   href="mailto:ysfcals@gmail.com?subject=CF-Intelligence%20Enterprise%20Integration%20Inquiry"
-                  className="w-full py-3.5 px-5 rounded-xl font-bold text-xs sm:text-sm text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_35px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 block text-center group"
+                  className="w-full py-3.5 px-5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_35px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 block text-center group"
                 >
                   <span>Send Direct Inquiry</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </a>
 
-                <div className="text-[10px] font-mono text-slate-600 text-center">
+                <div className="text-[10px] font-mono text-slate-400 text-center">
                   Guaranteed response within 24 hours for banking inquiries & architecture reviews.
                 </div>
               </div>
@@ -3022,7 +3022,7 @@ telemetry.on('round.stage', (evt) => {
                   {
                     step: '02',
                     title: 'Node Architecture & Security Scoping',
-                    desc: 'Define local node hardware parameters (NVIDIA DGX GPU or Intel SGX TEE), select differential privacy noise budgets (Îµ, Î´), and validate HSM key signing modules.',
+                    desc: 'Define local node hardware parameters (NVIDIA DGX GPU or Intel SGX TEE), select differential privacy noise budgets (ε, δ), and validate HSM key signing modules.',
                     badge: 'Security Review'
                   },
                   {
@@ -3032,19 +3032,19 @@ telemetry.on('round.stage', (evt) => {
                     badge: 'Onboarding & Deployment'
                   },
                 ].map(s => (
-                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-slate-200 hover:border-indigo-200 transition-all space-y-2 min-w-0">
+                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 transition-all space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-100 border border-indigo-200 text-indigo-600 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                        <span className="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
                           {s.step}
                         </span>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">{s.title}</h4>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-700 truncate">{s.title}</h4>
                       </div>
-                      <span className="text-[9px] font-mono font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md shrink-0">
+                      <span className="text-[9px] font-mono font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md shrink-0">
                         {s.badge}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
+                    <p className="text-xs text-slate-400 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
                   </div>
                 ))}
               </div>
@@ -3052,38 +3052,38 @@ telemetry.on('round.stage', (evt) => {
           </FadeSection>
         </section>
 
-        {/* â”€â”€ FOOTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── FOOTER ──────────────────────────────────────────────── */}
         <footer className="border-t border-slate-200 py-10 sm:py-12 px-3.5 sm:px-6 w-full min-w-0">
           <div className="max-w-7xl mx-auto flex flex-col gap-5 min-w-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
               <div className="flex items-center gap-3 min-w-0">
                 <BrandLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
                 <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-bold text-slate-800 truncate">Federated Intelligence Network</div>
-                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-600 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
+                  <div className="text-xs sm:text-sm font-bold text-slate-700 truncate">Federated Intelligence Network</div>
+                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-400 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
                 </div>
               </div>
 
               <button
                 onClick={handleLaunchDemo}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-slate-900 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_20px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-200 cursor-pointer active:scale-[0.98] w-full sm:w-auto shrink-0 group"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_20px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-200 cursor-pointer active:scale-[0.98] w-full sm:w-auto shrink-0 group"
               >
                 <span>Open Platform Demo</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
               </button>
             </div>
 
-            <div className="pt-3 border-t border-slate-200 text-[10.5px] sm:text-xs font-mono text-slate-600 break-words text-center">
-              PyTorch Â· Intel SGX Â· ISO 20022 Â· FinCEN SAR
+            <div className="pt-3 border-t border-slate-200 text-[10.5px] sm:text-xs font-mono text-slate-400 break-words text-center">
+              PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
-            <div className="text-[10px] sm:text-[11px] font-mono text-slate-600 text-center">
-              Â© 2026 Yusuf Ã‡alÄ±ÅŸÄ±r Â· Collaborative Fraud Intelligence Platform
+            <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 text-center">
+              © 2026 Yusuf Çalışır · Collaborative Fraud Intelligence Platform
             </div>
           </div>
         </footer>
 
-        {/* â”€â”€ BANK NODE INSPECTOR DRAWER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── BANK NODE INSPECTOR DRAWER ──────────────────────────── */}
         <AnimatePresence>
           {activeBankDrawer && (
             <BankDetailsDrawerModal
@@ -3093,21 +3093,21 @@ telemetry.on('round.stage', (evt) => {
           )}
         </AnimatePresence>
 
-        {/* â”€â”€ PLATFORM DEMO LAUNCH ANIMATED INITIALIZER MODAL â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── PLATFORM DEMO LAUNCH ANIMATED INITIALIZER MODAL ──────── */}
         <PlatformLaunchModal
           isOpen={isLaunchModalOpen}
           onClose={() => setIsLaunchModalOpen(false)}
           onComplete={handleLaunchComplete}
         />
 
-        {/* â”€â”€ BENCHMARK HUB LAUNCH ANIMATED INITIALIZER MODAL â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── BENCHMARK HUB LAUNCH ANIMATED INITIALIZER MODAL ──────── */}
         <BenchmarkLaunchModal
           isOpen={isBenchmarkModalOpen}
           onClose={() => setIsBenchmarkModalOpen(false)}
           onComplete={handleBenchmarkComplete}
         />
 
-        {/* â”€â”€ INTERACTIVE TECHNICAL REPORT MODAL â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── INTERACTIVE TECHNICAL REPORT MODAL ──────── */}
         <TechnicalReportModal
           isOpen={isReportOpen}
           onClose={() => setIsReportOpen(false)}
@@ -3138,7 +3138,7 @@ function BankDetailsDrawerModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex justify-end w-full max-w-full"
+      className="fixed inset-0 bg-slate-100 backdrop-blur-md z-50 flex justify-end w-full max-w-full"
     >
       <motion.div
         ref={containerRef}
@@ -3156,20 +3156,20 @@ function BankDetailsDrawerModal({
       >
         <div className="flex items-start justify-between border-b border-slate-200 pb-4 sm:pb-5 gap-2">
           <div className="min-w-0">
-            <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-600 uppercase tracking-wider">
+            <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
               Institution Node Detail
             </span>
-            <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-900 mt-0.5 truncate">
+            <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-800 mt-0.5 truncate">
               {bank.name}
             </h3>
-            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-600 mt-0.5 truncate">
+            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-400 mt-0.5 truncate">
               {bank.location}
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close node detail drawer"
-            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-slate-50 hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             Close
           </button>
@@ -3185,22 +3185,22 @@ function BankDetailsDrawerModal({
             { k: 'Status', v: 'READY (Simulated Local Agent)' },
           ].map((row) => (
             <div key={row.k} className="p-3 rounded-xl bg-slate-50 border border-slate-200 min-w-0">
-              <div className="text-slate-600 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
+              <div className="text-slate-400 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
                 {row.k}
               </div>
-              <div className="text-slate-800 truncate">{row.v}</div>
+              <div className="text-slate-700 truncate">{row.v}</div>
             </div>
           ))}
         </div>
 
         <div className="min-w-0">
-          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-600 uppercase tracking-wider mb-2.5">
+          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2.5">
             ISO 20022 Stream Log
           </div>
-          <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-600 overflow-x-auto max-w-full">
+          <div className="rounded-2xl bg-white border border-slate-200 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
             {bank.xmlLogs.map((log, i) => (
               <div key={i} className="flex items-start gap-2 border-b border-slate-200 pb-2 last:border-0 last:pb-0 min-w-0">
-                <span className="text-indigo-600 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
+                <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
                 <span className="break-all leading-relaxed">{log}</span>
               </div>
             ))}
@@ -3210,12 +3210,3 @@ function BankDetailsDrawerModal({
     </motion.div>
   );
 }
-
-
-
-
-
-
-
-
-

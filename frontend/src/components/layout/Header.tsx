@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
 import { useRealTimeFraudStream } from '../../hooks/useRealTimeFraudStream';
 import {
@@ -133,7 +133,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]/95 backdrop-blur-md flex items-center px-4 md:px-6 sticky top-0 z-40 shadow-sm">
+      <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-md flex items-center px-4 md:px-6 sticky top-0 z-40">
         {/* Menu toggle button on mobile */}
         <button
           onClick={onMenuClick}
@@ -146,7 +146,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </button>
 
         <div className="flex-1 min-w-0 flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+          <h2 className="text-sm font-semibold text-slate-800 truncate">
             Collaborative Fraud Intelligence Platform
           </h2>
 
@@ -154,40 +154,40 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <div className="hidden sm:flex items-center gap-2">
             {status === 'connected' ? (
               streamSource === 'LIVE_CONNECTOR' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200" title={`Live Ingestion Provider: ${streamProvenance}`}>
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title={`Live Ingestion Provider: ${streamProvenance}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   Live Connector WS ({latencyMs}ms)
                 </span>
               ) : streamSource === 'SIMULATED' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-600 border border-indigo-200" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
-                  <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-700 border border-indigo-500/30" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
+                  <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
                   Simulated Feed ({latencyMs}ms)
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-600 border border-amber-200" title="WebSocket connected, but no live telemetry provider is currently configured.">
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-700 border border-amber-500/30" title="WebSocket connected, but no live telemetry provider is currently configured.">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   Telemetry Standby ({latencyMs}ms)
                 </span>
               )
             ) : status === 'mock_active' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-100 text-indigo-600 border border-indigo-200" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
-                <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" />
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-700 border border-indigo-500/30" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
+                <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
                 Simulated Stream (Offline)
               </span>
             ) : status === 'connecting' ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-100 text-amber-600 border border-amber-200">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 Connecting...
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-100 text-slate-500 border border-slate-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
                 WS Offline
               </span>
             )}
 
             {/* Live streamed transactions ticker */}
-            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-500">
-              <Activity className="w-3 h-3 text-cyan-600" />
+            <span className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-slate-400">
+              <Activity className="w-3 h-3 text-cyan-400" />
               <span>{totalStreamedTransactions.toLocaleString()} txns</span>
             </span>
           </div>
@@ -198,11 +198,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-2">
               <span
                 data-testid="active-institutional-session"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{sessionUser.username}</span>
-                <span className="text-emerald-600/70">Â·</span>
+                <span className="text-emerald-400/70">·</span>
                 <span data-testid="active-session-tenant">{sessionUser.bank_id.toUpperCase()}</span>
               </span>
               <button
@@ -212,7 +212,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   setLoginError(null);
                   setIsLoginModalOpen(true);
                 }}
-                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-white hover:bg-slate-50 text-[var(--color-text-secondary)] border border-[var(--color-border)] transition-colors"
+                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-700 text-slate-600 border border-slate-200 transition-colors"
               >
                 Switch Principal
               </button>
@@ -220,7 +220,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 type="button"
                 data-testid="institutional-sign-out-btn"
                 onClick={handleSignOut}
-                className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
                 title="Sign out of institutional session"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -234,7 +234,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 setLoginError(null);
                 setIsLoginModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-700 border border-indigo-500/40 transition-colors"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Institutional Sign In</span>
@@ -247,7 +247,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             rel="noopener noreferrer"
             className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           >
-            API Docs â†—
+            API Docs ↗
           </a>
           <div className="w-px h-4 bg-[var(--color-border)]" />
           <span className="text-xs font-mono text-[var(--color-text-muted)]">v2.4.1</span>
@@ -257,29 +257,29 @@ export default function Header({ onMenuClick }: HeaderProps) {
       {isLoginModalOpen && (
         <div
           data-testid="institutional-login-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100 backdrop-blur-sm p-4"
         >
-          <div className="w-full max-w-md rounded-xl border border-[var(--color-border)] bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-bold text-[var(--color-text-primary)]">Institutional Session Authentication</h3>
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                <h3 className="text-base font-bold text-slate-800">Institutional Session Authentication</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
                   Authenticate with your sovereign institutional credentials to bind tenant context.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsLoginModalOpen(false)}
-                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-sm"
+                className="text-slate-400 hover:text-slate-700 text-sm"
               >
-                âœ•
+                ✕
               </button>
             </div>
 
             {loginError && (
               <div
                 data-testid="institutional-login-error"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600"
+                className="mb-4 rounded-lg border border-red-500/40 bg-red-50 p-3 text-xs text-red-300"
               >
                 {loginError}
               </div>
@@ -289,7 +289,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <div>
                 <label
                   htmlFor="institutional-username-input"
-                  className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+                  className="block text-xs font-medium text-slate-600 mb-1"
                 >
                   Principal Username
                 </label>
@@ -301,7 +301,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g., analyst_bank_a"
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 font-mono focus:border-indigo-500 focus:outline-none"
                   required
                 />
               </div>
@@ -309,7 +309,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <div>
                 <label
                   htmlFor="institutional-password-input"
-                  className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+                  className="block text-xs font-medium text-slate-600 mb-1"
                 >
                   Institutional Password
                 </label>
@@ -321,7 +321,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter institutional credential"
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 font-mono focus:border-indigo-500 focus:outline-none"
                   required
                 />
               </div>
@@ -331,7 +331,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   type="button"
                   data-testid="btn-cancel-institutional-login"
                   onClick={() => setIsLoginModalOpen(false)}
-                  className="rounded-lg border border-[var(--color-border)] bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-card-hover)]"
+                  className="rounded-lg border border-slate-200 bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-700"
                 >
                   Cancel
                 </button>
@@ -339,7 +339,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   type="submit"
                   data-testid="btn-submit-institutional-login"
                   disabled={isSubmitting || !username.trim() || !password}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-slate-900 hover:bg-indigo-500 disabled:opacity-50"
+                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Authenticating...' : 'Sign In'}
                 </button>
@@ -351,4 +351,3 @@ export default function Header({ onMenuClick }: HeaderProps) {
     </>
   );
 }
-

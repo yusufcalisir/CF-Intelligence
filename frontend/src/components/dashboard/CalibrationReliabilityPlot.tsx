@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -130,7 +130,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-cyan-600" />
+            <BarChart3 className="w-5 h-5 text-cyan-400" />
             <h3 className="text-sm sm:text-base font-bold text-[var(--color-text-primary)]">
               Probability Calibration & Reliability Curve
             </h3>
@@ -147,8 +147,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             onClick={() => setSelectedMethod('raw')}
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'raw'
-                ? 'bg-cyan-100 text-cyan-600 border border-cyan-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-slate-900'
+                ? 'bg-cyan-500/20 text-cyan-700 border border-cyan-500/40 shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-white'
             }`}
           >
             Raw Model
@@ -158,8 +158,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             onClick={() => setSelectedMethod('platt')}
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'platt'
-                ? 'bg-emerald-100 text-emerald-600 border border-emerald-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-slate-900'
+                ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/40 shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-white'
             }`}
           >
             Platt Scaling
@@ -169,8 +169,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             onClick={() => setSelectedMethod('isotonic')}
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
               selectedMethod === 'isotonic'
-                ? 'bg-purple-100 text-purple-600 border border-purple-500/40 shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-slate-900'
+                ? 'bg-purple-500/20 text-purple-700 border border-purple-500/40 shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-white'
             }`}
           >
             Isotonic (PAVA)
@@ -184,7 +184,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Expected Calib Error (ECE)
           </div>
-          <div className="text-lg font-mono font-bold text-cyan-600">
+          <div className="text-lg font-mono font-bold text-cyan-700">
             {metrics.ece.toFixed(4)}
           </div>
           <div className="text-[10px] text-[var(--color-text-muted)]">
@@ -196,7 +196,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Max Calib Error (MCE)
           </div>
-          <div className="text-lg font-mono font-bold text-amber-600">
+          <div className="text-lg font-mono font-bold text-amber-700">
             {metrics.mce.toFixed(4)}
           </div>
           <div className="text-[10px] text-[var(--color-text-muted)]">
@@ -208,7 +208,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Brier Score (MSE)
           </div>
-          <div className="text-lg font-mono font-bold text-emerald-600">
+          <div className="text-lg font-mono font-bold text-emerald-700">
             {metrics.brier.toFixed(4)}
           </div>
           <div className="text-[10px] text-[var(--color-text-muted)]">
@@ -222,12 +222,12 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
           <div className="flex items-center gap-1.5 pt-0.5 min-w-0">
             {metrics.isWellCalibrated ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-600 border border-emerald-200 max-w-full truncate">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 max-w-full truncate">
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">WELL-CALIBRATED</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-600 border border-amber-200 max-w-full truncate">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 max-w-full truncate">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">DEGRADED CALIB</span>
               </span>
@@ -277,16 +277,16 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
                       <div className="font-bold text-[var(--color-text-primary)] border-b border-slate-200 pb-1">
                         {data.bin_label}
                       </div>
-                      <div className="text-cyan-600">
+                      <div className="text-cyan-400">
                         Pred Confidence: <strong>{data.mean_confidence.toFixed(3)}</strong>
                       </div>
-                      <div className="text-emerald-600">
+                      <div className="text-emerald-400">
                         Empirical Fraud Rate: <strong>{data.empirical_ratio.toFixed(3)}</strong>
                       </div>
-                      <div className="text-slate-500">
+                      <div className="text-slate-400">
                         Perfect Calib Target: <strong>{data.perfect_ref.toFixed(3)}</strong>
                       </div>
-                      <div className="text-amber-600">
+                      <div className="text-amber-400">
                         Calibration Gap: <strong>{data.calibration_gap.toFixed(3)}</strong>
                       </div>
                       <div className="text-[var(--color-text-muted)] text-[11px] pt-1">
@@ -352,7 +352,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
       {/* Footer Info & Toggleable Bin Table */}
       <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-t border-slate-200">
         <div className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
-          <Info className="w-4 h-4 text-cyan-600 shrink-0" />
+          <Info className="w-4 h-4 text-cyan-400 shrink-0" />
           <span>
             {selectedMethod === 'raw' && 'Showing uncalibrated model outputs from holdout test partition.'}
             {selectedMethod === 'platt' && 'Platt scaling fits parametric logistic sigmoid on validation logits.'}
@@ -363,7 +363,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
         <button
           type="button"
           onClick={() => setShowTable(!showTable)}
-          className="text-cyan-600 hover:text-cyan-600 font-medium inline-flex items-center gap-1 shrink-0 self-start sm:self-auto"
+          className="text-cyan-400 hover:text-cyan-700 font-medium inline-flex items-center gap-1 shrink-0 self-start sm:self-auto"
         >
           <Sliders className="w-3.5 h-3.5" />
           {showTable ? 'Hide 10-Bin Data' : 'View 10-Bin Data'}
@@ -387,11 +387,11 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
             <tbody>
               {chartData.map((b) => (
                 <tr key={b.bin_index} className="border-b border-slate-200 hover:bg-white/[0.02]">
-                  <td className="py-1 px-2 font-bold text-slate-900">#{b.bin_index}</td>
+                  <td className="py-1 px-2 font-bold text-white">#{b.bin_index}</td>
                   <td className="py-1 px-2 text-[var(--color-text-muted)]">{b.bin_label.split(' ')[1]}</td>
-                  <td className="py-1 px-2 text-cyan-600">{b.mean_confidence.toFixed(3)}</td>
-                  <td className="py-1 px-2 text-emerald-600">{b.empirical_ratio.toFixed(3)}</td>
-                  <td className="py-1 px-2 text-amber-600">{b.calibration_gap.toFixed(3)}</td>
+                  <td className="py-1 px-2 text-cyan-700">{b.mean_confidence.toFixed(3)}</td>
+                  <td className="py-1 px-2 text-emerald-700">{b.empirical_ratio.toFixed(3)}</td>
+                  <td className="py-1 px-2 text-amber-700">{b.calibration_gap.toFixed(3)}</td>
                   <td className="py-1 px-2 text-right text-[var(--color-text-muted)]">{b.sample_count.toLocaleString()}</td>
                 </tr>
               ))}
@@ -404,4 +404,3 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
 };
 
 export default CalibrationReliabilityPlot;
-

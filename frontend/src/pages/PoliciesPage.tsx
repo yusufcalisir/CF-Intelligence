@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
@@ -332,11 +332,11 @@ export default function PoliciesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--color-border)] pb-6">
         <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
+          <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
             <ShieldCheck className="w-4 h-4" />
             Declarative AML & Fraud Policy Engine
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Policy Rules & Decisions
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] max-w-2xl mt-1">
@@ -362,11 +362,11 @@ export default function PoliciesPage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-900">
-                <Shield className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                <Shield className="w-5 h-5 text-indigo-400" />
                 <span>Active Rules Registry</span>
               </h2>
-              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-50/60 text-indigo-600 border border-indigo-200 font-semibold">
+              <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-500/30 font-semibold">
                 {rules?.length ?? 0} Configured Rules
               </span>
             </div>
@@ -384,18 +384,18 @@ export default function PoliciesPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-slate-900 text-base">
+                          <h3 className="font-bold text-white text-base">
                             {rule.rule_name}
                           </h3>
                           <span
                             className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                               rule.action === 'BLOCK_TRANSACTION'
-                                ? 'bg-rose-100 text-rose-600 border-rose-200'
+                                ? 'bg-rose-500/15 text-rose-700 border-rose-300'
                                 : rule.action === 'ESCALATE_TO_SAR'
-                                ? 'bg-amber-100 text-amber-600 border-amber-200'
+                                ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
                                 : rule.action === 'HOLD_FOR_REVIEW'
-                                ? 'bg-purple-100 text-purple-600 border-purple-200'
-                                : 'bg-indigo-100 text-indigo-600 border-indigo-200'
+                                ? 'bg-purple-500/15 text-purple-700 border-purple-500/30'
+                                : 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30'
                             }`}
                           >
                             Action: {rule.action}
@@ -416,7 +416,7 @@ export default function PoliciesPage() {
                             onChange={() => handleToggleActive(rule.id, rule.is_active)}
                             aria-label={`Toggle active state for ${rule.rule_name}`}
                           />
-                          <div className="w-9 h-5 bg-slate-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                          <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                           <span className="ml-2 text-xs font-medium text-[var(--color-text-muted)]">
                             {rule.is_active ? 'Active' : 'Inactive'}
                           </span>
@@ -426,7 +426,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleLoadRuleToTester(rule)}
                           aria-label={`Test Rule ${rule.rule_name} in engine`}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-50 text-indigo-700 border border-indigo-500/30 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Load this rule into the dynamic tester panel"
                         >
                           <Zap className="w-3.5 h-3.5" />
@@ -437,10 +437,10 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleOpenEditModal(rule)}
                           aria-label={`Edit Rule ${rule.rule_name}`}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-50/80 hover:bg-slate-100 text-slate-800 border border-slate-200 hover:border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-700 text-slate-700 border border-slate-200 hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Edit rule name, condition AST, or action"
                         >
-                          <Pencil className="w-3.5 h-3.5 text-indigo-600" />
+                          <Pencil className="w-3.5 h-3.5 text-indigo-400" />
                           <span>Edit</span>
                         </button>
 
@@ -448,7 +448,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleDeleteRule(rule.id)}
                           aria-label={`Delete Rule ${rule.rule_name}`}
-                          className="p-1.5 rounded-lg hover:bg-rose-100 text-rose-600 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-rose-500/15 text-rose-400 border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
                           title="Delete rule"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -474,11 +474,11 @@ export default function PoliciesPage() {
         <div id="dynamic-rule-tester-panel" className="space-y-6">
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-              <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-900">
-                <Zap className="w-5 h-5 text-amber-600" />
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                <Zap className="w-5 h-5 text-amber-400" />
                 <span>Dynamic Rule Tester</span>
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200 font-bold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30 font-bold uppercase">
                 Real-Time Sandbox
               </span>
             </div>
@@ -492,7 +492,7 @@ export default function PoliciesPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="test-condition-ast" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                    <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+                    <FileCode className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Condition JSON AST</span>
                   </label>
                   <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
@@ -502,7 +502,7 @@ export default function PoliciesPage() {
 
                 {/* Responsive Quick Template Grid */}
                 <div className="space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                     Load Template:
                   </span>
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -512,7 +512,7 @@ export default function PoliciesPage() {
                         type="button"
                         aria-label={`Tester Template ${tpl.id}`}
                         onClick={() => handleApplyTemplateToTester(tpl)}
-                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-50 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 border border-slate-200 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
+                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-100/90 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
                         title={tpl.description}
                       >
                         {tpl.badge.split('(')[0]?.trim() ?? tpl.badge}
@@ -534,23 +534,23 @@ export default function PoliciesPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <label htmlFor="test-transaction-payload" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-emerald-600" />
+                    <Database className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Transaction Payload</span>
                   </label>
                   <button
                     type="button"
                     onClick={() => handleLoadAlertPayload()}
                     aria-label="Load Live Alert"
-                    className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                    className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-50 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
                     title="Load highest-risk live alert from real-time ledger into test payload"
                   >
-                    <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Load Live Alert</span>
                   </button>
                 </div>
 
                 {loadedAlertInfo && (
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-50/40 border border-emerald-200 text-emerald-600 text-xs">
+                  <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-500/30 text-emerald-700 text-xs">
                     <div className="flex items-center gap-2 truncate">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                       <span className="truncate">
@@ -561,22 +561,22 @@ export default function PoliciesPage() {
                       type="button"
                       onClick={() => setLoadedAlertInfo(null)}
                       aria-label="Dismiss loaded alert banner"
-                      className="text-slate-500 hover:text-slate-900 ml-2 text-xs cursor-pointer p-0.5"
+                      className="text-slate-400 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
                     >
-                      âœ•
+                      ✕
                     </button>
                   </div>
                 )}
 
                 {suspiciousAlerts.length > 1 && (
                   <div className="space-y-1 text-xs">
-                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-500 font-medium block">
+                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-400 font-medium block">
                       Or select from recent alerts:
                     </label>
                     <select
                       id="test-alert-select"
                       aria-label="Select Suspicious Alert"
-                      className="w-full text-xs p-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      className="w-full text-xs p-2 rounded-lg bg-white border border-slate-200 text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
                       onChange={(e) => {
                         const target = suspiciousAlerts.find((a) => a.id === e.target.value);
                         if (target) handleLoadAlertPayload(target);
@@ -615,7 +615,7 @@ export default function PoliciesPage() {
               </button>
 
               {errorMessage && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs">
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
                   {errorMessage}
                 </div>
               )}
@@ -626,12 +626,12 @@ export default function PoliciesPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`p-4 rounded-xl border flex items-start gap-3 ${
                     testResult.matches
-                      ? 'bg-rose-50 border-rose-200 text-rose-600'
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                      ? 'bg-rose-50 border-rose-300 text-rose-700'
+                      : 'bg-emerald-50 border-emerald-500/30 text-emerald-700'
                   }`}
                 >
                   <div className="text-xl shrink-0 mt-0.5">
-                    {testResult.matches ? 'ğŸš¨' : 'âœ…'}
+                    {testResult.matches ? '🚨' : '✅'}
                   </div>
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="font-bold text-sm">
@@ -642,11 +642,11 @@ export default function PoliciesPage() {
                     </div>
                     {testResult.matched_fields && testResult.matched_fields.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[10px] text-slate-500 uppercase font-sans">Matched Fields:</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-sans">Matched Fields:</span>
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
-                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 font-semibold"
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-700 border border-rose-300 font-semibold"
                           >
                             {f}
                           </span>
@@ -664,7 +664,7 @@ export default function PoliciesPage() {
       {/* Create / Edit Rule Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-100 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
               ref={containerRef}
               role="dialog"
@@ -678,14 +678,14 @@ export default function PoliciesPage() {
             >
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600">
+                  <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                     {editingRule ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h3 id="rule-modal-title" className="text-lg font-bold text-slate-900">
+                    <h3 id="rule-modal-title" className="text-lg font-bold text-white">
                       {editingRule ? `Edit Policy Rule: ${editingRule.rule_name}` : 'Create Dynamic Policy Rule'}
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-400">
                       {editingRule
                         ? 'Update declarative AST conditions and triggered policy actions.'
                         : 'Define declarative screening conditions evaluated on transactions in real time.'}
@@ -698,17 +698,17 @@ export default function PoliciesPage() {
                     setEditingRule(null);
                   }}
                   aria-label="Close modal"
-                  className="text-slate-500 hover:text-slate-900 text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
+                  className="text-slate-400 hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded cursor-pointer"
                 >
-                  âœ•
+                  ✕
                 </button>
               </div>
 
               {/* Pre-built AML Rule Templates Section */}
-              <div className="space-y-2 bg-white/60 p-3.5 rounded-xl border border-slate-200">
+              <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="text-xs font-semibold text-indigo-700 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Pre-built AML Rule Templates (1-Click Apply)</span>
                   </span>
                   <span className="text-[10px] text-slate-500">Auto-populates AST</span>
@@ -720,15 +720,15 @@ export default function PoliciesPage() {
                       type="button"
                       aria-label={`Apply Template ${tpl.id}`}
                       onClick={() => handleApplyTemplateToModal(tpl)}
-                      className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-white/60 hover:bg-indigo-50/20 transition-all text-xs cursor-pointer group"
+                      className="text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-500/60 bg-slate-50 hover:bg-indigo-50 transition-all text-xs cursor-pointer group"
                     >
-                      <div className="font-semibold text-slate-900 group-hover:text-indigo-600 flex items-center justify-between">
+                      <div className="font-semibold text-white group-hover:text-indigo-700 flex items-center justify-between">
                         <span className="truncate">{tpl.badge}</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-50 text-slate-500 uppercase">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-400 uppercase">
                           {tpl.action.split('_')[0]}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{tpl.description}</p>
+                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{tpl.description}</p>
                     </button>
                   ))}
                 </div>
@@ -745,7 +745,7 @@ export default function PoliciesPage() {
                     type="text"
                     required
                     placeholder="e.g. suspicious_high_value_block"
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-slate-900 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-white focus:outline-none focus:border-indigo-500"
                     value={newRuleName}
                     onChange={(e) => setNewRuleName(e.target.value)}
                   />
@@ -758,7 +758,7 @@ export default function PoliciesPage() {
                   <select
                     id="modal-rule-action-select"
                     aria-label="Modal Triggered Action"
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-slate-900 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-white focus:outline-none focus:border-indigo-500"
                     value={newRuleAction}
                     onChange={(e) => setNewRuleAction(e.target.value)}
                   >
@@ -791,7 +791,7 @@ export default function PoliciesPage() {
                 </div>
 
                 {errorMessage && (
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs">
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
                     {errorMessage}
                   </div>
                 )}
@@ -803,7 +803,7 @@ export default function PoliciesPage() {
                       setIsModalOpen(false);
                       setEditingRule(null);
                     }}
-                    className="btn hover:bg-slate-50"
+                    className="btn hover:bg-gray-800"
                   >
                     Cancel
                   </button>
@@ -827,7 +827,3 @@ export default function PoliciesPage() {
     </div>
   );
 }
-
-
-
-

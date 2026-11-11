@@ -88,7 +88,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile Backdrop Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-slate-100 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={onClose}
         />
       )}
@@ -113,7 +113,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {logoFailed ? (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-slate-900 text-[11px] tracking-wider select-none">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-white text-[11px] tracking-wider select-none">
                 CFI
               </div>
             ) : (

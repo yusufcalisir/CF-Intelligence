@@ -272,7 +272,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                           ver.status === 'champion'
                             ? 'bg-[var(--color-status-success)]/15 text-[var(--color-status-success)]'
                             : ver.status === 'challenger'
-                            ? 'bg-blue-500/15 text-blue-600'
+                            ? 'bg-blue-500/15 text-blue-400'
                             : 'bg-yellow-500/15 text-yellow-500'
                         }`}
                       >
@@ -288,13 +288,13 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                       <div>Saved: {new Date(ver.created_at).toLocaleString()}</div>
                       <div className="font-mono text-[9px]">
                         Git Commit:{' '}
-                        <span className="text-slate-500">
+                        <span className="text-gray-400">
                           {ver.git_commit_hash?.slice(0, 8) || 'unknown'}
                         </span>
                       </div>
                       <div className="font-mono text-[9px]">
                         Dataset SHA:{' '}
-                        <span className="text-slate-500">
+                        <span className="text-gray-400">
                           {ver.dataset_hash?.slice(0, 8) || 'unknown'}
                         </span>
                       </div>
@@ -345,7 +345,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                             className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
                               sig
                                 ? 'bg-[var(--color-status-success)]/10 text-[var(--color-status-success)] border border-[var(--color-status-success)]/20'
-                                : 'bg-red-50 text-red-600 border border-red-200'
+                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
                             }`}
                           >
                             {role === 'compliance' ? 'Compliance: ' : 'ML Eng: '}{' '}
@@ -485,13 +485,13 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                   </div>
                   <div className="flex justify-between text-[11px]">
                     <span className="text-[var(--color-text-muted)]">False Positive Rate (FPR):</span>
-                    <span className={`font-mono font-bold ${shadowMetrics && shadowMetrics.champion_fpr > 0.05 ? 'text-red-600' : ''}`}>
+                    <span className={`font-mono font-bold ${shadowMetrics && shadowMetrics.champion_fpr > 0.05 ? 'text-red-400' : ''}`}>
                       {shadowMetrics?.champion_fpr ? `${(shadowMetrics.champion_fpr * 100).toFixed(1)}%` : '1.2%'}
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px]">
                     <span className="text-[var(--color-text-muted)]">Inference Latency:</span>
-                    <span className={`font-mono font-bold ${shadowMetrics && shadowMetrics.champion_latency_ms > 200.0 ? 'text-red-600' : ''}`}>
+                    <span className={`font-mono font-bold ${shadowMetrics && shadowMetrics.champion_latency_ms > 200.0 ? 'text-red-400' : ''}`}>
                       {shadowMetrics?.champion_latency_ms ? `${shadowMetrics.champion_latency_ms.toFixed(1)}ms` : '12.4ms'}
                     </span>
                   </div>
@@ -511,7 +511,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-[var(--color-text-primary)]">⚖️ Serving Challenger</span>
                   {shadowMetrics?.traffic_share && shadowMetrics.traffic_share > 0 ? (
-                    <span className="px-2 py-0.5 rounded text-[8px] bg-blue-500/15 text-blue-600 font-semibold uppercase animate-pulse">
+                    <span className="px-2 py-0.5 rounded text-[8px] bg-blue-500/15 text-blue-400 font-semibold uppercase animate-pulse">
                       Active
                     </span>
                   ) : (
@@ -557,7 +557,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               </div>
               <div className="mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-[10px] text-[var(--color-text-muted)] flex justify-between">
                 <span>Serving share:</span>
-                <span className="font-bold text-blue-600">
+                <span className="font-bold text-blue-400">
                   {shadowMetrics ? `${(shadowMetrics.traffic_share * 100).toFixed(0)}%` : '0%'}
                 </span>
               </div>
@@ -590,10 +590,10 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               <div
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-all ${
                   feedbackMessage.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
                     : feedbackMessage.type === 'info'
-                    ? 'bg-blue-50 border-blue-500/30 text-blue-600'
-                    : 'bg-rose-50 border-rose-200 text-rose-600'
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                    : 'bg-rose-500/10 border-rose-300 text-rose-700'
                 }`}
               >
                 <span>{feedbackMessage.text}</span>
@@ -641,7 +641,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
               <button
                 type="submit"
                 disabled={feedbackMutation.isPending}
-                className="px-4 py-1.5 bg-[var(--color-accent-teal)] hover:bg-[var(--color-accent-teal)]/90 text-slate-900 rounded text-xs font-semibold shrink-0 active:scale-95 transition-all"
+                className="px-4 py-1.5 bg-[var(--color-accent-teal)] hover:bg-[var(--color-accent-teal)]/90 text-white rounded text-xs font-semibold shrink-0 active:scale-95 transition-all"
               >
                 {feedbackMutation.isPending ? 'Submitting...' : 'Submit outcome'}
               </button>
@@ -652,7 +652,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
 
       {/* Model Sign-Off Form Overlay Modal */}
       {selectedVersionForSignoff !== null && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-100 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -759,7 +759,7 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                 <button
                   type="submit"
                   disabled={signoffMutation.isPending}
-                  className="px-4 py-1.5 bg-[var(--color-status-success)] hover:bg-[var(--color-status-success)]/95 text-slate-900 rounded text-xs font-semibold"
+                  className="px-4 py-1.5 bg-[var(--color-status-success)] hover:bg-[var(--color-status-success)]/95 text-white rounded text-xs font-semibold"
                 >
                   {signoffMutation.isPending ? 'Submitting...' : 'Authorize Sign-Off'}
                 </button>

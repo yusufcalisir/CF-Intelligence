@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   useDriftAnalysis,
@@ -149,7 +149,7 @@ export default function ObservabilityPage() {
           <button
             onClick={handleRetrain}
             disabled={triggerRetrain.isPending}
-            className="w-full sm:w-auto h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-indigo-600 text-slate-900 hover:bg-indigo-500 shadow-md transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 shadow-md transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
             {triggerRetrain.isPending ? (
               <>
@@ -157,7 +157,7 @@ export default function ObservabilityPage() {
                 <span>Initiating FL Round...</span>
               </>
             ) : (
-              <span>ğŸ”„ Trigger Automated Re-training</span>
+              <span>🔄 Trigger Automated Re-training</span>
             )}
           </button>
         </div>
@@ -168,42 +168,42 @@ export default function ObservabilityPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-600 space-y-3"
+          className="p-4 rounded-xl border bg-indigo-500/10 border-indigo-500/30 text-indigo-400 space-y-3"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <span className="text-2xl shrink-0">âš¡</span>
+              <span className="text-2xl shrink-0">⚡</span>
               <div>
-                <div className="font-bold text-sm text-slate-900">Automated Federated Re-training Round Initiated</div>
+                <div className="font-bold text-sm text-white">Automated Federated Re-training Round Initiated</div>
                 <div className="text-xs opacity-90">
-                  Simulation ID: <span className="font-mono text-cyan-600 font-bold">{triggerRetrain.data.new_simulation_id}</span> | Reason: {triggerRetrain.data.reason}
+                  Simulation ID: <span className="font-mono text-cyan-700 font-bold">{triggerRetrain.data.new_simulation_id}</span> | Reason: {triggerRetrain.data.reason}
                 </div>
               </div>
             </div>
-            <span className="text-[10px] font-mono px-2 py-1 bg-black/30 rounded shrink-0 self-start sm:self-auto text-slate-600">
+            <span className="text-[10px] font-mono px-2 py-1 bg-slate-100 rounded shrink-0 self-start sm:self-auto text-slate-600">
               {triggerRetrain.data.triggered_at}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-indigo-200 text-xs">
-            <div className="p-2 rounded bg-black/30 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">Target Feature Subset:</span>
-              <span className="font-mono font-bold text-indigo-600">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-indigo-500/20 text-xs">
+            <div className="p-2 rounded bg-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Target Feature Subset:</span>
+              <span className="font-mono font-bold text-indigo-700">
                 {triggerRetrain.data.retrain_feature_subset && triggerRetrain.data.retrain_feature_subset.length > 0
                   ? triggerRetrain.data.retrain_feature_subset.join(', ')
                   : 'Full Feature Set'}
               </span>
             </div>
-            <div className="p-2 rounded bg-black/30 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">Prometheus Telemetry:</span>
-              <span className="font-mono font-bold text-emerald-600 flex items-center gap-1">
-                <span>â—</span> cfi_concept_drift_psi emitted
+            <div className="p-2 rounded bg-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Prometheus Telemetry:</span>
+              <span className="font-mono font-bold text-emerald-400 flex items-center gap-1">
+                <span>●</span> cfi_concept_drift_psi emitted
               </span>
             </div>
-            <div className="p-2 rounded bg-black/30 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">Alertmanager Alert:</span>
-              <span className="font-mono font-bold text-amber-600 flex items-center gap-1">
-                <span>â—</span> {triggerRetrain.data.alertmanager_alert_dispatched ? 'ModelConceptDriftCritical (Firing)' : 'Suppressed'}
+            <div className="p-2 rounded bg-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Alertmanager Alert:</span>
+              <span className="font-mono font-bold text-amber-400 flex items-center gap-1">
+                <span>●</span> {triggerRetrain.data.alertmanager_alert_dispatched ? 'ModelConceptDriftCritical (Firing)' : 'Suppressed'}
               </span>
             </div>
           </div>
@@ -218,13 +218,13 @@ export default function ObservabilityPage() {
             <div
               className={`text-lg font-bold font-mono ${
                 driftData.overall_status === 'HEALTHY'
-                  ? 'text-emerald-600'
+                  ? 'text-emerald-400'
                   : driftData.overall_status === 'WARNING'
-                  ? 'text-amber-600'
-                  : 'text-red-600'
+                  ? 'text-amber-400'
+                  : 'text-red-400'
               }`}
             >
-              â— {driftData.overall_status}
+              ● {driftData.overall_status}
             </div>
           </div>
 
@@ -237,7 +237,7 @@ export default function ObservabilityPage() {
 
           <div className="glass-card p-4 space-y-1">
             <div className="text-xs text-[var(--color-text-muted)]">Concept Drift PSI (Risk Score)</div>
-            <div className="text-lg font-bold font-mono text-indigo-600">
+            <div className="text-lg font-bold font-mono text-indigo-400">
               {driftData.concept_drift_psi.toFixed(4)}
             </div>
           </div>
@@ -254,25 +254,25 @@ export default function ObservabilityPage() {
       {/* 5-Tab Navigation */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 border-b border-[var(--color-border)] pb-3">
         {[
-          { id: 'drift', icon: 'ğŸ“ˆ', title: 'Model Drift Analytics', subtitle: 'KS & PSI Drift' },
-          { id: 'calibration', icon: 'ğŸ¯', title: 'Calibration Curve', subtitle: 'Brier & Reliability' },
-          { id: 'alerts', icon: 'ğŸš¨', title: 'Prometheus Alerts', subtitle: 'Alertmanager Quorum' },
-          { id: 'telemetry', icon: 'ğŸ“Š', title: 'Loki & OpenTelemetry', subtitle: 'Trace & Metric Export' },
-          { id: 'connectors', icon: 'ğŸ”Œ', title: 'Enterprise Connectors', subtitle: 'Kafka, Vault & KMS' },
+          { id: 'drift', icon: '📈', title: 'Model Drift Analytics', subtitle: 'KS & PSI Drift' },
+          { id: 'calibration', icon: '🎯', title: 'Calibration Curve', subtitle: 'Brier & Reliability' },
+          { id: 'alerts', icon: '🚨', title: 'Prometheus Alerts', subtitle: 'Alertmanager Quorum' },
+          { id: 'telemetry', icon: '📊', title: 'Loki & OpenTelemetry', subtitle: 'Trace & Metric Export' },
+          { id: 'connectors', icon: '🔌', title: 'Enterprise Connectors', subtitle: 'Kafka, Vault & KMS' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`p-2.5 sm:p-3 rounded-xl transition-all border text-left min-h-[56px] flex items-center gap-2.5 cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-indigo-100 border-indigo-500/50 text-indigo-600 shadow-md shadow-indigo-600/15'
-                : 'bg-slate-50 border-slate-200 text-[var(--color-text-muted)] hover:text-slate-800 hover:bg-slate-50'
+                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-700 shadow-md shadow-indigo-600/15'
+                : 'bg-slate-50 border-slate-200 text-[var(--color-text-muted)] hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
             <span className="text-lg sm:text-xl shrink-0">{tab.icon}</span>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-bold text-slate-900 truncate">{tab.title}</div>
-              <div className="text-[10px] font-mono text-slate-500 truncate">{tab.subtitle}</div>
+              <div className="text-xs font-bold text-slate-800 truncate">{tab.title}</div>
+              <div className="text-[10px] font-mono text-slate-400 truncate">{tab.subtitle}</div>
             </div>
           </button>
         ))}
@@ -282,20 +282,20 @@ export default function ObservabilityPage() {
       {activeTab === 'drift' && (
         <div className="space-y-6">
           {/* Parametric Retraining Bridge Card */}
-          <div className="glass-card p-4 sm:p-5 space-y-4 border border-indigo-200 bg-indigo-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-200 pb-3">
+          <div className="glass-card p-4 sm:p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-500/20 pb-3">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">ğŸ§¬</span>
+                <span className="text-xl">🧬</span>
                 <div>
-                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-900">
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800">
                     Live Drift-to-Retraining Pipeline Bridge
                   </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Selectively pipe features exceeding PSI &ge; 0.20 into federated retraining round (<span className="font-mono text-cyan-600">retrain_feature_subset</span>)
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Selectively pipe features exceeding PSI &ge; 0.20 into federated retraining round (<span className="font-mono text-cyan-700">retrain_feature_subset</span>)
                   </p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 shrink-0 self-start sm:self-auto font-mono">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-700 border border-indigo-500/30 shrink-0 self-start sm:self-auto font-mono">
                 {effectiveFeatures.length} FEATURES TARGETED
               </span>
             </div>
@@ -309,13 +309,13 @@ export default function ObservabilityPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleSelectAllDrifted}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-cyan-600 border border-slate-200 transition-colors"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-50 text-cyan-700 border border-slate-200 transition-colors"
                   >
                     Select Drifted ({automaticallyDriftedFeatures.length})
                   </button>
                   <button
                     onClick={handleSelectAllFeatures}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors"
                   >
                     Select All ({allAvailableFeatures.length})
                   </button>
@@ -332,15 +332,15 @@ export default function ObservabilityPage() {
                       onClick={() => toggleFeature(fd.feature_name)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-2 border cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-600/30 border-indigo-500 text-slate-900 shadow-sm'
-                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                          ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-sm'
+                          : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${isDrifted ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
                       <span className="font-bold">{fd.feature_name}</span>
                       <span className="text-[10px] opacity-75 font-sans">PSI: {fd.psi.toFixed(3)}</span>
                       {isSelected ? (
-                        <span className="text-cyan-600 text-xs">âœ“</span>
+                        <span className="text-cyan-700 text-xs">✓</span>
                       ) : (
                         <span className="text-slate-600 text-xs">+</span>
                       )}
@@ -352,7 +352,7 @@ export default function ObservabilityPage() {
 
             {/* Pipeline Execution Parameters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-black/30 border border-slate-200 cursor-pointer">
+              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={dispatchWebhookAlert}
@@ -360,12 +360,12 @@ export default function ObservabilityPage() {
                   className="rounded bg-[var(--color-surface-alt)] border-[var(--color-border)] text-indigo-500"
                 />
                 <div>
-                  <div className="font-semibold text-slate-800">Alertmanager Webhook</div>
-                  <div className="text-[10px] text-slate-500">Emit ModelConceptDriftCritical</div>
+                  <div className="font-semibold text-slate-700">Alertmanager Webhook</div>
+                  <div className="text-[10px] text-slate-400">Emit ModelConceptDriftCritical</div>
                 </div>
               </label>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-black/30 border border-slate-200">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-100 border border-slate-200">
                 <span className="text-slate-600">Target FL Rounds:</span>
                 <div className="flex items-center gap-1">
                   {[3, 5, 10].map((rounds) => (
@@ -374,8 +374,8 @@ export default function ObservabilityPage() {
                       onClick={() => setTargetRounds(rounds)}
                       className={`px-2 py-1 rounded text-xs font-mono ${
                         targetRounds === rounds
-                          ? 'bg-indigo-600 text-slate-900 font-bold'
-                          : 'bg-slate-50 text-slate-500 hover:text-slate-900'
+                          ? 'bg-indigo-600 text-white font-bold'
+                          : 'bg-slate-50 text-slate-400 hover:text-white'
                       }`}
                     >
                       {rounds}R
@@ -387,7 +387,7 @@ export default function ObservabilityPage() {
               <button
                 onClick={handleRetrain}
                 disabled={triggerRetrain.isPending}
-                className="w-full h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-slate-900 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {triggerRetrain.isPending ? (
                   <>
@@ -395,7 +395,7 @@ export default function ObservabilityPage() {
                     <span>Dispatching Bridge Payload...</span>
                   </>
                 ) : (
-                  <span>ğŸš€ Trigger Retraining ({effectiveFeatures.length} Features)</span>
+                  <span>🚀 Trigger Retraining ({effectiveFeatures.length} Features)</span>
                 )}
               </button>
             </div>
@@ -424,16 +424,16 @@ export default function ObservabilityPage() {
                       className="p-4 rounded-xl bg-white border border-slate-200 space-y-3 shadow-lg"
                     >
                       <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                        <span className="font-mono font-bold text-xs text-slate-900 truncate">
+                        <span className="font-mono font-bold text-xs text-white truncate">
                           {fd.feature_name}
                         </span>
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
                             fd.status === 'STABLE'
-                              ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                               : fd.status === 'MODERATE_DRIFT'
-                              ? 'bg-amber-100 text-amber-600 border border-amber-200'
-                              : 'bg-red-100 text-red-600 border border-red-200'
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
                           }`}
                         >
                           {fd.status}
@@ -442,20 +442,20 @@ export default function ObservabilityPage() {
 
                       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-[10px] text-slate-500 block font-sans">KS Statistic</span>
-                          <span className="font-bold text-slate-800">{fd.ks_statistic.toFixed(4)}</span>
+                          <span className="text-[10px] text-slate-400 block font-sans">KS Statistic</span>
+                          <span className="font-bold text-slate-700">{fd.ks_statistic.toFixed(4)}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-[10px] text-slate-500 block font-sans">KS p-value</span>
-                          <span className="font-bold text-slate-800">{fd.ks_p_value.toFixed(4)}</span>
+                          <span className="text-[10px] text-slate-400 block font-sans">KS p-value</span>
+                          <span className="font-bold text-slate-700">{fd.ks_p_value.toFixed(4)}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-[10px] text-slate-500 block font-sans">Wasserstein Dist</span>
-                          <span className="font-bold text-slate-800">{fd.wasserstein_distance.toFixed(4)}</span>
+                          <span className="text-[10px] text-slate-400 block font-sans">Wasserstein Dist</span>
+                          <span className="font-bold text-slate-700">{fd.wasserstein_distance.toFixed(4)}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-[10px] text-slate-500 block font-sans">PSI Index</span>
-                          <span className="font-bold text-indigo-600">{fd.psi.toFixed(4)}</span>
+                          <span className="text-[10px] text-slate-400 block font-sans">PSI Index</span>
+                          <span className="font-bold text-indigo-400">{fd.psi.toFixed(4)}</span>
                         </div>
                       </div>
                     </div>
@@ -487,10 +487,10 @@ export default function ObservabilityPage() {
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 whitespace-nowrap ${
                                 fd.status === 'STABLE'
-                                  ? 'bg-emerald-100 text-emerald-600'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
                                   : fd.status === 'MODERATE_DRIFT'
-                                  ? 'bg-amber-100 text-amber-600'
-                                  : 'bg-red-100 text-red-600'
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-red-500/20 text-red-400'
                               }`}
                             >
                               {fd.status}
@@ -544,10 +544,10 @@ export default function ObservabilityPage() {
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
                           alert.severity === 'critical'
-                            ? 'bg-red-100 text-red-600 border border-red-200'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                             : alert.severity === 'warning'
-                            ? 'bg-amber-100 text-amber-600 border border-amber-200'
-                            : 'bg-blue-100 text-blue-600 border border-blue-500/30'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                         }`}
                       >
                         {alert.severity}
@@ -561,7 +561,7 @@ export default function ObservabilityPage() {
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 sm:gap-1 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 font-mono text-xs sm:text-[11px]">
                     <span
                       className={`font-bold inline-flex items-center gap-1.5 text-xs ${
-                        alert.status === 'firing' ? 'text-red-600' : 'text-emerald-600'
+                        alert.status === 'firing' ? 'text-red-400' : 'text-emerald-400'
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${alert.status === 'firing' ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
@@ -589,7 +589,7 @@ export default function ObservabilityPage() {
               rel="noreferrer"
               className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
             >
-              <div className="text-2xl">ğŸ“ˆ</div>
+              <div className="text-2xl">📈</div>
               <h4 className="font-bold text-sm">Grafana Dashboards</h4>
               <p className="text-xs text-[var(--color-text-muted)]">
                 Unified visualization for Prometheus metrics, Loki logs, and Tempo traces.
@@ -602,7 +602,7 @@ export default function ObservabilityPage() {
               rel="noreferrer"
               className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
             >
-              <div className="text-2xl">ğŸ“œ</div>
+              <div className="text-2xl">📜</div>
               <h4 className="font-bold text-sm">Grafana Loki Log Index</h4>
               <p className="text-xs text-[var(--color-text-muted)]">
                 PLG log aggregation engine indexing structured JSON container log streams.
@@ -615,7 +615,7 @@ export default function ObservabilityPage() {
               rel="noreferrer"
               className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
             >
-              <div className="text-2xl">ğŸ”</div>
+              <div className="text-2xl">🔎</div>
               <h4 className="font-bold text-sm">Jaeger OTLP Traces</h4>
               <p className="text-xs text-[var(--color-text-muted)]">
                 Distributed OpenTelemetry span traces across FL coordinator and microservices.
@@ -624,15 +624,15 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Interactive Prometheus Metric Exposition Panel */}
-          <div className="glass-card p-5 space-y-4 border border-indigo-200 bg-indigo-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-200 pb-3">
+          <div className="glass-card p-5 space-y-4 border border-indigo-500/20 bg-indigo-500/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-3">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">ğŸ”¥</span>
+                <span className="text-xl">🔥</span>
                 <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-                    Live Prometheus Metrics Exposition (<span className="font-mono text-cyan-600">/metrics/prometheus</span>)
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    Live Prometheus Metrics Exposition (<span className="font-mono text-cyan-700">/metrics/prometheus</span>)
                   </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-slate-400 mt-0.5">
                     Standard Prometheus scraping exposition text containing drift gauges and retraining counters
                   </p>
                 </div>
@@ -642,36 +642,36 @@ export default function ObservabilityPage() {
                 <button
                   onClick={() => refetchPrometheus()}
                   disabled={isPrometheusLoading}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-50 hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors flex items-center gap-1.5 shrink-0"
                 >
-                  <span>ğŸ”„</span>
+                  <span>🔄</span>
                   <span>Refresh</span>
                 </button>
                 <button
                   onClick={() => prometheusData && copyToClipboard(prometheusData.metrics_text, 'prometheus')}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-600 border border-indigo-500/40 transition-colors flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-700 border border-indigo-500/40 transition-colors flex items-center gap-1.5 shrink-0"
                 >
-                  <span>{copiedPrometheus ? 'âœ“ Copied' : 'ğŸ“‹ Copy Plaintext'}</span>
+                  <span>{copiedPrometheus ? '✓ Copied' : '📋 Copy Plaintext'}</span>
                 </button>
               </div>
             </div>
 
             {/* Metric Highlights Pill Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono min-w-0">
-              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
-                <span className="text-[10px] text-slate-500 block font-sans truncate">Metric Count</span>
-                <span className="font-bold text-cyan-600 truncate block">{prometheusData?.metric_count ?? 14} series</span>
+              <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Metric Count</span>
+                <span className="font-bold text-cyan-700 truncate block">{prometheusData?.metric_count ?? 14} series</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
-                <span className="text-[10px] text-slate-500 block font-sans truncate">cfi_concept_drift_psi</span>
-                <span className="font-bold text-indigo-600 truncate block">{driftData?.concept_drift_psi.toFixed(4) ?? '0.0000'}</span>
+              <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">cfi_concept_drift_psi</span>
+                <span className="font-bold text-indigo-700 truncate block">{driftData?.concept_drift_psi.toFixed(4) ?? '0.0000'}</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
-                <span className="text-[10px] text-slate-500 block font-sans truncate">Retraining Counter</span>
-                <span className="font-bold text-emerald-600 truncate block">active gauge</span>
+              <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Retraining Counter</span>
+                <span className="font-bold text-emerald-400 truncate block">active gauge</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-slate-200 space-y-0.5 min-w-0">
-                <span className="text-[10px] text-slate-500 block font-sans truncate">Scraped At</span>
+              <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Scraped At</span>
                 <span className="font-bold text-slate-600 text-[11px] truncate block">{prometheusData?.scraped_at ?? 'Live'}</span>
               </div>
             </div>
@@ -685,28 +685,28 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Interactive SIEM Metric Exporter (JSON & CEF) */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-100 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-500/5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cyan-500/20 pb-3 min-w-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl shrink-0">ğŸ›¡ï¸</span>
+                <span className="text-xl shrink-0">🛡️</span>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 truncate">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 truncate">
                     Enterprise SIEM / SOC Telemetry Exporter
                   </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-slate-400 mt-0.5">
                     Stream structured drift diagnostics and active alert feeds to Splunk, Datadog, or ArcSight CEF collectors
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
-                <div className="flex rounded-lg bg-black/40 p-1 border border-slate-200 shrink-0">
+                <div className="flex rounded-lg bg-slate-100 p-1 border border-slate-200 shrink-0">
                   <button
                     onClick={() => setSiemFormat('json')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
                       siemFormat === 'json'
-                        ? 'bg-cyan-600 text-slate-900'
-                        : 'text-slate-500 hover:text-slate-900'
+                        ? 'bg-cyan-600 text-white'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     JSON (Splunk/ELK)
@@ -715,8 +715,8 @@ export default function ObservabilityPage() {
                     onClick={() => setSiemFormat('cef')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
                       siemFormat === 'cef'
-                        ? 'bg-cyan-600 text-slate-900'
-                        : 'text-slate-500 hover:text-slate-900'
+                        ? 'bg-cyan-600 text-white'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     CEF (ArcSight)
@@ -726,7 +726,7 @@ export default function ObservabilityPage() {
                 <button
                   onClick={handleExportSiem}
                   disabled={exportSiem.isPending}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-slate-900 shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[40px] shrink-0"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[40px] shrink-0"
                 >
                   {exportSiem.isPending ? (
                     <>
@@ -734,7 +734,7 @@ export default function ObservabilityPage() {
                       <span>Exporting...</span>
                     </>
                   ) : (
-                    <span>ğŸ“¡ Generate SIEM Payload</span>
+                    <span>📡 Generate SIEM Payload</span>
                   )}
                 </button>
               </div>
@@ -768,25 +768,25 @@ export default function ObservabilityPage() {
               <div className="space-y-3 pt-2 min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-mono min-w-0">
-                    <span className="text-cyan-600 font-bold shrink-0">â— {exportSiem.data.event_count} Events Exported</span>
+                    <span className="text-cyan-700 font-bold shrink-0">● {exportSiem.data.event_count} Events Exported</span>
                     <span className="text-slate-500 hidden sm:inline">|</span>
-                    <span className="text-slate-500 shrink-0">Format: {exportSiem.data.format.toUpperCase()}</span>
+                    <span className="text-slate-400 shrink-0">Format: {exportSiem.data.format.toUpperCase()}</span>
                     <span className="text-slate-500 hidden sm:inline">|</span>
-                    <span className="text-slate-500 font-mono text-[11px] truncate">{exportSiem.data.exported_at}</span>
+                    <span className="text-slate-400 font-mono text-[11px] truncate">{exportSiem.data.exported_at}</span>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => copyToClipboard(exportSiem.data!.payload, 'siem')}
-                      className="px-2.5 py-1 rounded text-xs font-mono bg-slate-50 hover:bg-slate-100 text-cyan-600 border border-slate-200 transition-colors"
+                      className="px-2.5 py-1 rounded text-xs font-mono bg-slate-50 hover:bg-slate-50 text-cyan-700 border border-slate-200 transition-colors"
                     >
-                      {copiedSiem ? 'âœ“ Copied' : 'ğŸ“‹ Copy Payload'}
+                      {copiedSiem ? '✓ Copied' : '📋 Copy Payload'}
                     </button>
                     <button
                       onClick={() => downloadSiemPayload(exportSiem.data!.payload, exportSiem.data!.format)}
-                      className="px-2.5 py-1 rounded text-xs font-mono bg-cyan-600/30 hover:bg-cyan-600/50 text-slate-900 border border-cyan-500/40 transition-colors"
+                      className="px-2.5 py-1 rounded text-xs font-mono bg-cyan-600/30 hover:bg-cyan-600/50 text-white border border-cyan-500/40 transition-colors"
                     >
-                      ğŸ’¾ Download .{exportSiem.data.format === 'cef' ? 'log' : 'json'}
+                      💾 Download .{exportSiem.data.format === 'cef' ? 'log' : 'json'}
                     </button>
                   </div>
                 </div>
@@ -799,36 +799,36 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Flower Serverless P2P Peer Mesh Visualizer */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-100 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-500/5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
-                <span className="truncate">ğŸŒ¸ Flower FL Framework - Serverless P2P Peer Mesh Topology</span>
+                <span className="truncate">🌸 Flower FL Framework - Serverless P2P Peer Mesh Topology</span>
               </h3>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-600 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
-                âš¡ SERVERLESS P2P MESH (NO CENTRAL SERVER)
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-700 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
+                ⚡ SERVERLESS P2P MESH (NO CENTRAL SERVER)
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">P2P Gossip Strategy</div>
-                <div className="font-mono font-bold text-cyan-600">P2PGossipStrategy (Decentralized)</div>
+                <div className="font-mono font-bold text-cyan-700">P2PGossipStrategy (Decentralized)</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Active Network Topology</div>
-                <div className="font-mono font-bold text-indigo-600">Bidirectional 1D Ring / Mesh</div>
+                <div className="font-mono font-bold text-indigo-700">Bidirectional 1D Ring / Mesh</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Peer Consensus Divergence</div>
-                <div className="font-mono font-bold text-emerald-600">MAE = 0.001428 (Stable)</div>
+                <div className="font-mono font-bold text-emerald-400">MAE = 0.001428 (Stable)</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Coordinator Role</div>
-                <div className="font-mono font-bold text-purple-600">Bypassed (Peer-to-Peer Gossip)</div>
+                <div className="font-mono font-bold text-purple-700">Bypassed (Peer-to-Peer Gossip)</div>
               </div>
             </div>
 
-            <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-50 text-xs space-y-1 text-cyan-700">
+            <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-xs space-y-1 text-cyan-700">
               <div className="font-bold">Serverless Peer-to-Peer Architectural Guarantee:</div>
               <p className="text-[10px] opacity-90 leading-relaxed">
                 FlowerP2PEngine executes peer gossip weight mixing directly between consortium bank nodes without a central server or coordinator. Each node trains locally and exchanges model parameter updates with neighboring peers over authenticated P2P channels.
@@ -837,36 +837,36 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Apache Flink Real-Time Graph Streaming Visualizer Card */}
-          <div className="glass-card p-5 space-y-4 border border-emerald-200 bg-emerald-100 min-w-0">
+          <div className="glass-card p-5 space-y-4 border border-emerald-500/30 bg-emerald-500/5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
               <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
-                <span className="truncate">âš¡ Apache Flink - Sub-Second Real-Time Graph Streaming Engine</span>
+                <span className="truncate">⚡ Apache Flink - Sub-Second Real-Time Graph Streaming Engine</span>
               </h3>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200 shrink-0 self-start sm:self-auto font-mono">
-                â— SUB-SECOND SLA (&lt; 50ms PROCESSING LATENCY)
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 shrink-0 self-start sm:self-auto font-mono">
+                ● SUB-SECOND SLA (&lt; 50ms PROCESSING LATENCY)
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Processing SLA Latency</div>
-                <div className="font-mono font-bold text-emerald-600">18.4ms (&lt; 50ms Target)</div>
+                <div className="font-mono font-bold text-emerald-400">18.4ms (&lt; 50ms Target)</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Sliding Window Interval</div>
-                <div className="font-mono font-bold text-cyan-600">W(t, 500ms Sliding Window)</div>
+                <div className="font-mono font-bold text-cyan-700">W(t, 500ms Sliding Window)</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">Edge Velocity Anomaly</div>
-                <div className="font-mono font-bold text-amber-600">3.0x Baseline Spike Threshold</div>
+                <div className="font-mono font-bold text-amber-700">3.0x Baseline Spike Threshold</div>
               </div>
               <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                 <div className="text-[var(--color-text-muted)] text-[10px]">PyFlink DataStream State</div>
-                <div className="font-mono font-bold text-indigo-600">Stateful Accumulator Active</div>
+                <div className="font-mono font-bold text-indigo-700">Stateful Accumulator Active</div>
               </div>
             </div>
 
-            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-xs space-y-1 text-emerald-700">
+            <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-xs space-y-1 text-emerald-700">
               <div className="font-bold">Sub-Second Graph Streaming Engine Guarantee:</div>
               <p className="text-[10px] opacity-90 leading-relaxed">
                 FlinkGraphStreamProcessor ingests streaming transaction edge events in real-time, executing stateful sliding-window accumulator updates and edge velocity anomaly detection in &lt;19ms, bypassing batch Neo4j query overhead.
@@ -881,6 +881,3 @@ export default function ObservabilityPage() {
     </div>
   );
 }
-
-
-

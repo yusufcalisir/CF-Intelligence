@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { OnChainPayout } from '../../api/types';
 
 // Self-contained inline SVG icons
@@ -88,21 +88,21 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
   }
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 via-white to-white backdrop-blur-md rounded-xl border border-indigo-200 p-6 shadow-2xl space-y-6">
+    <div className="bg-gradient-to-br from-slate-50 via-white to-indigo-50 backdrop-blur-md rounded-xl border border-indigo-500/30 p-6 shadow-2xl space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/60">
         <div className="flex items-center space-x-3">
-          <div className="p-3 bg-indigo-100 rounded-lg border border-indigo-400/30">
-            <CoinsIcon className="w-6 h-6 text-indigo-600" />
+          <div className="p-3 bg-indigo-500/20 rounded-lg border border-indigo-400/30">
+            <CoinsIcon className="w-6 h-6 text-indigo-400" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
               Automated Smart Contract Settlement
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-500/40 font-mono">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 border border-emerald-500/40 font-mono">
                 EVM Web3 / CBDC
               </span>
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Real-time clearing house incentive disbursement driven by Leave-One-Out (LOO) Federated Shapley Values
             </p>
           </div>
@@ -110,9 +110,9 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
 
         {/* Currency badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Settlement Asset:</span>
+          <span className="text-xs text-slate-400">Settlement Asset:</span>
           <span className="px-3 py-1 bg-indigo-600/30 text-indigo-700 border border-indigo-400/40 text-sm font-semibold rounded-md font-mono flex items-center gap-1.5">
-            <CoinsIcon className="w-3.5 h-3.5 text-indigo-600" />
+            <CoinsIcon className="w-3.5 h-3.5 text-indigo-700" />
             {settlementCurrency}
           </span>
         </div>
@@ -121,24 +121,24 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
       {/* Contract & Execution Metadata Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Contract Address */}
-        <div className="bg-slate-50/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
-          <div className="flex items-center text-xs font-medium text-slate-500 space-x-1.5">
-            <FileCodeIcon className="w-3.5 h-3.5 text-indigo-600" />
+        <div className="bg-slate-100/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
+          <div className="flex items-center text-xs font-medium text-slate-400 space-x-1.5">
+            <FileCodeIcon className="w-3.5 h-3.5 text-indigo-400" />
             <span>Smart Contract Address</span>
           </div>
-          <p className="text-xs font-mono text-indigo-600 truncate" title={smartContractAddress}>
+          <p className="text-xs font-mono text-indigo-700 truncate" title={smartContractAddress}>
             {smartContractAddress}
           </p>
         </div>
 
         {/* Transaction Hash */}
-        <div className="bg-slate-50/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
-          <div className="flex items-center text-xs font-medium text-slate-500 space-x-1.5">
-            <ExternalLinkIcon className="w-3.5 h-3.5 text-emerald-600" />
+        <div className="bg-slate-100/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
+          <div className="flex items-center text-xs font-medium text-slate-400 space-x-1.5">
+            <ExternalLinkIcon className="w-3.5 h-3.5 text-emerald-400" />
             <span>On-Chain Tx Hash</span>
           </div>
           {settlementTxHash ? (
-            <p className="text-xs font-mono text-emerald-600 truncate" title={settlementTxHash}>
+            <p className="text-xs font-mono text-emerald-700 truncate" title={settlementTxHash}>
               {settlementTxHash}
             </p>
           ) : (
@@ -147,17 +147,17 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
         </div>
 
         {/* Block Height & Status */}
-        <div className="bg-slate-50/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
-          <div className="flex items-center text-xs font-medium text-slate-500 space-x-1.5">
-            <LayersIcon className="w-3.5 h-3.5 text-amber-600" />
+        <div className="bg-slate-100/70 rounded-lg p-3.5 border border-slate-200/60 space-y-1">
+          <div className="flex items-center text-xs font-medium text-slate-400 space-x-1.5">
+            <LayersIcon className="w-3.5 h-3.5 text-amber-400" />
             <span>Block Height & Status</span>
           </div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-mono text-slate-800">
+            <span className="text-xs font-mono text-slate-700">
               {settlementBlockNumber ? `Block #${settlementBlockNumber.toLocaleString()}` : 'Block #-'}
             </span>
             {settlementStatus === 'SUCCESS' && (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-600 font-semibold flex items-center gap-1 border border-emerald-200">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold flex items-center gap-1 border border-emerald-500/30">
                 <CheckCircle2Icon className="w-3 h-3" /> CONFIRMED
               </span>
             )}
@@ -167,9 +167,9 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
 
       {/* On-Chain Payout Table */}
       {onChainPayouts.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-200/60 bg-white/60">
+        <div className="overflow-x-auto rounded-lg border border-slate-200/60 bg-slate-50">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200/80">
+            <thead className="bg-slate-100/80 text-slate-600 font-semibold border-b border-slate-200/80">
               <tr>
                 <th className="py-2.5 px-3">Consortium Bank</th>
                 <th className="py-2.5 px-3">Wallet Address</th>
@@ -179,39 +179,39 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
                 <th className="py-2.5 px-3 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-600 font-mono">
+            <tbody className="divide-y divide-slate-800 text-slate-600 font-mono">
               {onChainPayouts.map((payout, idx) => (
                 <tr
                   key={idx}
-                  className={`hover:bg-slate-50/50 transition-colors ${
+                  className={`hover:bg-slate-100/50 transition-colors ${
                     payout.is_quarantined ? 'bg-amber-50' : ''
                   }`}
                 >
-                  <td className="py-2.5 px-3 font-sans font-medium text-slate-900 flex items-center space-x-2">
+                  <td className="py-2.5 px-3 font-sans font-medium text-white flex items-center space-x-2">
                     <span>{payout.bank_name || 'Consortium Bank'}</span>
                   </td>
-                  <td className="py-2.5 px-3 text-slate-500 text-[11px]" title={payout.wallet_address || 'Unspecified Address'}>
+                  <td className="py-2.5 px-3 text-slate-400 text-[11px]" title={payout.wallet_address || 'Unspecified Address'}>
                     {formatWalletAddress(payout.wallet_address)}
                   </td>
                   <td className="py-2.5 px-3 text-right font-semibold">
-                    <span className={(payout.shapley_score ?? 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                    <span className={(payout.shapley_score ?? 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}>
                       {(payout.shapley_score ?? 0).toFixed(4)} ({payout.shapley_basis_points ?? 0} bps)
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-right font-medium text-slate-600">
                     {(payout.share_percent ?? 0).toFixed(2)}%
                   </td>
-                  <td className="py-2.5 px-3 text-right font-bold text-indigo-600">
+                  <td className="py-2.5 px-3 text-right font-bold text-indigo-700">
                     ${(payout.payout_usd ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {payout.is_quarantined ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-rose-100 text-rose-600 border border-rose-200 rounded">
-                        <AlertTriangleIcon className="w-3 h-3 text-rose-600" /> QUARANTINED
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-rose-500/20 text-rose-700 border border-rose-300 rounded">
+                        <AlertTriangleIcon className="w-3 h-3 text-rose-400" /> QUARANTINED
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-600 border border-emerald-200 rounded">
-                        <ShieldCheckIcon className="w-3 h-3 text-emerald-600" /> SETTLED
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 rounded">
+                        <ShieldCheckIcon className="w-3 h-3 text-emerald-400" /> SETTLED
                       </span>
                     )}
                   </td>
@@ -221,8 +221,8 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
           </table>
         </div>
       ) : (
-        <div className="text-center py-6 bg-slate-50/40 rounded-lg border border-slate-200/50">
-          <p className="text-xs text-slate-500">
+        <div className="text-center py-6 bg-slate-100/40 rounded-lg border border-slate-200/50">
+          <p className="text-xs text-slate-400">
             No smart contract settlements executed for this simulation yet. Enable Web3 Settlement in controls to disburse automated token rewards.
           </p>
         </div>
@@ -230,7 +230,3 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
     </div>
   );
 };
-
-
-
-

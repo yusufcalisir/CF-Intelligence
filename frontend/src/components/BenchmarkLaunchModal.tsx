@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
@@ -33,16 +33,16 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     id: 1,
     label: 'Kaggle & PaySim Baseline Ingestion',
     subtext: 'Loading 284,807 real-world credit card transactions & 492 fraud cases',
-    tag: '284.8k Records Â· Loaded',
+    tag: '284.8k Records · Loaded',
     icon: Database,
     color: '#6366f1',
     glow: 'rgba(99, 102, 241, 0.4)',
   },
   {
     id: 2,
-    label: 'Non-IID Dirichlet Î±=0.5 Cross-Bank Partition',
+    label: 'Non-IID Dirichlet α=0.5 Cross-Bank Partition',
     subtext: 'Synthesizing heterogeneous data skew across JPM, HSBC & DBK nodes',
-    tag: 'Dirichlet Î±=0.5 Â· Bounded',
+    tag: 'Dirichlet α=0.5 · Bounded',
     icon: Layers,
     color: '#8b5cf6',
     glow: 'rgba(139, 92, 246, 0.4)',
@@ -69,7 +69,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     id: 5,
     label: 'Launching Design Partner Benchmark Sandbox',
     subtext: 'Attestation verified. Opening live interactive empirical metrics canvas',
-    tag: 'Sandbox Ready Â· v2.4',
+    tag: 'Sandbox Ready · v2.4',
     icon: ShieldCheck,
     color: '#38bdf8',
     glow: 'rgba(56, 189, 248, 0.4)',
@@ -141,7 +141,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-white backdrop-blur-2xl"
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-2xl"
         />
 
         {/* Modal Window Container */}
@@ -156,7 +156,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 15 }}
           transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-white via-slate-50 to-white border border-indigo-200 p-5 sm:p-7 shadow-indigo-100 space-y-5 z-10 overflow-hidden focus:outline-none"
+          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-white via-slate-50 to-white border border-indigo-500/30 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden focus:outline-none"
         >
           {/* Top Edge Glow */}
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
@@ -164,26 +164,26 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-inner shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-700 shadow-inner shrink-0">
                 <BarChart3 className="w-5 h-5 animate-pulse" />
               </div>
               <div className="min-w-0">
-                <h3 id="benchmark-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
+                <h3 id="benchmark-modal-title" className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
                   Initializing Benchmark Sandbox
                 </h3>
-                <p id="benchmark-modal-desc" className="text-xs text-indigo-600/80 font-mono truncate">
+                <p id="benchmark-modal-desc" className="text-xs text-indigo-700/80 font-mono truncate">
                   Empirical Proof & Real Data Baseline Engine
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-700 border border-indigo-500/30">
                 {Math.min(100, Math.round(progress))}%
               </span>
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>
@@ -212,10 +212,10 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   <CurrentIcon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block truncate">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block truncate">
                     Stage 0{currentStage.id} of 05
                   </span>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
                     {currentStage.label}
                   </h4>
                 </div>
@@ -249,24 +249,24 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   key={s.id}
                   className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
                     isCurrent
-                      ? 'bg-indigo-100 border border-indigo-200 text-indigo-700'
+                      ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-700'
                       : isCompleted
-                      ? 'text-slate-500 opacity-80'
+                      ? 'text-slate-400 opacity-80'
                       : 'text-slate-600 opacity-40'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {isCompleted ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     ) : isCurrent ? (
                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping shrink-0" />
                     ) : (
-                      <span className="w-2 h-2 rounded-full bg-slate-100 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-slate-700 shrink-0" />
                     )}
                     <span className="truncate">{s.label}</span>
                   </div>
                   <span className="text-[10px] opacity-75 shrink-0 ml-2">
-                    {isCompleted ? 'âœ“ Done' : isCurrent ? 'Active...' : 'Queued'}
+                    {isCompleted ? '✓ Done' : isCurrent ? 'Active...' : 'Queued'}
                   </span>
                 </div>
               );
@@ -291,7 +291,3 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
     </AnimatePresence>
   );
 }
-
-
-
-

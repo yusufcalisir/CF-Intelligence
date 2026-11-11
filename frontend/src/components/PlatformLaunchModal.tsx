@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
@@ -34,7 +34,7 @@ const STAGES: StageInfo[] = [
     id: 1,
     label: 'mTLS 1.3 & Vault PKI Handshake',
     subtext: 'Authenticating consortium bank node on-premises certificates',
-    tag: 'FIPS 140-3 Â· 1.2ms',
+    tag: 'FIPS 140-3 · 1.2ms',
     icon: Lock,
     color: '#6366f1',
     glow: 'rgba(99, 102, 241, 0.4)',
@@ -43,16 +43,16 @@ const STAGES: StageInfo[] = [
     id: 2,
     label: 'Post-Quantum Kyber-768 Exchange',
     subtext: 'Negotiating NIST FIPS 203 KEM & Dilithium-3 quantum-safe keys',
-    tag: 'PQC Lattice Â· Bound',
+    tag: 'PQC Lattice · Bound',
     icon: Binary,
     color: '#8b5cf6',
     glow: 'rgba(139, 92, 246, 0.4)',
   },
   {
     id: 3,
-    label: 'PyTorch GAT & RÃ©nyi DP Noise Calibration',
-    subtext: 'Computing 8-head structural embeddings with Opacus (Îµ=1.0, Î´=1e-5)',
-    tag: '12.8k Graphs Â· Active',
+    label: 'PyTorch GAT & Rényi DP Noise Calibration',
+    subtext: 'Computing 8-head structural embeddings with Opacus (ε=1.0, δ=1e-5)',
+    tag: '12.8k Graphs · Active',
     icon: Layers,
     color: '#06b6d4',
     glow: 'rgba(6, 182, 212, 0.4)',
@@ -61,7 +61,7 @@ const STAGES: StageInfo[] = [
     id: 4,
     label: 'Intel SGX Enclave & Paillier HE Sum',
     subtext: 'Hardware TEE blind homomorphic summation & zk-SNARK attestation',
-    tag: 'Groth16 BN254 Â· <5ms',
+    tag: 'Groth16 BN254 · <5ms',
     icon: Cpu,
     color: '#10b981',
     glow: 'rgba(16, 185, 129, 0.4)',
@@ -70,7 +70,7 @@ const STAGES: StageInfo[] = [
     id: 5,
     label: 'Byzantine Krum Defense & Global Weights',
     subtext: 'Adversarial poisoning filtered. Dispatching consortium model',
-    tag: '94.2% Acc Â· Consensus',
+    tag: '94.2% Acc · Consensus',
     icon: ShieldCheck,
     color: '#38bdf8',
     glow: 'rgba(56, 189, 248, 0.4)',
@@ -78,8 +78,8 @@ const STAGES: StageInfo[] = [
   {
     id: 6,
     label: 'Inter-Bank FININT & UNODC goAML Active',
-    subtext: 'Curve25519 ECDH bridge Â· UNODC goAML 4.0 XML & EU AMLA Single Rulebook ready',
-    tag: 'UNODC Â· EU AMLA',
+    subtext: 'Curve25519 ECDH bridge · UNODC goAML 4.0 XML & EU AMLA Single Rulebook ready',
+    tag: 'UNODC · EU AMLA',
     icon: ShieldCheck,
     color: '#f59e0b',
     glow: 'rgba(245, 158, 11, 0.4)',
@@ -87,8 +87,8 @@ const STAGES: StageInfo[] = [
   {
     id: 7,
     label: 'Asset Recovery & FININT Operational Hub',
-    subtext: 'EUR recall KPIs Â· MTTR analytics Â· mule chain containment live',
-    tag: 'ISO 20022 Â· EPC SCT',
+    subtext: 'EUR recall KPIs · MTTR analytics · mule chain containment live',
+    tag: 'ISO 20022 · EPC SCT',
     icon: Radio,
     color: '#10b981',
     glow: 'rgba(16, 185, 129, 0.4)',
@@ -168,8 +168,8 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
       >
         {/* Ambient Holographic Radial Background */}
         <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] sm:w-[500px] h-[340px] sm:h-[500px] bg-indigo-100 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] sm:w-[320px] h-[220px] sm:h-[320px] bg-cyan-100 rounded-full blur-[90px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] sm:w-[500px] h-[340px] sm:h-[500px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] sm:w-[320px] h-[220px] sm:h-[320px] bg-cyan-500/15 rounded-full blur-[90px] pointer-events-none" />
 
         {/* Modal Window Container - Zero Scroll, 100% Viewport-Friendly */}
         <motion.div
@@ -183,7 +183,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.94, opacity: 0, y: 10 }}
           transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-          className="relative w-full max-w-[480px] bg-white border border-indigo-200 rounded-2xl sm:rounded-3xl shadow-indigo-100 overflow-hidden flex flex-col focus:outline-none"
+          className="relative w-full max-w-[480px] bg-white border border-indigo-500/30 rounded-2xl sm:rounded-3xl shadow-[0_0_80px_rgba(79,70,229,0.3)] overflow-hidden flex flex-col focus:outline-none"
         >
           {/* Top Neon Laser Glow Bar */}
           <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]" />
@@ -191,22 +191,22 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
           {/* Header: Minimal, High-Tech, Crisp */}
           <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-100 border border-indigo-400/40 shrink-0 shadow-indigo-100">
-                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+              <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-400/40 shrink-0 shadow-[0_0_12px_rgba(99,102,241,0.3)]">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
                 <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
                 </span>
               </div>
               <div className="min-w-0">
-                <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5 truncate">
+                <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight flex items-center gap-1.5 truncate">
                   Consortium Handshake
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-600 bg-cyan-50 border border-cyan-500/25">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/25">
                     <Radio className="w-2 h-2 animate-pulse" /> DEMO SEQUENCE
                   </span>
                 </h3>
-                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-500 truncate">
-                  CF-Intelligence Â· Initialization Animation Preview
+                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-400 truncate">
+                  CF-Intelligence · Initialization Animation Preview
                 </p>
               </div>
             </div>
@@ -214,7 +214,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             <button
               onClick={onComplete || onClose}
               aria-label="Skip handshake and proceed to dashboard"
-              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               title="Direct jump to dashboard"
             >
               <span>Skip</span>
@@ -224,12 +224,12 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
 
           {/* Body Content */}
           <div className="p-4 sm:p-5 space-y-3.5 sm:space-y-4">
-            {/* â”€â”€ 1. CINEMATIC SVG TOPOLOGY RADAR (Zero-scroll, responsive) â”€â”€ */}
+            {/* ── 1. CINEMATIC SVG TOPOLOGY RADAR (Zero-scroll, responsive) ── */}
             <div className="relative h-32 sm:h-36 rounded-2xl bg-white border border-slate-200 p-2 flex items-center justify-center overflow-hidden">
               {/* Radar Grid Circles */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-28 h-28 rounded-full border border-indigo-500/15 animate-ping opacity-25" />
-                <div className="w-24 h-24 rounded-full border border-indigo-200" />
+                <div className="w-24 h-24 rounded-full border border-indigo-500/20" />
                 <div className="w-16 h-16 rounded-full border border-cyan-500/25" />
               </div>
 
@@ -254,11 +254,11 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               <div className="relative z-10 flex flex-col items-center">
                 <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-[0_0_25px_rgba(6,182,212,0.6)]">
                   <div className="w-full h-full rounded-[10px] bg-white flex flex-col items-center justify-center">
-                    <Cpu className="w-4 h-4 text-cyan-600" />
-                    <span className="text-[7.5px] font-mono font-bold text-cyan-600">SGX TEE</span>
+                    <Cpu className="w-4 h-4 text-cyan-700" />
+                    <span className="text-[7.5px] font-mono font-bold text-cyan-700">SGX TEE</span>
                   </div>
                 </div>
-                <span className="text-[8.5px] font-mono text-cyan-600 font-semibold mt-1">FL Coordinator</span>
+                <span className="text-[8.5px] font-mono text-cyan-400 font-semibold mt-1">FL Coordinator</span>
               </div>
 
               {/* 3 Bank Nodes Around Enclave */}
@@ -269,7 +269,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold text-slate-900 shadow-md border"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold text-white shadow-md border"
                     style={{
                       backgroundColor: `${node.color}20`,
                       borderColor: `${node.color}70`,
@@ -278,13 +278,13 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   >
                     {node.id}
                   </div>
-                  <span className="text-[7.5px] font-mono text-slate-500 mt-0.5">{node.role}</span>
+                  <span className="text-[7.5px] font-mono text-slate-400 mt-0.5">{node.role}</span>
                 </div>
               ))}
             </div>
 
-            {/* â”€â”€ 2. DYNAMIC FOCUSED ACTIVE STAGE CARD (Framer Motion) â”€â”€ */}
-            <div className="relative min-h-[72px] sm:min-h-[76px] rounded-xl sm:rounded-2xl bg-indigo-50 border border-indigo-200 p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-indigo-100 overflow-hidden">
+            {/* ── 2. DYNAMIC FOCUSED ACTIVE STAGE CARD (Framer Motion) ── */}
+            <div className="relative min-h-[72px] sm:min-h-[76px] rounded-xl sm:rounded-2xl bg-indigo-500/10 border border-indigo-500/30 p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-[0_0_20px_rgba(99,102,241,0.15)] overflow-hidden">
               <div className="flex items-center gap-3 min-w-0">
                 <div
                   className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border"
@@ -294,30 +294,30 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                     boxShadow: `0 0 15px ${currentStage.glow}`,
                   }}
                 >
-                  <StageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-900" />
+                  <StageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-600 border border-indigo-200 shrink-0">
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-700 border border-indigo-500/30 shrink-0">
                       STAGE 0{currentStage.id}/0{STAGES.length}
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-[13px] font-bold text-slate-900 tracking-tight truncate mt-0.5">
+                  <h4 className="text-xs sm:text-[13px] font-bold text-slate-800 tracking-tight truncate mt-0.5">
                     {currentStage.label}
                   </h4>
-                  <p className="text-[10px] text-slate-500 truncate mt-0.2">
+                  <p className="text-[10px] text-slate-400 truncate mt-0.2">
                     {currentStage.subtext}
                   </p>
                 </div>
               </div>
 
-              <span className="text-[9.5px] font-mono font-semibold px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-cyan-600 shrink-0">
+              <span className="text-[9.5px] font-mono font-semibold px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-cyan-700 shrink-0">
                 {currentStage.tag}
               </span>
             </div>
 
-            {/* â”€â”€ 3. SYNCHRONIZED MULTI-STAGE STEP TRACKER (Dynamic Visual Breadcrumb) â”€â”€ */}
+            {/* ── 3. SYNCHRONIZED MULTI-STAGE STEP TRACKER (Dynamic Visual Breadcrumb) ── */}
             <div
               className="grid gap-1.5"
               style={{ gridTemplateColumns: `repeat(${STAGES.length}, minmax(0, 1fr))` }}
@@ -341,7 +341,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 return (
                   <div
                     key={s.id}
-                    className="h-1.5 rounded-full bg-slate-100 overflow-hidden relative"
+                    className="h-1.5 rounded-full bg-slate-50 overflow-hidden relative"
                   >
                     <div
                       className="h-full rounded-full transition-[width] duration-75 ease-linear"
@@ -360,15 +360,15 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               })}
             </div>
 
-            {/* â”€â”€ 4. REAL-TIME TELEMETRY MICRO-PILLS â”€â”€ */}
+            {/* ── 4. REAL-TIME TELEMETRY MICRO-PILLS ── */}
             <div className="grid grid-cols-3 gap-2 text-center font-mono text-[9px] sm:text-[10px]">
               <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 flex items-center justify-center gap-1 text-slate-600">
-                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
                 <span className="truncate">3 Nodes Linked</span>
               </div>
               <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 flex items-center justify-center gap-1 text-slate-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                <span className="truncate">Îµ=1.0 DP Bound</span>
+                <span className="truncate">ε=1.0 DP Bound</span>
               </div>
               <div className="p-1.5 rounded-lg bg-white/[0.02] border border-slate-200 flex items-center justify-center gap-1 text-slate-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
@@ -381,14 +381,14 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
           <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-white border-t border-slate-200 space-y-1.5">
             <div className="flex items-center justify-between text-[10.5px] sm:text-xs font-mono">
               <span className="text-slate-600 flex items-center gap-1.5 truncate">
-                <Sparkles className="w-3 h-3 text-indigo-600 shrink-0" />
+                <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
                 <span className="truncate">
                   {progress >= 100
-                    ? 'Consortium Handshake Complete Â· Launching...'
+                    ? 'Consortium Handshake Complete · Launching...'
                     : 'Synchronizing Consortium Data Plane...'}
                 </span>
               </span>
-              <span className="text-cyan-600 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
+              <span className="text-cyan-400 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
             </div>
             <div className="relative w-full h-1.5 sm:h-2 bg-white rounded-full overflow-hidden border border-slate-200 p-0.5">
               <div
@@ -396,7 +396,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5">
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5">
               <span>Interactive launch preview animation</span>
               <span>Verifying runtime services concurrently</span>
             </div>
@@ -406,7 +406,3 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
     </AnimatePresence>
   );
 }
-
-
-
-

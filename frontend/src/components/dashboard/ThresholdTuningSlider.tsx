@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Sliders,
   DollarSign,
@@ -139,20 +139,20 @@ export function ThresholdTuningSlider({
 
   return (
     <div
-      className="glass-card p-6 space-y-6 border border-indigo-200 shadow-xl"
+      className="glass-card p-6 space-y-6 border border-indigo-500/20 shadow-xl"
       data-testid="threshold-tuning-slider-container"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
         <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
+          <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
             <Sliders className="w-4 h-4" />
             Cost-Sensitive Risk Threshold & Financial Utility Optimizer
           </div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
             Decision Threshold Tuning
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-mono border border-indigo-200">
-              Ï„ = {threshold} ({(threshold / 1000).toFixed(2)})
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 font-mono border border-indigo-500/30">
+              τ = {threshold} ({(threshold / 1000).toFixed(2)})
             </span>
           </h2>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
@@ -165,17 +165,17 @@ export function ThresholdTuningSlider({
             <button
               type="button"
               onClick={handleApplyOptimal}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50/70 text-emerald-600 hover:bg-emerald-100 border border-emerald-500/40 hover:border-emerald-400 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-500/40 hover:border-emerald-400 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               title={`Snap to optimal threshold ${optimalPoint.threshold}`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Apply Optimal (Ï„* = {optimalPoint.threshold})</span>
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Apply Optimal (τ* = {optimalPoint.threshold})</span>
             </button>
           )}
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="text-xs text-slate-500 hover:text-slate-900 p-1.5 rounded bg-slate-50/80 hover:bg-slate-100 transition-colors"
+            className="text-xs text-slate-400 hover:text-white p-1.5 rounded bg-slate-100/80 hover:bg-slate-700 transition-colors"
             title="Reset parameters to defaults"
             aria-label="Reset parameters"
           >
@@ -187,17 +187,17 @@ export function ThresholdTuningSlider({
       {/* Main Controls Grid: Threshold Slider + Financial Cost Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Threshold Slider (2 cols on md) */}
-        <div className="md:col-span-2 space-y-3 bg-white/50 p-4 rounded-xl border border-slate-200">
+        <div className="md:col-span-2 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <div className="flex items-center justify-between">
             <label
               htmlFor="threshold-range-slider"
-              className="text-xs font-semibold text-slate-800 flex items-center gap-1.5"
+              className="text-xs font-semibold text-slate-700 flex items-center gap-1.5"
             >
-              <span>Operating Decision Cutoff (Ï„)</span>
-              <span className="text-[10px] text-slate-500 font-mono">[500 â€“ 900]</span>
+              <span>Operating Decision Cutoff (τ)</span>
+              <span className="text-[10px] text-slate-400 font-mono">[500 – 900]</span>
             </label>
-            <span className="font-mono text-sm font-bold text-indigo-600">
-              {threshold} <span className="text-xs text-slate-500">/ 1000</span>
+            <span className="font-mono text-sm font-bold text-indigo-700">
+              {threshold} <span className="text-xs text-slate-400">/ 1000</span>
             </span>
           </div>
 
@@ -210,10 +210,10 @@ export function ThresholdTuningSlider({
             value={threshold}
             onChange={handleSliderChange}
             aria-label="Decision Threshold Slider"
-            className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
           />
 
-          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+          <div className="flex justify-between text-[10px] text-slate-400 font-mono">
             <span>500 (Aggressive / High Recall)</span>
             <span>700 (Balanced)</span>
             <span>900 (Conservative / High Precision)</span>
@@ -221,7 +221,7 @@ export function ThresholdTuningSlider({
 
           {/* Quick Preset Threshold Buttons */}
           <div className="pt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-slate-500 mr-1">Presets:</span>
+            <span className="text-[11px] text-slate-400 mr-1">Presets:</span>
             {EMPIRICAL_SWEEP_DATA.map((pt) => {
               const isSelected = pt.threshold === threshold;
               const isOpt = pt.threshold === optimalPoint.threshold;
@@ -235,14 +235,14 @@ export function ThresholdTuningSlider({
                   }}
                   className={`text-[10px] px-2 py-0.5 rounded font-mono transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-indigo-600 text-slate-900 font-bold shadow-sm'
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm'
                       : isOpt
-                      ? 'bg-emerald-50/70 text-emerald-600 border border-emerald-500/40 hover:bg-emerald-100/60'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-500/40 hover:bg-emerald-50'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-700'
                   }`}
                 >
                   {pt.threshold}
-                  {isOpt ? ' â˜…' : ''}
+                  {isOpt ? ' ★' : ''}
                 </button>
               );
             })}
@@ -250,16 +250,16 @@ export function ThresholdTuningSlider({
         </div>
 
         {/* Cost Matrix Config Inputs */}
-        <div className="space-y-3 bg-white/50 p-4 rounded-xl border border-slate-200 text-xs">
-          <div className="font-semibold text-slate-800 flex items-center gap-1">
-            <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+        <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+          <div className="font-semibold text-slate-700 flex items-center gap-1">
+            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
             <span>Financial Cost Matrix ($)</span>
           </div>
 
           <div>
             <div className="flex justify-between text-[11px] text-slate-600 mb-1">
               <label htmlFor="cost-fn-input">Undetected Fraud Loss (c_FN):</label>
-              <span className="font-mono text-emerald-600">${costFn}</span>
+              <span className="font-mono text-emerald-700">${costFn}</span>
             </div>
             <input
               id="cost-fn-input"
@@ -270,14 +270,14 @@ export function ThresholdTuningSlider({
               value={costFn}
               onChange={(e) => setCostFn(Math.max(0, Number(e.target.value)))}
               aria-label="Cost of False Negative"
-              className="w-full px-2 py-1 rounded bg-slate-50 border border-slate-200 text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+              className="w-full px-2 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div>
             <div className="flex justify-between text-[11px] text-slate-600 mb-1">
               <label htmlFor="cost-fp-input">False Alarm Overhead (c_FP):</label>
-              <span className="font-mono text-amber-600">${costFp}</span>
+              <span className="font-mono text-amber-700">${costFp}</span>
             </div>
             <input
               id="cost-fp-input"
@@ -288,14 +288,14 @@ export function ThresholdTuningSlider({
               value={costFp}
               onChange={(e) => setCostFp(Math.max(0, Number(e.target.value)))}
               aria-label="Cost of False Positive"
-              className="w-full px-2 py-1 rounded bg-slate-50 border border-slate-200 text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+              className="w-full px-2 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div>
             <div className="flex justify-between text-[11px] text-slate-600 mb-1">
               <label htmlFor="cost-tp-input">SAR Filing / Hold Cost (c_TP):</label>
-              <span className="font-mono text-indigo-600">${costTp}</span>
+              <span className="font-mono text-indigo-700">${costTp}</span>
             </div>
             <input
               id="cost-tp-input"
@@ -306,7 +306,7 @@ export function ThresholdTuningSlider({
               value={costTp}
               onChange={(e) => setCostTp(Math.max(0, Number(e.target.value)))}
               aria-label="Cost of True Positive"
-              className="w-full px-2 py-1 rounded bg-slate-50 border border-slate-200 text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+              className="w-full px-2 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs focus:outline-none focus:border-indigo-500"
             />
           </div>
         </div>
@@ -314,42 +314,42 @@ export function ThresholdTuningSlider({
 
       {/* KPI Ribbons: Cost & Net Savings */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 rounded-xl bg-white/60 border border-slate-200">
-          <div className="text-[11px] text-slate-500 font-medium">Expected Total Cost</div>
-          <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div className="text-[11px] text-slate-400 font-medium">Expected Total Cost</div>
+          <div className="text-lg font-bold text-white font-mono mt-0.5">
             ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[10px] text-slate-500">c_FNÂ·FN + c_FPÂ·FP + c_TPÂ·TP</div>
+          <div className="text-[10px] text-slate-500">c_FN·FN + c_FP·FP + c_TP·TP</div>
         </div>
 
-        <div className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200">
-          <div className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-500/30">
+          <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
             <TrendingUp className="w-3 h-3" />
             <span>Net Financial Savings</span>
           </div>
-          <div className="text-lg font-bold text-emerald-600 font-mono mt-0.5">
+          <div className="text-lg font-bold text-emerald-700 font-mono mt-0.5">
             +${netSavings.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[10px] text-emerald-600/80">vs Zero-Detection Baseline</div>
+          <div className="text-[10px] text-emerald-400/80">vs Zero-Detection Baseline</div>
         </div>
 
-        <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
-          <div className="text-[11px] text-indigo-600 font-medium">Efficiency Ratio</div>
+        <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-500/30">
+          <div className="text-[11px] text-indigo-700 font-medium">Efficiency Ratio</div>
           <div className="text-lg font-bold text-indigo-700 font-mono mt-0.5">
             {efficiencyRatio.toFixed(1)}%
           </div>
-          <div className="text-[10px] text-indigo-600/80">Baseline Loss Averted</div>
+          <div className="text-[10px] text-indigo-400/80">Baseline Loss Averted</div>
         </div>
 
-        <div className="p-3 rounded-xl bg-white/60 border border-slate-200">
-          <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-emerald-600" />
-            <span>Optimal Cutoff (Ï„*)</span>
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-emerald-400" />
+            <span>Optimal Cutoff (τ*)</span>
           </div>
-          <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">
+          <div className="text-lg font-bold text-white font-mono mt-0.5">
             {optimalPoint.threshold}
             {isCurrentOptimal && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-600 font-sans">
+              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 font-sans">
                 Active
               </span>
             )}
@@ -361,68 +361,68 @@ export function ThresholdTuningSlider({
       {/* Confusion Matrix & Classification Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 2x2 Confusion Matrix Visualizer */}
-        <div className="bg-white/60 p-4 rounded-xl border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
             <span>Projected Confusion Matrix (N = 5,000)</span>
-            <span className="text-[11px] text-slate-500 font-mono">100 Fraud / 4,900 Clean</span>
+            <span className="text-[11px] text-slate-400 font-mono">100 Fraud / 4,900 Clean</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
-            <div className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
-              <div className="text-[10px] text-emerald-600 font-semibold uppercase">True Positive (TP)</div>
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-500/30">
+              <div className="text-[10px] text-emerald-400 font-semibold uppercase">True Positive (TP)</div>
               <div className="text-xl font-mono font-bold text-emerald-700 mt-0.5">{currentPoint.tp}</div>
-              <div className="text-[10px] text-emerald-600/80">Fraud Blocked</div>
+              <div className="text-[10px] text-emerald-400/80">Fraud Blocked</div>
             </div>
 
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-              <div className="text-[10px] text-amber-600 font-semibold uppercase">False Positive (FP)</div>
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-500/30">
+              <div className="text-[10px] text-amber-400 font-semibold uppercase">False Positive (FP)</div>
               <div className="text-xl font-mono font-bold text-amber-700 mt-0.5">{currentPoint.fp}</div>
-              <div className="text-[10px] text-amber-600/80">False Alarms Reviewed</div>
+              <div className="text-[10px] text-amber-400/80">False Alarms Reviewed</div>
             </div>
 
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-              <div className="text-[10px] text-red-600 font-semibold uppercase">False Negative (FN)</div>
+            <div className="p-3 rounded-lg bg-red-50 border border-red-500/30">
+              <div className="text-[10px] text-red-400 font-semibold uppercase">False Negative (FN)</div>
               <div className="text-xl font-mono font-bold text-red-200 mt-0.5">{currentPoint.fn}</div>
-              <div className="text-[10px] text-red-600/80">Undetected Fraud Loss</div>
+              <div className="text-[10px] text-red-400/80">Undetected Fraud Loss</div>
             </div>
 
-            <div className="p-3 rounded-lg bg-slate-50/60 border border-slate-200/50">
-              <div className="text-[10px] text-slate-500 font-semibold uppercase">True Negative (TN)</div>
-              <div className="text-xl font-mono font-bold text-slate-800 mt-0.5">{currentPoint.tn}</div>
-              <div className="text-[10px] text-slate-500">Clean Pass-Through</div>
+            <div className="p-3 rounded-lg bg-slate-100/60 border border-slate-200/50">
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">True Negative (TN)</div>
+              <div className="text-xl font-mono font-bold text-slate-700 mt-0.5">{currentPoint.tn}</div>
+              <div className="text-[10px] text-slate-400">Clean Pass-Through</div>
             </div>
           </div>
         </div>
 
         {/* Operating Performance Metrics */}
-        <div className="bg-white/60 p-4 rounded-xl border border-slate-200 space-y-3">
-          <div className="text-xs font-semibold text-slate-800">Statistical Performance Metrics</div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <div className="text-xs font-semibold text-slate-700">Statistical Performance Metrics</div>
 
           <div className="space-y-2 text-xs">
             <div className="flex justify-between items-center py-1 border-b border-slate-200">
-              <span className="text-slate-500">Recall / Sensitivity (Fraud Captured):</span>
-              <span className="font-mono font-bold text-emerald-600">
+              <span className="text-slate-400">Recall / Sensitivity (Fraud Captured):</span>
+              <span className="font-mono font-bold text-emerald-700">
                 {(currentPoint.recall * 100).toFixed(1)}%
               </span>
             </div>
 
             <div className="flex justify-between items-center py-1 border-b border-slate-200">
-              <span className="text-slate-500">Precision / PPV (Alert Accuracy):</span>
-              <span className="font-mono font-bold text-indigo-600">
+              <span className="text-slate-400">Precision / PPV (Alert Accuracy):</span>
+              <span className="font-mono font-bold text-indigo-700">
                 {(currentPoint.precision * 100).toFixed(1)}%
               </span>
             </div>
 
             <div className="flex justify-between items-center py-1 border-b border-slate-200">
-              <span className="text-slate-500">False Positive Rate (FPR):</span>
-              <span className="font-mono font-bold text-amber-600">
+              <span className="text-slate-400">False Positive Rate (FPR):</span>
+              <span className="font-mono font-bold text-amber-700">
                 {(currentPoint.fpr * 100).toFixed(3)}%
               </span>
             </div>
 
             <div className="flex justify-between items-center py-1 border-b border-slate-200">
-              <span className="text-slate-500">F1-Score:</span>
-              <span className="font-mono font-bold text-slate-800">
+              <span className="text-slate-400">F1-Score:</span>
+              <span className="font-mono font-bold text-slate-700">
                 {(
                   (2 * currentPoint.precision * currentPoint.recall) /
                   (currentPoint.precision + currentPoint.recall || 1)
@@ -431,8 +431,8 @@ export function ThresholdTuningSlider({
             </div>
 
             <div className="flex justify-between items-center py-1">
-              <span className="text-slate-500">Baseline Default Cost (Zero-Detection):</span>
-              <span className="font-mono text-red-600 font-semibold">
+              <span className="text-slate-400">Baseline Default Cost (Zero-Detection):</span>
+              <span className="font-mono text-red-400 font-semibold">
                 ${baselineCost.toLocaleString()}
               </span>
             </div>
@@ -442,7 +442,3 @@ export function ThresholdTuningSlider({
     </div>
   );
 }
-
-
-
-

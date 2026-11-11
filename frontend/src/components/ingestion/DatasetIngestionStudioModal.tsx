@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Upload,
@@ -180,7 +180,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-100 backdrop-blur-md">
       <div
         ref={containerRef}
         id="dataset-ingestion-studio-modal"
@@ -192,7 +192,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
               <FileCheck size={20} />
             </div>
             <div>
@@ -200,20 +200,20 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                 Real Dataset Ingestion Studio
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                CSV & Parquet Dropzone â€¢ Great Expectations Gating â€¢ Zero-Raw-PII
+                CSV & Parquet Dropzone • Great Expectations Gating • Zero-Raw-PII
               </p>
             </div>
           </div>
           <button
             onClick={resetModal}
-            className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-50 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Wizard Steps Progress Indicator */}
-        <div className="px-6 py-3 bg-black/30 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
+        <div className="px-6 py-3 bg-slate-100 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
           {[
             { id: 'upload', label: '1. Dropzone', icon: Upload },
             { id: 'mapping', label: '2. Schema Mapping', icon: SlidersHorizontal },
@@ -226,10 +226,10 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
               <div
                 key={s.id}
                 className={`flex items-center gap-1.5 text-xs font-semibold ${
-                  isActive ? 'text-indigo-600' : 'text-[var(--color-text-muted)]'
+                  isActive ? 'text-indigo-400' : 'text-[var(--color-text-muted)]'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-indigo-600' : 'text-slate-500'} />
+                <Icon size={14} className={isActive ? 'text-indigo-400' : 'text-slate-500'} />
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
             );
@@ -240,22 +240,22 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
         <div className="flex-1 overflow-y-auto p-6">
           {enrollSuccess ? (
             <div className="p-6 text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                 <CheckCircle2 size={32} />
               </div>
-              <h4 className="text-lg font-bold text-slate-900">
+              <h4 className="text-lg font-bold text-slate-800">
                 Dataset Enrolled into {enrollSuccess.bank_id.toUpperCase()} Successfully!
               </h4>
               <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
                 {enrollSuccess.records_enrolled} records partitioned into federated aggregation buffer{' '}
-                <strong className="text-indigo-600 font-mono">({enrollSuccess.partition_assigned})</strong>.
+                <strong className="text-indigo-700 font-mono">({enrollSuccess.partition_assigned})</strong>.
               </p>
               <div className="pt-3">
                 <button
                   type="button"
                   id="ingest-modal-done-btn"
                   onClick={resetModal}
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-900 bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/25 transition-all"
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/25 transition-all"
                 >
                   Return to Live Operations
                 </button>
@@ -295,7 +295,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
 
         {/* Modal Footer Controls */}
         {!enrollSuccess && (
-          <div className="px-6 py-3.5 border-t border-[var(--color-border-subtle)] bg-black/20 flex items-center justify-between">
+          <div className="px-6 py-3.5 border-t border-[var(--color-border-subtle)] bg-slate-100 flex items-center justify-between">
             {currentStep !== 'upload' ? (
               <button
                 type="button"
@@ -304,7 +304,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                   if (currentStep === 'contract') setCurrentStep('mapping');
                   if (currentStep === 'consortium') setCurrentStep('contract');
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-50 transition-colors"
               >
                 <ArrowLeft size={13} />
                 <span>Previous Step</span>
@@ -317,7 +317,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                 id="proceed-to-contract-audit-btn"
                 disabled={auditContractMutation.isPending}
                 onClick={handleProceedToContractAudit}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all"
               >
                 <span>Run Great Expectations Audit</span>
                 <ArrowRight size={14} />
@@ -329,7 +329,7 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
                 type="button"
                 id="proceed-to-consortium-btn"
                 onClick={() => setCurrentStep('consortium')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all"
               >
                 <span>Allocate Consortium Node</span>
                 <ArrowRight size={14} />
@@ -341,4 +341,3 @@ export const DatasetIngestionStudioModal: React.FC<DatasetIngestionStudioModalPr
     </div>
   );
 };
-

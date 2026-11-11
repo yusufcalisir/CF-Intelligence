@@ -12,7 +12,7 @@ function getBankLogo(bankId: string) {
   if (bankId === 'bank_a') {
     // Meridian National (National Bank Architecture)
     return (
-      <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 21h18" />
         <path d="M19 21v-8" />
         <path d="M5 21v-8" />
@@ -26,7 +26,7 @@ function getBankLogo(bankId: string) {
   if (bankId === 'bank_b') {
     // Nexus Digital (Isometric Technology Node/Cube)
     return (
-      <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
         <path d="M2 17l10 5 10-5" />
         <path d="M2 12l10 5 10-5" />
@@ -36,7 +36,7 @@ function getBankLogo(bankId: string) {
   }
   // Heritage Regional (Classic Shield/Key Security Logo)
   return (
-    <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       <circle cx="12" cy="11" r="3" />
       <path d="M12 14v4" />
@@ -58,7 +58,7 @@ export default function BankCard({ bank, index }: BankCardProps) {
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-900 shrink-0"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
             style={{ background: `linear-gradient(135deg, ${color}, ${color}88)` }}
           >
             {getBankLogo(bank.id)}

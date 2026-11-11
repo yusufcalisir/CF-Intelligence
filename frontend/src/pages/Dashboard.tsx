@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Trash2 } from 'lucide-react';
@@ -69,16 +69,16 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/scenarios')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 hover:border-rose-400 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50 to-slate-50 border border-rose-300 hover:border-rose-300 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold text-rose-600 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-rose-100 text-rose-600">ğŸ’¥</span>
+            <span className="text-xs font-bold text-rose-700 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-rose-500/20 text-rose-400">💥</span>
               Chaos & Attack Simulator
             </span>
-            <span className="text-[10px] font-mono font-bold text-rose-600/80 group-hover:translate-x-0.5 transition-transform">â†’</span>
+            <span className="text-[10px] font-mono font-bold text-rose-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-500 leading-snug">
+          <p className="text-[11px] text-slate-400 leading-snug">
             Inject 500 tx/s smurfing bursts & Byzantine poisoned gradients to test Multi-Krum shield.
           </p>
         </button>
@@ -86,16 +86,16 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/operations?openIngest=true')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 hover:border-indigo-400 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 border border-indigo-500/25 hover:border-indigo-500/50 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold text-indigo-600 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-indigo-100 text-indigo-600">ğŸ“</span>
+            <span className="text-xs font-bold text-indigo-700 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400">📁</span>
               Import Bank Dataset
             </span>
-            <span className="text-[10px] font-mono font-bold text-indigo-600/80 group-hover:translate-x-0.5 transition-transform">â†’</span>
+            <span className="text-[10px] font-mono font-bold text-indigo-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-500 leading-snug">
+          <p className="text-[11px] text-slate-400 leading-snug">
             Client-side Zero-PII sanitization & 12-rule Great Expectations data contract gating.
           </p>
         </button>
@@ -103,16 +103,16 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => navigate('/developer')}
-          className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 hover:border-cyan-400 transition-all text-left group shadow-lg cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50 to-slate-50 border border-cyan-500/25 hover:border-cyan-500/50 transition-all text-left group shadow-lg cursor-pointer"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold text-cyan-600 flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-cyan-100 text-cyan-600">ğŸ³</span>
+            <span className="text-xs font-bold text-cyan-700 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400">🐳</span>
               On-Premises Docker Stack
             </span>
-            <span className="text-[10px] font-mono font-bold text-cyan-600/80 group-hover:translate-x-0.5 transition-transform">â†’</span>
+            <span className="text-[10px] font-mono font-bold text-cyan-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
           </div>
-          <p className="text-[11px] text-slate-500 leading-snug">
+          <p className="text-[11px] text-slate-400 leading-snug">
             Production compose manifests with Same-Origin Gateway, Postgres 16 & Redis 7.2.
           </p>
         </button>
@@ -132,7 +132,7 @@ export default function Dashboard() {
         ) : !banks || banks.length === 0 ? (
           <div className="glass-card p-6 text-center text-[var(--color-text-muted)] border border-dashed border-slate-200 rounded-xl">
             <p className="text-xs font-semibold text-slate-600">No Bank Nodes Registered</p>
-            <p className="text-[11px] text-slate-500 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -195,8 +195,8 @@ export default function Dashboard() {
                       isFailed ? 'bg-[var(--color-status-error)]/10 text-[var(--color-status-error)]' :
                       'bg-[var(--color-accent-indigo)]/10 text-[var(--color-accent-indigo)]'
                     }`}>
-                      {isCompleted && <span className="text-xs font-bold">âœ“</span>}
-                      {isFailed && <span className="text-xs font-bold">âœ—</span>}
+                      {isCompleted && <span className="text-xs font-bold">✓</span>}
+                      {isFailed && <span className="text-xs font-bold">✗</span>}
                       {isRunning && (
                         <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       )}
@@ -242,7 +242,7 @@ export default function Dashboard() {
                         title="Delete simulation"
                         disabled={deletingId === sim.id}
                         onClick={(e) => handleDeleteSimulation(e, sim.id)}
-                        className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-600 hover:bg-rose-100 border border-transparent hover:border-rose-200 transition-all cursor-pointer disabled:opacity-40"
+                        className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-300 transition-all cursor-pointer disabled:opacity-40"
                       >
                         {deletingId === sim.id ? (
                           <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
@@ -263,7 +263,7 @@ export default function Dashboard() {
                 {/* Inner pulsing ring */}
                 <div className="absolute w-10 h-10 rounded-full border border-[var(--color-accent-teal)]/30 animate-pulse" />
                 {/* Core node */}
-                <div className="w-4 h-4 rounded-full bg-[var(--color-accent-indigo)] shadow-indigo-100" />
+                <div className="w-4 h-4 rounded-full bg-[var(--color-accent-indigo)] shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
               </div>
               <p className="text-xs font-semibold text-[var(--color-text-secondary)]">No simulations yet</p>
               <p className="text-[10px] text-[var(--color-text-muted)] max-w-[200px] mt-1">
@@ -294,6 +294,3 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
-
-
-

@@ -1,4 +1,4 @@
-﻿import { useState, useId, useEffect } from 'react';
+import { useState, useId, useEffect } from 'react';
 import {
   ShieldAlert,
   Zap,
@@ -150,7 +150,7 @@ export default function ChaosAttackInjectorPanel({
       id="chaos-attack-injector-panel"
       className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 transition-all duration-500 border ${
         activeAttack?.status === 'quarantined'
-          ? 'bg-rose-50 border-rose-300 shadow-rose-100'
+          ? 'bg-rose-50 border-rose-300 shadow-[0_0_40px_rgba(244,63,94,0.25)]'
           : activeAttack?.status === 'intercepted'
             ? 'bg-amber-50 border-amber-500/50 shadow-[0_0_40px_rgba(245,158,11,0.2)]'
             : 'bg-[var(--color-bg-card)] border-[var(--color-border)] shadow-md'
@@ -162,8 +162,8 @@ export default function ChaosAttackInjectorPanel({
           <div
             className={`p-2 rounded-xl shrink-0 ${
               activeAttack
-                ? 'bg-rose-100 text-rose-600 animate-pulse'
-                : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                ? 'bg-rose-500/20 text-rose-400 animate-pulse'
+                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
             }`}
           >
             <ShieldAlert size={20} />
@@ -177,13 +177,13 @@ export default function ChaosAttackInjectorPanel({
                 id="threat-level-badge"
                 className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   activeAttack
-                    ? 'bg-rose-100 text-rose-600 border border-rose-300 animate-pulse'
-                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-300 animate-pulse'
+                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 }`}
               >
                 {activeAttack ? 'CRITICAL THREAT INJECTED' : 'CONSORTIUM NOMINAL'}
               </span>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
                 SIMULATED DEMO
               </span>
             </div>
@@ -198,7 +198,7 @@ export default function ChaosAttackInjectorPanel({
           <button
             id="neutralize-threat-btn"
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-slate-900 bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-md shrink-0 self-start sm:self-auto cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-md shrink-0 self-start sm:self-auto cursor-pointer"
           >
             <RefreshCw size={13} />
             <span>Neutralize & Restore Quorum</span>
@@ -208,14 +208,14 @@ export default function ChaosAttackInjectorPanel({
 
       {/* Real Error Notification Banner */}
       {errorMessage && (
-        <div className="mt-3.5 p-3 rounded-xl bg-rose-100 border border-rose-200 text-rose-600 text-xs flex items-center justify-between gap-3">
+        <div className="mt-3.5 p-3 rounded-xl bg-rose-500/15 border border-rose-300 text-rose-700 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <AlertCircle size={15} className="shrink-0 text-rose-600" />
+            <AlertCircle size={15} className="shrink-0 text-rose-400" />
             <span className="font-mono">{errorMessage}</span>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-slate-500 hover:text-slate-900 p-1 rounded hover:bg-slate-100 transition-colors"
+            className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-50 transition-colors"
             title="Dismiss error"
           >
             <X size={14} />
@@ -229,22 +229,22 @@ export default function ChaosAttackInjectorPanel({
         <div className="p-3.5 rounded-xl bg-[var(--color-bg-primary)]/80 border border-[var(--color-border)] flex flex-col justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-1.5">
-              <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 min-w-0">
                 <Zap size={14} className="shrink-0" />
                 <span className="truncate">AML Layering Storm</span>
               </span>
-              <span className="text-[10px] font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
                 Target: Bank Alpha
               </span>
             </div>
             <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
-              Injects high-frequency ({intensity} tx/s) micro-transactions below the â‚¬10,000 reporting threshold to test autonomous LSH-PSI intersection.
+              Injects high-frequency ({intensity} tx/s) micro-transactions below the €10,000 reporting threshold to test autonomous LSH-PSI intersection.
             </p>
 
             {/* Defense Specification */}
             <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
               <span className="text-[10px] text-[var(--color-text-muted)] font-semibold shrink-0">Defense:</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-600 border border-amber-500/40 font-bold whitespace-nowrap">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 border border-amber-500/40 font-bold whitespace-nowrap">
                 LSH-PSI + GRAPHSAGE
               </span>
             </div>
@@ -254,7 +254,7 @@ export default function ChaosAttackInjectorPanel({
             id="inject-smurfing-attack-btn"
             disabled={injectAttackMutation.isPending}
             onClick={handleLaunchSmurfing}
-            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-slate-900 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
+            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
             {injectAttackMutation.isPending ? (
               <>
@@ -274,23 +274,23 @@ export default function ChaosAttackInjectorPanel({
         <div className="p-3.5 rounded-xl bg-[var(--color-bg-primary)]/80 border border-[var(--color-border)] flex flex-col justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-1.5">
-              <span className="text-xs font-bold text-rose-600 flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5 min-w-0">
                 <ShieldAlert size={14} className="shrink-0" />
                 <span className="truncate">Byzantine Gradient Poisoning</span>
               </span>
-              <span className="text-[10px] font-mono text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+              <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 border border-rose-300 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
                 Adversary: Bank Gamma
               </span>
             </div>
             <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
-              Bank Gamma uploads malicious sign-flipped gradient weights (Î”w Ã— -10.0). Krum evaluates Euclidean distances and drops the rogue update.
+              Bank Gamma uploads malicious sign-flipped gradient weights (Δw × -10.0). Krum evaluates Euclidean distances and drops the rogue update.
             </p>
 
             {/* Defense Selector */}
             <div className="mt-2.5 space-y-1.5">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-[var(--color-text-muted)] font-semibold">Defense Strategy:</span>
-                <span className="font-mono text-rose-600 font-bold uppercase">{selectedDefense}</span>
+                <span className="font-mono text-rose-400 font-bold uppercase">{selectedDefense}</span>
               </div>
               <div className="grid grid-cols-4 gap-1 w-full">
                 {(['krum', 'trimmed_mean', 'bulyan', 'spectral'] as const).map((def) => (
@@ -300,8 +300,8 @@ export default function ChaosAttackInjectorPanel({
                     onClick={() => setSelectedDefense(def)}
                     className={`text-[9px] sm:text-[10px] font-mono py-1 px-1 rounded-lg text-center transition-all cursor-pointer truncate ${
                       selectedDefense === def
-                        ? 'bg-rose-100 text-rose-600 border border-rose-300 font-bold shadow-sm'
-                        : 'text-[var(--color-text-muted)] bg-slate-50 hover:bg-slate-100 border border-transparent'
+                        ? 'bg-rose-500/20 text-rose-700 border border-rose-300 font-bold shadow-sm'
+                        : 'text-[var(--color-text-muted)] bg-slate-50 hover:bg-slate-50 border border-transparent'
                     }`}
                     title={def.toUpperCase()}
                   >
@@ -323,7 +323,7 @@ export default function ChaosAttackInjectorPanel({
             id="inject-byzantine-attack-btn"
             disabled={injectAttackMutation.isPending}
             onClick={handleLaunchByzantine}
-            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-slate-900 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
+            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
             {injectAttackMutation.isPending ? (
               <>
@@ -348,71 +348,71 @@ export default function ChaosAttackInjectorPanel({
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {/* Defense Shield Activated */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
+            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-                <Lock size={11} className="text-emerald-600" /> Defense Shield
+                <Lock size={11} className="text-emerald-400" /> Defense Shield
               </span>
-              <p className="text-xs font-bold text-emerald-600 mt-1 truncate">
+              <p className="text-xs font-bold text-emerald-400 mt-1 truncate">
                 {activeAttack.defense_activated}
               </p>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-slate-400 font-mono">
                 Latency: {activeAttack.mitigation_latency_ms.toFixed(1)}ms
               </span>
             </div>
 
             {/* Status / Quarantine */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
+            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-                <Cpu size={11} className="text-rose-600" /> Action Taken
+                <Cpu size={11} className="text-rose-400" /> Action Taken
               </span>
               <p
                 id="active-quarantine-status"
-                className="text-xs font-bold text-rose-600 mt-1 uppercase"
+                className="text-xs font-bold text-rose-400 mt-1 uppercase"
               >
                 {activeAttack.status === 'quarantined'
                   ? `Quarantined: ${activeAttack.adversary_quarantined}`
                   : `Intercepted: ${activeAttack.packets_blocked} txs`}
               </p>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-slate-400 font-mono">
                 {activeAttack.status === 'quarantined' ? 'Byzantine Dropped' : 'LSH Pool Isolated'}
               </span>
             </div>
 
             {/* Anomaly Metric */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200">
+            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200">
               <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-                <TrendingDown size={11} className="text-amber-600" /> Outlier Score
+                <TrendingDown size={11} className="text-amber-400" /> Outlier Score
               </span>
-              <p className="text-xs font-bold font-mono text-amber-600 mt-1">
+              <p className="text-xs font-bold font-mono text-amber-400 mt-1">
                 {activeAttack.euclidean_distance > 0
-                  ? `Î” ${activeAttack.euclidean_distance.toFixed(1)} (Cutoff: ${activeAttack.distance_threshold.toFixed(1)})`
+                  ? `Δ ${activeAttack.euclidean_distance.toFixed(1)} (Cutoff: ${activeAttack.distance_threshold.toFixed(1)})`
                   : `${activeAttack.packets_blocked} Blocked`}
               </p>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-slate-400 font-mono">
                 {activeAttack.euclidean_distance > activeAttack.distance_threshold ? 'Threshold Exceeded' : 'Filtered'}
               </span>
             </div>
 
             {/* Model AUC Protection */}
-            <div className="p-2.5 rounded-xl bg-black/30 border border-slate-200 flex flex-col justify-between">
+            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-                    <ShieldAlert size={11} className="text-indigo-600" /> Model Accuracy
+                    <ShieldAlert size={11} className="text-indigo-400" /> Model Accuracy
                   </span>
-                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-600 border border-indigo-200 font-semibold">
+                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-700 border border-indigo-500/30 font-semibold">
                     Simulated
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs font-bold font-mono text-emerald-600">
+                  <span className="text-xs font-bold font-mono text-emerald-400">
                     {activeAttack.auc_protected.toFixed(4)}
                   </span>
-                  <span className="text-[10px] font-mono text-rose-600 line-through">
+                  <span className="text-[10px] font-mono text-rose-400 line-through">
                     {activeAttack.auc_compromised_baseline.toFixed(4)}
                   </span>
                 </div>
-                <span className="text-[10px] text-emerald-600 font-semibold block">
+                <span className="text-[10px] text-emerald-400 font-semibold block">
                   +{(activeAttack.auc_protected - activeAttack.auc_compromised_baseline).toFixed(2)} AUC Preserved
                 </span>
               </div>
@@ -423,14 +423,14 @@ export default function ChaosAttackInjectorPanel({
           </div>
 
           {/* Audit Log ticker */}
-          <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-slate-200 text-[11px] font-mono text-slate-600 flex items-center gap-2">
-            <span className="text-rose-600 font-bold shrink-0">AUDIT:</span>
+          <div className="mt-2.5 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-600 flex items-center gap-2">
+            <span className="text-rose-400 font-bold shrink-0">AUDIT:</span>
             <span className="truncate">{activeAttack.log_entry}</span>
           </div>
 
           {/* Simulation Disclaimer Banner */}
-          <div className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-50/20 border border-indigo-200 text-[10px] text-indigo-600/80 flex items-center gap-2">
-            <span className="font-bold text-indigo-600 shrink-0 uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 border border-indigo-200">
+          <div className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-500/20 text-[10px] text-indigo-700/80 flex items-center gap-2">
+            <span className="font-bold text-indigo-400 shrink-0 uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30">
               Demo Notice
             </span>
             <span>
@@ -456,7 +456,3 @@ export default function ChaosAttackInjectorPanel({
     </div>
   );
 }
-
-
-
-

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -157,7 +157,7 @@ export default function LiveOperationsView() {
     setTimeout(() => setIsRetryingWs(false), 1000);
   };
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Dataset-aware training state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Dataset-aware training state ──────────────────────────────────────────
   const initialProfile = (storedSession?.selectedProfileKey && DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES])
     ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
     : DATASET_PROFILES.paysim;
@@ -169,7 +169,7 @@ export default function LiveOperationsView() {
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
   const createSimulation = useCreateSimulation();
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Real Backend Query Hooks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Real Backend Query Hooks ───────────────────────────────────────────────
   const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
   const { data: simulations } = useSimulations();
   const activeSimId = id || simulations?.[0]?.id;
@@ -184,7 +184,7 @@ export default function LiveOperationsView() {
   const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
   const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Unified Round Telemetry Pipeline (Single Source of Truth for Top & Bottom) Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Unified Round Telemetry Pipeline (Single Source of Truth for Top & Bottom) ──
   const convertTrainingRoundToRoundData = useCallback((r: TrainingRound, fallbackAuc: number): RoundData => {
     const roundNum = r.round_number;
     const globalAuc = typeof r.auc === 'number' && r.auc > 0 ? r.auc : fallbackAuc;
@@ -272,7 +272,7 @@ export default function LiveOperationsView() {
         // Smooth ROC curve with 11 operating points
         const pts = [0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.8, 1.0];
         // Power-law: area under y = x^(1/k) on [0,1] is k/(k+1).
-        // Setting AUC = k/(k+1) Ã¢â€ â€™ k = AUC/(1-AUC).
+        // Setting AUC = k/(k+1) → k = AUC/(1-AUC).
         const k = Math.max(1, auc / Math.max(1 - auc, 1e-9));
         const tprs = pts.map((fpr) => {
           if (fpr === 0) return 0;
@@ -294,8 +294,8 @@ export default function LiveOperationsView() {
         ? Math.max(0, lastBankAuc / meanBankAuc)
         : null;
 
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Derive confusion matrix from AUC + fraud ratio Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-      // At optimal threshold (Youden index), sensitivity Ã¢â€°Ë† TPR at FPR Ã¢â€°Ë† 1-AUCÃ‚Â²
+      // ── Derive confusion matrix from AUC + fraud ratio ──────────────────────
+      // At optimal threshold (Youden index), sensitivity ≈ TPR at FPR ≈ 1-AUC²
       const deriveConfusionMatrix = (auc: number, fraudRat: number, nTx: number) => {
         const positives = Math.round(nTx * fraudRat);
         const negatives = nTx - positives;
@@ -309,7 +309,7 @@ export default function LiveOperationsView() {
         return { tp, fp, tn, fn };
       };
 
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Derive feature importance from dataset profile Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+      // ── Derive feature importance from dataset profile ──────────────────────
       const FRAUD_FEATURES: Record<string, string[]> = {
         paysim: ['amount', 'oldbalanceOrg', 'newbalanceOrig', 'oldbalanceDest', 'newbalanceDest', 'step', 'type_TRANSFER', 'type_CASH_OUT', 'isFlaggedFraud', 'balanceDiffOrg', 'balanceDiffDest'],
         ieee_cis: ['TransactionAmt', 'card1', 'card2', 'addr1', 'dist1', 'P_emaildomain', 'C1', 'C2', 'D1', 'D15', 'V258', 'V201', 'V294', 'id_02', 'DeviceType'],
@@ -321,10 +321,10 @@ export default function LiveOperationsView() {
       const buildFeatureImportance = (bankIdx: number, baseAuc: number): Record<string, number> => {
         const fi: Record<string, number> = {};
         featureNames.forEach((name, i) => {
-          // Exponential decay with per-bank offset Ã¢â€ â€™ top features dominate
+          // Exponential decay with per-bank offset → top features dominate
           const base = Math.exp(-0.25 * i) * 0.95;
           const bankOffset = ((bankIdx * 7 + i * 13) % 17) / 170; // deterministic pseudo-noise
-          const aucScale = 0.6 + 0.4 * baseAuc; // better model Ã¢â€ â€™ sharper importance
+          const aucScale = 0.6 + 0.4 * baseAuc; // better model → sharper importance
           fi[name] = parseFloat(Math.min(1, Math.max(0.01, base * aucScale + bankOffset)).toFixed(3));
         });
         return fi;
@@ -580,7 +580,7 @@ export default function LiveOperationsView() {
           return {
             ...b,
             status: 'QUARANTINED',
-            lastHeartbeat: 'DROPPED BY KRUM (Ãâ€ 48.2 > 14.1)',
+            lastHeartbeat: 'DROPPED BY KRUM (Δ 48.2 > 14.1)',
           };
         }
         return {
@@ -908,7 +908,7 @@ export default function LiveOperationsView() {
     return () => clearInterval(interval);
   }, []);
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Dataset-aware simulated federated training run Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Dataset-aware simulated federated training run ────────────────────────
   const startSimulatedTraining = (profile: DatasetProfile = selectedProfile) => {
     if (isTraining) return;
     setIsTraining(true);
@@ -916,7 +916,7 @@ export default function LiveOperationsView() {
     setCurrentRound(0);
     setGradientSubmissions(0);
 
-    // Phase sequence: generating_data Ã¢â€ â€™ training_local Ã¢â€ â€™ training_federated (Ãƒâ€”rounds) Ã¢â€ â€™ evaluating Ã¢â€ â€™ completed
+    // Phase sequence: generating_data → training_local → training_federated (×rounds) → evaluating → completed
     const runPhase = (phase: TrainingPhase, duration: number, next: () => void) => {
       setTrainingPhase(phase);
       phaseTimerRef.current = setTimeout(next, duration);
@@ -972,7 +972,7 @@ export default function LiveOperationsView() {
     });
   };
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Config panel launch handler Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Config panel launch handler ────────────────────────────────────────────
   const isLaunchingRef = useRef(false);
   const handleLaunchTraining = async (profile: DatasetProfile, mode: TrainingMode) => {
     if (isLaunchingRef.current || createSimulation.isPending) {
@@ -1032,12 +1032,12 @@ export default function LiveOperationsView() {
   };
 
   // NOTE: phaseTimerRef is intentionally NOT cleared on unmount.
-  // React 18 StrictMode double-mounts (mount Ã¢â€ â€™ unmount Ã¢â€ â€™ remount) but preserves refs/state.
+  // React 18 StrictMode double-mounts (mount → unmount → remount) but preserves refs/state.
   // If the timer is cleared during the "fake" unmount, the setTimeout chain that drives
   // simulation stages die permanently - hasAutoStartedRef blocks restart, leaving training
   // stuck at "generating_data". Timer cleanup is handled explicitly by:
-  //   Ã¢â‚¬Â¢ resetTraining() - user-initiated reset
-  //   Ã¢â‚¬Â¢ ID-change effect - sim switch clears old timers before starting new ones
+  //   • resetTraining() - user-initiated reset
+  //   • ID-change effect - sim switch clears old timers before starting new ones
   // In real (non-StrictMode) unmounts, stale timer callbacks become no-ops in React 18.
 
   // When the sim ID changes (user navigated to a different simulation), fully reset local state
@@ -1113,7 +1113,7 @@ export default function LiveOperationsView() {
           {/* Title & Live Status */}
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-slate-50 border border-slate-200 shadow-xs">
-              ÄŸÅ¸â€œÂ¡
+              📡
             </span>
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
               <h1 className="text-lg sm:text-2xl font-extrabold text-[var(--color-text-primary)] tracking-tight whitespace-nowrap">
@@ -1122,10 +1122,10 @@ export default function LiveOperationsView() {
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                   wsStatus === 'CONNECTED' && !isOfflineDemoMode
-                    ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                     : wsStatus === 'RECONNECTING'
-                    ? 'bg-amber-100 text-amber-600 border border-amber-200'
-                    : 'bg-slate-100 text-slate-500 border border-slate-500/30'
+                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
                 }`}
               >
                 <span
@@ -1142,9 +1142,9 @@ export default function LiveOperationsView() {
               {isOfflineDemoMode && (
                 <span
                   id="offline-demo-mode-badge"
-                  className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-100 text-amber-600 border border-amber-500/40 shadow-sm animate-pulse"
+                  className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-700 border border-amber-500/40 shadow-sm animate-pulse"
                 >
-                  <AlertTriangle size={12} className="text-amber-600 shrink-0" />
+                  <AlertTriangle size={12} className="text-amber-400 shrink-0" />
                   <span>Offline Demo Mode (Connection Lost - Simulated)</span>
                 </span>
               )}
@@ -1170,9 +1170,9 @@ export default function LiveOperationsView() {
                 <button
                   id="import-custom-dataset-btn"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-600 hover:text-slate-900 bg-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-700 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
                 >
-                  <FileUp size={14} className="text-indigo-600" />
+                  <FileUp size={14} className="text-indigo-400" />
                   <span>Import Dataset</span>
                 </button>
                 {/* Configure Dataset button */}
@@ -1191,7 +1191,7 @@ export default function LiveOperationsView() {
                   whileTap={{ scale: 0.96 }}
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                     boxShadow: `0 4px 16px ${selectedProfile.color}35`,
@@ -1205,22 +1205,22 @@ export default function LiveOperationsView() {
               <button
                 id="reset-simulation-btn"
                 onClick={resetTraining}
-                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
+                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
                   trainingPhase === 'failed'
                     ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-90'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'
                 }`}
               >
-                ÄŸÅ¸â€â€ {trainingPhase === 'failed' ? 'Reset Failed Run' : 'Reset Simulation'}
+                🔄 {trainingPhase === 'failed' ? 'Reset Failed Run' : 'Reset Simulation'}
               </button>
             ) : (
               <div
                 className="h-10 inline-flex items-center gap-2 px-3.5 sm:px-4 rounded-xl border shrink-0"
                 style={{ borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}10` }}
               >
-                <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>Ã¢â€”Â</span>
+                <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>●</span>
                 <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">
-                  {trainingMode === 'real' ? 'Ã¢Å¡Â¡ Real TrainingÃ¢â‚¬Â¦' : 'ÄŸÅ¸Â§Âª SimulatingÃ¢â‚¬Â¦'}
+                  {trainingMode === 'real' ? '⚡ Real Training…' : '🧪 Simulating…'}
                 </span>
               </div>
             )}
@@ -1244,18 +1244,18 @@ export default function LiveOperationsView() {
             {/* Training Mode Tag */}
             <span
               className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${trainingMode === 'mock'
-                  ? 'text-indigo-600 border-indigo-500/40 bg-indigo-50'
-                  : 'text-amber-600 border-amber-500/40 bg-amber-50'
+                  ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
+                  : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
                 }`}
             >
               {trainingMode === 'mock' ? (
                 <>
-                  <FlaskConical size={11} className="text-indigo-600" />
+                  <FlaskConical size={11} className="text-indigo-400" />
                   <span>Simulated Sandbox (Demo Mode)</span>
                 </>
               ) : (
                 <>
-                  <Zap size={11} className="text-amber-600" />
+                  <Zap size={11} className="text-amber-400" />
                   <span>Live Backend Orchestration</span>
                 </>
               )}
@@ -1275,9 +1275,9 @@ export default function LiveOperationsView() {
 
       {/* Offline Fallback Banner */}
       {isOfflineDemoMode && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-xs font-medium shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs font-medium shadow-sm">
           <div className="flex items-center gap-2.5 min-w-0">
-            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
             <span className="leading-relaxed">
               <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker - this data is illustrative and not live production telemetry.
             </span>
@@ -1286,7 +1286,7 @@ export default function LiveOperationsView() {
             type="button"
             id="retry-live-stream-btn"
             onClick={handleRetryLiveStream}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-100 text-amber-700 border border-amber-500/40 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all active:scale-95 shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 border border-amber-500/40 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all active:scale-95 shrink-0"
           >
             <RefreshCw size={13} className={isRetryingWs ? 'animate-spin' : ''} />
             <span>Retry Live Stream</span>
@@ -1299,12 +1299,12 @@ export default function LiveOperationsView() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-600 flex items-start gap-3 shadow-sm"
+          className="p-4 rounded-xl border border-rose-300 bg-rose-500/10 text-rose-700 flex items-start gap-3 shadow-sm"
         >
-          <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-rose-700">Federated Training Failed</h4>
-            <p className="text-xs text-rose-600/90 mt-0.5 break-words">
+            <p className="text-xs text-rose-700/90 mt-0.5 break-words">
               {currentSim?.error_message || 'An error occurred during federated training. Inspect telemetry or reset the simulation.'}
             </p>
           </div>
@@ -1318,7 +1318,7 @@ export default function LiveOperationsView() {
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
             {bankNodes.filter((b) => b.status === 'ACTIVE').length} / {bankNodes.length}
           </p>
-          <p className="text-xs text-emerald-600 mt-1">100% Quorum Reached</p>
+          <p className="text-xs text-emerald-400 mt-1">100% Quorum Reached</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
@@ -1334,7 +1334,7 @@ export default function LiveOperationsView() {
         {/* Dataset-specific KPI: Fraud Rate */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Dataset Fraud Rate</p>
-          <p className="text-2xl font-bold font-mono text-rose-600 mt-1">
+          <p className="text-2xl font-bold font-mono text-rose-400 mt-1">
             {selectedProfile.fraudRatio < 0.001
               ? `${(selectedProfile.fraudRatio * 100).toFixed(3)}%`
               : `${(selectedProfile.fraudRatio * 100).toFixed(2)}%`}
@@ -1346,7 +1346,7 @@ export default function LiveOperationsView() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">DP Epsilon Consumed</p>
-          <p className="text-2xl font-bold font-mono text-amber-600 mt-1">2.10 / 8.00</p>
+          <p className="text-2xl font-bold font-mono text-amber-400 mt-1">2.10 / 8.00</p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">73.7% Privacy Budget Left</p>
         </motion.div>
       </div>
@@ -1377,19 +1377,19 @@ export default function LiveOperationsView() {
 
           {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
-              <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600">
-                <span className="text-3xl">ÄŸÅ¸â€œÅ </span>
+              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                <span className="text-3xl">📊</span>
               </div>
               <div className="max-w-xs space-y-1">
                 <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                   {trainingPhase === 'pending'
                     ? 'No Telemetry Rounds Recorded'
-                    : 'Initializing Training PipelineÃ¢â‚¬Â¦'}
+                    : 'Initializing Training Pipeline…'}
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {trainingPhase === 'pending'
                     ? 'Launch federated training to stream per-round model convergence and cross-bank AUC progression.'
-                    : 'Synthesizing edge shards and dispatching local gradient tasksÃ¢â‚¬Â¦'}
+                    : 'Synthesizing edge shards and dispatching local gradient tasks…'}
                 </p>
               </div>
               {trainingPhase === 'pending' && (
@@ -1397,7 +1397,7 @@ export default function LiveOperationsView() {
                   type="button"
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FlaskConical size={14} />
                   <span>Start Training Run ({selectedProfile.label})</span>
@@ -1449,7 +1449,7 @@ export default function LiveOperationsView() {
           </div>
           {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-6 sm:py-0">
-              <p className="text-sm text-[var(--color-text-muted)]">Awaiting training startÃ¢â‚¬Â¦</p>
+              <p className="text-sm text-[var(--color-text-muted)]">Awaiting training start…</p>
             </div>
           ) : (
             <div className="h-48 min-w-0">
@@ -1479,7 +1479,7 @@ export default function LiveOperationsView() {
               <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/hour)</p>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               LIVE AGGREGATION
             </span>
           </div>
@@ -1529,24 +1529,24 @@ export default function LiveOperationsView() {
               <div
                 key={bank.id}
                 className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 min-w-0 ${bank.status === 'QUARANTINED'
-                    ? 'border-rose-300 bg-rose-50 shadow-rose-100 ring-1 ring-rose-300'
-                    : 'border-[var(--color-border)] bg-white/40'
+                    ? 'border-rose-300 bg-rose-50 shadow-[0_0_25px_rgba(244,63,94,0.3)] ring-1 ring-rose-500/40'
+                    : 'border-[var(--color-border)] bg-slate-50'
                   }`}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{bank.name}</p>
-                    <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} Ã¢â‚¬Â¢ Last seen {bank.lastHeartbeat}</p>
+                    <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
                   </div>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${bank.status === 'ACTIVE'
-                        ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : bank.status === 'QUARANTINED'
-                          ? 'bg-rose-100 text-rose-600 border border-rose-300 animate-pulse'
-                          : 'bg-rose-100 text-rose-600 border border-rose-200'
+                          ? 'bg-rose-500/30 text-rose-700 border border-rose-300 animate-pulse'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-300'
                       }`}
                   >
-                    Ã¢â€”Â {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
+                    ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
                   </span>
                 </div>
                 {bankAuc != null && !isNaN(bankAuc) && (
@@ -1571,8 +1571,8 @@ export default function LiveOperationsView() {
       <div className="glass-card p-3.5 sm:p-5 md:p-6 space-y-6 min-w-0 border border-slate-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs tracking-wider uppercase mb-1">
-              <span className="p-1 rounded-lg bg-indigo-50 border border-indigo-200">ÄŸÅ¸â€Â¬</span>
+            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
+              <span className="p-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">🔬</span>
               Model Telemetry & Empirical Validation
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
@@ -1596,7 +1596,7 @@ export default function LiveOperationsView() {
                   aria-label="Select consortium bank for discrimination analytics"
                   value={selectedBankId || effectiveBanks[0]?.id}
                   onChange={(e) => setSelectedBankId(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-400"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400"
                 >
                   {effectiveBanks.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -1611,8 +1611,8 @@ export default function LiveOperationsView() {
                 type="button"
                 onClick={() => setRocModelType('federated')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'federated'
-                    ? 'bg-indigo-600 text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-700'
                   }`}
               >
                 Federated
@@ -1621,8 +1621,8 @@ export default function LiveOperationsView() {
                 type="button"
                 onClick={() => setRocModelType('local')}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'local'
-                    ? 'bg-indigo-600 text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-700'
                   }`}
               >
                 Local Baselines
@@ -1658,7 +1658,7 @@ export default function LiveOperationsView() {
           </div>
         ) : (
           <div className="p-8 text-center border border-dashed border-slate-200 rounded-xl">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               Launch a federated training run or select an existing simulation to view real-time model verification metrics.
             </p>
           </div>
@@ -1671,47 +1671,47 @@ export default function LiveOperationsView() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-5 shadow-sm"
+          className="mt-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-50 via-slate-50 to-cyan-50 p-5 shadow-[0_0_40px_rgba(16,185,129,0.08)]"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono font-bold text-emerald-600 uppercase tracking-widest">
+              <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-widest">
                 Asset Recovery &amp; FININT Operational Hub
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-              LIVE Ã‚Â· {arSummary.total_events} events
+            <span className="text-[10px] font-mono text-slate-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+              LIVE · {arSummary.total_events} events
             </span>
           </div>
 
           {/* KPI Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Frozen</p>
-              <p className="text-xl font-bold text-emerald-600 font-mono">Ã¢â€šÂ¬{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Frozen</p>
+              <p className="text-xl font-bold text-emerald-700 font-mono">€{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">via camt.056 recalls</p>
             </div>
-            <div className="rounded-xl bg-cyan-50 border border-cyan-200 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-500 mb-1">EUR Recovered</p>
-              <p className="text-xl font-bold text-cyan-600 font-mono">Ã¢â€šÂ¬{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
+            <div className="rounded-xl bg-cyan-50 border border-cyan-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Recovered</p>
+              <p className="text-xl font-bold text-cyan-700 font-mono">€{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">successful recalls</p>
             </div>
-            <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-500 mb-1">MTTR Reduction</p>
-              <p className="text-xl font-bold text-indigo-600 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
+            <div className="rounded-xl bg-indigo-50 border border-indigo-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">MTTR Reduction</p>
+              <p className="text-xl font-bold text-indigo-700 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">vs. 48h baseline</p>
             </div>
-            <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
-              <p className="text-[10px] font-mono text-slate-500 mb-1">Containment Rate</p>
-              <p className="text-xl font-bold text-purple-600 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
+            <div className="rounded-xl bg-purple-50 border border-purple-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">Containment Rate</p>
+              <p className="text-xl font-bold text-purple-700 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">&lt;60min freezes</p>
             </div>
           </div>
 
           {/* Sub-metrics bar */}
-          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-400">
             <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
             <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
             <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
@@ -1765,8 +1765,3 @@ export default function LiveOperationsView() {
     </div>
   );
 }
-
-
-
-
-
