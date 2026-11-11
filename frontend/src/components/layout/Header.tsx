@@ -133,7 +133,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-md flex items-center px-4 md:px-6 sticky top-0 z-40">
+      <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]/95 backdrop-blur-md flex items-center px-4 md:px-6 sticky top-0 z-40 shadow-sm">
         {/* Menu toggle button on mobile */}
         <button
           onClick={onMenuClick}
@@ -146,7 +146,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </button>
 
         <div className="flex-1 min-w-0 flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-slate-100 truncate">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
             Collaborative Fraud Intelligence Platform
           </h2>
 
@@ -212,7 +212,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   setLoginError(null);
                   setIsLoginModalOpen(true);
                 }}
-                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-white hover:bg-slate-50 text-[var(--color-text-secondary)] border border-[var(--color-border)] transition-colors"
               >
                 Switch Principal
               </button>
@@ -220,7 +220,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 type="button"
                 data-testid="institutional-sign-out-btn"
                 onClick={handleSignOut}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
+                className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 title="Sign out of institutional session"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -234,7 +234,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 setLoginError(null);
                 setIsLoginModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 transition-colors"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Institutional Sign In</span>
@@ -257,20 +257,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
       {isLoginModalOpen && (
         <div
           data-testid="institutional-login-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         >
-          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-[var(--color-border)] bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-bold text-slate-100">Institutional Session Authentication</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h3 className="text-base font-bold text-[var(--color-text-primary)]">Institutional Session Authentication</h3>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
                   Authenticate with your sovereign institutional credentials to bind tenant context.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsLoginModalOpen(false)}
-                className="text-slate-400 hover:text-slate-200 text-sm"
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-sm"
               >
                 ✕
               </button>
@@ -279,7 +279,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             {loginError && (
               <div
                 data-testid="institutional-login-error"
-                className="mb-4 rounded-lg border border-red-500/40 bg-red-950/40 p-3 text-xs text-red-300"
+                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600"
               >
                 {loginError}
               </div>
@@ -289,7 +289,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <div>
                 <label
                   htmlFor="institutional-username-input"
-                  className="block text-xs font-medium text-slate-300 mb-1"
+                  className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
                 >
                   Principal Username
                 </label>
@@ -301,7 +301,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g., analyst_bank_a"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 font-mono focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:border-indigo-500 focus:outline-none"
                   required
                 />
               </div>
@@ -309,7 +309,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <div>
                 <label
                   htmlFor="institutional-password-input"
-                  className="block text-xs font-medium text-slate-300 mb-1"
+                  className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
                 >
                   Institutional Password
                 </label>
@@ -321,7 +321,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter institutional credential"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 font-mono focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:border-indigo-500 focus:outline-none"
                   required
                 />
               </div>
@@ -331,7 +331,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   type="button"
                   data-testid="btn-cancel-institutional-login"
                   onClick={() => setIsLoginModalOpen(false)}
-                  className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700"
+                  className="rounded-lg border border-[var(--color-border)] bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-card-hover)]"
                 >
                   Cancel
                 </button>

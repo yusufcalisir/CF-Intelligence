@@ -8,13 +8,13 @@ export default {
     extend: {
       colors: {
         brand: {
-          dark: '#0B0F19',
-          card: '#131B2E',
-          accent: '#00F2FE',
-          purple: '#7928CA',
-          danger: '#FF0080',
-          warning: '#F59E0B',
-          success: '#10B981',
+          bg: '#f8fafc',
+          card: '#ffffff',
+          accent: '#4f46e5',
+          purple: '#7c3aed',
+          danger: '#dc2626',
+          warning: '#d97706',
+          success: '#059669',
         }
       },
       fontFamily: {
