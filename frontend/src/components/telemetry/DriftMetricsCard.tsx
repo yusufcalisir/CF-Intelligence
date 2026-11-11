@@ -296,7 +296,7 @@ export default function DriftMetricsCard({
                 <th className="py-2.5 px-3">Drift Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-slate-600">
+            <tbody className="divide-y divide-slate-200 font-mono text-slate-600">
               {data?.feature_drifts && data.feature_drifts.length > 0 ? (
                 data.feature_drifts.map((feat) => {
                   const isSelected = selectedFeatures.includes(feat.feature_name);

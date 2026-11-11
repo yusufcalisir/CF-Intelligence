@@ -776,7 +776,7 @@ export default function ApiDocsPage() {
             href={redocUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-700 text-slate-700 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
           >
             <span>ReDoc</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -785,7 +785,7 @@ export default function ApiDocsPage() {
             href={docsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-700 text-slate-700 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-all whitespace-nowrap"
           >
             <span>Swagger UI</span>
             <ExternalLink className="w-3.5 h-3.5" />

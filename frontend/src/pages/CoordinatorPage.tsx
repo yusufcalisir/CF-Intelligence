@@ -428,7 +428,7 @@ export default function CoordinatorPage() {
                 <th className="py-3.5 px-4 text-right">Negotiate</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
+            <tbody className="divide-y divide-slate-200 font-mono">
               {displayClients.map((client) => {
                 const isSelected = selectedBankId === client.bank_id;
                 const isCuda = client.hardware_type === 'cuda';
@@ -497,7 +497,7 @@ export default function CoordinatorPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border cursor-pointer ${
                           isSelected
                             ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                            : 'bg-slate-100 hover:bg-slate-700 text-slate-600 border-slate-200'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
                         }`}
                       >
                         {isSelected ? 'Selected' : 'Select'}

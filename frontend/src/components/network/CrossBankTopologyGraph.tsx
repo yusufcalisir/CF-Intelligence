@@ -154,26 +154,28 @@ export default function CrossBankTopologyGraph({
     return SCENARIO_PREVIEWS[selectedScenario] ?? DEFAULT_PREVIEW;
   }, [selectedScenario]);
 
-  // Topology node layout coordinates inside SVG coordinate space (960 x 520)
-  // Symmetrical 3-Pod layout:
+  // Topology node layout coordinates inside SVG coordinate space (960 x 580)
+  // Top corridor lane:    y: 10..52   (SWIFT / FX Corridor clears all Pod headers)
+  // Symmetrical 3-Pod layout: y: 60..468
   // Pod Alpha: x: 25..305 (Center X = 165)
   // Pod Beta:  x: 340..620 (Center X = 480)
   // Pod Gamma: x: 655..935 (Center X = 795)
+  // Bottom corridor lane: y: 476..568 (Cycle closure & multi-hop return paths)
   const nodes: TopologyNode[] = useMemo(() => [
     // Bank Alpha Cluster (Retail - Left Pod)
-    { id: 'a_hub', name: 'Alpha Core Gateway', bankId: 'bank_a', type: 'retail', x: 165, y: 130, role: 'Consortium Clearing Hub', volume: '$1.4M / 24h' },
-    { id: 'a_mule1', name: 'Retail Mule A1', bankId: 'bank_a', type: 'mule', x: 110, y: 270, role: 'Origin Account', volume: '$42,500' },
-    { id: 'a_mule2', name: 'Structuring Acc A2', bankId: 'bank_a', type: 'mule', x: 225, y: 390, role: 'Pooling Account', volume: '$89,200' },
+    { id: 'a_hub', name: 'Alpha Core Gateway', bankId: 'bank_a', type: 'retail', x: 165, y: 160, role: 'Consortium Clearing Hub', volume: '$1.4M / 24h' },
+    { id: 'a_mule1', name: 'Retail Mule A1', bankId: 'bank_a', type: 'mule', x: 110, y: 278, role: 'Origin Account', volume: '$42,500' },
+    { id: 'a_mule2', name: 'Structuring Acc A2', bankId: 'bank_a', type: 'mule', x: 225, y: 392, role: 'Pooling Account', volume: '$89,200' },
 
     // Bank Beta Cluster (Commercial B2B - Center Pod)
-    { id: 'b_hub', name: 'Beta Clearing Node', bankId: 'bank_b', type: 'commercial', x: 480, y: 130, role: 'Commercial Clearing Hub', volume: '$4.8M / 24h' },
-    { id: 'b_layer', name: 'Corporate Mule B1', bankId: 'bank_b', type: 'mule', x: 425, y: 270, role: 'Layering Account', volume: '$126,000' },
-    { id: 'b_pool', name: 'B2B Liquidity B2', bankId: 'bank_b', type: 'commercial', x: 540, y: 390, role: 'Escrow Account', volume: '$310,000' },
+    { id: 'b_hub', name: 'Beta Clearing Node', bankId: 'bank_b', type: 'commercial', x: 480, y: 160, role: 'Commercial Clearing Hub', volume: '$4.8M / 24h' },
+    { id: 'b_layer', name: 'Corporate Mule B1', bankId: 'bank_b', type: 'mule', x: 425, y: 278, role: 'Layering Account', volume: '$126,000' },
+    { id: 'b_pool', name: 'B2B Liquidity B2', bankId: 'bank_b', type: 'commercial', x: 540, y: 392, role: 'Escrow Account', volume: '$310,000' },
 
     // Bank Gamma Cluster (Cross-Border FX - Right Pod)
-    { id: 'c_hub', name: 'Gamma Cross-Border', bankId: 'bank_c', type: 'cross_border', x: 795, y: 130, role: 'Correspondent FX Gateway', volume: '$3.2M / 24h' },
-    { id: 'c_wire', name: 'Offshore Mule C1', bankId: 'bank_c', type: 'mule', x: 740, y: 270, role: 'Rapid Outward Wire', volume: '$215,000' },
-    { id: 'c_exit', name: 'Fintech Exit C2', bankId: 'bank_c', type: 'exit', x: 855, y: 390, role: 'Digital Asset Cash-Out', volume: '$450,000' },
+    { id: 'c_hub', name: 'Gamma Cross-Border', bankId: 'bank_c', type: 'cross_border', x: 795, y: 160, role: 'Correspondent FX Gateway', volume: '$3.2M / 24h' },
+    { id: 'c_wire', name: 'Offshore Mule C1', bankId: 'bank_c', type: 'mule', x: 740, y: 278, role: 'Rapid Outward Wire', volume: '$215,000' },
+    { id: 'c_exit', name: 'Fintech Exit C2', bankId: 'bank_c', type: 'exit', x: 855, y: 392, role: 'Digital Asset Cash-Out', volume: '$450,000' },
   ], []);
 
   // Multi-hop edges dynamically adjusted per scenario
@@ -203,9 +205,9 @@ export default function CrossBankTopologyGraph({
         amount: 89000, 
         isLaundering: false, 
         label: 'SWIFT / FX Corridor',
-        customPath: 'M 795 105 Q 480 35 165 105',
+        customPath: 'M 795 160 C 745 -10, 215 -10, 165 160',
         labelX: 480,
-        labelY: 52
+        labelY: 32
       },
     ];
 
@@ -220,7 +222,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_1', 
           isLaundering: true, 
           hopIndex: 0, 
-          label: 'Hop 0: Smurfing ($9,450)' 
+          label: 'Hop 0: Smurfing ($9,450)',
+          labelX: 168,
+          labelY: 348
         },
         { 
           id: 'sc1_2', 
@@ -230,7 +234,10 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_1', 
           isLaundering: true, 
           hopIndex: 1, 
-          label: 'Hop 1: Consolidation ($9,380)' 
+          label: 'Hop 1: Consolidation ($9,380)',
+          customPath: 'M 225 392 Q 305 260 165 160',
+          labelX: 235,
+          labelY: 248
         },
       ];
     } else if (selectedScenario === 'SCENARIO_2') {
@@ -244,7 +251,10 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_2', 
           isLaundering: true, 
           hopIndex: 0, 
-          label: 'Hop 0: Wire A ➔ B ($22k)' 
+          label: 'Hop 0: Wire A ➔ B ($22k)',
+          customPath: 'M 110 278 Q 267 230 425 278',
+          labelX: 267,
+          labelY: 254
         },
         { 
           id: 'sc2_2', 
@@ -254,7 +264,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_2', 
           isLaundering: true, 
           hopIndex: 1, 
-          label: 'Hop 1: Layering inside B ($21.5k)' 
+          label: 'Hop 1: Layering inside B ($21.5k)',
+          labelX: 482,
+          labelY: 348
         },
       ];
     } else if (selectedScenario === 'SCENARIO_3') {
@@ -289,9 +301,9 @@ export default function CrossBankTopologyGraph({
           isLaundering: true, 
           hopIndex: 2, 
           label: 'Hop 2: C ➔ A ($39.8k) [Cycle Closure]',
-          customPath: 'M 740 280 Q 480 475 110 280',
-          labelX: 480,
-          labelY: 440
+          customPath: 'M 740 284 C 750 580, 190 580, 110 284',
+          labelX: 460,
+          labelY: 506
         },
       ];
     } else if (selectedScenario === 'SCENARIO_4') {
@@ -335,7 +347,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_4', 
           isLaundering: true, 
           hopIndex: 2, 
-          label: 'Hop 2: Crypto Cash-Out ($182.5k)' 
+          label: 'Hop 2: Crypto Cash-Out ($182.5k)',
+          labelX: 798,
+          labelY: 348
         },
       ];
     } else if (selectedScenario === 'SCENARIO_5') {
@@ -349,7 +363,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_5', 
           isLaundering: true, 
           hopIndex: 0, 
-          label: 'Hop 0: Retail ➔ B2B Arbitrage ($78k)' 
+          label: 'Hop 0: Retail ➔ B2B Arbitrage ($78k)',
+          labelX: 325,
+          labelY: 350
         },
         { 
           id: 'sc5_2', 
@@ -369,7 +385,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_5', 
           isLaundering: true, 
           hopIndex: 2, 
-          label: 'Hop 2: Offshore Exit ($75.2k)' 
+          label: 'Hop 2: Offshore Exit ($75.2k)',
+          labelX: 798,
+          labelY: 348
         },
       ];
     } else if (selectedScenario === 'SCENARIO_6') {
@@ -403,7 +421,9 @@ export default function CrossBankTopologyGraph({
           scenarioId: 'SCENARIO_6', 
           isLaundering: true, 
           hopIndex: 2, 
-          label: 'Hop 2: Unflagged Cold Exit ($30.4k)' 
+          label: 'Hop 2: Unflagged Cold Exit ($30.4k)',
+          labelX: 798,
+          labelY: 348
         },
       ];
     } else if (selectedScenario === 'SCENARIO_7') {
@@ -418,9 +438,9 @@ export default function CrossBankTopologyGraph({
           isLaundering: true, 
           hopIndex: 0, 
           label: 'Hop 0: Cold-Start Exploit on Gamma ($34k)',
-          customPath: 'M 110 280 Q 480 475 855 390',
-          labelX: 480,
-          labelY: 450
+          customPath: 'M 110 288 C 140 605, 810 605, 855 400',
+          labelX: 478,
+          labelY: 540
         },
         { 
           id: 'sc7_2', 
@@ -431,9 +451,9 @@ export default function CrossBankTopologyGraph({
           isLaundering: true, 
           hopIndex: 0, 
           label: 'Hop 0: Parallel Mule Infiltration ($28.5k)',
-          customPath: 'M 225 390 Q 480 435 740 270',
+          customPath: 'M 225 396 C 280 542, 680 542, 740 284',
           labelX: 480,
-          labelY: 405
+          labelY: 492
         },
       ];
     }
@@ -588,10 +608,10 @@ export default function CrossBankTopologyGraph({
       </AnimatePresence>
 
       {/* Main Unified SVG Network Canvas */}
-      <div className="relative w-full rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-50 overflow-hidden shadow-2xl">
+      <div className="relative w-full rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <svg 
-          viewBox="0 0 960 520" 
-          className="w-full h-auto max-h-[540px] block select-none"
+          viewBox="0 0 960 580" 
+          className="w-full h-auto max-h-[580px] block select-none"
           preserveAspectRatio="xMidYMid meet"
         >
           <defs>
@@ -603,29 +623,29 @@ export default function CrossBankTopologyGraph({
             </linearGradient>
 
             <linearGradient id="benignFlow" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#818cf8" stopOpacity="0.4" />
+              <stop offset="0%" stopColor="#0284c7" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.45" />
             </linearGradient>
 
-            {/* Pod Radial Background Gradients */}
-            <radialGradient id="alphaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#0369a1" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+            {/* Pod Radial Background Gradients (Clean White SaaS Tint) */}
+            <radialGradient id="alphaPodGrad" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stopColor="#0284c7" stopOpacity="0.09" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.96" />
             </radialGradient>
 
-            <radialGradient id="betaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#4338ca" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+            <radialGradient id="betaPodGrad" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.09" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.96" />
             </radialGradient>
 
-            <radialGradient id="gammaPodGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#047857" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+            <radialGradient id="gammaPodGrad" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stopColor="#059669" stopOpacity="0.09" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.96" />
             </radialGradient>
 
             {/* Subtle Cyber Grid Pattern */}
             <pattern id="cyber-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#cbd5e1" strokeWidth="0.5" strokeOpacity="0.5" />
+              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#e2e8f0" strokeWidth="0.6" strokeOpacity="0.7" />
             </pattern>
 
             {/* Markers */}
@@ -641,9 +661,9 @@ export default function CrossBankTopologyGraph({
               <path d="M 0 2 L 8 5 L 0 8 z" fill="#64748b" />
             </marker>
 
-            {/* Glowing Drop-Shadow Filters */}
+            {/* Drop-Shadow Filters */}
             <filter id="glow-fraud" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3.5" result="blur" />
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
@@ -651,87 +671,60 @@ export default function CrossBankTopologyGraph({
             </filter>
 
             <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.18" />
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#0f172a" floodOpacity="0.12" />
             </filter>
           </defs>
 
           {/* Background Cyber Grid */}
-          <rect width="960" height="520" fill="url(#cyber-grid)" />
+          <rect width="960" height="580" fill="url(#cyber-grid)" />
 
           {/* ======================================================== */}
-          {/* Institutional Cluster Zones (SVG Pods - Unified Geometry) */}
+          {/* Institutional Cluster Zone Frames (Rendered Behind Edges) */}
           {/* ======================================================== */}
 
-          {/* --- Pod 1: Bank Alpha (Retail) --- */}
           <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_a' ? 'opacity-30' : 'opacity-100'}`}>
             <rect 
               x="25" 
-              y="35" 
+              y="60" 
               width="280" 
-              height="450" 
+              height="408" 
               rx="18" 
               fill="url(#alphaPodGrad)" 
               stroke="#0284c7" 
               strokeWidth={horizon === 'bank_a' ? "2" : "1.2"} 
               strokeDasharray={horizon === 'bank_a' ? undefined : "6 4"}
-              strokeOpacity={horizon === 'bank_a' ? "0.9" : "0.4"}
+              strokeOpacity={horizon === 'bank_a' ? "0.9" : "0.45"}
             />
-            {/* Header Badge */}
-            <rect x="37" y="47" width="256" height="42" rx="10" fill="#e0f2fe" fillOpacity="1" stroke="#0284c7" strokeWidth="0.8" strokeOpacity="0.3" />
-            <circle cx="56" cy="68" r="10" fill="#0284c7" fillOpacity="0.2" stroke="#38bdf8" strokeWidth="1" />
-            <path d="M 52 72 L 52 66 L 56 63 L 60 66 L 60 72 Z" fill="#38bdf8" />
-            <text x="73" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK ALPHA</text>
-            <text x="73" y="78" fill="#0369a1" fontSize="9" fontWeight="600">RETAIL BANKING POD</text>
-            <rect x="220" y="58" width="62" height="20" rx="5" fill="#bae6fd" fillOpacity="1" stroke="#0284c7" strokeWidth="0.6" />
-            <text x="251" y="72" fill="#075985" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">8.4k ACCTS</text>
           </g>
 
-          {/* --- Pod 2: Bank Beta (Commercial B2B) --- */}
           <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_b' ? 'opacity-30' : 'opacity-100'}`}>
             <rect 
               x="340" 
-              y="35" 
+              y="60" 
               width="280" 
-              height="450" 
+              height="408" 
               rx="18" 
               fill="url(#betaPodGrad)" 
-              stroke="#6366f1" 
+              stroke="#4f46e5" 
               strokeWidth={horizon === 'bank_b' ? "2" : "1.2"} 
               strokeDasharray={horizon === 'bank_b' ? undefined : "6 4"}
-              strokeOpacity={horizon === 'bank_b' ? "0.9" : "0.4"}
+              strokeOpacity={horizon === 'bank_b' ? "0.9" : "0.45"}
             />
-            {/* Header Badge */}
-            <rect x="352" y="47" width="256" height="42" rx="10" fill="#e0e7ff" fillOpacity="1" stroke="#6366f1" strokeWidth="0.8" strokeOpacity="0.3" />
-            <circle cx="371" cy="68" r="10" fill="#4338ca" fillOpacity="0.2" stroke="#818cf8" strokeWidth="1" />
-            <path d="M 367 72 L 367 65 L 375 65 L 375 72 Z" fill="#818cf8" />
-            <text x="388" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK BETA</text>
-            <text x="388" y="78" fill="#4338ca" fontSize="9" fontWeight="600">COMMERCIAL B2B POD</text>
-            <rect x="535" y="58" width="62" height="20" rx="5" fill="#c7d2fe" fillOpacity="1" stroke="#6366f1" strokeWidth="0.6" />
-            <text x="566" y="72" fill="#3730a3" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">4.2k ACCTS</text>
           </g>
 
-          {/* --- Pod 3: Bank Gamma (Cross-Border FX) --- */}
           <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_c' ? 'opacity-30' : 'opacity-100'}`}>
             <rect 
               x="655" 
-              y="35" 
+              y="60" 
               width="280" 
-              height="450" 
+              height="408" 
               rx="18" 
               fill="url(#gammaPodGrad)" 
               stroke="#059669" 
               strokeWidth={horizon === 'bank_c' ? "2" : "1.2"} 
               strokeDasharray={horizon === 'bank_c' ? undefined : "6 4"}
-              strokeOpacity={horizon === 'bank_c' ? "0.9" : "0.4"}
+              strokeOpacity={horizon === 'bank_c' ? "0.9" : "0.45"}
             />
-            {/* Header Badge */}
-            <rect x="667" y="47" width="256" height="42" rx="10" fill="#d1fae5" fillOpacity="1" stroke="#059669" strokeWidth="0.8" strokeOpacity="0.3" />
-            <circle cx="686" cy="68" r="10" fill="#047857" fillOpacity="0.2" stroke="#34d399" strokeWidth="1" />
-            <circle cx="686" cy="68" r="5" fill="none" stroke="#34d399" strokeWidth="1" />
-            <text x="703" y="64" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK GAMMA</text>
-            <text x="703" y="78" fill="#047857" fontSize="9" fontWeight="600">CROSS-BORDER FX POD</text>
-            <rect x="850" y="58" width="62" height="20" rx="5" fill="#a7f3d0" fillOpacity="1" stroke="#059669" strokeWidth="0.6" />
-            <text x="881" y="72" fill="#065f46" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">1.9k ACCTS</text>
           </g>
 
           {/* ======================================================== */}
@@ -747,17 +740,6 @@ export default function CrossBankTopologyGraph({
             const isBlindSpot = isBlindSpotEdge(edge);
             const isHovered = activeEdgeHover === edge.id;
 
-            // Calculate label coordinates
-            const midX = edge.labelX ?? (src.x + tgt.x) / 2;
-            const midY = edge.labelY ?? (src.y + tgt.y) / 2;
-            const labelText = isBlindSpot 
-              ? '🔒 BLIND SPOT' 
-              : edge.label || `$${edge.amount.toLocaleString()}`;
-
-            const labelWidth = isBlindSpot 
-              ? 96 
-              : Math.max(76, labelText.length * 6.5 + 16);
-
             return (
               <g 
                 key={edge.id} 
@@ -765,7 +747,6 @@ export default function CrossBankTopologyGraph({
                 onMouseEnter={() => setActiveEdgeHover(edge.id)}
                 onMouseLeave={() => setActiveEdgeHover(null)}
               >
-                {/* Edge Line or Curved Path */}
                 {edge.customPath ? (
                   <path
                     d={edge.customPath}
@@ -817,48 +798,46 @@ export default function CrossBankTopologyGraph({
                     className="cursor-pointer transition-all duration-200"
                   />
                 )}
-
-                {/* Edge Label Pill Chip */}
-                {(edge.isLaundering || edge.label) && (
-                  <g transform={`translate(${midX}, ${midY})`} className="cursor-pointer pointer-events-none">
-                    <rect
-                      x={-labelWidth / 2}
-                      y={-10.5}
-                      width={labelWidth}
-                      height={21}
-                      rx={10.5}
-                      fill={isBlindSpot ? "#f1f5f9" : edge.isLaundering ? "#fff1f2" : "#ffffff"}
-                      stroke={
-                        isBlindSpot 
-                          ? "#94a3b8" 
-                          : edge.isLaundering 
-                          ? "#f43f5e" 
-                          : "#cbd5e1"
-                      }
-                      strokeWidth={edge.isLaundering && !isBlindSpot ? 1.4 : 1}
-                      filter="url(#nodeShadow)"
-                    />
-                    <text
-                      y={3.5}
-                      fill={
-                        isBlindSpot 
-                          ? "#475569" 
-                          : edge.isLaundering 
-                          ? "#be123c" 
-                          : "#334155"
-                      }
-                      fontSize={isBlindSpot ? 9.5 : 9}
-                      fontWeight="700"
-                      fontFamily="monospace"
-                      textAnchor="middle"
-                    >
-                      {labelText}
-                    </text>
-                  </g>
-                )}
               </g>
             );
           })}
+
+          {/* ======================================================== */}
+          {/* Institutional Header Badges (Rendered Above Background Arcs) */}
+          {/* ======================================================== */}
+
+          {/* --- Pod 1 Header: Bank Alpha --- */}
+          <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_a' ? 'opacity-30' : 'opacity-100'}`}>
+            <rect x="37" y="72" width="256" height="42" rx="10" fill="#e0f2fe" fillOpacity="1" stroke="#0284c7" strokeWidth="0.9" strokeOpacity="0.35" />
+            <circle cx="56" cy="93" r="10" fill="#0284c7" fillOpacity="0.15" stroke="#0284c7" strokeWidth="1" />
+            <path d="M 52 97 L 52 91 L 56 88 L 60 91 L 60 97 Z" fill="#0284c7" />
+            <text x="73" y="89" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK ALPHA</text>
+            <text x="73" y="103" fill="#0369a1" fontSize="9" fontWeight="600">RETAIL BANKING POD</text>
+            <rect x="220" y="83" width="62" height="20" rx="5" fill="#bae6fd" fillOpacity="1" stroke="#0284c7" strokeWidth="0.6" />
+            <text x="251" y="97" fill="#075985" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">8.4k ACCTS</text>
+          </g>
+
+          {/* --- Pod 2 Header: Bank Beta --- */}
+          <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_b' ? 'opacity-30' : 'opacity-100'}`}>
+            <rect x="352" y="72" width="256" height="42" rx="10" fill="#e0e7ff" fillOpacity="1" stroke="#4f46e5" strokeWidth="0.9" strokeOpacity="0.35" />
+            <circle cx="371" cy="93" r="10" fill="#4f46e5" fillOpacity="0.15" stroke="#4f46e5" strokeWidth="1" />
+            <path d="M 367 97 L 367 90 L 375 90 L 375 97 Z" fill="#4f46e5" />
+            <text x="388" y="89" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK BETA</text>
+            <text x="388" y="103" fill="#3730a3" fontSize="9" fontWeight="600">COMMERCIAL B2B POD</text>
+            <rect x="535" y="83" width="62" height="20" rx="5" fill="#c7d2fe" fillOpacity="1" stroke="#4f46e5" strokeWidth="0.6" />
+            <text x="566" y="97" fill="#3730a3" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">4.2k ACCTS</text>
+          </g>
+
+          {/* --- Pod 3 Header: Bank Gamma --- */}
+          <g className={`transition-opacity duration-300 ${horizon !== 'global' && horizon !== 'bank_c' ? 'opacity-30' : 'opacity-100'}`}>
+            <rect x="667" y="72" width="256" height="42" rx="10" fill="#d1fae5" fillOpacity="1" stroke="#059669" strokeWidth="0.9" strokeOpacity="0.35" />
+            <circle cx="686" cy="93" r="10" fill="#059669" fillOpacity="0.15" stroke="#059669" strokeWidth="1" />
+            <circle cx="686" cy="93" r="5" fill="none" stroke="#059669" strokeWidth="1.2" />
+            <text x="703" y="89" fill="#0f172a" fontSize="12" fontWeight="700" fontFamily="monospace">BANK GAMMA</text>
+            <text x="703" y="103" fill="#047857" fontSize="9" fontWeight="600">CROSS-BORDER FX POD</text>
+            <rect x="850" y="83" width="62" height="20" rx="5" fill="#a7f3d0" fillOpacity="1" stroke="#059669" strokeWidth="0.6" />
+            <text x="881" y="97" fill="#065f46" fontSize="8.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">1.9k ACCTS</text>
+          </g>
 
           {/* ======================================================== */}
           {/* Render Topology Nodes (Consortium Gateways & Mules) */}
@@ -870,9 +849,15 @@ export default function CrossBankTopologyGraph({
             const isSelected = selectedNode?.id === node.id;
 
             const hubColor = {
-              bank_a: '#38bdf8',
-              bank_b: '#818cf8',
-              bank_c: '#34d399',
+              bank_a: '#0284c7',
+              bank_b: '#4f46e5',
+              bank_c: '#059669',
+            }[node.bankId];
+
+            const hubTextColor = {
+              bank_a: '#075985',
+              bank_b: '#3730a3',
+              bank_c: '#065f46',
             }[node.bankId];
 
             return (
@@ -905,7 +890,7 @@ export default function CrossBankTopologyGraph({
                       strokeWidth={isSelected ? 3.5 : 2.5}
                     />
                     {/* Hub Icon Indicator */}
-                    <circle r={7} fill={hubColor} fillOpacity={0.85} />
+                    <circle r={7} fill={hubColor} fillOpacity={0.9} />
                     <circle r={3} fill="#ffffff" />
                   </>
                 ) : (
@@ -922,10 +907,10 @@ export default function CrossBankTopologyGraph({
                       }
                       stroke={
                         node.type === 'mule' 
-                          ? '#fb7185' 
+                          ? '#e11d48' 
                           : node.type === 'exit' 
-                          ? '#f59e0b' 
-                          : '#818cf8'
+                          ? '#d97706' 
+                          : '#4f46e5'
                       }
                       strokeWidth={isSelected ? 3 : 1.8}
                     />
@@ -933,10 +918,10 @@ export default function CrossBankTopologyGraph({
                       r={5}
                       fill={
                         node.type === 'mule' 
-                          ? '#f43f5e' 
+                          ? '#e11d48' 
                           : node.type === 'exit' 
-                          ? '#fbbf24' 
-                          : '#a5b4fc'
+                          ? '#d97706' 
+                          : '#4f46e5'
                       }
                     />
                   </>
@@ -951,9 +936,9 @@ export default function CrossBankTopologyGraph({
                     height={18}
                     rx={6}
                     fill="#ffffff"
-                    fillOpacity="0.95"
+                    fillOpacity="0.98"
                     stroke={isSelected ? "#0284c7" : "#cbd5e1"}
-                    strokeWidth={isSelected ? 1 : 0.6}
+                    strokeWidth={isSelected ? 1.2 : 0.75}
                   />
                   <text
                     y={3.5}
@@ -966,60 +951,84 @@ export default function CrossBankTopologyGraph({
                   </text>
                 </g>
 
-                {/* Role / Type Subtitle */}
+                {/* Role / Type Subtitle (High Contrast) */}
                 <text
                   y={isBankHub ? 52 : 44}
-                  fill={isBankHub ? hubColor : "#64748b"}
-                  fontSize={8.5}
+                  fill={isBankHub ? hubTextColor : "#334155"}
+                  stroke="rgba(255,255,255,0.92)"
+                  strokeWidth={2.8}
+                  paintOrder="stroke"
+                  fontSize={9}
+                  fontWeight="600"
                   fontFamily="monospace"
                   textAnchor="middle"
-                  className="pointer-events-none select-none font-medium"
+                  className="pointer-events-none select-none"
                 >
                   {node.role}
                 </text>
               </g>
             );
           })}
+
+          {/* ======================================================== */}
+          {/* Edge Label Pill Chips (Rendered Last Above Lines) */}
+          {/* ======================================================== */}
+
+          {edges.map((edge) => {
+            const src = nodes.find((n) => n.id === edge.source);
+            const tgt = nodes.find((n) => n.id === edge.target);
+            if (!src || !tgt || (!edge.isLaundering && !edge.label)) return null;
+
+            const isBlindSpot = isBlindSpotEdge(edge);
+            const midX = edge.labelX ?? (src.x + tgt.x) / 2;
+            const midY = edge.labelY ?? (src.y + tgt.y) / 2;
+            const labelText = isBlindSpot 
+              ? '🔒 BLIND SPOT' 
+              : edge.label || `$${edge.amount.toLocaleString()}`;
+
+            const labelWidth = isBlindSpot 
+              ? 96 
+              : Math.max(76, labelText.length * 6.5 + 16);
+
+            return (
+              <g key={`${edge.id}-label`} transform={`translate(${midX}, ${midY})`} className="pointer-events-none">
+                <rect
+                  x={-labelWidth / 2}
+                  y={-10.5}
+                  width={labelWidth}
+                  height={21}
+                  rx={10.5}
+                  fill={isBlindSpot ? "#f1f5f9" : edge.isLaundering ? "#fff1f2" : "#ffffff"}
+                  stroke={
+                    isBlindSpot 
+                      ? "#94a3b8" 
+                      : edge.isLaundering 
+                      ? "#e11d48" 
+                      : "#cbd5e1"
+                  }
+                  strokeWidth={edge.isLaundering && !isBlindSpot ? 1.4 : 1}
+                  filter="url(#nodeShadow)"
+                />
+                <text
+                  y={3.5}
+                  fill={
+                    isBlindSpot 
+                      ? "#334155" 
+                      : edge.isLaundering 
+                      ? "#9f1239" 
+                      : "#1e293b"
+                  }
+                  fontSize={isBlindSpot ? 9.5 : 9}
+                  fontWeight="700"
+                  fontFamily="monospace"
+                  textAnchor="middle"
+                >
+                  {labelText}
+                </text>
+              </g>
+            );
+          })}
         </svg>
-
-        {/* Desktop Scenario Overlay Card (Floating with Collapse/Expand) */}
-        <div className="hidden sm:block absolute bottom-3.5 left-3.5 max-w-sm lg:max-w-md rounded-xl border border-slate-200/90 bg-slate-50 p-4 backdrop-blur-md shadow-2xl transition-all">
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="text-xs font-mono font-semibold text-cyan-600 uppercase tracking-wider">
-              {scenarioData.typology}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 font-bold">
-                +{scenarioData.deltaUplift.toFixed(1)}% Uplift
-              </span>
-              <button 
-                onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}
-                className="text-slate-500 hover:text-slate-700 p-0.5 rounded hover:bg-slate-100 transition-colors"
-                title={isDossierCollapsed ? "Expand Details" : "Collapse Details"}
-              >
-                {isDossierCollapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          <h4 className="text-sm font-bold text-slate-800 mb-1">{scenarioData.title}</h4>
-
-          {!isDossierCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-            >
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">{scenarioData.description}</p>
-              <div className="text-[11px] text-amber-700/90 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Silo Vulnerability:</strong> {scenarioData.vulnerability}
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </div>
 
         {/* Selected Node Inspector Flyout */}
         <AnimatePresence>
@@ -1028,21 +1037,21 @@ export default function CrossBankTopologyGraph({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute top-3.5 right-3.5 max-w-xs rounded-xl border border-cyan-500/40 bg-slate-50 p-3.5 text-xs backdrop-blur-md shadow-2xl"
+              className="absolute top-3.5 right-3.5 max-w-xs rounded-xl border border-cyan-500/40 bg-white/95 p-3.5 text-xs backdrop-blur-md shadow-xl"
             >
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
-                <div className="flex items-center gap-1.5 text-cyan-600 font-bold">
+                <div className="flex items-center gap-1.5 text-cyan-700 font-bold">
                   <Info className="h-3.5 w-3.5" /> Node Inspection
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="text-slate-500 hover:text-slate-900 text-xs px-1"
+                  className="text-slate-500 hover:text-slate-900 text-xs px-1 cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
               <div className="space-y-1.5 font-mono">
-                <div><span className="text-slate-500">Node:</span> <span className="text-slate-800 font-bold">{selectedNode.name}</span></div>
+                <div><span className="text-slate-500">Node:</span> <span className="text-slate-900 font-bold">{selectedNode.name}</span></div>
                 <div><span className="text-slate-500">Institution:</span> <span className="text-cyan-700">{selectedNode.bankId.replace('_', ' ').toUpperCase()}</span></div>
                 <div><span className="text-slate-500">Classification:</span> <span className="text-amber-700">{selectedNode.role}</span></div>
                 <div><span className="text-slate-500">Est. 24h Volume:</span> <span className="text-emerald-600 font-semibold">{selectedNode.volume}</span></div>
@@ -1060,24 +1069,40 @@ export default function CrossBankTopologyGraph({
         </AnimatePresence>
       </div>
 
-      {/* Mobile-Only Dedicated Scenario Dossier Card (Never overlaps the graph!) */}
-      <div className="sm:hidden rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-xl">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-mono font-semibold text-cyan-600 uppercase tracking-wider">
-            {scenarioData.typology}
-          </span>
-          <span className="text-[11px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 font-bold">
-            +{scenarioData.deltaUplift.toFixed(1)}% Uplift
-          </span>
+      {/* Dedicated Scenario Dossier Card (Docked below SVG so it never obscures Bank Alpha nodes) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm transition-all">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-mono font-semibold text-cyan-700 uppercase tracking-wider">
+              {scenarioData.typology}
+            </span>
+            <h4 className="text-sm font-bold text-slate-900">{scenarioData.title}</h4>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 font-bold">
+              +{scenarioData.deltaUplift.toFixed(1)}% Uplift
+            </span>
+            <button
+              onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}
+              className="text-slate-500 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+              title={isDossierCollapsed ? "Expand Details" : "Collapse Details"}
+            >
+              {isDossierCollapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </div>
-        <h4 className="text-sm font-bold text-slate-800 mb-1.5">{scenarioData.title}</h4>
-        <p className="text-xs text-slate-600 leading-relaxed mb-3">{scenarioData.description}</p>
-        <div className="text-xs text-amber-700/90 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-          <span>
-            <strong>Silo Vulnerability:</strong> {scenarioData.vulnerability}
-          </span>
-        </div>
+
+        {!isDossierCollapsed && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-1">
+            <p className="lg:col-span-7 text-xs text-slate-600 leading-relaxed">{scenarioData.description}</p>
+            <div className="lg:col-span-5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Silo Vulnerability:</strong> {scenarioData.vulnerability}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Multi-Hop Execution Trail (Hop-by-hop breakdown) */}

@@ -992,7 +992,7 @@ function BudgetLogSection() {
                     <th className="py-3.5 px-4 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-slate-200 font-mono">
                   {entries.map((entry: BudgetLogEntry) => (
                     <tr
                       key={entry.simulation_id}

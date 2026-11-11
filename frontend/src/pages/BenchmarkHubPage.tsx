@@ -667,15 +667,15 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-indigo-200">
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
                     <span className="text-slate-600 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily != null ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
                     <span className="text-amber-700 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars != null ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
                     <span className="text-emerald-600 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars != null ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
@@ -721,15 +721,15 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-slate-200">
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
                     <span className="text-rose-700 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily != null ? `${benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
                     <span className="text-rose-600 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars != null ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
                     <span className="text-slate-500 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
                     <span className="text-rose-600 font-bold font-mono text-[11px] mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars != null ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '-')}</span>
                   </div>
@@ -751,7 +751,7 @@ export const BenchmarkHubPage: React.FC = () => {
                     <th className="py-3 px-4">Net Total Daily Cost</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                <tbody className="divide-y divide-slate-200 font-mono text-xs">
                   <tr className="bg-indigo-50 text-indigo-700">
                     <td className="py-3 px-4 font-sans font-bold text-slate-900 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
@@ -968,7 +968,7 @@ export const BenchmarkHubPage: React.FC = () => {
                           <th className="py-2.5 px-3">Fidelity Score</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                      <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
                         {benchmarkData.distribution_fidelity.feature_metrics.slice(0, 8).map((feat) => (
                           <tr key={feat.feature_name} className="hover:bg-slate-100/40">
                             <td className="py-2.5 px-3 font-sans font-medium text-slate-700">{feat.feature_name}</td>
@@ -1060,7 +1060,7 @@ export const BenchmarkHubPage: React.FC = () => {
                 <button
                   onClick={handleInjectViolation}
                   disabled={injectPiiMutation.isPending}
-                  className="h-11 min-h-[44px] px-4 bg-slate-100 hover:bg-slate-700 text-slate-600 text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
+                  className="h-11 min-h-[44px] px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   {injectPiiMutation.isPending ? (
                     <>

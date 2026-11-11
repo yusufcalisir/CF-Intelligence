@@ -46,7 +46,7 @@ export default function PilotScopeSection({ pilot }: PilotScopeSectionProps) {
             <button
               onClick={handleCopyDigest}
               title="Copy full 64-character SHA-256 scope digest"
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200"
+              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors border border-slate-200"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
             </button>

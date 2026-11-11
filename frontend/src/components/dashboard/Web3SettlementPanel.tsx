@@ -179,7 +179,7 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
                 <th className="py-2.5 px-3 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-600 font-mono">
+            <tbody className="divide-y divide-slate-200 text-slate-600 font-mono">
               {onChainPayouts.map((payout, idx) => (
                 <tr
                   key={idx}

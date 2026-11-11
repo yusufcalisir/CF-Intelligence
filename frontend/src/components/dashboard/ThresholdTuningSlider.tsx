@@ -175,7 +175,7 @@ export function ThresholdTuningSlider({
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="text-xs text-slate-500 hover:text-slate-900 p-1.5 rounded bg-slate-100/80 hover:bg-slate-700 transition-colors"
+            className="text-xs text-slate-500 hover:text-slate-900 p-1.5 rounded bg-slate-100/80 hover:bg-slate-200 transition-colors"
             title="Reset parameters to defaults"
             aria-label="Reset parameters"
           >
@@ -238,7 +238,7 @@ export function ThresholdTuningSlider({
                       ? 'bg-indigo-600 text-white font-bold shadow-sm'
                       : isOpt
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-500/40 hover:bg-emerald-50'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-700'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
                   {pt.threshold}

@@ -203,7 +203,7 @@ export default function ConsortiumPage() {
                 <th className="py-3 px-4 text-right whitespace-nowrap">Collaborative Uplift</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
+            <tbody className="divide-y divide-slate-200 font-mono">
               {Object.entries(SCENARIO_PREVIEWS).map(([scId, sc]) => {
                 const isSelected = selectedScenario === scId;
                 return (

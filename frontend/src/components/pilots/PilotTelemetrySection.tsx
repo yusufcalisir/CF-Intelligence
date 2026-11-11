@@ -37,7 +37,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
         </p>
         <button
           onClick={() => refetch()}
-          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-900 text-xs border border-slate-200 font-medium"
+          className="mt-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs border border-slate-200 font-medium"
         >
           Retry Telemetry Poll
         </button>
@@ -84,7 +84,7 @@ export default function PilotTelemetrySection({ pilot }: PilotTelemetrySectionPr
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-600 transition-colors border border-slate-200 cursor-pointer"
+            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors border border-slate-200 cursor-pointer"
             title="Refresh Telemetry"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-cyan-600' : ''}`} />

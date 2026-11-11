@@ -303,7 +303,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <div
                 role="listbox"
                 aria-label="Target Alert Options"
-                className="absolute left-0 right-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:w-84 max-w-[calc(100vw-2rem)] bg-slate-50 backdrop-blur-xl border border-slate-200/80 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-800/60 max-h-72 overflow-y-auto"
+                className="absolute left-0 right-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:w-84 max-w-[calc(100vw-2rem)] bg-slate-50 backdrop-blur-xl border border-slate-200/80 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-200 max-h-72 overflow-y-auto"
               >
                 {alertsList.length > 0 ? (
                   alertsList.map((alt) => {

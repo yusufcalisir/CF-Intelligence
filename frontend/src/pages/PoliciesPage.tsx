@@ -437,7 +437,7 @@ export default function PoliciesPage() {
                         <button
                           onClick={() => handleOpenEditModal(rule)}
                           aria-label={`Edit Rule ${rule.rule_name}`}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-700 text-slate-700 border border-slate-200 hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-200 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Edit rule name, condition AST, or action"
                         >
                           <Pencil className="w-3.5 h-3.5 text-indigo-600" />
@@ -803,7 +803,7 @@ export default function PoliciesPage() {
                       setIsModalOpen(false);
                       setEditingRule(null);
                     }}
-                    className="btn hover:bg-gray-800"
+                    className="btn hover:bg-gray-200"
                   >
                     Cancel
                   </button>

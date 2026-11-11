@@ -547,7 +547,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       <th className="p-3.5 sm:p-4 text-right">Verdict</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-600">
+                  <tbody className="divide-y divide-slate-200 text-slate-600">
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-slate-900 font-sans">Total Ingested Messages</td>
                       <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">76,700 txns</td>
@@ -597,7 +597,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                         <th className="p-3.5 sm:p-4 text-right">Error Rate</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 text-slate-600">
+                    <tbody className="divide-y divide-slate-200 text-slate-600">
                       <tr className="hover:bg-slate-100/30">
                         <td className="p-3.5 sm:p-4 font-semibold text-slate-900 font-sans">bank_a (JPMorgan Node)</td>
                         <td className="p-3.5 sm:p-4 text-center text-cyan-600 font-bold">25,300 txns</td>
@@ -679,7 +679,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       <th className="p-3.5 sm:p-4 text-right">Uplift & Averted Volume</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-600">
+                  <tbody className="divide-y divide-slate-200 text-slate-600">
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-slate-900 font-sans">
                         <div>Scenario 1: Single-Bank Localized Fraud</div>
@@ -819,7 +819,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                       <th className="p-3.5 sm:p-4 text-right">Collaborative Gain / Privacy</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-600">
+                  <tbody className="divide-y divide-slate-200 text-slate-600">
                     <tr className="hover:bg-slate-100/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-slate-900 font-sans">
                         <div>CFI Consortium Benchmark (N=45k Test)</div>
@@ -978,7 +978,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                 <button
                   type="button"
                   onClick={handleDownloadMarkdown}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-700 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all self-start sm:self-auto cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all self-start sm:self-auto cursor-pointer"
                 >
                   <Download className="h-3.5 w-3.5 text-cyan-600" />
                   <span>Download .md File</span>

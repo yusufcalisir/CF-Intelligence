@@ -715,7 +715,7 @@ export default function PsiPage() {
           <button
             type="submit"
             disabled={fuzzyResolveMutation.isPending}
-            className="w-full h-11 min-h-[44px] bg-slate-100 hover:bg-slate-700 disabled:opacity-50 text-slate-700 font-bold px-4 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 border border-slate-200 cursor-pointer whitespace-nowrap shrink-0"
+            className="w-full h-11 min-h-[44px] bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold px-4 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 border border-slate-200 cursor-pointer whitespace-nowrap shrink-0"
           >
             {fuzzyResolveMutation.isPending ? (
               <>
@@ -746,7 +746,7 @@ export default function PsiPage() {
                   <th className="p-3 text-right">Ego Graph</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 bg-slate-50">
+              <tbody className="divide-y divide-slate-200 bg-slate-50">
                 {fuzzyResolveMutation.data.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-4 text-center text-slate-500 italic">
@@ -831,7 +831,7 @@ export default function PsiPage() {
                   <th className="p-3">Privacy Hash</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 bg-slate-50">
+              <tbody className="divide-y divide-slate-200 bg-slate-50">
                 {runPSIMutation.data.matches.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-4 text-center text-slate-500 italic">

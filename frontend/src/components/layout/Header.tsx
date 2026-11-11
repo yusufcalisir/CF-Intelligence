@@ -212,7 +212,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   setLoginError(null);
                   setIsLoginModalOpen(true);
                 }}
-                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-700 text-slate-600 border border-slate-200 transition-colors"
+                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 transition-colors"
               >
                 Switch Principal
               </button>
@@ -331,7 +331,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   type="button"
                   data-testid="btn-cancel-institutional-login"
                   onClick={() => setIsLoginModalOpen(false)}
-                  className="rounded-lg border border-slate-200 bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-700"
+                  className="rounded-lg border border-slate-200 bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
                 >
                   Cancel
                 </button>
