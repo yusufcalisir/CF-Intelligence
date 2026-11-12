@@ -26,7 +26,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
-    colorScheme: 'dark',
+    colorScheme: 'light',
     actionTimeout: 15000,
     navigationTimeout: 30000,
   },

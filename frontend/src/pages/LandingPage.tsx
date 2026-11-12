@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import PlatformLaunchModal from '../components/PlatformLaunchModal';
 import BenchmarkLaunchModal from '../components/BenchmarkLaunchModal';
@@ -622,11 +622,13 @@ const scrollToSection = (id: string) => {
 
 // ── 2026 HIGH-END FUTURISTIC CONSORTIUM NETWORK SVG ──────────────────────────
 const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
+  const shouldReduceMotion = useReducedMotion();
   const [pulseTick, setPulseTick] = useState(0);
   useEffect(() => {
+    if (shouldReduceMotion) return;
     const t = setInterval(() => setPulseTick(p => p + 1), 60);
     return () => clearInterval(t);
-  }, []);
+  }, [shouldReduceMotion]);
 
   const banks = [
     { id: 'JPM', name: 'JPMorgan', x: 45,  y: 65,  color: '#6366f1', glow: '#818cf8' },
@@ -700,13 +702,15 @@ const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
 // ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
 const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
   const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar' | 'chaos' | 'ingest'>('home');
   const [alertTick, setAlertTick] = useState(0);
 
   useEffect(() => {
+    if (shouldReduceMotion) return;
     const t = setInterval(() => setAlertTick(p => p + 1), 3200);
     return () => clearInterval(t);
-  }, []);
+  }, [shouldReduceMotion]);
 
   const alerts = [
     { id: 'JPM-9912', bank: 'JPM', amount: '1,450,000', score: 0.94, high: true },
@@ -1094,8 +1098,15 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 const FadeSection = memo(function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
+  const shouldReduceMotion = useReducedMotion();
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay, ease: 'easeOut' }} className={`will-change-transform transform-gpu ${className}`}>
+    <motion.div
+      ref={ref}
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+      animate={shouldReduceMotion || inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : delay, ease: 'easeOut' }}
+      className={`will-change-transform transform-gpu ${className}`}
+    >
       {children}
     </motion.div>
   );
@@ -1335,6 +1346,7 @@ const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: Ar
 // ── MAIN LANDING PAGE ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCapabilitiesDropdownOpen, setIsCapabilitiesDropdownOpen] = useState(false);
   const [openNavDropdown, setOpenNavDropdown] = useState<'platform' | 'arch' | 'bench' | 'dev' | null>(null);
@@ -1379,12 +1391,13 @@ export default function LandingPage() {
 
   // Illustrative client-side simulation ticker for interactive hero dashboard preview
   useEffect(() => {
+    if (shouldReduceMotion) return;
     const t = setInterval(() => {
       setFlRound(p => p + 1);
       setAccuracy(parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
     }, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [shouldReduceMotion]);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -1804,7 +1817,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 - PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
-        <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -1859,7 +1872,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 3 - WORKFLOW / EXECUTION PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -1937,7 +1950,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 - ENGINE CAPABILITIES (#product)
         ══════════════════════════════════════════════════════════ */}
-        <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 min-w-0">
               <div className="max-w-3xl min-w-0">
@@ -2063,7 +2076,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 - PLATFORM / NODE INSPECTOR (#platform)
         ══════════════════════════════════════════════════════════ */}
-        <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -2105,7 +2118,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 - ARCHITECTURE (#architecture)
         ══════════════════════════════════════════════════════════ */}
-        <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -2186,7 +2199,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 - SECURITY & PRIVACY (#security)
         ══════════════════════════════════════════════════════════ */}
-        <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -2286,7 +2299,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.5 - EMPIRICAL BENCHMARKS & PRODUCTION VALIDATION (#benchmarks)
         ══════════════════════════════════════════════════════════ */}
-        <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="benchmarks" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             {/* Header & Quick Action Buttons */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12">
@@ -2621,7 +2634,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.6 - TARGET CUSTOMER PROFILES (#solutions)
         ══════════════════════════════════════════════════════════ */}
-        <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             {/* Part 1: Target Customer Segments */}
             <div className="max-w-3xl mb-8 sm:mb-12 min-w-0">
@@ -2708,7 +2721,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7.7 - INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
         ══════════════════════════════════════════════════════════ */}
-        <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 space-y-6 shadow-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
@@ -2777,7 +2790,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 8 - EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
-        <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <div id="docs" className="w-full min-w-0">
             <FadeSection>
               <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
@@ -2956,7 +2969,7 @@ telemetry.on('round.stage', (evt) => {
         {/* ══════════════════════════════════════════════════════════
             SECTION 9 - ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
         ══════════════════════════════════════════════════════════ */}
-        <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-slate-200 w-full min-w-0">
           <FadeSection>
             <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
               <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">

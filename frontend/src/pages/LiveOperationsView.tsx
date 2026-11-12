@@ -1109,14 +1109,14 @@ export default function LiveOperationsView() {
         style={{ borderLeftColor: selectedProfile.color }}
       >
         {/* Primary Row: Title & Connectivity on Left | Champion Metric & Controls on Right */}
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5 min-w-0">
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-3.5 min-w-0">
           {/* Title & Live Status */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 max-w-full">
             <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-slate-50 border border-slate-200 shadow-xs">
               📡
             </span>
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <h1 className="text-lg sm:text-2xl font-extrabold text-[var(--color-text-primary)] tracking-tight whitespace-nowrap">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-[var(--color-text-primary)] tracking-tight sm:whitespace-nowrap">
                 Live Operations Dashboard
               </h1>
               <span
@@ -1152,7 +1152,7 @@ export default function LiveOperationsView() {
           </div>
 
           {/* Key Metric & Action Controls */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0 max-w-full">
             {/* Active Champion AUC Card */}
             <div className="h-10 inline-flex items-center gap-2.5 px-3.5 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-subtle)] shadow-xs shrink-0">
               <span className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">
@@ -1165,7 +1165,7 @@ export default function LiveOperationsView() {
 
             {/* Training control buttons */}
             {!isTraining && trainingPhase !== 'completed' && trainingPhase !== 'failed' && trainingPhase !== 'stopped' ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Import Custom Dataset button */}
                 <button
                   id="import-custom-dataset-btn"
@@ -1191,7 +1191,7 @@ export default function LiveOperationsView() {
                   whileTap={{ scale: 0.96 }}
                   disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                     boxShadow: `0 4px 16px ${selectedProfile.color}35`,
@@ -1205,7 +1205,7 @@ export default function LiveOperationsView() {
               <button
                 id="reset-simulation-btn"
                 onClick={resetTraining}
-                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-slate-900 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
+                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
                   trainingPhase === 'failed'
                     ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-90'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'

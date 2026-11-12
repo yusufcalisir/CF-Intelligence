@@ -324,7 +324,7 @@ export default function SecurityPage() {
             <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-500/25 text-indigo-600 shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <h1 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-200 to-purple-300 tracking-tight truncate">
+            <h1 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 tracking-tight truncate">
               Enterprise Security & Identity Control Suite
             </h1>
           </div>
@@ -365,7 +365,7 @@ export default function SecurityPage() {
               </>
             ) : (
               <>
-                <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-white shrink-0" />
                 <span>Verify SHA-256 Audit Chain</span>
               </>
             )}

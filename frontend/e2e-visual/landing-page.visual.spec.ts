@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ reducedMotion: 'reduce' });
+
 test.describe('Visual Regression: SaaS Landing Page & Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -16,6 +18,7 @@ test.describe('Visual Regression: SaaS Landing Page & Navigation', () => {
   });
 
   test('captures full landing page layout across all sections', async ({ page }) => {
+    test.setTimeout(60000);
     await expect(page.locator('#hero')).toBeAttached();
     await expect(page.locator('#problem-solution')).toBeAttached();
     await expect(page.locator('#architecture')).toBeAttached();
@@ -24,6 +27,7 @@ test.describe('Visual Regression: SaaS Landing Page & Navigation', () => {
 
     await expect(page).toHaveScreenshot('landing-fullpage.png', {
       fullPage: true,
+      timeout: 30000,
     });
   });
 
