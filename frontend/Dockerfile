@@ -11,6 +11,8 @@ RUN apk update && apk add --no-cache \
     curl=8.23.0-r0 \
     libcurl=8.23.0-r0 \
     libexpat=2.10.0-r0 \
+    libxslt=1.1.43-r4 \
+    zlib=1.4-r0 \
     apk-tools=3.0.9-r0 \
     libapk=3.0.9-r0
 COPY --from=builder /app/dist /usr/share/nginx/html

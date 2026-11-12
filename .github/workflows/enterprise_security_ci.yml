@@ -137,12 +137,14 @@ jobs:
 
       - name: Run Linux Container Ray Runtime Tests
         run: |
-          docker run --rm --entrypoint "" \
+          docker run --rm --shm-size=512m --entrypoint "" \
+            -e APP_ENV=test \
+            -e CFI_STORAGE_DIR=/tmp/cfi_storage \
             -e CFI_EXPECT_RAY_JARS_ABSENT=1 \
             -e PYTHONPATH=/app:/app/backend \
             -v "${{ github.workspace }}/backend/tests:/app/tests:ro" \
             cfi-backend:ci \
-            /opt/venv/bin/python -m pytest /app/tests/unit/test_ray_runtime_functional.py -v
+            /opt/venv/bin/python -m pytest /app/tests/unit/test_ray_runtime_functional.py -v -o cache_dir=/tmp/pytest_cache
 
       - name: Audit Installed Packages in Final Backend Runtime Environment (/opt/venv)
         run: |

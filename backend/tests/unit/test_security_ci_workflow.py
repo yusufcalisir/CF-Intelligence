@@ -118,6 +118,8 @@ class TestEnterpriseSecurityCIWorkflow:
         backend_runs = "\n".join(s.get("run", "") for s in backend_job.get("steps", []))
         assert "run_pip_audit.py" in backend_runs and "--path" in backend_runs
         assert "test_ray_runtime_functional.py" in backend_runs
+        assert "APP_ENV=test" in backend_runs
+        assert "CFI_EXPECT_RAY_JARS_ABSENT=1" in backend_runs
         assert "ray/jars" in backend_runs
 
         # No setup-uv step may float on "latest"
