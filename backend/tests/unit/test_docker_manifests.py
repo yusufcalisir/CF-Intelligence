@@ -116,8 +116,11 @@ def test_dockerfiles_security_and_grpc_port_parity() -> None:
         assert "777" not in content, f"{df_path} must not contain world-writable chmod 777"
         assert "chown -R root:root /opt/venv" in content
         assert "ray/jars" in content, f"{df_path} must strip ray/jars from /opt/venv"
+        assert "bom.cdx.json" in content, f"{df_path} must strip pip internal bom.cdx.json to eliminate phantom CVE-2025-47273"
         if df_path.name != "Dockerfile":
             assert "50051" in content
+
+    assert "bom.cdx.json" in (root_dir / "docker" / "Dockerfile.institutional_worker").read_text(encoding="utf-8")
 
     for df_path in [
         root_dir / "Dockerfile",

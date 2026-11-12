@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install verified OpenMined PSI and minimal worker dependencies
 RUN /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 && \
+    find /usr/local -name "bom.cdx.json" -delete && \
     pip install --no-cache-dir \
     openmined-psi==2.0.6 \
     filelock>=4.2.1 \

@@ -128,6 +128,7 @@ jobs:
             set -eu
             test "$(id -u)" = "1000"
             test ! -e /opt/venv/lib/python3.12/site-packages/ray/jars
+            test -z "$(find /usr/local /opt/venv -name "bom.cdx.json" 2>/dev/null)"
             test ! -w /app
             test ! -w /opt/venv
             test -w /app/storage
