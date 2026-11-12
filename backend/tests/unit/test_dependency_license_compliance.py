@@ -113,12 +113,10 @@ def _enforces_security_floor(specifier, min_version) -> bool:
             if spec_ver < min_version:
                 return False
             has_valid_lower_bound = True
-        elif spec.operator == "<":
-            if spec_ver <= min_version:
-                return False
-        elif spec.operator == "<=":
-            if spec_ver < min_version:
-                return False
+        elif (spec.operator == "<" and spec_ver <= min_version) or (
+            spec.operator == "<=" and spec_ver < min_version
+        ):
+            return False
 
     return has_valid_lower_bound
 
