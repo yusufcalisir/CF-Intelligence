@@ -98,22 +98,66 @@ def test_license_compliance_no_copyleft():
     assert flagged == [], f"Found copyleft-licensed dependencies conflicting with MIT: {flagged}"
 
 
+def _enforces_security_floor(specifier, min_version) -> bool:
+    """Return True if a PEP 440 SpecifierSet enforces all allowed versions are >= min_version."""
+    from packaging.version import InvalidVersion, Version
+
+    has_valid_lower_bound = False
+    for spec in specifier:
+        try:
+            spec_ver = Version(spec.version)
+        except InvalidVersion:
+            return False
+
+        if spec.operator in {">=", ">", "==", "~="}:
+            if spec_ver < min_version:
+                return False
+            has_valid_lower_bound = True
+        elif spec.operator == "<":
+            if spec_ver <= min_version:
+                return False
+        elif spec.operator == "<=":
+            if spec_ver < min_version:
+                return False
+
+    return has_valid_lower_bound
+
+
 def test_cve_mitigation_pins_in_requirements():
-    """Ensure critical libraries have explicit security version floors in requirements.txt."""
-    req_text = (REPO_ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").lower()
+    """Ensure critical libraries meet or exceed explicit security version floors in requirements.txt."""
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+    from packaging.version import Version
 
-    expected_security_floors = [
-        "starlette>=1.3.1",
-        "mlflow>=3.11.0",
-        "pytest>=9.0.3",
-        "urllib3>=2.2.2",
-        "jinja2>=3.1.4",
-        "aiohttp>=3.10.11",
-        "tornado>=6.4.2",
-        "certifi>=2024.7.4",
-        "setuptools>=70.0.0",
-        "werkzeug>=3.0.6",
-    ]
+    req_lines = (REPO_ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    parsed_requirements: dict[str, list[Requirement]] = {}
+    for raw_line in req_lines:
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        req = Requirement(line)
+        if req.marker is None:
+            parsed_requirements.setdefault(canonicalize_name(req.name), []).append(req)
 
-    for floor in expected_security_floors:
-        assert floor in req_text, f"Missing expected security version floor: {floor}"
+    expected_security_floors = {
+        "starlette": "1.3.1",
+        "mlflow": "3.11.0",
+        "pytest": "9.0.3",
+        "urllib3": "2.2.2",
+        "jinja2": "3.1.4",
+        "aiohttp": "3.10.11",
+        "tornado": "6.4.2",
+        "certifi": "2024.7.4",
+        "setuptools": "70.0.0",
+        "werkzeug": "3.0.6",
+    }
+
+    violations = []
+    for pkg, min_ver_str in expected_security_floors.items():
+        min_ver = Version(min_ver_str)
+        reqs = parsed_requirements.get(canonicalize_name(pkg), [])
+        if not reqs or not all(_enforces_security_floor(req.specifier, min_ver) for req in reqs):
+            found = [str(req.specifier) or "<unpinned>" for req in reqs]
+            violations.append(f"{pkg}>={min_ver_str} (found: {found or 'missing'})")
+
+    assert violations == [], "Requirements below expected security version floor(s): " + "; ".join(violations)
