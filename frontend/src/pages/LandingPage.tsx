@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import PlatformLaunchModal from '../components/PlatformLaunchModal';
@@ -1380,6 +1380,10 @@ export default function LandingPage() {
     navigate('/benchmarks');
   };
 
+  const handleCloseReport = useCallback(() => {
+    setIsReportOpen(false);
+  }, []);
+
   const handleCopyEmail = () => {
     navigator.clipboard.writeText('ysfcals@gmail.com');
     setIsCopied(true);
@@ -1637,7 +1641,8 @@ export default function LandingPage() {
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <button
                 aria-label="Toggle Navigation Menu"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-expanded={isMobileMenuOpen}
+                onClick={() => setIsMobileMenuOpen((prev) => !prev)}
                 className="lg:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 cursor-pointer transition-colors active:scale-95"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
@@ -3123,7 +3128,7 @@ telemetry.on('round.stage', (evt) => {
         {/* ── INTERACTIVE TECHNICAL REPORT MODAL ──────── */}
         <TechnicalReportModal
           isOpen={isReportOpen}
-          onClose={() => setIsReportOpen(false)}
+          onClose={handleCloseReport}
         />
       </div>
     </div>

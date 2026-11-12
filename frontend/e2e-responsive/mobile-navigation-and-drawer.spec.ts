@@ -15,36 +15,29 @@ test.describe('Responsive Navigation: Mobile Drawer, Dropdowns & Scroll Locking'
       await expect(hamburger).toBeVisible();
 
       // 2. Click to open navigation drawer
-      await hamburger.dispatchEvent('click');
-      await page.waitForTimeout(400);
+      await hamburger.click();
 
       // 3. Body scroll should be locked (overflow: hidden)
-      const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
-      expect(bodyOverflow).toBe('hidden');
+      await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden');
 
       // 4. Verify category navigation items are accessible in full-screen drawer
       const archLink = page.locator('button:has-text("03 Architecture & Security"), button:has-text("Architecture & Security")').last();
       await expect(archLink).toBeVisible();
 
       // 5. Click category link -> drawer should close and body scroll should be restored
-      await archLink.dispatchEvent('click');
-      await page.waitForTimeout(400);
+      await archLink.click();
 
-      const restoredOverflow = await page.evaluate(() => document.body.style.overflow);
-      expect(restoredOverflow).not.toBe('hidden');
+      await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
 
       // 6. Test Close (X) button toggle - scroll to top first
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(200);
-      await hamburger.dispatchEvent('click');
-      await page.waitForTimeout(400);
+      await expect(hamburger).toBeVisible();
+      await hamburger.click();
+      await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden');
       const closeButton = page.locator('button[aria-label="Close Navigation Menu"]').first();
-      if (await closeButton.isVisible()) {
-        await closeButton.dispatchEvent('click');
-        await page.waitForTimeout(400);
-        const finalOverflow = await page.evaluate(() => document.body.style.overflow);
-        expect(finalOverflow).not.toBe('hidden');
-      }
+      await expect(closeButton).toBeVisible();
+      await closeButton.click();
+      await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
     } else {
       // On desktop viewports (>= 1024px), verify top horizontal navigation
       const desktopNav = page.locator('nav').first();

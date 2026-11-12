@@ -34,6 +34,7 @@ export const TechnicalReportModal: React.FC<TechnicalReportModalProps> = ({ isOp
 
   // Handle ESC key to close or exit fullscreen
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (isFullscreen) {
@@ -43,15 +44,21 @@ export const TechnicalReportModal: React.FC<TechnicalReportModalProps> = ({ isOp
         }
       }
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
-    }
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isFullscreen, onClose]);
+
+  // Lock body scroll only while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
