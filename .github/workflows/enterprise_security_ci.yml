@@ -29,11 +29,11 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Linting & Security Tools (uv)
         run: |
-          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv==0.13.7 && break || sleep 5; done
           uv pip install --system ruff mypy bandit pydantic pydantic-settings types-PyYAML
 
       - name: Ruff Lint Check
@@ -59,12 +59,12 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install pip-audit & uv
         run: |
-          for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit && break || sleep 5; done
-          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
+          for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv==0.13.7 && break || sleep 5; done
 
       - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
@@ -90,10 +90,14 @@ jobs:
           echo "✅ npm audit passed – no high or critical vulnerabilities found."
 
   trivy-container-security:
-    name: Container CVE Vulnerability Scan (Trivy)
+    name: Backend Container CVE & Runtime Security Audit (Trivy + Runtime Checks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Free Runner Disk Space
         run: |
@@ -116,21 +120,73 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 15
-          command: docker build ./backend -t cfi-backend:latest
+          command: docker build ./backend -t cfi-backend:ci
 
-      - name: Trivy Backend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+      - name: Verify Non-Root Permissions & Ray JAR Removal Inside Final Backend Image
+        run: |
+          docker run --rm --entrypoint /bin/sh cfi-backend:ci -ec '
+            set -eu
+            test "$(id -u)" = "1000"
+            test ! -e /opt/venv/lib/python3.12/site-packages/ray/jars
+            test ! -w /app
+            test ! -w /opt/venv
+            test -w /app/storage
+            test -w /tmp/cfi_storage
+            touch /app/storage/.perm_check && rm -f /app/storage/.perm_check
+          '
+
+      - name: Run Linux Container Ray Runtime Tests
+        run: |
+          docker run --rm --entrypoint "" \
+            -e CFI_EXPECT_RAY_JARS_ABSENT=1 \
+            -e PYTHONPATH=/app:/app/backend \
+            -v "${{ github.workspace }}/backend/tests:/app/tests:ro" \
+            cfi-backend:ci \
+            /opt/venv/bin/python -m pytest /app/tests/unit/test_ray_runtime_functional.py -v
+
+      - name: Audit Installed Packages in Final Backend Runtime Environment (/opt/venv)
+        run: |
+          for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
+          cid="$(docker create cfi-backend:ci)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "${cid}:/opt/venv/lib/python3.12/site-packages" /tmp/runtime-site-packages
+          python scripts/run_pip_audit.py \
+            --path /tmp/runtime-site-packages \
+            --strict \
+            --format json \
+            -o /tmp/backend_runtime_pip_audit.json
+
+      - name: Trivy Backend Container Vulnerability Scan (Blocking CRITICAL & HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: 'cfi-backend:latest'
+          version: 'v0.70.0'
+          image-ref: 'cfi-backend:ci'
           format: 'table'
-          exit-code: '1' # Fail on CRITICAL,HIGH container vulnerabilities
-          ignore-unfixed: true
+          exit-code: '1' # Blocking fail on ALL CRITICAL,HIGH findings (no ignore-unfixed)
+          ignore-unfixed: false
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
       - name: Prune Backend Container Image
-        run: docker rmi cfi-backend:latest || true
+        if: always()
+        run: docker rmi cfi-backend:ci || true
+
+  trivy-frontend-container-security:
+    name: Frontend Container CVE Vulnerability Scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (avoid unauthenticated rate-limit timeouts)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true  # Best-effort — build still attempted if creds missing
 
       - name: Build Frontend Container Image (with retry)
         uses: nick-fields/retry@v3
@@ -138,18 +194,23 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 15
-          command: docker build ./frontend -t cfi-frontend:latest
+          command: docker build ./frontend -t cfi-frontend:ci
 
-      - name: Trivy Frontend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+      - name: Trivy Frontend Container Vulnerability Scan (Blocking CRITICAL & HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: 'cfi-frontend:latest'
+          version: 'v0.70.0'
+          image-ref: 'cfi-frontend:ci'
           format: 'table'
-          exit-code: '1' # Fail on CRITICAL,HIGH container vulnerabilities
-          ignore-unfixed: true
+          exit-code: '1' # Blocking fail on ALL CRITICAL,HIGH findings (no ignore-unfixed)
+          ignore-unfixed: false
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Prune Frontend Container Image
+        if: always()
+        run: docker rmi cfi-frontend:ci || true
 
   helm-and-terraform-security-audit:
     name: Infrastructure Security Audit (Helm & Terraform)
@@ -204,11 +265,11 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install dependencies (uv)
         run: |
-          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv==0.13.7 && break || sleep 5; done
           uv pip install --system -r requirements.txt
 
       - name: Run Full Pytest Suite across Security, Governance & Compliance

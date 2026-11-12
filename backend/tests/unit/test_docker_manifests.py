@@ -103,16 +103,36 @@ def test_docker_compose_enterprise_profiles_and_healthchecks() -> None:
 
 
 def test_dockerfiles_security_and_grpc_port_parity() -> None:
-    """Verify multi-stage Dockerfiles enforce non-root user and expose gRPC port 50051."""
+    """Verify multi-stage Dockerfiles enforce non-root user, digest pinning, and least-privilege permissions."""
     for df_path in [
         root_dir / "docker" / "Dockerfile.backend",
         root_dir / "backend" / "Dockerfile",
+        root_dir / "Dockerfile",
     ]:
         assert df_path.exists()
         content = df_path.read_text(encoding="utf-8")
         assert "USER user" in content
-        assert "50051" in content
-        assert "uv" in content
+        assert "uv==0.13.7" in content
+        assert "777" not in content, f"{df_path} must not contain world-writable chmod 777"
+        assert "chown -R root:root /opt/venv" in content
+        assert "ray/jars" in content, f"{df_path} must strip ray/jars from /opt/venv"
+        if df_path.name != "Dockerfile":
+            assert "50051" in content
+
+    for df_path in [
+        root_dir / "Dockerfile",
+        root_dir / "backend" / "Dockerfile",
+        root_dir / "frontend" / "Dockerfile",
+        root_dir / "docker" / "Dockerfile.backend",
+        root_dir / "docker" / "Dockerfile.frontend",
+        root_dir / "docker" / "Dockerfile.institutional_worker",
+    ]:
+        content = df_path.read_text(encoding="utf-8")
+        from_lines = [line.strip() for line in content.splitlines() if line.strip().startswith("FROM ")]
+        assert from_lines, f"No FROM instructions found in {df_path}"
+        for line in from_lines:
+            assert "@sha256:" in line, f"Base image in {df_path} must be digest-pinned: {line}"
+        assert "npm install" not in content, f"{df_path} must use strict npm ci rather than npm install fallback"
 
 
 def test_dev_compose_parity() -> None:

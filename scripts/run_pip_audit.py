@@ -69,7 +69,8 @@ POSITIVE_NETWORK_MARKERS: Final[tuple[str, ...]] = (
 
 # Explicit markers indicating pip-audit discovered real vulnerabilities
 VULNERABILITY_OUTPUT_MARKERS: Final[tuple[str, ...]] = (
-    "known vulnerabilities found",
+    "known vulnerabilities",
+    "known vulnerability",
     "vulnerabilities found",
     "found vulnerabilities",
     "vulnerability",
@@ -77,6 +78,8 @@ VULNERABILITY_OUTPUT_MARKERS: Final[tuple[str, ...]] = (
     "ghsa-",
     "cve-",
     "pysec-",
+    '"vulns": [{',
+    '"vulns":[{',
 )
 
 
@@ -111,21 +114,45 @@ def execute_audit_command(cmd: list[str]) -> tuple[int, str, str]:
 
 
 def build_audit_cmd(
-    requirements_file: str,
+    requirements_file: str | None = None,
+    *,
+    path: str | None = None,
+    local_env: bool = False,
+    strict: bool = True,
+    skip_editable: bool = False,
+    output_format: str = "columns",
+    output_file: str | None = None,
     service: str = "pypi",
     timeout: int = 30,
     ignored_vulns: list[str] | None = None,
 ) -> list[str]:
-    """Construct the pip-audit CLI command list."""
-    cmd = [
-        "pip-audit",
-        "--no-deps",
-        "--disable-pip",
-        "-r",
-        requirements_file,
-        "--timeout",
-        str(timeout),
-    ]
+    """Construct the pip-audit CLI command list for lockfile or live-environment auditing."""
+    if requirements_file and (path or local_env):
+        raise ValueError("requirements_file cannot be combined with runtime path/local_env auditing.")
+    if not requirements_file and not path and not local_env:
+        raise ValueError("Either requirements_file or a runtime target (path/local_env) is required.")
+
+    cmd = [sys.executable, "-m", "pip_audit"] if not requirements_file else ["pip-audit"]
+
+    if requirements_file:
+        cmd.extend(["--no-deps", "--disable-pip", "-r", requirements_file])
+    else:
+        if local_env:
+            cmd.append("--local")
+        if path:
+            cmd.extend(["--path", path])
+        if strict:
+            cmd.append("--strict")
+        if skip_editable:
+            cmd.append("--skip-editable")
+
+    cmd.extend(["--progress-spinner", "off", "--timeout", str(timeout)])
+
+    if output_format and output_format != "columns":
+        cmd.extend(["-f", output_format])
+    if output_file:
+        cmd.extend(["-o", output_file])
+
     if service and service.lower() != "pypi":
         cmd.extend(["-s", service.lower()])
 
@@ -139,7 +166,14 @@ def build_audit_cmd(
 
 
 def run_audit_pipeline(
-    requirements_file: str,
+    requirements_file: str | None = None,
+    *,
+    path: str | None = None,
+    local_env: bool = False,
+    strict: bool = True,
+    skip_editable: bool = False,
+    output_format: str = "columns",
+    output_file: str | None = None,
     ignored_vulns: list[str] | None = None,
     max_retries: int = 3,
     initial_backoff: float = 10.0,
@@ -147,16 +181,24 @@ def run_audit_pipeline(
     executor: Callable[[list[str]], tuple[int, str, str]] = execute_audit_command,
 ) -> int:
     """Run pip-audit with bounded retry on network failure and explicit fail-closed semantics."""
-    logger.info("Starting dependency vulnerability audit against '%s'...", requirements_file)
+    target_desc = requirements_file or (f"runtime path '{path}'" if path else "local environment")
+    logger.info("Starting dependency vulnerability audit against %s...", target_desc)
     backoff = initial_backoff
+
+    cmd_kwargs: dict[str, object] = {
+        "requirements_file": requirements_file,
+        "path": path,
+        "local_env": local_env,
+        "strict": strict,
+        "skip_editable": skip_editable,
+        "output_format": output_format,
+        "output_file": output_file,
+        "ignored_vulns": ignored_vulns,
+    }
 
     # 1. Primary PyPI Vulnerability Service Phase
     for attempt in range(1, max_retries + 1):
-        cmd = build_audit_cmd(
-            requirements_file=requirements_file,
-            service="pypi",
-            ignored_vulns=ignored_vulns,
-        )
+        cmd = build_audit_cmd(service="pypi", **cmd_kwargs)  # type: ignore[arg-type]
         logger.info("[PyPI] Running pip-audit scan (attempt %d/%d)...", attempt, max_retries)
         rc, out, err = executor(cmd)
         classification = classify_pip_audit_result(rc, out, err)
@@ -204,11 +246,7 @@ def run_audit_pipeline(
 
     logger.warning("⚠️ Primary PyPI service unavailable after %d network attempts.", max_retries)
     logger.info("Executing secondary audit via OSV vulnerability service (-s osv)...")
-    osv_cmd = build_audit_cmd(
-        requirements_file=requirements_file,
-        service="osv",
-        ignored_vulns=ignored_vulns,
-    )
+    osv_cmd = build_audit_cmd(service="osv", **cmd_kwargs)  # type: ignore[arg-type]
     rc, out, err = executor(osv_cmd)
     classification = classify_pip_audit_result(rc, out, err)
 
@@ -235,7 +273,15 @@ def run_audit_pipeline(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Resilient pip-audit security auditor with fail-closed classification")
-    parser.add_argument("-r", "--requirements", required=True, help="Path to locked requirements file")
+    target_group = parser.add_mutually_exclusive_group(required=True)
+    target_group.add_argument("-r", "--requirements", help="Path to locked requirements file")
+    target_group.add_argument("--path", help="Path to runtime site-packages directory (e.g. /opt/venv/lib/python3.12/site-packages)")
+    target_group.add_argument("--local", action="store_true", help="Audit currently active local Python environment")
+    parser.add_argument("--strict", dest="strict", action="store_true", default=True, help="Fail audit if any installed package cannot be collected (default: enabled for runtime mode)")
+    parser.add_argument("--no-strict", dest="strict", action="store_false", help="Disable --strict mode when explicitly requested")
+    parser.add_argument("--skip-editable", action="store_true", help="Skip editable packages (disabled by default to prevent silent omissions)")
+    parser.add_argument("-f", "--format", default="columns", choices=["columns", "json", "cyclonedx-json", "cyclonedx-xml", "markdown"], help="pip-audit output format")
+    parser.add_argument("-o", "--output", default=None, help="Write audit report to file")
     parser.add_argument("--ignore-vuln", action="append", default=[], help="Advisory IDs to suppress with justification")
     parser.add_argument("--max-retries", type=int, default=3, help="Max network retries before OSV fallback")
     parser.add_argument("--backoff", type=float, default=10.0, help="Initial retry backoff in seconds")
@@ -244,6 +290,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     return run_audit_pipeline(
         requirements_file=args.requirements,
+        path=args.path,
+        local_env=args.local,
+        strict=args.strict,
+        skip_editable=args.skip_editable,
+        output_format=args.format,
+        output_file=args.output,
         ignored_vulns=args.ignore_vuln,
         max_retries=args.max_retries,
         initial_backoff=args.backoff,

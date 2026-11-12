@@ -1,6 +1,6 @@
 # Multi-Stage Production Dockerfile for CFI Backend API & ML Engine
 # Stage 1: Build virtual environment with pre-compiled wheels using uv
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS builder
 
 WORKDIR /build
 
@@ -16,16 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.13.7
 
 COPY requirements.txt ./
 RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install --no-cache -r requirements.txt && \
-    rm -rf /opt/venv/lib/python3.12/site-packages/ray/jars
+    rm -rf /opt/venv/lib/python*/site-packages/ray/jars && \
+    test ! -e /opt/venv/lib/python3.12/site-packages/ray/jars
 
 # Stage 2: Hardened, non-root production runtime
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS runtime
 
 WORKDIR /app
 

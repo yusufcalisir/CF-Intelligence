@@ -11,6 +11,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.run_pip_audit import (  # noqa: E402
+    build_audit_cmd,
     classify_pip_audit_result,
     run_audit_pipeline,
 )
@@ -131,3 +132,54 @@ def test_pipeline_fails_closed_when_both_services_fail() -> None:
         executor=mock_executor,
     )
     assert rc != 0
+
+
+def test_build_audit_cmd_runtime_path_defaults_strict_and_unfiltered() -> None:
+    """Runtime --path mode enables --strict and never omits packages with --skip-editable/--no-deps."""
+    cmd = build_audit_cmd(
+        path="/opt/venv/lib/python3.12/site-packages",
+        output_format="json",
+        output_file="/tmp/out.json",
+    )
+    assert "--path" in cmd
+    assert "/opt/venv/lib/python3.12/site-packages" in cmd
+    assert "--strict" in cmd
+    assert "--skip-editable" not in cmd
+    assert "--no-deps" not in cmd
+    assert "--disable-pip" not in cmd
+    assert "-f" in cmd and "json" in cmd
+    assert "-o" in cmd and "/tmp/out.json" in cmd
+
+
+def test_classify_json_vulnerability_and_unverified_package_errors() -> None:
+    """JSON vulnerability payloads and pip-audit count summaries fail immediately; missing PyPI packages fail closed."""
+    json_vuln = '{"dependencies": [{"name": "pkg", "version": "1.0", "vulns": [{"id": "RUSTSEC-2026-0001"}]}]}'
+    assert classify_pip_audit_result(1, json_vuln, "") == "VULNERABILITY_FOUND"
+    assert classify_pip_audit_result(1, "", "Found 226 known vulnerabilities in 25 packages") == "VULNERABILITY_FOUND"
+    assert classify_pip_audit_result(1, "", "Found 1 known vulnerability in 1 package") == "VULNERABILITY_FOUND"
+
+    missing_pkg_err = "ERROR:pip_audit._cli:cfi-connector-sdk: Dependency not found on PyPI and could not be audited"
+    assert classify_pip_audit_result(1, "", missing_pkg_err) == "CLI_OR_CONFIG_ERROR"
+
+
+def test_runtime_path_pipeline_preserves_flags_across_osv_fallback() -> None:
+    """Runtime --path audit preserves runtime target and --strict when falling back to OSV."""
+    calls: list[list[str]] = []
+
+    def mock_executor(cmd: list[str]) -> tuple[int, str, str]:
+        calls.append(cmd)
+        if "-s" in cmd and "osv" in cmd:
+            return 0, "[]", ""
+        return 2, "", "503 Server Error: Service Unavailable"
+
+    rc = run_audit_pipeline(
+        path="/tmp/runtime-site-packages",
+        output_format="json",
+        max_retries=2,
+        initial_backoff=0.01,
+        executor=mock_executor,
+    )
+    assert rc == 0
+    assert len(calls) == 3
+    assert all("--path" in c and "/tmp/runtime-site-packages" in c and "--strict" in c for c in calls)
+    assert "-s" in calls[-1] and "osv" in calls[-1]

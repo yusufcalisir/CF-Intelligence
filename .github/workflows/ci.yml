@@ -36,7 +36,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Linting & Security Tools
         run: uv pip install --system ruff bandit mypy pip-audit pydantic pydantic-settings types-PyYAML
@@ -76,7 +76,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Backend Dependencies
         run: |
@@ -165,7 +165,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Dependencies
         run: |
@@ -205,7 +205,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Dependencies
         run: |
@@ -245,7 +245,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Dependencies
         run: |
@@ -391,7 +391,7 @@ jobs:
       - name: Set up uv Package Manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.7"
 
       - name: Install Verification Dependencies
         run: |

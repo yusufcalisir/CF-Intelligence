@@ -33,7 +33,7 @@ print(">>> Python main.py loaded successfully! <<<", flush=True)
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -706,12 +706,7 @@ app.add_middleware(
     expose_headers=["Retry-After", "X-RateLimit-Exceeded"],
 )
 
-# ── HTTP Security Headers ─────────────────────────────────────────────────────
-# Injected on every response: CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy.
-# NOTE: Starlette executes middleware in LIFO order (last added = outermost).
-# SecurityHeadersMiddleware is added AFTER CORSMiddleware so CORS headers are
-# set first and security headers wrap the final outbound response.
-app.add_middleware(SecurityHeadersMiddleware)
+# ── HTTP Security Headers (mounted outermost below after RequestBodySizeLimitMiddleware) ──
 
 
 # ── Global Exception Handler (RFC 7807 Compliant & Production Sanitized) ──────
@@ -778,11 +773,26 @@ app.add_middleware(ContentTypeMiddleware)
 
 
 # ── Request Body Size Limit Middleware ─────────────────────────────────────────
+class _RequestBodyLimitExceeded(BaseException):
+    """Internal control-flow abort when streamed request body exceeds max_bytes.
+
+    Inherits from BaseException so downstream except Exception handlers,
+    FastAPI ExceptionMiddleware, or multipart form parsers cannot swallow the
+    413 abort before it unwinds to RequestBodySizeLimitMiddleware.
+    """
+
+    def __init__(self, received_bytes: int) -> None:
+        self.received_bytes = received_bytes
+        super().__init__(f"Request body exceeded limit at {received_bytes} bytes")
+
+
 class RequestBodySizeLimitMiddleware:
     """Enforce strict upper bound on request payload size (Pure ASGI).
 
     Mitigates resource exhaustion and parser denial-of-service from oversized
     or malicious streaming/multipart bodies before unbounded allocation occurs.
+    Mounted outermost below so size bounds run before auth, content-type,
+    JSON decoding, or multipart form parsing.
     """
 
     DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -790,12 +800,60 @@ class RequestBodySizeLimitMiddleware:
     def __init__(self, app: ASGIApp, max_bytes: int | None = None) -> None:
         self.app = app
         if max_bytes is not None:
+            if max_bytes <= 0:
+                raise ValueError("max_bytes must be a positive integer.")
             self.max_bytes = max_bytes
         else:
             try:
-                self.max_bytes = int(os.getenv("CFI_MAX_REQUEST_BODY_SIZE", str(self.DEFAULT_MAX_BYTES)))
+                parsed = int(os.getenv("CFI_MAX_REQUEST_BODY_SIZE", str(self.DEFAULT_MAX_BYTES)))
+                self.max_bytes = parsed if parsed > 0 else self.DEFAULT_MAX_BYTES
             except ValueError:
                 self.max_bytes = self.DEFAULT_MAX_BYTES
+
+    @staticmethod
+    def _problem_response(
+        status_code: int,
+        error_slug: str,
+        title: str,
+        detail: str,
+        path: str,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "type": f"https://cfi-platform.org/errors/{error_slug}",
+                "title": title,
+                "status": status_code,
+                "detail": detail,
+                "instance": path,
+            },
+        )
+
+    @staticmethod
+    def _parse_content_length_headers(
+        headers: list[tuple[bytes, bytes]],
+    ) -> tuple[int | None, str | None]:
+        """Validate all Content-Length headers fail-closed per RFC 9112 section 6.3."""
+        values: list[int] = []
+        for name, raw_value in headers:
+            if name.lower() != b"content-length":
+                continue
+            try:
+                decoded = raw_value.decode("latin-1")
+            except UnicodeDecodeError:
+                return None, "Invalid Content-Length header encoding."
+            parts = [part.strip() for part in decoded.split(",")]
+            if not parts or any(not part or not (part.isascii() and part.isdigit()) for part in parts):
+                return None, "Malformed or negative Content-Length header."
+            for part in parts:
+                values.append(int(part))
+
+        if not values:
+            return None, None
+        first = values[0]
+        if any(v != first for v in values[1:]):
+            return None, "Conflicting Content-Length headers are not permitted."
+        return first, None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -803,66 +861,79 @@ class RequestBodySizeLimitMiddleware:
             return
 
         path = scope.get("path", "")
-        # Check upfront Content-Length header
-        content_length: int | None = None
-        for name, value in scope.get("headers", []):
-            if name.lower() == b"content-length":
-                try:
-                    content_length = int(value.decode("latin-1"))
-                except (ValueError, UnicodeDecodeError):
-                    content_length = None
-                break
-
-        if content_length is not None and content_length > self.max_bytes:
-            response = JSONResponse(
-                status_code=413,
-                content={
-                    "type": "https://cfi-platform.org/errors/PayloadTooLarge",
-                    "title": "Payload Too Large",
-                    "status": 413,
-                    "detail": f"Request body size ({content_length} bytes) exceeds maximum allowed limit of {self.max_bytes} bytes.",
-                    "instance": path,
-                },
+        content_length, cl_error = self._parse_content_length_headers(
+            list(scope.get("headers", []))
+        )
+        if cl_error is not None:
+            response = self._problem_response(
+                status_code=400,
+                error_slug="BadRequest",
+                title="Bad Request",
+                detail=cl_error,
+                path=path,
             )
             await response(scope, receive, send)
             return
 
-        # Wrap receive stream to defend against chunked / streaming bodies exceeding limit
+        if content_length is not None and content_length > self.max_bytes:
+            response = self._problem_response(
+                status_code=413,
+                error_slug="PayloadTooLarge",
+                title="Payload Too Large",
+                detail=(
+                    f"Request body size ({content_length} bytes) exceeds maximum allowed limit "
+                    f"of {self.max_bytes} bytes."
+                ),
+                path=path,
+            )
+            await response(scope, receive, send)
+            return
+
+        # Wrap receive stream to defend against chunked / streaming / multipart bodies
+        # exceeding limit without buffering past max_bytes.
         received_bytes = 0
+        limit_exceeded = False
+        response_started = False
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
 
         async def limited_receive() -> Message:
-            nonlocal received_bytes
+            nonlocal received_bytes, limit_exceeded
+            if limit_exceeded:
+                raise _RequestBodyLimitExceeded(received_bytes)
+
             message = await receive()
-            if message["type"] == "http.request":
+            if message.get("type") == "http.request":
                 chunk = message.get("body", b"")
+                if not isinstance(chunk, (bytes, bytearray, memoryview)):
+                    raise TypeError("ASGI http.request body chunk must be bytes-like.")
                 received_bytes += len(chunk)
                 if received_bytes > self.max_bytes:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"Streaming payload exceeded maximum allowed limit of {self.max_bytes} bytes.",
-                    )
+                    limit_exceeded = True
+                    raise _RequestBodyLimitExceeded(received_bytes)
             return message
 
         try:
-            await self.app(scope, limited_receive, send)
-        except HTTPException as exc:
-            if exc.status_code == 413:
-                response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "type": "https://cfi-platform.org/errors/PayloadTooLarge",
-                        "title": "Payload Too Large",
-                        "status": 413,
-                        "detail": exc.detail,
-                        "instance": path,
-                    },
-                )
-                await response(scope, receive, send)
-            else:
-                raise
-
-
-app.add_middleware(RequestBodySizeLimitMiddleware)
+            await self.app(scope, limited_receive, send_wrapper)
+        except _RequestBodyLimitExceeded as exc:
+            if response_started:
+                raise RuntimeError(
+                    "Streaming payload exceeded maximum allowed limit after response started."
+                ) from exc
+            response = self._problem_response(
+                status_code=413,
+                error_slug="PayloadTooLarge",
+                title="Payload Too Large",
+                detail=(
+                    f"Streaming payload exceeded maximum allowed limit of {self.max_bytes} bytes."
+                ),
+                path=path,
+            )
+            await response(scope, receive, send)
 
 
 # ── W3C Distributed Trace Context Middleware ─────────────────────────────────
@@ -1444,6 +1515,13 @@ class TenantAccessControlMiddleware:
 
 
 app.add_middleware(TenantAccessControlMiddleware)
+# Outermost HTTP intake boundary (LIFO last-added = first-executed): enforce strict
+# payload size limits BEFORE tenant auth, DDoS rate limiting, mTLS header checks,
+# content-type validation, JSON parsing, or multipart form processing.
+app.add_middleware(RequestBodySizeLimitMiddleware)
+# Outermost outbound response header wrapper: injects security headers on EVERY
+# response (including early 400/401/403/413/415/429 rejections) without reading receive.
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ── Observability ─────────────────────────────

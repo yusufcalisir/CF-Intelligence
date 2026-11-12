@@ -64,12 +64,13 @@ class TestEnterpriseSecurityCIWorkflow:
         assert "schedule" in triggers
 
     def test_workflow_defines_all_five_security_jobs(self, workflow_yaml: dict[str, Any]):
-        """Workflow must contain all 5 required security jobs."""
+        """Workflow must contain all core security jobs, including independent backend & frontend Trivy jobs."""
         jobs = workflow_yaml.get("jobs", {})
         expected_jobs = [
             "sast-static-analysis",
             "dependency-security-audit",
             "trivy-container-security",
+            "trivy-frontend-container-security",
             "helm-and-terraform-security-audit",
             "pytest-security-and-compliance-suites",
         ]
@@ -87,14 +88,46 @@ class TestEnterpriseSecurityCIWorkflow:
         assert any("Bandit" in name for name in step_names), "Missing Bandit SAST step"
 
     def test_container_job_uses_trivy_action(self, workflow_yaml: dict[str, Any]):
-        """Container security job must execute Trivy vulnerability scanner action."""
-        trivy_job = workflow_yaml["jobs"]["trivy-container-security"]
-        steps = trivy_job.get("steps", [])
-        uses_actions = [s.get("uses", "") for s in steps]
+        """Backend & frontend Trivy jobs run independently, pin scanners, and block CRITICAL/HIGH without ignore-unfixed."""
+        jobs = workflow_yaml["jobs"]
+        backend_job = jobs["trivy-container-security"]
+        frontend_job = jobs["trivy-frontend-container-security"]
 
-        assert any("trivy-action" in action for action in uses_actions), (
-            "Missing Trivy vulnerability scanner action in container job"
-        )
+        # Independent jobs: neither waits on or depends on the other
+        assert "needs" not in backend_job
+        assert "needs" not in frontend_job
+
+        for job_name, job in (
+            ("trivy-container-security", backend_job),
+            ("trivy-frontend-container-security", frontend_job),
+        ):
+            trivy_steps = [s for s in job.get("steps", []) if "trivy-action" in s.get("uses", "")]
+            assert len(trivy_steps) == 1, f"{job_name} must execute its own Trivy scan step"
+            step = trivy_steps[0]
+            uses_ref = step["uses"]
+            assert "@master" not in uses_ref and "@main" not in uses_ref and "@latest" not in uses_ref
+            with_cfg = step.get("with", {})
+            assert with_cfg.get("exit-code") == "1"
+            assert with_cfg.get("severity") == "CRITICAL,HIGH"
+            assert with_cfg.get("ignore-unfixed") is False, (
+                f"{job_name} must not silently ignore unfixed CRITICAL/HIGH vulnerabilities"
+            )
+            assert with_cfg.get("version") and with_cfg["version"] != "latest"
+
+        # Backend container job also enforces runtime /opt/venv pip-audit, Ray checks, and permissions
+        backend_runs = "\n".join(s.get("run", "") for s in backend_job.get("steps", []))
+        assert "run_pip_audit.py" in backend_runs and "--path" in backend_runs
+        assert "test_ray_runtime_functional.py" in backend_runs
+        assert "ray/jars" in backend_runs
+
+        # No setup-uv step may float on "latest"
+        for job_name, job in jobs.items():
+            for step in job.get("steps", []):
+                if "setup-uv" in step.get("uses", ""):
+                    uv_ver = step.get("with", {}).get("version", "")
+                    assert uv_ver and uv_ver != "latest", (
+                        f"{job_name} must pin setup-uv version instead of '{uv_ver}'"
+                    )
 
     def test_iac_job_includes_helm_and_terraform(self, workflow_yaml: dict[str, Any]):
         """Infrastructure job must contain Helm linting and Terraform validation steps."""
