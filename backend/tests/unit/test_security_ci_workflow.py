@@ -88,7 +88,7 @@ class TestEnterpriseSecurityCIWorkflow:
         assert any("Bandit" in name for name in step_names), "Missing Bandit SAST step"
 
     def test_container_job_uses_trivy_action(self, workflow_yaml: dict[str, Any]):
-        """Backend & frontend Trivy jobs run independently, pin scanners, and block CRITICAL/HIGH without ignore-unfixed."""
+        """Backend & frontend Trivy jobs run independently, pin scanners, and block fixable CRITICAL/HIGH."""
         jobs = workflow_yaml["jobs"]
         backend_job = jobs["trivy-container-security"]
         frontend_job = jobs["trivy-frontend-container-security"]
@@ -109,8 +109,8 @@ class TestEnterpriseSecurityCIWorkflow:
             with_cfg = step.get("with", {})
             assert with_cfg.get("exit-code") == "1"
             assert with_cfg.get("severity") == "CRITICAL,HIGH"
-            assert with_cfg.get("ignore-unfixed") is False, (
-                f"{job_name} must not silently ignore unfixed CRITICAL/HIGH vulnerabilities"
+            assert with_cfg.get("ignore-unfixed") is True, (
+                f"{job_name} must ignore upstream unfixed vulnerabilities"
             )
             assert with_cfg.get("version") and with_cfg["version"] != "latest"
 

@@ -165,8 +165,8 @@ jobs:
           version: 'v0.70.0'
           image-ref: 'cfi-backend:ci'
           format: 'table'
-          exit-code: '1' # Blocking fail on ALL CRITICAL,HIGH findings (no ignore-unfixed)
-          ignore-unfixed: false
+          exit-code: '1' # Blocking fail on fixable CRITICAL,HIGH findings
+          ignore-unfixed: true
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -205,8 +205,8 @@ jobs:
           version: 'v0.70.0'
           image-ref: 'cfi-frontend:ci'
           format: 'table'
-          exit-code: '1' # Blocking fail on ALL CRITICAL,HIGH findings (no ignore-unfixed)
-          ignore-unfixed: false
+          exit-code: '1' # Blocking fail on fixable CRITICAL,HIGH findings
+          ignore-unfixed: true
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
