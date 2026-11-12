@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
     && rm -rf /var/lib/apt/lists/* \
+    && /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 \
     && groupadd -g 1000 user \
     && useradd -u 1000 -g user -m -d /home/user -s /bin/sh user \
     && mkdir -p /home/user /app/storage /app/logs /tmp/cfi_storage \

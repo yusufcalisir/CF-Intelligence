@@ -19,7 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install verified OpenMined PSI and minimal worker dependencies
-RUN pip install --no-cache-dir \
+RUN /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 && \
+    pip install --no-cache-dir \
     openmined-psi==2.0.6 \
     filelock>=4.2.1 \
     fastapi>=0.115.0 \
