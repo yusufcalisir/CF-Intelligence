@@ -192,7 +192,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
           <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-400/40 shrink-0 shadow-[0_0_12px_rgba(99,102,241,0.3)]">
-                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                <ShieldCheck className="w-4 h-4 text-cyan-800" />
                 <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
@@ -201,11 +201,11 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               <div className="min-w-0">
                 <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight flex items-center gap-1.5 truncate">
                   Consortium Handshake
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-600 bg-cyan-50 border border-cyan-500/25">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-800 bg-cyan-50 border border-cyan-500/25">
                     <Radio className="w-2 h-2 animate-pulse" /> DEMO SEQUENCE
                   </span>
                 </h3>
-                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-500 truncate">
+                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-700 truncate">
                   CF-Intelligence · Initialization Animation Preview
                 </p>
               </div>
@@ -214,7 +214,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             <button
               onClick={onComplete || onClose}
               aria-label="Skip handshake and proceed to dashboard"
-              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               title="Direct jump to dashboard"
             >
               <span>Skip</span>
@@ -258,7 +258,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                     <span className="text-[7.5px] font-mono font-bold text-cyan-700">SGX TEE</span>
                   </div>
                 </div>
-                <span className="text-[8.5px] font-mono text-cyan-600 font-semibold mt-1">FL Coordinator</span>
+                <span className="text-[8.5px] font-mono text-cyan-800 font-semibold mt-1">FL Coordinator</span>
               </div>
 
               {/* 3 Bank Nodes Around Enclave */}
@@ -278,7 +278,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   >
                     {node.id}
                   </div>
-                  <span className="text-[7.5px] font-mono text-slate-500 mt-0.5">{node.role}</span>
+                  <span className="text-[7.5px] font-mono text-slate-700 mt-0.5">{node.role}</span>
                 </div>
               ))}
             </div>
@@ -306,7 +306,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                   <h4 className="text-xs sm:text-[13px] font-bold text-slate-800 tracking-tight truncate mt-0.5">
                     {currentStage.label}
                   </h4>
-                  <p className="text-[10px] text-slate-500 truncate mt-0.2">
+                  <p className="text-[10px] text-slate-700 truncate mt-0.2">
                     {currentStage.subtext}
                   </p>
                 </div>
@@ -388,7 +388,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                     : 'Synchronizing Consortium Data Plane...'}
                 </span>
               </span>
-              <span className="text-cyan-600 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
+              <span className="text-cyan-800 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
             </div>
             <div className="relative w-full h-1.5 sm:h-2 bg-white rounded-full overflow-hidden border border-slate-200 p-0.5">
               <div
@@ -396,7 +396,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5">
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-700 pt-0.5">
               <span>Interactive launch preview animation</span>
               <span>Verifying runtime services concurrently</span>
             </div>

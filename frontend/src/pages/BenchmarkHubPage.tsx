@@ -272,7 +272,7 @@ export const BenchmarkHubPage: React.FC = () => {
               </span>
             </div>
             <div className="text-sm font-semibold text-slate-900 mt-1 truncate">{datasetDescriptions[ds]?.title ?? ds}</div>
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{datasetDescriptions[ds]?.subtitle ?? ''}</p>
+            <p className="text-xs text-slate-700 mt-1 line-clamp-2">{datasetDescriptions[ds]?.subtitle ?? ''}</p>
           </button>
         ))}
       </div>

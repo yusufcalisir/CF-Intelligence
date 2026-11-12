@@ -180,7 +180,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 Connecting...
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-500 border border-slate-500/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-500/15 text-slate-700 border border-slate-500/30">
                 WS Offline
               </span>
             )}

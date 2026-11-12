@@ -615,7 +615,7 @@ export default function PoliciesPage() {
               </button>
 
               {errorMessage && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 text-xs">
                   {errorMessage}
                 </div>
               )}
@@ -791,7 +791,7 @@ export default function PoliciesPage() {
                 </div>
 
                 {errorMessage && (
-                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 text-xs">
                     {errorMessage}
                   </div>
                 )}

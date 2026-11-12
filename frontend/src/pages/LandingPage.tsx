@@ -864,20 +864,20 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 min-w-0">
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Active FL Round</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-600 mt-0.5">#{flRound}</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-700 uppercase">Active FL Round</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-700 mt-0.5">#{flRound}</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Global Accuracy</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-600 mt-0.5">{accuracy}%</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-700 uppercase">Global Accuracy</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-800 mt-0.5">{accuracy}%</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Privacy Budget</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-600 mt-0.5">ε = 0.50</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-700 uppercase">Privacy Budget</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-700 mt-0.5">ε = 0.50</div>
                   </div>
                   <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-200">
-                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-500 uppercase">Stream Speed</div>
-                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-600 mt-0.5">1.4 GB/s</div>
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-700 uppercase">Stream Speed</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-800 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-500">
@@ -887,8 +887,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
                 <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 min-w-0">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-slate-200 bg-slate-50">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Risk Alert Feed</span>
-                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-600">
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-700 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-800">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
                     </span>
                   </div>
@@ -896,9 +896,9 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     {alerts.map((a) => (
                       <div key={`${a.id}-${alertTick}`} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 text-[8.5px] sm:text-[9px] font-mono min-w-0">
                         <span className={`w-1 h-3 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <span className="text-slate-500 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
+                        <span className="text-slate-700 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
                         <span className="text-slate-600 flex-1 truncate">${a.amount}</span>
-                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-600' : 'text-emerald-600'}`}>{a.score.toFixed(2)}</span>
+                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-700' : 'text-emerald-800'}`}>{a.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -906,8 +906,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-1.5 sm:p-2 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-wider">Consortium Topology</span>
-                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-600">3/3 Nodes Synced</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-700 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-800">3/3 Nodes Synced</span>
                   </div>
                   <HighEndConsortiumSVG />
                 </div>

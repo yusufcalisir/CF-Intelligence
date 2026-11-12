@@ -35,7 +35,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     subtext: 'Loading 284,807 real-world credit card transactions & 492 fraud cases',
     tag: '284.8k Records · Loaded',
     icon: Database,
-    color: '#6366f1',
+    color: '#4338ca',
     glow: 'rgba(99, 102, 241, 0.4)',
   },
   {
@@ -44,7 +44,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     subtext: 'Synthesizing heterogeneous data skew across JPM, HSBC & DBK nodes',
     tag: 'Dirichlet α=0.5 · Bounded',
     icon: Layers,
-    color: '#8b5cf6',
+    color: '#6d28d9',
     glow: 'rgba(139, 92, 246, 0.4)',
   },
   {
@@ -53,7 +53,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     subtext: 'Benchmarking PR-AUC (0.8420 vs 0.6940) & ROC-AUC (0.9120 vs 0.8350)',
     tag: '+21.3% PR-AUC Gain',
     icon: TrendingUp,
-    color: '#06b6d4',
+    color: '#155e75',
     glow: 'rgba(6, 182, 212, 0.4)',
   },
   {
@@ -62,7 +62,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     subtext: 'Reconciling cross-bank laundering volume detection (+$836.3k detected volume)',
     tag: '+55.59% Gain',
     icon: Cpu,
-    color: '#10b981',
+    color: '#065f46',
     glow: 'rgba(16, 185, 129, 0.4)',
   },
   {
@@ -71,7 +71,7 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
     subtext: 'Attestation verified. Opening live interactive empirical metrics canvas',
     tag: 'Sandbox Ready · v2.4',
     icon: ShieldCheck,
-    color: '#38bdf8',
+    color: '#0369a1',
     glow: 'rgba(56, 189, 248, 0.4)',
   },
 ];
@@ -183,7 +183,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
               <button
                 onClick={onComplete || onClose}
                 aria-label="Skip initialization and open benchmark hub"
-                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 title="Direct jump to benchmark sandbox"
               >
                 <span>Skip</span>
@@ -212,7 +212,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                   <CurrentIcon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block truncate">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-700 block truncate">
                     Stage 0{currentStage.id} of 05
                   </span>
                   <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
@@ -251,7 +251,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                     isCurrent
                       ? 'bg-indigo-600/15 border border-indigo-200 text-indigo-700'
                       : isCompleted
-                      ? 'text-slate-500 opacity-80'
+                      ? 'text-slate-700'
                       : 'text-slate-600 opacity-40'
                   }`}
                 >
@@ -281,7 +281,7 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] font-mono text-slate-500">
+            <div className="flex justify-between text-[10px] font-mono text-slate-700">
               <span>Authenticating Secure Sandbox...</span>
               <span>Redirecting to Benchmark Hub</span>
             </div>

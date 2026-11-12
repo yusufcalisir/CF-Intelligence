@@ -248,7 +248,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
             <span>Back to Alerts Feed</span>
           </Link>
           <span className="text-xs text-slate-600 shrink-0">/</span>
-          <span className="text-xs font-mono font-semibold text-cyan-600 truncate max-w-[140px] sm:max-w-none">
+          <span className="text-xs font-mono font-semibold text-cyan-800 truncate max-w-[140px] sm:max-w-none">
             {effectiveAlertId || 'Select Target Alert'}
           </span>
         </div>
@@ -527,7 +527,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>💵</span> Transaction Amount ($)
               </span>
-              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-800 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 ${amount.toLocaleString()}
               </span>
             </div>
@@ -557,7 +557,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>⚡</span> Hourly Velocity (txns/hr)
               </span>
-              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-800 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 {velocity} txns
               </span>
             </div>
@@ -587,7 +587,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               <span className="text-slate-600 font-semibold flex items-center gap-1.5">
                 <span>🏢</span> Merchant Risk Category
               </span>
-              <span className="font-mono text-cyan-600 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
+              <span className="font-mono text-cyan-800 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-500/30">
                 {(merchantRisk * 100).toFixed(0)}% Risk
               </span>
             </div>
@@ -678,7 +678,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               {/* Status and Baseline Delta */}
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 {isSuspicious ? (
-                  <span className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-300 font-bold">
+                  <span className="flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-300 font-bold">
                     <AlertTriangle className="h-3.5 w-3.5" /> High Risk (Fraud Suspected)
                   </span>
                 ) : (
@@ -695,8 +695,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   <span
                     className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
                       scoreDelta > 0
-                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                        : 'bg-rose-50 text-rose-600 border border-rose-300'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-300'
                     }`}
                   >
                     {scoreDelta > 0 ? `-${scoreDelta} pts` : `+${Math.abs(scoreDelta)} pts`} vs baseline

@@ -475,7 +475,7 @@ export default function SecurityPage() {
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
                     <span className="text-[var(--color-text-muted)]">mTLS Status</span>
-                    <span className="font-mono text-emerald-600 font-bold">
+                    <span className="font-mono text-emerald-800 font-bold">
                       {status?.mtls.enabled ? 'ACTIVE (CERT_REQUIRED)' : 'DEVELOPMENT'}
                     </span>
                   </div>
@@ -489,7 +489,7 @@ export default function SecurityPage() {
                   </div>
                   <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
                     <span className="text-[var(--color-text-muted)]">Peer SAN Validation</span>
-                    <span className="font-mono text-emerald-600 font-bold">{status?.mtls.peer_verification}</span>
+                    <span className="font-mono text-emerald-800 font-bold">{status?.mtls.peer_verification}</span>
                   </div>
                 </div>
               </div>

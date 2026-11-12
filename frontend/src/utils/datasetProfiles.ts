@@ -58,7 +58,7 @@ export const DATASET_PROFILES: Record<DatasetProfile['id'], DatasetProfile> = {
     subtitle: 'Kenya M-Pesa · 6.36M transactions · 11 features',
     badge: 'Academic Standard · Kaggle: ealaxi/paysim1',
     sourceLink: 'https://www.kaggle.com/datasets/ealaxi/paysim1',
-    color: '#6366f1',   // indigo - matches platform primary
+    color: '#4338ca',   // indigo-700 - matches platform primary
     icon: '📱',
     totalSamples: 6_362_620,
     fraudRatio: 0.00129,   // REAL: 8,213 / 6,362,620 = 0.129% (verified from PS_20174392719...log.csv)
@@ -82,7 +82,7 @@ export const DATASET_PROFILES: Record<DatasetProfile['id'], DatasetProfile> = {
     subtitle: 'Vesta Corp · 590K e-commerce txns · 394 features',
     badge: 'Real Production Data · Kaggle Competition',
     sourceLink: 'https://www.kaggle.com/competitions/ieee-fraud-detection',
-    color: '#0ea5e9',   // sky blue - high-feature dense data
+    color: '#0369a1',   // sky-700 - high-feature dense data
     icon: '🛒',
     totalSamples: 590_540,
     fraudRatio: 0.03499,
@@ -106,7 +106,7 @@ export const DATASET_PROFILES: Record<DatasetProfile['id'], DatasetProfile> = {
     subtitle: '203K+ nodes · 234K+ directed edges · GNN topology',
     badge: 'Real On-Chain Graph Data · Elliptic Co.',
     sourceLink: 'https://www.kaggle.com/datasets/ellipticco/elliptic-data-set',
-    color: '#f59e0b',   // amber - blockchain/graph context
+    color: '#92400e',   // amber-800 - blockchain/graph context
     icon: '🔗',
     totalSamples: 46_564,       // REAL: labeled nodes only (unknown class excluded) from elliptic_txs_classes.csv
     fraudRatio: 0.09761,          // REAL: 4,545 illicit / 46,564 labeled nodes = 9.76%
@@ -130,7 +130,7 @@ export const DATASET_PROFILES: Record<DatasetProfile['id'], DatasetProfile> = {
     subtitle: '284K txns · 0.17% fraud · PCA V1–V28 features',
     badge: 'PCA Benchmark Standard · ULB Machine Learning Group',
     sourceLink: 'https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud',
-    color: '#10b981',   // emerald - classic benchmark
+    color: '#065f46',   // emerald-800 - classic benchmark
     icon: '💳',
     totalSamples: 284_807,
     fraudRatio: 0.001727,

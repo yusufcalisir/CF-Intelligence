@@ -1122,10 +1122,10 @@ export default function LiveOperationsView() {
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                   wsStatus === 'CONNECTED' && !isOfflineDemoMode
-                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-500/30'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-500/30'
                     : wsStatus === 'RECONNECTING'
-                    ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                    : 'bg-slate-500/15 text-slate-500 border border-slate-500/30'
+                    ? 'bg-amber-500/15 text-amber-800 border border-amber-500/30'
+                    : 'bg-slate-500/15 text-slate-700 border border-slate-500/30'
                 }`}
               >
                 <span
@@ -1244,18 +1244,18 @@ export default function LiveOperationsView() {
             {/* Training Mode Tag */}
             <span
               className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${trainingMode === 'mock'
-                  ? 'text-indigo-600 border-indigo-500/40 bg-indigo-50'
-                  : 'text-amber-600 border-amber-500/40 bg-amber-50'
+                  ? 'text-indigo-700 border-indigo-500/40 bg-indigo-50'
+                  : 'text-amber-800 border-amber-500/40 bg-amber-50'
                 }`}
             >
               {trainingMode === 'mock' ? (
                 <>
-                  <FlaskConical size={11} className="text-indigo-600" />
+                  <FlaskConical size={11} className="text-indigo-700" />
                   <span>Simulated Sandbox (Demo Mode)</span>
                 </>
               ) : (
                 <>
-                  <Zap size={11} className="text-amber-600" />
+                  <Zap size={11} className="text-amber-800" />
                   <span>Live Backend Orchestration</span>
                 </>
               )}
@@ -1318,7 +1318,7 @@ export default function LiveOperationsView() {
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
             {bankNodes.filter((b) => b.status === 'ACTIVE').length} / {bankNodes.length}
           </p>
-          <p className="text-xs text-emerald-600 mt-1">100% Quorum Reached</p>
+          <p className="text-xs text-emerald-800 mt-1">100% Quorum Reached</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
@@ -1346,7 +1346,7 @@ export default function LiveOperationsView() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">DP Epsilon Consumed</p>
-          <p className="text-2xl font-bold font-mono text-amber-600 mt-1">2.10 / 8.00</p>
+          <p className="text-2xl font-bold font-mono text-amber-800 mt-1">2.10 / 8.00</p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">73.7% Privacy Budget Left</p>
         </motion.div>
       </div>
@@ -1479,7 +1479,7 @@ export default function LiveOperationsView() {
               <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/hour)</p>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
               LIVE AGGREGATION
             </span>
           </div>
@@ -1681,7 +1681,7 @@ export default function LiveOperationsView() {
                 Asset Recovery &amp; FININT Operational Hub
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-mono text-slate-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
               LIVE · {arSummary.total_events} events
             </span>
           </div>

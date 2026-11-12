@@ -272,7 +272,7 @@ export default function ObservabilityPage() {
             <span className="text-lg sm:text-xl shrink-0">{tab.icon}</span>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-slate-800 truncate">{tab.title}</div>
-              <div className="text-[10px] font-mono text-slate-500 truncate">{tab.subtitle}</div>
+              <div className="text-[10px] font-mono text-slate-700 truncate">{tab.subtitle}</div>
             </div>
           </button>
         ))}
@@ -361,7 +361,7 @@ export default function ObservabilityPage() {
                 />
                 <div>
                   <div className="font-semibold text-slate-700">Alertmanager Webhook</div>
-                  <div className="text-[10px] text-slate-500">Emit ModelConceptDriftCritical</div>
+                  <div className="text-[10px] text-slate-700">Emit ModelConceptDriftCritical</div>
                 </div>
               </label>
 

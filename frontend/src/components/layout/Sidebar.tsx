@@ -185,7 +185,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         to={path}
                         className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                           isActive
-                            ? 'bg-[var(--color-accent-indigo)]/15 text-[var(--color-accent-indigo-light)] border border-[var(--color-accent-indigo)]/30'
+                            ? 'bg-[var(--color-accent-indigo)]/15 text-indigo-700 border border-[var(--color-accent-indigo)]/30'
                             : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)]'
                         }`}
                       >
