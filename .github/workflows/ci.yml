@@ -52,8 +52,8 @@ jobs:
 
       - name: Run Python Dependency Audit (pip-audit)
         run: |
-          uv pip compile backend/requirements.txt -o /tmp/requirements.lock --quiet
-          python backend/scripts/run_pip_audit.py -r /tmp/requirements.lock
+          cd backend && uv lock --check && cd ..
+          python backend/scripts/run_pip_audit.py -r backend/requirements.lock
 
   # --------------------------------------------------------------------------
   # 2. Backend Unit, Integration & Chaos Test Suite

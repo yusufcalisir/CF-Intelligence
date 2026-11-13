@@ -18,12 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install --no-cache-dir uv==0.13.7
 
-COPY backend/requirements.txt ./
+COPY backend/requirements.lock ./
 RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
-    uv pip install --no-cache -r requirements.txt && \
+    uv pip install --no-cache --require-hashes -r requirements.lock && \
     rm -rf /opt/venv/lib/python*/site-packages/ray/jars && \
-    find /opt/venv -name "bom.cdx.json" -delete && \
     test ! -e /opt/venv/lib/python3.12/site-packages/ray/jars
 
 # ── Stage 2: Production Runtime ──────────────────────
@@ -45,7 +44,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
     && rm -rf /var/lib/apt/lists/* \
     && /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 \
-    && find /usr/local -name "bom.cdx.json" -delete \
     && groupadd -g 1000 user \
     && useradd -u 1000 -g user -m -d /home/user -s /bin/sh user \
     && mkdir -p /home/user /app/storage /app/logs /tmp/cfi_storage \

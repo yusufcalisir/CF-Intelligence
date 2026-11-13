@@ -1,51 +1,64 @@
 # Multi-Stage Hardened Dockerfile for CFI Institutional Private Matching Worker
-FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
+# Stage 1: Build virtual environment with hash-verified, locked dependencies
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS builder
+
+WORKDIR /build
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ca-certificates \
+    && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv==0.13.7
+
+COPY docker/worker-requirements.lock ./
+RUN uv venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    uv pip install --no-cache --require-hashes -r worker-requirements.lock
+
+# Stage 2: Minimalist, hardened non-root runtime (no compilers/build-essential)
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS runtime
 
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/backend" \
     APP_ENV="production" \
     HOME="/home/worker" \
     CFI_STORAGE_DIR="/vault"
 
-# Install system dependencies
+# Install only runtime OS dependencies (curl + ca-certificates for healthchecks/TLS)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    build-essential \
     && apt-get --only-upgrade install -y apt=2.6.2 libapt-pkg6.0=2.6.2 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 \
+    && groupadd -g 10001 worker \
+    && useradd -u 10001 -g worker -m -d /home/worker -s /bin/sh worker \
+    && mkdir -p /vault /vault/logs /app/backend /home/worker /tmp/cfi_storage \
+    && chmod 0700 /vault /vault/logs \
+    && chmod 0750 /home/worker /tmp/cfi_storage \
+    && chown -R worker:worker /vault /home/worker /tmp/cfi_storage
 
-# Install verified OpenMined PSI and minimal worker dependencies
-RUN /usr/local/bin/python3 -m pip install --no-cache-dir --upgrade pip==26.3 && \
-    find /usr/local -name "bom.cdx.json" -delete && \
-    pip install --no-cache-dir \
-    openmined-psi==2.0.6 \
-    filelock>=4.2.1 \
-    fastapi>=0.115.0 \
-    uvicorn>=0.30.0 \
-    pydantic>=2.9.0 \
-    pydantic-settings>=2.5.0 \
-    httpx>=0.27.0 \
-    cryptography>=50.0.0 \
-    pyjwt>=2.15.0 \
-    bcrypt>=4.0.0 \
-    redis>=5.2.0
-
-# Create dedicated non-root institutional worker identity (uid: 10001, gid: 10001)
-RUN groupadd -g 10001 worker && \
-    useradd -u 10001 -g worker -m -d /home/worker -s /bin/sh worker && \
-    mkdir -p /vault /app/backend /home/worker && \
-    chmod 0700 /vault && \
-    chmod 0750 /home/worker && \
-    chown -R worker:worker /vault /home/worker
+COPY --from=builder /opt/venv /opt/venv
+RUN chown -R root:root /opt/venv && chmod -R go-w /opt/venv
 
 # Copy application backend codebase read-only to runtime user (root-owned, go-w)
 COPY --chown=root:root backend /app/backend
-RUN find /app -type d -exec chmod 0755 {} + \
-    && find /app -type f -exec chmod 0644 {} +
+RUN find /app/backend -type d -exec chmod 0755 {} + \
+    && find /app/backend -type f -exec chmod 0644 {} + \
+    && chown -R worker:worker /vault /home/worker /tmp/cfi_storage \
+    && chmod 0700 /vault /vault/logs \
+    && chmod 0750 /home/worker /tmp/cfi_storage
 
 USER worker
 

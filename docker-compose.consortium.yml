@@ -153,6 +153,9 @@ services:
 
   # ── 5. Private Set Intersection (PSI) Coordinator ───────────────────────────
   coordinator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.institutional_worker
     image: cfi-institutional-worker:latest
     container_name: cfi-coordinator
     restart: unless-stopped

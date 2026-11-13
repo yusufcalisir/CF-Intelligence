@@ -66,11 +66,16 @@ jobs:
           for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
           command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv==0.13.7 && break || sleep 5; done
 
-      - name: Run pip-audit Dependency Vulnerability Scan
+      - name: Verify Lockfile Consistency & Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
         run: |
-          uv pip compile requirements.txt -o /tmp/requirements.lock --quiet
-          python scripts/run_pip_audit.py -r /tmp/requirements.lock
+          uv lock --check
+          uv export --frozen --no-dev --no-emit-project -o /tmp/expected-requirements.lock
+          diff -u requirements.lock /tmp/expected-requirements.lock
+          cd ..
+          python scripts/run_pip_audit.py -r backend/requirements.lock
+          uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_36 --generate-hashes docker/worker-requirements.txt -o /tmp/expected-worker-requirements.lock
+          diff -u docker/worker-requirements.lock /tmp/expected-worker-requirements.lock
 
       # ── Frontend: npm audit ─────────────────────────────────────────────
       - uses: actions/setup-node@v4
@@ -122,54 +127,96 @@ jobs:
           retry_wait_seconds: 15
           command: docker build ./backend -t cfi-backend:ci
 
-      - name: Verify Non-Root Permissions & Ray JAR Removal Inside Final Backend Image
+      - name: Verify Recursive Non-Root Runtime Permissions & Ray JAR Removal Inside Final Backend Image
         run: |
           docker run --rm --entrypoint /bin/sh cfi-backend:ci -ec '
             set -eu
             test "$(id -u)" = "1000"
             test ! -e /opt/venv/lib/python3.12/site-packages/ray/jars
-            test -z "$(find /usr/local /opt/venv -name "bom.cdx.json" 2>/dev/null)"
-            test ! -w /app
-            test ! -w /opt/venv
-            test -w /app/storage
-            test -w /tmp/cfi_storage
-            touch /app/storage/.perm_check && rm -f /app/storage/.perm_check
+            test -z "$(find /app /home/user /opt/venv /usr/local /app/storage /app/logs /tmp/cfi_storage ! -type l -perm -0002 2>/dev/null)"
+            test -z "$(find /app /opt/venv /usr/local -path /app/storage -prune -o -path /app/logs -prune -o -writable -print 2>/dev/null)"
+            for dir in /home/user /app/storage /app/logs "${CFI_STORAGE_DIR:-/app/storage}/logs" /tmp/cfi_storage; do
+              mkdir -p "$dir"
+              test -d "$dir" && test -w "$dir"
+              touch "${dir}/.perm_check" && rm -f "${dir}/.perm_check"
+            done
           '
 
       - name: Run Linux Container Ray Runtime Tests
         run: |
-          docker run --rm --shm-size=512m --entrypoint "" \
+          mkdir -p "${{ runner.temp }}/pytest_overlay"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "${{ runner.temp }}/pytest_overlay:/tmp/pytest_overlay" \
+            --entrypoint /usr/local/bin/pip \
+            cfi-backend:ci \
+            install --no-cache-dir --target /tmp/pytest_overlay pytest==9.0.3
+          chmod -R a+rX "${{ runner.temp }}/pytest_overlay"
+          docker run --rm --shm-size=512m --entrypoint /opt/venv/bin/python \
             -e APP_ENV=test \
             -e CFI_STORAGE_DIR=/tmp/cfi_storage \
             -e CFI_EXPECT_RAY_JARS_ABSENT=1 \
-            -e PYTHONPATH=/app:/app/backend \
+            -e PYTHONPATH=/app:/app/backend:/tmp/pytest_overlay \
             -v "${{ github.workspace }}/backend/tests:/app/tests:ro" \
+            -v "${{ runner.temp }}/pytest_overlay:/tmp/pytest_overlay:ro" \
             cfi-backend:ci \
-            /opt/venv/bin/python -m pytest /app/tests/unit/test_ray_runtime_functional.py -v -o cache_dir=/tmp/pytest_cache
+            -m pytest /app/tests/unit/test_ray_runtime_functional.py -v -o cache_dir=/tmp/pytest_cache
 
-      - name: Audit Installed Packages in Final Backend Runtime Environment (/opt/venv)
+      - name: Audit Installed Packages in All Backend Runtime Python Environments (/opt/venv & /usr/local)
         run: |
           for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
           cid="$(docker create cfi-backend:ci)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/opt/venv/lib/python3.12/site-packages" /tmp/runtime-site-packages
-          python scripts/run_pip_audit.py \
-            --path /tmp/runtime-site-packages \
-            --strict \
-            --format json \
-            -o /tmp/backend_runtime_pip_audit.json
+          mkdir -p /tmp/backend-site-packages
+          env_paths="$(docker run --rm --entrypoint /bin/sh cfi-backend:ci -ec '
+            for py in /opt/venv/bin/python /usr/local/bin/python3; do
+              [ -x "$py" ] || continue
+              "$py" -c "import site; [print(p) for p in site.getsitepackages()]"
+            done | sort -u
+          ')"
+          idx=0
+          for sp_dir in $env_paths; do
+            idx=$((idx + 1))
+            target_dir="/tmp/backend-site-packages/env_${idx}"
+            if docker cp "${cid}:${sp_dir}" "$target_dir" 2>/dev/null; then
+              echo "Auditing backend runtime Python environment: ${sp_dir}"
+              python scripts/run_pip_audit.py \
+                --path "$target_dir" \
+                --strict \
+                --format json \
+                -o "/tmp/backend_runtime_pip_audit_${idx}.json"
+            fi
+          done
 
-      - name: Trivy Backend Container Vulnerability Scan (Blocking CRITICAL & HIGH)
+      - name: Generate Backend Container CycloneDX SBOM Artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-backend:ci'
+          format: 'cyclonedx'
+          output: 'backend-sbom.cdx.json'
+          scanners: 'vuln'
+
+      - name: Trivy Backend Container Vulnerability Scan (Strict Blocking CRITICAL & HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.70.0'
           image-ref: 'cfi-backend:ci'
           format: 'table'
-          exit-code: '1' # Blocking fail on fixable CRITICAL,HIGH findings
-          ignore-unfixed: true
+          exit-code: '1'
+          ignore-unfixed: false
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Upload Backend SBOM & Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-container-security-artifacts
+          path: |
+            backend-sbom.cdx.json
+            /tmp/backend_runtime_pip_audit_*.json
+          if-no-files-found: warn
 
       - name: Prune Backend Container Image
         if: always()
@@ -199,21 +246,144 @@ jobs:
           retry_wait_seconds: 15
           command: docker build ./frontend -t cfi-frontend:ci
 
-      - name: Trivy Frontend Container Vulnerability Scan (Blocking CRITICAL & HIGH)
+      - name: Generate Frontend Container CycloneDX SBOM Artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-frontend:ci'
+          format: 'cyclonedx'
+          output: 'frontend-sbom.cdx.json'
+          scanners: 'vuln'
+
+      - name: Trivy Frontend Container Vulnerability Scan (Strict Blocking CRITICAL & HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.70.0'
           image-ref: 'cfi-frontend:ci'
           format: 'table'
-          exit-code: '1' # Blocking fail on fixable CRITICAL,HIGH findings
-          ignore-unfixed: true
+          exit-code: '1'
+          ignore-unfixed: false
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
+      - name: Upload Frontend SBOM Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-container-security-artifacts
+          path: frontend-sbom.cdx.json
+          if-no-files-found: warn
+
       - name: Prune Frontend Container Image
         if: always()
         run: docker rmi cfi-frontend:ci || true
+
+  trivy-institutional-worker-security:
+    name: Institutional Worker Container CVE, Runtime & Python Env Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (avoid unauthenticated rate-limit timeouts)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true  # Best-effort — build still attempted if creds missing
+
+      - name: Build Institutional Worker Container Image (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: docker build -f docker/Dockerfile.institutional_worker -t cfi-institutional-worker:ci .
+
+      - name: Verify Multi-Stage Toolchain Stripping & Recursive Non-Root Permissions Inside Worker Image
+        run: |
+          docker run --rm --entrypoint /bin/sh cfi-institutional-worker:ci -ec '
+            set -eu
+            test "$(id -u)" = "10001"
+            ! command -v gcc >/dev/null 2>&1
+            ! command -v g++ >/dev/null 2>&1
+            python -c "import private_set_intersection.python as openmined_psi; print(openmined_psi.__name__)"
+            test -z "$(find /app /home/worker /opt/venv /usr/local /vault /tmp/cfi_storage ! -type l -perm -0002 2>/dev/null)"
+            test -z "$(find /app /opt/venv /usr/local -writable -print 2>/dev/null)"
+            for dir in /vault /vault/logs /home/worker /tmp/cfi_storage; do
+              mkdir -p "$dir"
+              test -d "$dir" && test -w "$dir"
+              touch "${dir}/.perm_check" && rm -f "${dir}/.perm_check"
+            done
+          '
+
+      - name: Audit Installed Packages in All Worker Runtime Python Environments (/opt/venv & /usr/local)
+        run: |
+          for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
+          cid="$(docker create cfi-institutional-worker:ci)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          mkdir -p /tmp/worker-site-packages
+          env_paths="$(docker run --rm --entrypoint /bin/sh cfi-institutional-worker:ci -ec '
+            for py in /opt/venv/bin/python /usr/local/bin/python3; do
+              [ -x "$py" ] || continue
+              "$py" -c "import site; [print(p) for p in site.getsitepackages()]"
+            done | sort -u
+          ')"
+          idx=0
+          for sp_dir in $env_paths; do
+            idx=$((idx + 1))
+            target_dir="/tmp/worker-site-packages/env_${idx}"
+            if docker cp "${cid}:${sp_dir}" "$target_dir" 2>/dev/null; then
+              echo "Auditing worker runtime Python environment: ${sp_dir}"
+              python scripts/run_pip_audit.py \
+                --path "$target_dir" \
+                --strict \
+                --format json \
+                -o "/tmp/worker_runtime_pip_audit_${idx}.json"
+            fi
+          done
+
+      - name: Generate Institutional Worker Container CycloneDX SBOM Artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-institutional-worker:ci'
+          format: 'cyclonedx'
+          output: 'worker-sbom.cdx.json'
+          scanners: 'vuln'
+
+      - name: Trivy Institutional Worker Container Vulnerability Scan (Strict Blocking CRITICAL & HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-institutional-worker:ci'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: false
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Institutional Worker SBOM & Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-container-security-artifacts
+          path: |
+            worker-sbom.cdx.json
+            /tmp/worker_runtime_pip_audit_*.json
+          if-no-files-found: warn
+
+      - name: Prune Institutional Worker Container Image
+        if: always()
+        run: docker rmi cfi-institutional-worker:ci || true
 
   helm-and-terraform-security-audit:
     name: Infrastructure Security Audit (Helm & Terraform)

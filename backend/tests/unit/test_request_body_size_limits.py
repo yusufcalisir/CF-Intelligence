@@ -100,7 +100,7 @@ def test_middleware_installed_outermost_at_intake_boundary() -> None:
         "RequestBodySizeLimitMiddleware must execute before ContentTypeMiddleware"
     )
     for idx, cls in enumerate(middleware_classes):
-        if cls.__name__ in {
+        if dev in {
             "TenantAccessControlMiddleware",
             "DDoSProtectionMiddleware",
             "MTLSVerificationMiddleware",
@@ -532,5 +532,55 @@ def test_custom_size_limit_via_middleware_constructor() -> None:
     too_large_resp = test_client.post("/", headers=headers, content=b"a" * 50)
     assert too_large_resp.status_code == 413
     assert "Payload Too Large" in too_large_resp.json()["title"]
+
+
+@pytest.mark.asyncio
+async def test_production_app_allows_within_limit_json_post_through_asgi_stack() -> None:
+    """Within-limit JSON POST passes through RequestBodySizeLimitMiddleware to real production app."""
+    payload = b'{"username": "nonexistent_user", "password": "wrong_password"}'
+    chunks: list[Message] = [
+        {"type": "http.request", "body": payload[:20], "more_body": True},
+        {"type": "http.request", "body": payload[20:], "more_body": False},
+    ]
+    status_code, resp_headers, _, _, drained_all = await _invoke_asgi(
+        app,
+        method="POST",
+        path="/api/v1/auth/login",
+        headers=[
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(payload)).encode("ascii")),
+        ],
+        chunks=chunks,
+    )
+    assert status_code not in {400, 413}
+    assert status_code == 401
+    assert drained_all is True
+    assert resp_headers.get("x-content-type-options") == "nosniff"
+
+
+@pytest.mark.asyncio
+async def test_production_app_rejects_spoofed_small_content_length_stream() -> None:
+    """Real production app rejects oversized streamed body even when Content-Length claims 32 bytes."""
+    chunk_size = 512 * 1024
+    num_chunks = 22  # 11 MB > 10 MB limit
+    chunks: list[Message] = [
+        {"type": "http.request", "body": b"z" * chunk_size, "more_body": i < num_chunks - 1}
+        for i in range(num_chunks)
+    ]
+    status_code, resp_headers, body, pulled, drained_all = await _invoke_asgi(
+        app,
+        method="POST",
+        path="/api/v1/auth/login",
+        headers=[
+            (b"content-type", b"application/json"),
+            (b"content-length", b"32"),
+        ],
+        chunks=chunks,
+    )
+    assert status_code == 413
+    assert pulled == 21  # Aborts on chunk #21 (10.5 MB > 10 MB) without draining chunk #22
+    assert drained_all is False
+    assert json.loads(body)["status"] == 413
+    assert resp_headers.get("x-content-type-options") == "nosniff"
 
 

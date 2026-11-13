@@ -113,14 +113,25 @@ def test_dockerfiles_security_and_grpc_port_parity() -> None:
         content = df_path.read_text(encoding="utf-8")
         assert "USER user" in content
         assert "uv==0.13.7" in content
+        assert "requirements.lock" in content, f"{df_path} must install from frozen requirements.lock"
+        assert "--require-hashes" in content, f"{df_path} must verify package hashes via --require-hashes"
         assert "777" not in content, f"{df_path} must not contain world-writable chmod 777"
         assert "chown -R root:root /opt/venv" in content
         assert "ray/jars" in content, f"{df_path} must strip ray/jars from /opt/venv"
-        assert "bom.cdx.json" in content, f"{df_path} must strip pip internal bom.cdx.json to eliminate phantom CVE-2025-47273"
+        assert "bom.cdx.json" not in content, f"{df_path} must preserve genuine SBOM/package metadata (never delete bom.cdx.json)"
         if df_path.name != "Dockerfile":
             assert "50051" in content
 
-    assert "bom.cdx.json" in (root_dir / "docker" / "Dockerfile.institutional_worker").read_text(encoding="utf-8")
+    worker_df = (root_dir / "docker" / "Dockerfile.institutional_worker").read_text(encoding="utf-8")
+    assert "AS builder" in worker_df and "AS runtime" in worker_df, (
+        "Dockerfile.institutional_worker must use a multi-stage build to keep build-essential out of runtime"
+    )
+    runtime_section = worker_df.split("AS runtime", 1)[1]
+    assert "build-essential" not in runtime_section
+    assert "worker-requirements.lock" in worker_df
+    assert "--require-hashes" in worker_df
+    assert "USER worker" in worker_df
+    assert "bom.cdx.json" not in worker_df
 
     for df_path in [
         root_dir / "Dockerfile",

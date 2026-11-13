@@ -63,14 +63,15 @@ class TestEnterpriseSecurityCIWorkflow:
         assert "pull_request" in triggers
         assert "schedule" in triggers
 
-    def test_workflow_defines_all_five_security_jobs(self, workflow_yaml: dict[str, Any]):
-        """Workflow must contain all core security jobs, including independent backend & frontend Trivy jobs."""
+    def test_workflow_defines_all_security_jobs(self, workflow_yaml: dict[str, Any]):
+        """Workflow must contain all core security jobs, including backend, frontend & worker Trivy jobs."""
         jobs = workflow_yaml.get("jobs", {})
         expected_jobs = [
             "sast-static-analysis",
             "dependency-security-audit",
             "trivy-container-security",
             "trivy-frontend-container-security",
+            "trivy-institutional-worker-security",
             "helm-and-terraform-security-audit",
             "pytest-security-and-compliance-suites",
         ]
@@ -88,39 +89,60 @@ class TestEnterpriseSecurityCIWorkflow:
         assert any("Bandit" in name for name in step_names), "Missing Bandit SAST step"
 
     def test_container_job_uses_trivy_action(self, workflow_yaml: dict[str, Any]):
-        """Backend & frontend Trivy jobs run independently, pin scanners, and block fixable CRITICAL/HIGH."""
+        """Backend, frontend & worker Trivy jobs run independently, pin scanners, and block ALL CRITICAL/HIGH."""
         jobs = workflow_yaml["jobs"]
         backend_job = jobs["trivy-container-security"]
         frontend_job = jobs["trivy-frontend-container-security"]
+        worker_job = jobs["trivy-institutional-worker-security"]
 
-        # Independent jobs: neither waits on or depends on the other
+        # Independent jobs: none wait on or depend on another
         assert "needs" not in backend_job
         assert "needs" not in frontend_job
+        assert "needs" not in worker_job
 
         for job_name, job in (
             ("trivy-container-security", backend_job),
             ("trivy-frontend-container-security", frontend_job),
+            ("trivy-institutional-worker-security", worker_job),
         ):
             trivy_steps = [s for s in job.get("steps", []) if "trivy-action" in s.get("uses", "")]
-            assert len(trivy_steps) == 1, f"{job_name} must execute its own Trivy scan step"
-            step = trivy_steps[0]
+            vuln_steps = [s for s in trivy_steps if s.get("with", {}).get("exit-code") == "1"]
+            sbom_steps = [s for s in trivy_steps if s.get("with", {}).get("format") == "cyclonedx"]
+            assert len(vuln_steps) == 1, f"{job_name} must execute a blocking Trivy vuln scan step"
+            assert len(sbom_steps) == 1, f"{job_name} must generate a CycloneDX SBOM via Trivy"
+            step = vuln_steps[0]
             uses_ref = step["uses"]
             assert "@master" not in uses_ref and "@main" not in uses_ref and "@latest" not in uses_ref
             with_cfg = step.get("with", {})
             assert with_cfg.get("exit-code") == "1"
             assert with_cfg.get("severity") == "CRITICAL,HIGH"
-            assert with_cfg.get("ignore-unfixed") is True, (
-                f"{job_name} must ignore upstream unfixed vulnerabilities"
+            assert with_cfg.get("ignore-unfixed") is False, (
+                f"{job_name} must keep ignore-unfixed=false so ALL CRITICAL/HIGH findings block the gate"
             )
             assert with_cfg.get("version") and with_cfg["version"] != "latest"
 
-        # Backend container job also enforces runtime /opt/venv pip-audit, Ray checks, and permissions
+        # Backend & worker jobs enforce multi-env runtime pip-audit, SBOM preservation, and recursive FS checks
         backend_runs = "\n".join(s.get("run", "") for s in backend_job.get("steps", []))
         assert "run_pip_audit.py" in backend_runs and "--path" in backend_runs
+        assert "/usr/local/bin/python3" in backend_runs
         assert "test_ray_runtime_functional.py" in backend_runs
         assert "APP_ENV=test" in backend_runs
         assert "CFI_EXPECT_RAY_JARS_ABSENT=1" in backend_runs
         assert "ray/jars" in backend_runs
+        assert "bom.cdx.json" not in backend_runs
+
+        worker_runs = "\n".join(s.get("run", "") for s in worker_job.get("steps", []))
+        assert "run_pip_audit.py" in worker_runs and "--path" in worker_runs
+        assert "/usr/local/bin/python3" in worker_runs
+        assert "private_set_intersection" in worker_runs
+
+        # Dependency audit verifies uv.lock + exported frozen lockfiles
+        dep_runs = "\n".join(
+            s.get("run", "") for s in jobs["dependency-security-audit"].get("steps", [])
+        )
+        assert "uv lock --check" in dep_runs
+        assert "requirements.lock" in dep_runs
+        assert "worker-requirements.lock" in dep_runs
 
         # No setup-uv step may float on "latest"
         for job_name, job in jobs.items():
