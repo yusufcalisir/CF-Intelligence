@@ -81,9 +81,14 @@ async def _invoke_asgi(
     return status_code, resp_headers, b"".join(body_parts), pulled, pulled == len(queue)
 
 
+def _middleware_name(mw_cls: Any) -> str:
+    """Return middleware class name safely across Starlette factory protocol stubs."""
+    return str(getattr(mw_cls, "__name__", repr(mw_cls)))
+
+
 def test_middleware_installed_outermost_at_intake_boundary() -> None:
     """RequestBodySizeLimitMiddleware executes before auth, rate-limit, content-type, and parsing."""
-    middleware_classes = [mw.cls for mw in app.user_middleware]
+    middleware_classes: list[Any] = [mw.cls for mw in app.user_middleware]
     assert RequestBodySizeLimitMiddleware in middleware_classes
 
     # Starlette user_middleware[0] is outermost at execution time (reverse of add_middleware order).
@@ -91,7 +96,7 @@ def test_middleware_installed_outermost_at_intake_boundary() -> None:
     limit_idx = middleware_classes.index(RequestBodySizeLimitMiddleware)
     outer_classes = middleware_classes[:limit_idx]
     assert all(
-        cls.__name__ in {"PrometheusInstrumentatorMiddleware", "SecurityHeadersMiddleware"}
+        _middleware_name(cls) in {"PrometheusInstrumentatorMiddleware", "SecurityHeadersMiddleware"}
         for cls in outer_classes
     ), f"Unexpected middleware wrapping outside RequestBodySizeLimitMiddleware: {outer_classes}"
 
@@ -100,7 +105,8 @@ def test_middleware_installed_outermost_at_intake_boundary() -> None:
         "RequestBodySizeLimitMiddleware must execute before ContentTypeMiddleware"
     )
     for idx, cls in enumerate(middleware_classes):
-        if dev in {
+        cls_name = _middleware_name(cls)
+        if cls_name in {
             "TenantAccessControlMiddleware",
             "DDoSProtectionMiddleware",
             "MTLSVerificationMiddleware",
@@ -110,7 +116,7 @@ def test_middleware_installed_outermost_at_intake_boundary() -> None:
             "CORSMiddleware",
         }:
             assert limit_idx < idx, (
-                f"RequestBodySizeLimitMiddleware (idx={limit_idx}) must run before {cls.__name__} (idx={idx})"
+                f"RequestBodySizeLimitMiddleware (idx={limit_idx}) must run before {cls_name} (idx={idx})"
             )
 
 
@@ -174,7 +180,7 @@ async def test_oversized_content_length_does_not_read_body_or_reach_app() -> Non
         chunks=[{"type": "http.request", "body": b'{"a":1}', "more_body": False}],
     )
     assert status_code == 413
-    assert downstream_called is False
+    assert not downstream_called
     assert pulled == 0
     assert json.loads(body)["status"] == 413
 
@@ -208,7 +214,7 @@ async def test_malformed_or_conflicting_content_length_fails_closed(
         chunks=[{"type": "http.request", "body": b"{}", "more_body": False}],
     )
     assert status_code == 400
-    assert downstream_called is False
+    assert not downstream_called
     assert pulled == 0
     assert json.loads(body)["status"] == 400
 
@@ -365,7 +371,7 @@ async def test_exempt_upload_route_with_full_middleware_stack_rejects_chunked_mu
     assert status_code == 413
     assert json.loads(body)["status"] == 413
     assert "x-content-type-options" in resp_headers
-    assert parser_completed is False
+    assert not parser_completed
     assert pulled == 2
     assert drained_all is False
 
@@ -428,7 +434,7 @@ async def test_fragmented_chunks_and_multipart_stream_cannot_bypass_limit() -> N
     )
     assert status_code == 413
     assert json.loads(body)["status"] == 413
-    assert parser_completed is False
+    assert not parser_completed
     # Cumulative buffered bytes downstream strictly never exceeded max_bytes (256)
     assert parsed_bytes <= 256
     # Must stop as soon as cumulative bytes exceed 256 bytes (keepalive + 5 * 64 = 320 bytes -> 6 frames)
@@ -471,7 +477,7 @@ async def test_spoofed_small_content_length_cannot_bypass_streaming_limit() -> N
     )
     assert status_code == 413
     assert json.loads(body)["status"] == 413
-    assert parser_completed is False
+    assert not parser_completed
     assert parsed_bytes <= 120
     assert pulled == 3
     assert drained_all is False

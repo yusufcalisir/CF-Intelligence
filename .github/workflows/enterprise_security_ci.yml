@@ -70,11 +70,11 @@ jobs:
         working-directory: backend
         run: |
           uv lock --check
-          uv export --frozen --no-dev --no-emit-project -o /tmp/expected-requirements.lock
+          uv export --frozen --no-dev --no-emit-project --no-header -o /tmp/expected-requirements.lock
           diff -u requirements.lock /tmp/expected-requirements.lock
           cd ..
           python scripts/run_pip_audit.py -r backend/requirements.lock
-          uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_36 --generate-hashes docker/worker-requirements.txt -o /tmp/expected-worker-requirements.lock
+          uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_36 --generate-hashes --no-header docker/worker-requirements.txt -o /tmp/expected-worker-requirements.lock
           diff -u docker/worker-requirements.lock /tmp/expected-worker-requirements.lock
 
       # ── Frontend: npm audit ─────────────────────────────────────────────
