@@ -161,6 +161,15 @@ jobs:
             cfi-backend:ci \
             -m pytest /app/tests/unit/test_ray_runtime_functional.py -v -o cache_dir=/tmp/pytest_cache
 
+      - name: Generate Backend Container CycloneDX SBOM Artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-backend:ci'
+          format: 'cyclonedx'
+          output: 'backend-sbom.cdx.json'
+          scanners: 'vuln'
+
       - name: Audit Installed Packages in All Backend Runtime Python Environments (/opt/venv & /usr/local)
         run: |
           for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
@@ -186,15 +195,6 @@ jobs:
                 -o "/tmp/backend_runtime_pip_audit_${idx}.json"
             fi
           done
-
-      - name: Generate Backend Container CycloneDX SBOM Artifact
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          version: 'v0.70.0'
-          image-ref: 'cfi-backend:ci'
-          format: 'cyclonedx'
-          output: 'backend-sbom.cdx.json'
-          scanners: 'vuln'
 
       - name: Trivy Backend Container Vulnerability Scan (Strict Blocking CRITICAL & HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -324,6 +324,15 @@ jobs:
             done
           '
 
+      - name: Generate Institutional Worker Container CycloneDX SBOM Artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: 'cfi-institutional-worker:ci'
+          format: 'cyclonedx'
+          output: 'worker-sbom.cdx.json'
+          scanners: 'vuln'
+
       - name: Audit Installed Packages in All Worker Runtime Python Environments (/opt/venv & /usr/local)
         run: |
           for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit==2.10.1 && break || sleep 5; done
@@ -349,15 +358,6 @@ jobs:
                 -o "/tmp/worker_runtime_pip_audit_${idx}.json"
             fi
           done
-
-      - name: Generate Institutional Worker Container CycloneDX SBOM Artifact
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          version: 'v0.70.0'
-          image-ref: 'cfi-institutional-worker:ci'
-          format: 'cyclonedx'
-          output: 'worker-sbom.cdx.json'
-          scanners: 'vuln'
 
       - name: Trivy Institutional Worker Container Vulnerability Scan (Strict Blocking CRITICAL & HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
