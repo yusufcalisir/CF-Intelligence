@@ -33,7 +33,7 @@ mlflow>=3.17.2,<4.0.0           # security: CVE-2026-53995, CVE-2026-116691, GHS
 
 # Data Validation & Contracts
 pandera>=0.21.0,<1.0.0
-great_expectations>=1.21.0,<2.0.0
+great_expectations>=1.23.0,<2.0.0
 lxml>=5.0.0
 defusedxml>=0.7.1
 
